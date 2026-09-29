@@ -8,7 +8,9 @@ export const openrouter: LlmProvider = {
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json',
         'HTTP-Referer': 'https://github.com/serious-tavern', 'X-Title': 'Serious Tavern' },
       body: JSON.stringify({
-        model: request.model, messages: request.messages, temperature: request.temperature,
+        model: request.model, messages: request.messages.map(message => ({
+          role: message.role, content: message.content, ...(message.name === undefined ? {} : { name: message.name })
+        })), temperature: request.temperature,
         max_tokens: request.maxTokens,
         ...(request.topP === undefined ? {} : { top_p: request.topP }),
         ...(request.frequencyPenalty === undefined ? {} : { frequency_penalty: request.frequencyPenalty }),

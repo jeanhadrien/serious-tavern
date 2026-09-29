@@ -71,7 +71,7 @@ export const presetSchema = z.object({
 export type Preset = z.infer<typeof presetSchema>;
 export type PresetInput = z.infer<typeof presetInputSchema>;
 export type PresetEntry = z.infer<typeof presetEntrySchema>;
-export type PromptMessage = { role: z.infer<typeof presetRoleSchema>; content: string };
+export type PromptMessage = { role: z.infer<typeof presetRoleSchema>; content: string; name?: string };
 export type PresetWarning = { path: (string | number)[]; message: string };
 
 export function presetWarnings(preset: Preset): PresetWarning[] {

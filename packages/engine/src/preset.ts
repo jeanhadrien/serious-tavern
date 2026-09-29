@@ -1,4 +1,4 @@
-import { canConnect, caseInsensitiveValue, findMacro, presetSchema, type Character, type Persona, type PortDataType, type Preset, type PromptMessage } from '@st/shared';
+import { canConnect, caseInsensitiveValue, findMacro, presetSchema, type Character, type Persona, type PortDataType, type Preset, type PresetEntry, type PromptMessage } from '@st/shared';
 import { renderContextTemplate } from './template.js';
 
 function sourceType(value: unknown): PortDataType {
@@ -19,6 +19,18 @@ function toText(value: unknown): string {
     return (value as PromptMessage[]).map(message => `${message.role}: ${message.content}`).join('\n');
   return typeof value === 'string' ? value :
     typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
+}
+
+function renderMessagesSlot(value: unknown, slot: Extract<PresetEntry, { kind: 'slot' }>): PromptMessage[] {
+  if (value != null && !Array.isArray(value)) throw new Error(`Input ${slot.inputKey} requires messages`);
+  return (value ?? []).map((message: unknown) => {
+    const parsed = message as PromptMessage;
+    if (!parsed || !['system', 'user', 'assistant'].includes(parsed.role) || typeof parsed.content !== 'string')
+      throw new Error(`Input ${slot.inputKey} requires messages with role and content`);
+    if (parsed.name !== undefined && typeof parsed.name !== 'string')
+      throw new Error(`Input ${slot.inputKey} requires message names to be strings`);
+    return { role: parsed.role, content: parsed.content, ...(parsed.name === undefined ? {} : { name: parsed.name }) };
+  });
 }
 
 export function renderPreset(preset: Preset, options: {
@@ -62,13 +74,7 @@ export function renderPreset(preset: Preset, options: {
       if (content.trim()) result.push({ role: entry.role, content });
       continue;
     }
-    if (value != null && !Array.isArray(value)) throw new Error(`Input ${input.key} requires messages`);
-    const messages: PromptMessage[] = (value ?? []).map((message: unknown) => {
-      const parsed = message as PromptMessage;
-      if (!parsed || !['system', 'user', 'assistant'].includes(parsed.role) || typeof parsed.content !== 'string')
-        throw new Error(`Input ${input.key} requires messages with role and content`);
-      return { role: parsed.role, content: parsed.content };
-    });
+    const messages = renderMessagesSlot(value, entry);
     const insertions = new Map<number, PromptMessage[]>();
     for (const candidate of valid.entries) {
       if (candidate.kind !== 'message' || !candidate.enabled || candidate.placement.mode !== 'depth' ||

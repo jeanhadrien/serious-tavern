@@ -62,4 +62,23 @@ describe('integration nodes', () => {
     await expect(openrouter.chat({ model: 'test', messages: [], temperature: 0.7, maxTokens: 10 },
       { apiKey: 'test-key', signal: new AbortController().signal })).rejects.toThrow('OpenRouter 429: limited');
   });
+
+  it('includes message names in the OpenRouter body only when present', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
+      JSON.stringify({ choices: [{ message: { content: 'reply' } }] }), { status: 200 }));
+    await openrouter.chat({
+      model: 'test', temperature: 0.7, maxTokens: 10, messages: [
+        { role: 'user', content: 'Hi', name: 'Alex' },
+        { role: 'assistant', content: 'Hello' },
+        { role: 'system', content: 'Empty name is still set', name: '' }
+      ]
+    }, { apiKey: 'test-key', signal: new AbortController().signal });
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body.messages).toEqual([
+      { role: 'user', content: 'Hi', name: 'Alex' },
+      { role: 'assistant', content: 'Hello' },
+      { role: 'system', content: 'Empty name is still set', name: '' }
+    ]);
+    expect(Object.hasOwn(body.messages[1], 'name')).toBe(false);
+  });
 });

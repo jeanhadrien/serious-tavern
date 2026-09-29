@@ -82,6 +82,26 @@ describe('renderPreset', () => {
       .toThrow('Input history requires messages');
     expect(() => renderPreset(definition, options({ history: [{ role: 'tool', content: 'bad' }] })))
       .toThrow('Input history requires messages with role and content');
+    expect(() => renderPreset(definition, options({ history: [{ role: 'user', content: 'bad', name: 3 }] })))
+      .toThrow('Input history requires message names to be strings');
+  });
+
+  it('passes optional speaker names through repeated history slots and depth insertion without mutating input', () => {
+    const definition = preset([input('history', 'messages')], [
+      slot('first', 'history'),
+      message('note', 'Note', { mode: 'depth', entryId: 'first', depth: 1 }),
+      slot('second', 'history')
+    ]);
+    const history = [
+      { role: 'user', content: 'Hi', name: 'Alex' },
+      { role: 'assistant', content: 'Hello', name: 'Mira' },
+      { role: 'user', content: 'Unnamed' }
+    ];
+    const snapshot = structuredClone(history);
+    expect(renderPreset(definition, options({ history }))).toEqual([
+      history[0], history[1], { role: 'system', content: 'Note' }, history[2], ...history
+    ]);
+    expect(history).toEqual(snapshot);
   });
 
   it('rejects invalid schema references rather than rendering them', () => {
