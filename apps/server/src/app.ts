@@ -3,10 +3,11 @@ import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { workflowSchema, type Workflow, type Session, type ExecutionLog } from '@st/shared';
-import { descriptors, executeWorkflow, ExecutionFailure, validateWorkflow } from '@st/engine';
+import { descriptors, executeWorkflow, ExecutionFailure, registry, validateWorkflow } from '@st/engine';
 import { JsonRepository } from './storage/repository.js';
 import { SecretStore } from './secrets/store.js';
 import { seed } from './seed.js';
+import { HttpError, notFound } from './errors.js';
 
 const idParam = z.object({ id: z.string().uuid() });
 const nameParam = z.object({ name: z.string().regex(/^[a-zA-Z0-9_-]+$/) });
@@ -37,12 +38,15 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
     await workflows.save(workflow);
     return reply.code(201).send(workflow);
   });
-  app.get('/api/workflows/:id', async (request, reply) =>
-    await workflows.get(idParam.parse(request.params).id) ?? reply.code(404).send({ error: 'Workflow not found' }));
-  app.put('/api/workflows/:id', async (request, reply) => {
+  app.get('/api/workflows/:id', async request => {
+    const workflow = await workflows.get(idParam.parse(request.params).id);
+    if (!workflow) throw notFound('Workflow');
+    return workflow;
+  });
+  app.put('/api/workflows/:id', async request => {
     const { id } = idParam.parse(request.params);
     const old = await workflows.get(id);
-    if (!old) return reply.code(404).send({ error: 'Workflow not found' });
+    if (!old) throw notFound('Workflow');
     const body = workflowSchema.pick({ name: true, nodes: true, edges: true }).parse(request.body);
     const workflow = { ...old, ...body, updatedAt: now() };
     await workflows.save(workflow);
@@ -51,37 +55,41 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
   app.delete('/api/workflows/:id', async (request, reply) => {
     const { id } = idParam.parse(request.params);
     if ((await sessions.list()).some(s => s.workflowId === id))
-      return reply.code(409).send({ error: 'Workflow is used by a session' });
+      throw new HttpError(409, 'WORKFLOW_IN_USE', 'Workflow is used by a session');
     await workflows.delete(id);
     return reply.code(204).send();
   });
-  app.post('/api/workflows/:id/validate', async (request, reply) => {
+  app.post('/api/workflows/:id/validate', async request => {
     const { id } = idParam.parse(request.params);
     const workflow = await workflows.get(id);
-    if (!workflow) return reply.code(404).send({ error: 'Workflow not found' });
+    if (!workflow) throw notFound('Workflow');
     const errors = validateWorkflow(workflow);
-    return { valid: errors.length === 0, errors };
+    if (errors.length) throw new HttpError(422, 'WORKFLOW_INVALID', 'Invalid workflow', errors);
+    return { valid: true, errors: [] };
   });
 
   app.get('/api/sessions', async () => (await sessions.list()).map(({ messages, ...session }) =>
     ({ ...session, messageCount: messages.length })));
   app.post('/api/sessions', async (request, reply) => {
     const body = z.object({ workflowId: z.string().uuid(), title: z.string().trim().min(1).optional() }).parse(request.body);
-    if (!await workflows.get(body.workflowId)) return reply.code(404).send({ error: 'Workflow not found' });
+    if (!await workflows.get(body.workflowId)) throw notFound('Workflow');
     const date = now();
     const session: Session = { id: randomUUID(), title: body.title ?? 'New chat', workflowId: body.workflowId,
       messages: [], createdAt: date, updatedAt: date };
     await sessions.save(session);
     return reply.code(201).send(session);
   });
-  app.get('/api/sessions/:id', async (request, reply) =>
-    await sessions.get(idParam.parse(request.params).id) ?? reply.code(404).send({ error: 'Session not found' }));
-  app.patch('/api/sessions/:id', async (request, reply) => {
+  app.get('/api/sessions/:id', async request => {
+    const session = await sessions.get(idParam.parse(request.params).id);
+    if (!session) throw notFound('Session');
+    return session;
+  });
+  app.patch('/api/sessions/:id', async request => {
     const { id } = idParam.parse(request.params);
     const body = z.object({ title: z.string().trim().min(1).optional(), workflowId: z.string().uuid().optional() }).parse(request.body);
     const session = await sessions.get(id);
-    if (!session) return reply.code(404).send({ error: 'Session not found' });
-    if (body.workflowId && !await workflows.get(body.workflowId)) return reply.code(404).send({ error: 'Workflow not found' });
+    if (!session) throw notFound('Session');
+    if (body.workflowId && !await workflows.get(body.workflowId)) throw notFound('Workflow');
     Object.assign(session, body, { updatedAt: now() });
     await sessions.save(session);
     return session;
@@ -94,11 +102,11 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
     const { id } = idParam.parse(request.params);
     const { content } = z.object({ content: z.string().trim().min(1) }).parse(request.body);
     const session = await sessions.get(id);
-    if (!session) return reply.code(404).send({ error: 'Session not found' });
+    if (!session) throw notFound('Session');
     const workflow = await workflows.get(session.workflowId);
-    if (!workflow) return reply.code(404).send({ error: 'Workflow not found' });
+    if (!workflow) throw notFound('Workflow');
     const errors = validateWorkflow(workflow);
-    if (errors.length) return reply.code(400).send({ error: `Invalid workflow: ${errors.join('; ')}` });
+    if (errors.length) throw new HttpError(400, 'WORKFLOW_INVALID', 'Invalid workflow', errors);
     const history = [...session.messages];
     const userMessage = { id: randomUUID(), role: 'user' as const, content, createdAt: now() };
     session.messages.push(userMessage);
@@ -116,13 +124,23 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
     } catch (error) {
       if (error instanceof ExecutionFailure) {
         await executions.save(error.execution);
-        return reply.code(500).send({ error: error.message, execution: error.execution, userMessage });
+        const failedId = /^Node ([^ ]+) \(/.exec(error.message)?.[1];
+        const failedNode = workflow.nodes.find(node => node.id === failedId);
+        const label = failedNode && registry.get(failedNode.type)?.label;
+        const message = label && failedId
+          ? `${label} (${failedId}): ${error.execution.nodes[failedId]?.error ?? error.message}` : error.message;
+        throw new HttpError(500, 'WORKFLOW_EXECUTION_FAILED', message, {
+          execution: error.execution, userMessage
+        });
       }
       throw error;
     }
   });
-  app.get('/api/executions/:id', async (request, reply) =>
-    await executions.get(idParam.parse(request.params).id) ?? reply.code(404).send({ error: 'Execution not found' }));
+  app.get('/api/executions/:id', async request => {
+    const execution = await executions.get(idParam.parse(request.params).id);
+    if (!execution) throw notFound('Execution');
+    return execution;
+  });
   app.get('/api/secrets', async () => secrets.list());
   app.put('/api/secrets/:name', async (request, reply) => {
     const { name } = nameParam.parse(request.params);
@@ -134,11 +152,27 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
     await secrets.delete(nameParam.parse(request.params).name);
     return reply.code(204).send();
   });
-  app.setErrorHandler((error, _request, reply) => {
-    const invalid = error instanceof z.ZodError;
-    const code = typeof error === 'object' && error !== null && 'statusCode' in error ? error.statusCode : undefined;
-    const status = invalid ? 400 : typeof code === 'number' && code >= 400 && code < 500 ? code : 500;
-    reply.code(status).send({ error: invalid ? error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ') : errorMessage(error) });
+  app.setNotFoundHandler(() => { throw notFound('Route'); });
+  app.setErrorHandler((error, request, reply) => {
+    if (error instanceof z.ZodError) {
+      return reply.code(400).send({ error: { code: 'VALIDATION_ERROR', message: 'Invalid request',
+        details: error.issues.map(issue => ({ path: issue.path.join('.'), message: issue.message })) } });
+    }
+    if (error instanceof HttpError) {
+      return reply.code(error.statusCode).send({ error: {
+        code: error.code, message: error.message, ...(error.details === undefined ? {} : { details: error.details })
+      } });
+    }
+    const statusCode = typeof error === 'object' && error !== null && 'statusCode' in error ? error.statusCode : undefined;
+    if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
+      return reply.code(statusCode).send({ error: {
+        code: typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string'
+          ? error.code : 'BAD_REQUEST',
+        message: errorMessage(error)
+      } });
+    }
+    console.error(`Unexpected API error on ${request.method} ${request.url}:`, error);
+    return reply.code(500).send({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
   });
   return app;
 }

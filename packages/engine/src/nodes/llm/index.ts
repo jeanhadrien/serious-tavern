@@ -26,7 +26,15 @@ export const llm: NodeDefinition = {
       body: JSON.stringify({ model: ctx.config.model, messages, temperature: ctx.config.temperature, max_tokens: ctx.config.maxTokens }),
       signal: ctx.signal
     });
-    if (!response.ok) throw new Error(`OpenRouter ${response.status}: ${(await response.text()).slice(0, 300)}`);
+    if (!response.ok) {
+      const body = await response.text();
+      let message = body;
+      try {
+        const parsed = JSON.parse(body) as { error?: { message?: string } | string };
+        message = typeof parsed.error === 'string' ? parsed.error : parsed.error?.message ?? body;
+      } catch { message = body; }
+      throw new Error(`OpenRouter ${response.status}: ${message.slice(0, 500)}`);
+    }
     const raw: unknown = await response.json();
     const text = (raw as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content;
     if (typeof text !== 'string') throw new Error('OpenRouter returned no assistant text');

@@ -1,22 +1,22 @@
 import { useEffect, useState } from 'react';
 import { api, json, type SecretSummary } from '../api.js';
+import { alerts } from '../alerts/index.js';
 export function Settings() {
   const [secrets, setSecrets] = useState<SecretSummary[]>([]);
   const [name, setName] = useState('openrouter');
   const [value, setValue] = useState('');
-  const [error, setError] = useState('');
-  const refresh = () => api<SecretSummary[]>('/secrets').then(setSecrets).catch(e => setError(String(e)));
-  useEffect(() => { void refresh(); }, []);
+  const refresh = () => api<SecretSummary[]>('/secrets').then(setSecrets);
+  useEffect(() => { void refresh().catch(() => {}); }, []);
   const save = async () => {
-    try { await api(`/secrets/${encodeURIComponent(name)}`, json('PUT', { value })); setValue(''); setError(''); await refresh(); }
-    catch (e) { setError(String(e)); }
+    try { await api(`/secrets/${encodeURIComponent(name)}`, json('PUT', { value }));
+      setValue(''); alerts.success('Secret saved'); await refresh(); }
+    catch { /* API errors are toasted. */ }
   };
   const remove = async (secret: string) => {
     try { await api(`/secrets/${encodeURIComponent(secret)}`, json('DELETE')); await refresh(); }
-    catch (e) { setError(String(e)); }
+    catch { /* API errors are toasted. */ }
   };
   return <div className="page narrow"><h1>Settings</h1><p className="hint">API keys are encrypted on the server and cannot be retrieved through the API.</p>
-    {error && <p className="error">{error}</p>}
     <h2>Secrets</h2>{secrets.length === 0 && <p className="hint">No secrets saved.</p>}
     {secrets.map(s => <div className="list-row" key={s.name}><span>{s.name} <small>{s.hint}</small></span>
       <button onClick={() => void remove(s.name)}>Delete</button></div>)}

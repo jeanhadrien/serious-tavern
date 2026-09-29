@@ -7,6 +7,7 @@ import {
 import type { Workflow, NodeTypeDescriptor, NodeInstance } from '@st/shared';
 import { NodeConfigPanel } from '@st/node-ui';
 import { api, getNodeTypes, getWorkflows, json } from '../api.js';
+import { alerts } from '../alerts/index.js';
 
 type CanvasNode = FlowNode<{ descriptor: NodeTypeDescriptor; config: NodeInstance['config'] }>;
 function WorkflowNode({ data, selected }: NodeProps<CanvasNode>) {
@@ -32,12 +33,10 @@ function WorkflowEditor() {
   const [nodes, setNodes] = useState<CanvasNode[]>([]);
   const [edges, setEdges] = useState<FlowEdge[]>([]);
   const [selected, setSelected] = useState<string>();
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
   const canvasRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
   const refresh = () => getWorkflows().then(setWorkflows);
-  useEffect(() => { void refresh().catch(e => setError(String(e))); void getNodeTypes().then(setTypes).catch(e => setError(String(e))); }, []);
+  useEffect(() => { void refresh().catch(() => {}); void getNodeTypes().then(setTypes).catch(() => {}); }, []);
   const load = (next: Workflow) => {
     setWorkflow(next);
     setNodes(next.nodes.flatMap(n => {
@@ -47,8 +46,6 @@ function WorkflowEditor() {
     }));
     setEdges(next.edges.map(e => ({ ...e })));
     setSelected(undefined);
-    setMessage('');
-    setError('');
   };
   const onNodesChange: OnNodesChange<CanvasNode> = useCallback(changes => {
     setNodes(prev => applyNodeChanges(changes, prev));
@@ -86,9 +83,9 @@ function WorkflowEditor() {
     const name = window.prompt('Workflow name');
     if (!name?.trim()) return;
     try { const created = await api<Workflow>('/workflows', json('POST', { name })); await refresh(); load(created); }
-    catch (e) { setError(String(e)); }
+    catch { /* API errors are toasted. */ }
   };
-  const save = async (): Promise<boolean> => {
+  const save = async (showToast = true): Promise<boolean> => {
     if (!workflow) return false;
     const current = { ...workflow,
       nodes: nodes.map(n => ({ id: n.id, type: n.data.descriptor.type, config: n.data.config, position: n.position })),
@@ -96,23 +93,24 @@ function WorkflowEditor() {
         target: e.target, targetHandle: e.targetHandle ?? '' })) };
     try { const updated = await api<Workflow>(`/workflows/${workflow.id}`, json('PUT', current));
       setWorkflow(prev => prev?.id === updated.id ? { ...prev, updatedAt: updated.updatedAt } : prev);
-      await refresh(); setMessage('Saved'); setError(''); return true; }
-    catch (e) { setError(String(e)); return false; }
+      if (showToast) alerts.success('Workflow saved');
+      await refresh(); return true; }
+    catch { return false; }
   };
   const validate = async () => {
     if (!workflow) return;
     try {
-      if (!await save()) return;
-      const result = await api<{ valid: boolean; errors: string[] }>(`/workflows/${workflow.id}/validate`, json('POST'));
-      setMessage(result.valid ? 'Workflow is valid ✓' : result.errors.join('\n')); setError('');
-    } catch (e) { setError(String(e)); }
+      if (!await save(false)) return;
+      await api(`/workflows/${workflow.id}/validate`, json('POST'));
+      alerts.success('Workflow is valid');
+    } catch { /* API errors are toasted. */ }
   };
   const remove = async (id: string) => {
     if (!window.confirm('Delete this workflow?')) return;
     try { await api(`/workflows/${id}`, json('DELETE'));
       if (workflow?.id === id) { setWorkflow(undefined); setNodes([]); setEdges([]); setSelected(undefined); }
-      await refresh(); setError(''); }
-    catch (e) { setError(String(e)); }
+      await refresh(); }
+    catch { /* API errors are toasted. */ }
   };
   const current = nodes.find(n => n.id === selected);
   const currentDescriptor = current?.data.descriptor;
@@ -127,7 +125,7 @@ function WorkflowEditor() {
     {workflow ? <div className="editor"><div className="editor-toolbar">
       <input aria-label="Workflow name" value={workflow.name} onChange={e => setWorkflow(prev => prev && ({ ...prev, name: e.target.value }))} />
       <button onClick={() => void validate()}>Validate</button><button className="primary" onClick={() => void save()}>Save</button>
-      {message && <span className="hint" style={{ whiteSpace: 'pre-wrap' }}>{message}</span>}{error && <span className="error">{error}</span>}</div>
+      </div>
       <div className="editor-body"><aside className="palette"><h3>Nodes</h3>{types.map(t =>
         <button title={t.description} key={t.type} draggable onDragStart={event => {
           event.dataTransfer.setData('application/st-node-type', t.type);
@@ -143,5 +141,5 @@ function WorkflowEditor() {
         {current && currentDescriptor && <aside className="config-panel"><div className="toolbar"><h3>{currentDescriptor.label}</h3>
           <button onClick={() => setSelected(undefined)}>×</button></div><p className="hint">{currentDescriptor.description}</p>
           <NodeConfigPanel descriptor={currentDescriptor} config={current.data.config} onChange={updateConfig} /></aside>}</div></div> :
-      <div className="empty-state"><h1>Build a workflow</h1><p>Choose a workflow or create a new one.</p>{error && <p className="error">{error}</p>}</div>}</div>;
+      <div className="empty-state"><h1>Build a workflow</h1><p>Choose a workflow or create a new one.</p></div>}</div>;
 }

@@ -31,3 +31,9 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;f
 .flow-node.selected{border-color:#95a4ff}.flow-node>strong,.flow-node>small{display:block}.flow-node>small{margin-top:4px}
 .port{position:relative;height:25px;font-size:.78rem;color:#c7cede;display:flex;align-items:center}.output-port{justify-content:flex-end}
 .react-flow__handle{width:11px;height:11px;background:#9aabff;border:1px solid #20232b}
+.toaster{position:fixed;right:20px;bottom:20px;width:min(380px,calc(100vw - 32px));z-index:1000;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.toast{pointer-events:auto;background:#292e39;border:1px solid #5b6376;border-left:4px solid #8897e9;border-radius:9px;padding:12px 14px;box-shadow:0 9px 30px #0009;overflow-wrap:anywhere}
+.toast-error{border-left-color:#ef8186}.toast-success{border-left-color:#80c9a2}.toast-warning{border-left-color:#ecc079}.toast-info{border-left-color:#8897e9}
+.toast-heading{display:flex;align-items:center;gap:8px;text-transform:capitalize}.toast-heading button{margin-left:auto;border:0;background:transparent;padding:0 5px;font-size:1.35rem}
+.toast p{margin:6px 0 0;font-size:.92rem}.toast details{font-size:.82rem;margin-top:8px}.toast pre{margin:8px 0 0;max-height:170px}
+.toast-count{background:#424959;color:#fff;border-radius:12px;padding:1px 7px;font-size:.75rem}

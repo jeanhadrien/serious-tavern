@@ -18,6 +18,8 @@ Create a chat and choose a workflow. The seeded **Default Assistant** requires a
 - `apps/server`: Fastify API, JSON-file repository, encryption, workflow seeds, and execution persistence. The server owns all data and secrets.
 - `apps/web`: React/Vite chat, React Flow workflow editor, and Settings. The UI calls the API; it does not execute workflows.
 
+Frontend notifications live in `apps/web/src/alerts/`. Import `alerts` and call `alerts.error(message)`, `.success`, `.info`, or `.warning` from any module; React components can use `useAlerts()`. API failures toast automatically unless a request uses `{ silent: true }` to handle an error inline.
+
 To add a node type: (1) create `packages/engine/src/nodes/<type>/index.ts` exporting a `NodeDefinition` with Zod config, ports, defaults and `execute(ctx)`; (2) add that definition to the list in `packages/engine/src/registry.ts`; (3) optionally add a component to `customPanels` in `packages/node-ui/src/index.tsx`. The editor automatically renders other types using the serialized config schema.
 
 ## Data and secrets
