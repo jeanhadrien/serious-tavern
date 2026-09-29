@@ -29,6 +29,11 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 ## Commands
 - `npm run dev`: server and web together.
 - `npm run typecheck`, `npm test` (vitest, all packages), `npm run build` (typecheck and web build).
+- **`npm run check`** runs Biome (format and lint, without writing), typecheck, tests and knip, in about 7 seconds. It must pass before every commit.
+  - `npm run fix` applies Biome formatting and safe lint fixes.
+  - knip reports unused files, exports and dependencies. Delete dead code; configure `knip.json` only for real false positives.
+  - Tuned lint rules and the reasons are in the README. Don't disable more rules without a reason.
+  - Large mechanical reformats go in their own `style:` commit, and that commit is added to `.git-blame-ignore-revs`.
 - All three must pass before committing.
 
 ## Key contracts (don't break)
