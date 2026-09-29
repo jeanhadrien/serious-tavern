@@ -11,6 +11,7 @@ import {
   type PromptMessage,
 } from '@st/shared';
 import { renderContextTemplate } from './template.js';
+import { coerceValue } from './text.js';
 
 function sourceType(value: unknown): PortDataType {
   if (
@@ -31,9 +32,7 @@ function toText(value: unknown): string {
   if (value == null) return '';
   const compatibility = canConnect(sourceType(value), 'text');
   if (!compatibility.ok) throw new Error(compatibility.reason);
-  if (compatibility.coerce === 'messages-to-text')
-    return (value as PromptMessage[]).map((message) => `${message.role}: ${message.content}`).join('\n');
-  return typeof value === 'string' ? value : typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
+  return coerceValue(value, compatibility.coerce ?? 'to-text');
 }
 
 function renderMessagesSlot(value: unknown, slot: Extract<PresetEntry, { kind: 'slot' }>): PromptMessage[] {

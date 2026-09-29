@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { NodeDefinition } from '../../types.js';
-import { renderTemplate, stringify } from '../../template.js';
+import { renderTemplate } from '../../template.js';
+import { stringify } from '../../text.js';
 export const chatOutput: NodeDefinition = {
   type: 'chat-output',
   label: 'Chat Output',

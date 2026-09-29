@@ -1,4 +1,6 @@
 import { caseInsensitiveValue, findMacro, type Character, type Persona } from '@st/shared';
+import { stringify } from './text.js';
+export { stringify } from './text.js';
 
 export type TemplateContext = {
   inputs: Record<string, unknown>;
@@ -7,9 +9,6 @@ export type TemplateContext = {
   character?: Character;
   persona?: Persona;
 };
-
-const asText = (value: unknown): string =>
-  value == null ? '' : typeof value === 'string' ? value : JSON.stringify(value);
 
 export function contextMacro(
   path: string,
@@ -34,7 +33,7 @@ export function contextMacro(
   }
   const parts = macro.field ? [macro.field] : path.split('.').slice(1);
   const value = parts.reduce<unknown>(caseInsensitiveValue, context[macro.source]);
-  return asText(value);
+  return stringify(value);
 }
 
 export function renderContextTemplate(
@@ -53,6 +52,3 @@ export function renderContextTemplate(
 export function renderTemplate(template: string, ctx: TemplateContext): string {
   return renderContextTemplate(template, ctx);
 }
-
-export const stringify = (value: unknown): string =>
-  typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value);

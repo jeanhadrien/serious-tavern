@@ -1,18 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { canConnect, type CoercionKind } from '@st/shared/ports';
+import { canConnect } from '@st/shared/ports';
 import type { Character, Workflow, ChatMessage, ExecutionLog, Edge, Persona } from '@st/shared';
 import { registry } from './registry.js';
 import type { EngineEvent, ExecutionContext, NodeResources } from './types.js';
-import { stringify } from './template.js';
-
-function coerceValue(value: unknown, kind: CoercionKind): string {
-  if (kind === 'messages-to-text') {
-    if (!Array.isArray(value)) return stringify(value);
-    return value.map((message: ChatMessage) => `${message.role}: ${message.content}`).join('\n');
-  }
-  if (value != null && typeof value === 'object') return JSON.stringify(value, null, 2);
-  return value == null ? '' : String(value);
-}
+import { stringify, coerceValue } from './text.js';
 
 export async function validateWorkflow(
   workflow: Workflow,
