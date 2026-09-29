@@ -58,6 +58,8 @@ Frontend notifications live in `apps/web/src/alerts/`. Import `alerts` and call 
 
 `pages/workflows/` contains controlled canvas/editor hooks, the node view, palette, toolbar, configuration panel and tested canvas conversion model (including read-only unknown-node placeholders). `pages/presets/` retains its existing list/editor/entry/preview components.
 
+`pages/entities/` shares list/detail/avatar/drop components and draft/CRUD/import state between the character and persona pages, with separate field editors and validation/import notifications.
+
 To add a node type: (1) create `packages/engine/src/nodes/<type>/index.ts` exporting a `NodeDefinition` with Zod config, typed ports (`dataType`, optional `description`), defaults and `execute(ctx)`; (2) optionally add `resolvePorts(config, resources)` for instance-specific ports (resources provide read-only access to presets without importing server code), and declare `templateFields` for config fields accepting `{{...}}`; (3) register the definition in `packages/engine/src/registry.ts`; (4) optionally add a custom config panel. `/api/node-types/:type/ports` resolves dynamic ports for the editor; validation and execution use the same resolver.
 
 ## Presets and LLM providers

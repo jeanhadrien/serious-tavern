@@ -34,6 +34,11 @@ export const personaImportResultSchema = z.object({
   imported: z.array(personaSchema),
   failed: z.array(importFailureSchema),
 });
+export type EntityImportResult<T> = {
+  [K in keyof z.infer<typeof characterImportResultSchema>]: K extends 'imported'
+    ? T[]
+    : z.infer<typeof characterImportResultSchema>[K];
+};
 // Card extensions are flattened into the export alongside the known card fields.
 export const characterCardDataSchema = characterFieldsSchema.omit({ extensions: true }).catchall(z.unknown());
 export const characterExportQuerySchema = z.object({ format: z.enum(['png', 'json']).default('json') });
