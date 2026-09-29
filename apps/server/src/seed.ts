@@ -3,11 +3,11 @@ import type { Workflow, NodeInstance, Edge, Preset } from '@st/shared';
 import { registry } from '@st/engine';
 import type { Repository } from './storage/repository.js';
 
-function makeWorkflow(name: string, specs: { id: string; type: string; config?: Record<string, unknown> }[],
+function makeWorkflow(id: string, name: string, specs: { id: string; type: string; config?: Record<string, unknown> }[],
   connections: [string, string, string, string][]): Workflow {
   const now = new Date().toISOString();
   return {
-    id: randomUUID(), name, createdAt: now, updatedAt: now,
+    id, name, createdAt: now, updatedAt: now,
     nodes: specs.map((spec, index): NodeInstance => ({
       id: spec.id, type: spec.type, config: { ...registry.get(spec.type)!.defaultConfig, ...spec.config },
       position: { x: 100 + (index % 3) * 310, y: 100 + Math.floor(index / 3) * 230 }
@@ -18,7 +18,7 @@ function makeWorkflow(name: string, specs: { id: string; type: string; config?: 
 }
 export function defaultPreset(): Preset {
   const date = new Date().toISOString();
-  return { id: randomUUID(), name: 'Default', entries: [
+  return { id: '5d6c72c7-5185-4963-8227-527f12ef9eea', name: 'Default', entries: [
     { id: randomUUID(), name: 'Main prompt', enabled: true, kind: 'message', role: 'system', content: 'You are a helpful assistant.', placement: { mode: 'ordered' } },
     { id: randomUUID(), name: 'History', enabled: true, kind: 'slot', key: 'history', dataType: 'messages', role: 'user' },
     { id: randomUUID(), name: 'Message', enabled: true, kind: 'slot', key: 'message', dataType: 'text', role: 'user' }
@@ -28,10 +28,10 @@ export async function seed(workflows: Repository<Workflow>, presets: Repository<
   let available = await presets.list();
   if (!available.length) { const preset = defaultPreset(); await presets.save(preset); available = [preset]; }
   if ((await workflows.list()).length) return;
-  await workflows.save(makeWorkflow('Default Assistant',
+  await workflows.save(makeWorkflow('9f042b0a-a269-415f-bf83-375a70ce9d92', 'Default Assistant',
     [{ id: 'input', type: 'chat-input' }, { id: 'llm', type: 'llm', config: { presetId: available[0]!.id } }, { id: 'output', type: 'chat-output' }],
     [['input', 'message', 'llm', 'message'], ['input', 'history', 'llm', 'history'], ['llm', 'text', 'output', 'value']]));
-  await workflows.save(makeWorkflow('Parallel demo',
+  await workflows.save(makeWorkflow('db4c4ad3-c814-4879-9fc4-9b06d444a6c9', 'Parallel demo',
     [{ id: 'input', type: 'chat-input' }, { id: 'http-a', type: 'http-request', config: { url: 'https://httpbin.org/anything?source=a' } },
       { id: 'http-b', type: 'http-request', config: { url: 'https://httpbin.org/anything?source=b' } },
       { id: 'merge', type: 'merge' }, { id: 'output', type: 'chat-output' }],

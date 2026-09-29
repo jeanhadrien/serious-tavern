@@ -9,10 +9,18 @@ export async function migrateLegacyLlm(workflows: Repository<Workflow>, presets:
     for (const node of workflow.nodes.filter(n => n.type === 'llm')) {
       const config = node.config;
       const old = ['systemPrompt', 'promptTemplate', 'includeHistory'].some(key => Object.hasOwn(config, key)) ||
-        workflow.edges.some(edge => edge.target === node.id && ['prompt', 'context'].includes(edge.targetHandle));
+        workflow.edges.some(edge => edge.target === node.id && edge.targetHandle === 'prompt');
       if (!old) continue;
+      const history = config.includeHistory !== false;
+      const duplicateHistory = history && workflow.edges.some(edge => edge.target === node.id &&
+        edge.targetHandle === 'context' && workflow.nodes.some(source => source.id === edge.source && source.type === 'memory'));
+      if (duplicateHistory) {
+        workflow.edges = workflow.edges.filter(edge => !(edge.target === node.id && edge.targetHandle === 'context' &&
+          workflow.nodes.some(source => source.id === edge.source && source.type === 'memory')));
+        workflow.nodes = workflow.nodes.filter(source => source.type !== 'memory' ||
+          workflow.edges.some(edge => edge.source === source.id || edge.target === source.id));
+      }
       const context = workflow.edges.some(edge => edge.target === node.id && edge.targetHandle === 'context');
-      const history = config.includeHistory === true;
       const date = new Date().toISOString();
       const entries: PresetEntry[] = [];
       const system = String(config.systemPrompt ?? '');
@@ -30,6 +38,10 @@ export async function migrateLegacyLlm(workflows: Repository<Workflow>, presets:
         temperature: config.temperature ?? 0.7, maxTokens: config.maxTokens ?? 1024 };
       for (const edge of workflow.edges.filter(edge => edge.target === node.id)) {
         if (edge.targetHandle === 'prompt') edge.targetHandle = 'message';
+      }
+      if (!workflow.edges.some(edge => edge.target === node.id && edge.targetHandle === 'message')) {
+        const input = workflow.nodes.find(candidate => candidate.type === 'chat-input');
+        if (input) workflow.edges.push({ id: randomUUID(), source: input.id, sourceHandle: 'message', target: node.id, targetHandle: 'message' });
       }
       if (history && !workflow.edges.some(edge => edge.target === node.id && edge.targetHandle === 'history')) {
         const input = workflow.nodes.find(candidate => candidate.type === 'chat-input');

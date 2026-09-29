@@ -30,6 +30,8 @@ Message placement defaults to **ordered**, at its position in the entry list. **
 
 The LLM node selects a **provider**, **model**, **preset**, temperature, max tokens and optional samplers (top-p, frequency/presence penalties, stop sequences). History is only supplied through a preset slot; it is never added implicitly. Its outputs are `text` and `raw`. Each execution log records provider, model, sampler parameters and the final messages sent, without recording API keys.
 
+On startup, workflows with legacy LLM configuration or a legacy `prompt` edge are migrated to a preset. When legacy history was already supplied by a Memory node as `context`, the redundant edge and orphaned Memory node are removed. Existing nodes without a `prompt` edge are wired to Chat Input's message. Seeding uses stable IDs so concurrent initializers do not create duplicate Default presets or demo workflows.
+
 To add a provider, implement `LlmProvider` in `packages/engine/src/providers/` with `id`, `label`, `secretName` and `chat(request, { apiKey, signal })`, returning `{ text, raw, usage? }`. Register the provider in the provider registry and import its module during startup (the existing OpenRouter implementation is an example). The request is provider-neutral; translate sampler names into your provider's API format. The provider picker is served by `/api/providers`, and the engine looks up the configured secret by `secretName`. Streaming can be added as a separate method in a future release.
 
 ## Ports & types

@@ -25,3 +25,19 @@ it('seeds two valid workflows only once', async () => {
   expect(items.size).toBe(2);
   expect(presets.size).toBe(1);
 });
+it('uses stable seed IDs when two initializers observe empty stores concurrently', async () => {
+  const workflows = new Map<string, Workflow>();
+  const presets = new Map<string, Preset>();
+  const workflowRepository: Repository<Workflow> = {
+    list: async () => [...workflows.values()], get: async key => workflows.get(key),
+    save: async workflow => { workflows.set(workflow.id, workflow); }, delete: async key => { workflows.delete(key); }
+  };
+  const presetRepository: Repository<Preset> = {
+    list: async () => [...presets.values()], get: async key => presets.get(key),
+    save: async preset => { presets.set(preset.id, preset); }, delete: async key => { presets.delete(key); }
+  };
+  await Promise.all([seed(workflowRepository, presetRepository), seed(workflowRepository, presetRepository)]);
+  expect(presets.size).toBe(1);
+  expect(workflows.size).toBe(2);
+  for (const workflow of workflows.values()) expect(await validateWorkflow(workflow, { presets: presetRepository })).toEqual([]);
+});

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { presetSchema, type Preset, type PresetEntry, type PromptMessage } from '@st/shared';
 import { api, getPresets, json, type SessionSummary } from '../api.js';
@@ -21,6 +21,7 @@ export function Presets() {
   const [sessionId, setSessionId] = useState('');
   const [samples, setSamples] = useState<Record<string, string>>({});
   const [issues, setIssues] = useState<string[]>([]);
+  const focusedContent = useRef<HTMLTextAreaElement | null>(null);
   const refresh = async () => setList(await getPresets());
   useEffect(() => {
     void refresh().catch(() => {});
@@ -65,6 +66,17 @@ export function Presets() {
   const updateEntry = (index: number, next: PresetEntry) => {
     if (!draft) return;
     change({ ...draft, entries: draft.entries.map((item, i) => i === index ? next : item) });
+  };
+  const insertHint = (index: number, item: Extract<PresetEntry, { kind: 'message' }>, hint: string) => {
+    const textarea = focusedContent.current;
+    const selected = textarea?.dataset.entryId === item.id ? textarea : null;
+    const start = selected?.selectionStart ?? item.content.length;
+    const end = selected?.selectionEnd ?? start;
+    updateEntry(index, { ...item, content: item.content.slice(0, start) + hint + item.content.slice(end) });
+    if (selected) requestAnimationFrame(() => {
+      selected.focus();
+      selected.setSelectionRange(start + hint.length, start + hint.length);
+    });
   };
   const move = (index: number, direction: number) => {
     if (!draft || index + direction < 0 || index + direction >= draft.entries.length) return;
@@ -119,11 +131,14 @@ export function Presets() {
           <label>Role <select value={item.role} onChange={event => updateEntry(index,
             { ...item, role: event.target.value as 'system' | 'user' | 'assistant' })}>
             {['system', 'user', 'assistant'].map(role => <option key={role}>{role}</option>)}</select></label>
-          <label>Content <textarea rows={4} value={item.content} onChange={event => updateEntry(index, { ...item, content: event.target.value })} /></label>
+          <label>Content <textarea rows={4} data-entry-id={item.id} value={item.content}
+            onFocus={event => { focusedContent.current = event.currentTarget; }}
+            onChange={event => updateEntry(index, { ...item, content: event.target.value })} /></label>
           <div className="template-hints"><small>Variables (click to insert):</small>
             {['{{trigger.message}}', '{{trigger.sessionId}}', ...draft.entries.filter(slotsOnly)
               .map(candidate => `{{input.${candidate.key}}}`)].map(hint =>
-              <button type="button" key={hint} onClick={() => updateEntry(index, { ...item, content: item.content + hint })}>{hint}</button>)}</div>
+              <button type="button" key={hint} onMouseDown={event => event.preventDefault()}
+                onClick={() => insertHint(index, item, hint)}>{hint}</button>)}</div>
           <label>Placement <select value={item.placement.mode} onChange={event => updateEntry(index, {
             ...item, placement: event.target.value === 'ordered' ? { mode: 'ordered' } :
               { mode: 'depth', slot: draft.entries.filter(slotsOnly).find(candidate => candidate.enabled &&
