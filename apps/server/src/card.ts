@@ -182,8 +182,6 @@ export function writePngCard(png: Buffer, v2Json: string, v3Json: string): Buffe
   return Buffer.concat(chunks);
 }
 
-export const pngSignature = signature;
-
 export function placeholderPng(): Buffer {
   const header = Buffer.alloc(13);
   header.writeUInt32BE(1, 0);

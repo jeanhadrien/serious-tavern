@@ -11,4 +11,3 @@ export function useAlerts() {
   return { items, alerts: store };
 }
 export { alerts } from './store.js';
-export type { Alert, AlertOptions, AlertLevel } from './store.js';
