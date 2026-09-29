@@ -18,7 +18,18 @@ function GenericPanel({ descriptor, config, onChange }: Props) {
     ...descriptor.inputs.map(port => ({ expression: `{{input.${port.name}}}`, type: port.dataType })),
     { expression: '{{trigger.message}}', type: 'text' },
     { expression: '{{trigger.sessionId}}', type: 'text' },
-    { expression: '{{history}}', type: 'messages' }
+    { expression: '{{history}}', type: 'messages' },
+    { expression: '{{char}}', type: 'text' },
+    { expression: '{{char.description}}', type: 'text' },
+    { expression: '{{char.personality}}', type: 'text' },
+    { expression: '{{char.scenario}}', type: 'text' },
+    { expression: '{{char.first_mes}}', type: 'text' },
+    { expression: '{{char.mes_example}}', type: 'text' },
+    { expression: '{{char.system_prompt}}', type: 'text' },
+    { expression: '{{char.post_history_instructions}}', type: 'text' },
+    { expression: '{{user}}', type: 'text' },
+    { expression: '{{user.name}}', type: 'text' },
+    { expression: '{{user.description}}', type: 'text' }
   ];
   const insert = (field: string, expression: string) => {
     const target = focused.current;

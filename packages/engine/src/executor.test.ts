@@ -78,6 +78,15 @@ describe('executor', () => {
       { inputs: { foo: 3 }, trigger: { message: 'hi', sessionId: 's' }, history: [] }))
       .toBe('A 3 B hi C [] D {{input.foo.constructor()}}');
   });
+  it('renders character and persona variables in node templates', () => {
+    expect(renderTemplate('{{char}}/{{char.description}}/{{user}}/{{user.description}}', {
+      inputs: {}, trigger: { message: '', sessionId: '' }, history: [],
+      character: { id: 'c', name: 'Rin', description: 'A {{user}}', personality: '', scenario: '', first_mes: '',
+        mes_example: '', creator_notes: '', system_prompt: '', post_history_instructions: '', alternate_greetings: [],
+        tags: [], creator: '', character_version: '', extensions: {}, avatar: false, createdAt: '', updatedAt: '' },
+      persona: { id: 'p', name: 'Sam', description: '', avatar: false, createdAt: '', updatedAt: '' }
+    })).toBe('Rin/A Sam/Sam/');
+  });
   it('marks a timed-out node failed and emits events', async () => {
     registry.set('slow-test', { type: 'slow-test', label: 'Slow', description: '', category: '',
       inputs: [{ name: 'in', label: 'In', dataType: 'any' }], outputs: [{ name: 'out', label: 'Out', dataType: 'any' }],

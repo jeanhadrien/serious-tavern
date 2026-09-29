@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { rm } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { createApp } from './app.js';
+import { placeholderPng, writePngCard } from './card.js';
+import type { Character, Persona } from '@st/shared';
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -202,4 +204,90 @@ it('keeps one Default preset and both valid seed workflows across server restart
       expect(response.json()).toEqual({ valid: true, errors: [] });
     }
   } finally { await second.close(); }
+});
+
+function multipart(files: { filename: string; mime: string; data: Buffer }[]) {
+  const boundary = `test-${randomUUID()}`;
+  const chunks: Buffer[] = [];
+  for (const file of files) {
+    chunks.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="files"; filename="${file.filename}"\r\nContent-Type: ${file.mime}\r\n\r\n`),
+      file.data, Buffer.from('\r\n'));
+  }
+  chunks.push(Buffer.from(`--${boundary}--\r\n`));
+  return { boundary, payload: Buffer.concat(chunks) };
+}
+
+it('supports character/persona CRUD, card import and export, avatars, and session context persistence', async () => {
+  const directory = join(process.cwd(), 'data', `test-${randomUUID()}`);
+  directories.push(directory);
+  const app = await createApp(directory, { seed: false });
+  try {
+    const character = (await app.inject({ method: 'POST', url: '/api/characters', payload: { name: 'Test character' } })).json();
+    expect((await app.inject({ method: 'GET', url: '/api/characters' })).json()).toHaveLength(1);
+    expect((await app.inject({ method: 'PUT', url: `/api/characters/${character.id}`, payload: {
+      description: 'Updated', personality: 'curious'
+    } })).json()).toMatchObject({ description: 'Updated', personality: 'curious' });
+
+    const plainPng = multipart([{ filename: 'plain.png', mime: 'image/png', data: placeholderPng() }]);
+    const invalid = await app.inject({ method: 'POST', url: '/api/characters/import',
+      headers: { 'content-type': `multipart/form-data; boundary=${plainPng.boundary}` }, payload: plainPng.payload });
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json().error).toMatchObject({ code: 'INVALID_CARD' });
+
+    const cardPng = writePngCard(placeholderPng(),
+      JSON.stringify({ spec: 'chara_card_v2', data: { name: 'Imported V2', description: 'From png' } }),
+      JSON.stringify({ spec: 'chara_card_v3', data: { name: 'Imported V3', description: 'From png' } }));
+    const importedPayload = multipart([
+      { filename: 'character.json', mime: 'application/json', data: Buffer.from(JSON.stringify({ name: 'Imported JSON', description: 'From file' })) },
+      { filename: 'card.png', mime: 'image/png', data: cardPng }
+    ]);
+    const importedResponse = await app.inject({ method: 'POST', url: '/api/characters/import',
+      headers: { 'content-type': `multipart/form-data; boundary=${importedPayload.boundary}` }, payload: importedPayload.payload });
+    expect(importedResponse.statusCode).toBe(200);
+    const imported = importedResponse.json();
+    expect(imported.imported.map((item: Character) => item.name)).toEqual(['Imported JSON', 'Imported V3']);
+    expect(imported.failed).toEqual([]);
+    const exported = await app.inject({ method: 'GET', url: `/api/characters/${imported.imported[1].id}/export?format=png` });
+    expect(exported.headers['content-type']).toContain('image/png');
+    const roundTrip = multipart([{ filename: 'export.png', mime: 'image/png', data: exported.rawPayload }]);
+    const roundTripResponse = await app.inject({ method: 'POST', url: '/api/characters/import',
+      headers: { 'content-type': `multipart/form-data; boundary=${roundTrip.boundary}` }, payload: roundTrip.payload });
+    expect(roundTripResponse.json().imported[0]).toMatchObject({ name: 'Imported V3', description: 'From png' });
+    expect((await app.inject({ method: 'GET', url: `/api/characters/${imported.imported[1].id}/avatar` })).statusCode).toBe(200);
+
+    const persona = (await app.inject({ method: 'POST', url: '/api/personas', payload: { name: 'Persona' } })).json();
+    expect((await app.inject({ method: 'GET', url: '/api/personas' })).json()).toHaveLength(1);
+    await app.inject({ method: 'PUT', url: `/api/personas/${persona.id}`, payload: { description: 'About me' } });
+    const avatarUpload = multipart([{ filename: 'avatar.png', mime: 'image/png', data: placeholderPng() }]);
+    const avatarResponse = await app.inject({ method: 'PUT', url: `/api/personas/${persona.id}/avatar`,
+      headers: { 'content-type': `multipart/form-data; boundary=${avatarUpload.boundary}` }, payload: avatarUpload.payload });
+    expect(avatarResponse.json().avatar).toContain('.png');
+    const personaImport = multipart([
+      { filename: 'simple.png', mime: 'image/png', data: placeholderPng() },
+      { filename: 'character-card.png', mime: 'image/png', data: cardPng }
+    ]);
+    const personaResult = await app.inject({ method: 'POST', url: '/api/personas/import',
+      headers: { 'content-type': `multipart/form-data; boundary=${personaImport.boundary}` }, payload: personaImport.payload });
+    expect(personaResult.json().imported.map((item: Persona) => item.name)).toEqual(['simple', 'Imported V3']);
+
+    const workflow = (await app.inject({ method: 'POST', url: '/api/workflows', payload: { name: 'Echo' } })).json();
+    const session = (await app.inject({ method: 'POST', url: '/api/sessions', payload: {
+      workflowId: workflow.id, characterId: character.id, personaId: persona.id
+    } })).json();
+    expect((await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json())
+      .toMatchObject({ characterId: character.id, personaId: persona.id });
+    await app.inject({ method: 'PUT', url: `/api/workflows/${workflow.id}`, payload: {
+      name: 'Context echo', nodes: [
+        { id: 'input', type: 'chat-input', config: {}, position: { x: 0, y: 0 } },
+        { id: 'output', type: 'chat-output', config: { template: '{{char.name}} meets {{user.name}}' }, position: { x: 200, y: 0 } }
+      ], edges: [{ id: 'message', source: 'input', sourceHandle: 'message', target: 'output', targetHandle: 'value' }]
+    } });
+    const message = await app.inject({ method: 'POST', url: `/api/sessions/${session.id}/messages`, payload: { content: 'Hi' } });
+    expect(message.json().assistantMessage.content).toBe('Test character meets Persona');
+    const changed = await app.inject({ method: 'PATCH', url: `/api/sessions/${session.id}`, payload: { characterId: null } });
+    expect(changed.json()).not.toHaveProperty('characterId');
+    expect(changed.json().personaId).toBe(persona.id);
+    expect((await app.inject({ method: 'DELETE', url: `/api/characters/${character.id}` })).statusCode).toBe(204);
+    expect((await app.inject({ method: 'DELETE', url: `/api/personas/${persona.id}` })).statusCode).toBe(204);
+  } finally { await app.close(); }
 });

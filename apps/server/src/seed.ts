@@ -22,7 +22,9 @@ export function defaultPreset(): Preset {
     { id: 'default-history', key: 'history', label: 'Chat history', dataType: 'messages' },
     { id: 'default-message', key: 'message', label: 'User message', dataType: 'text' }
   ], entries: [
-    { id: 'default-main-prompt', name: 'Main prompt', enabled: true, kind: 'message', role: 'system', content: 'You are a helpful assistant.', placement: { mode: 'ordered' } },
+    { id: 'default-main-prompt', name: 'Main prompt', enabled: true, kind: 'message', role: 'system',
+      content: '{{char.name}}\n{{char.description}}\n{{char.personality}}\n{{char.scenario}}\n{{char.first_mes}}\n{{char.mes_example}}\n{{char.system_prompt}}\n{{char.post_history_instructions}}\nYou are speaking with {{user}}. {{user.description}}',
+      placement: { mode: 'ordered' } },
     { id: 'default-history-slot', name: 'Chat history', enabled: true, kind: 'slot', inputKey: 'history', role: 'user' },
     { id: 'default-message-slot', name: 'User message', enabled: true, kind: 'slot', inputKey: 'message', role: 'user' }
   ], createdAt: date, updatedAt: date };

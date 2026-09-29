@@ -30,7 +30,9 @@ export const llm: NodeDefinition = {
     if (!preset) throw new Error(`Preset ${ctx.config.presetId} not found`);
     const key = await ctx.secrets.get(provider.secretName);
     if (!key) throw new Error(`Missing ${provider.secretName} secret. Add it in Settings.`);
-    const messages = renderPreset(preset, { inputs: ctx.inputs, templateContext: { trigger: ctx.trigger, history: ctx.history } });
+    const messages = renderPreset(preset, { inputs: ctx.inputs, templateContext: {
+      trigger: ctx.trigger, history: ctx.history, character: ctx.character, persona: ctx.persona
+    } });
     const request = {
       model: String(ctx.config.model), messages, temperature: Number(ctx.config.temperature),
       maxTokens: Number(ctx.config.maxTokens),

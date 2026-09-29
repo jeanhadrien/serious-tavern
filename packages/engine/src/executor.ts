@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { canConnect, type CoercionKind } from '@st/shared/ports';
-import type { Workflow, ChatMessage, ExecutionLog, Edge } from '@st/shared';
+import type { Character, Workflow, ChatMessage, ExecutionLog, Edge, Persona } from '@st/shared';
 import { registry } from './registry.js';
 import type { EngineEvent, ExecutionContext, NodeResources } from './types.js';
 import { stringify } from './template.js';
@@ -84,6 +84,7 @@ export async function executeWorkflow(
   options: {
     message: string; sessionId: string; history: ChatMessage[];
     secrets: ExecutionContext['secrets']; signal?: AbortSignal;
+    character?: Character; persona?: Persona;
     resources?: NodeResources;
     onEvent?: (event: EngineEvent) => void; nodeTimeoutMs?: number;
   }
@@ -153,7 +154,8 @@ export async function executeWorkflow(
           const output = await Promise.race([
             definition.execute({
               inputs, config: definition.configSchema.parse(node.config), trigger: { message: options.message, sessionId: options.sessionId },
-              history: options.history, secrets: options.secrets, resources, signal, log: () => {}, emit,
+              history: options.history, character: options.character, persona: options.persona,
+              secrets: options.secrets, resources, signal, log: () => {}, emit,
               recordRequest: request => { execution.nodes[node.id] = { ...execution.nodes[node.id]!, request }; }
             }),
             new Promise<never>((_, reject) => {

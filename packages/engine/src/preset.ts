@@ -1,4 +1,5 @@
-import { canConnect, presetSchema, type PortDataType, type Preset, type PresetEntry, type PromptMessage } from '@st/shared';
+import { canConnect, presetSchema, type Character, type Persona, type PortDataType, type Preset, type PresetEntry, type PromptMessage } from '@st/shared';
+import { renderContextTemplate } from './template.js';
 
 function sourceType(value: unknown): PortDataType {
   if (Array.isArray(value) && value.every(item => item && typeof item === 'object' &&
@@ -22,19 +23,23 @@ function toText(value: unknown): string {
 
 export function renderPreset(preset: Preset, options: {
   inputs: Record<string, unknown>;
-  templateContext: { trigger: { message: string; sessionId: string }; history?: unknown[] };
+  templateContext: { trigger: { message: string; sessionId: string }; history?: unknown[];
+    character?: Character; persona?: Persona };
 }): PromptMessage[] {
   const valid = presetSchema.parse(preset);
   const inputByKey = new Map(valid.inputs.map(input => [input.key, input]));
   const renderedMessages = new Map<string, PromptMessage>();
   for (const entry of valid.entries) {
     if (entry.kind !== 'message' || !entry.enabled) continue;
-    const content = entry.content.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, path: string) => {
+    const content = renderContextTemplate(entry.content, {
+      inputs: options.inputs, trigger: options.templateContext.trigger, history: options.templateContext.history,
+      character: options.templateContext.character, persona: options.templateContext.persona
+    }, path => {
       if (path.startsWith('input.')) return toText(options.inputs[path.slice('input.'.length)]);
       if (path === 'trigger.message') return options.templateContext.trigger.message;
       if (path === 'trigger.sessionId') return options.templateContext.trigger.sessionId;
       if (path === 'history') return toText(options.templateContext.history);
-      return '';
+      return undefined;
     });
     if (content.trim()) renderedMessages.set(entry.id, { role: entry.role, content });
   }

@@ -61,7 +61,10 @@ export function PresetEntryEditor(props: {
         onChange={event => update({ content: event.target.value })} /></label>
       <div className="template-hints"><small>Insert variable at cursor</small>
         {[...preset.inputs.map(input => `{{input.${input.key}}}`),
-          '{{trigger.message}}', '{{trigger.sessionId}}'].map(token =>
+          '{{trigger.message}}', '{{trigger.sessionId}}', '{{char}}', '{{char.name}}', '{{char.description}}',
+          '{{char.personality}}', '{{char.scenario}}', '{{char.first_mes}}', '{{char.mes_example}}',
+          '{{char.system_prompt}}', '{{char.post_history_instructions}}', '{{user}}', '{{user.name}}',
+          '{{user.description}}'].map(token =>
           <button type="button" key={token} onMouseDown={event => event.preventDefault()}
             onClick={() => insert(token)}>{token}</button>)}
       </div>

@@ -1,4 +1,4 @@
-import type { ChatMessage, PortDef, Preset } from '@st/shared';
+import type { Character, ChatMessage, Persona, PortDef, Preset } from '@st/shared';
 import type { z } from 'zod';
 
 export type EngineEvent = { type: 'node:start' | 'node:complete' | 'node:skipped' | 'node:error' | 'execution:complete'; nodeId?: string; detail?: unknown };
@@ -8,6 +8,8 @@ export type ExecutionContext = {
   config: Record<string, unknown>;
   trigger: { message: string; sessionId: string };
   history: ChatMessage[];
+  character?: Character;
+  persona?: Persona;
   secrets: { get(name: string): Promise<string | undefined> };
   resources: NodeResources;
   signal: AbortSignal;

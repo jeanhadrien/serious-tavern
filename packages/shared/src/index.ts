@@ -5,6 +5,7 @@ export {
   presetSchema, presetInputSchema, presetEntrySchema, presetInputKeySchema, presetRoleSchema, presetWarnings,
   type Preset, type PresetInput, type PresetEntry, type PresetWarning, type PromptMessage
 } from './preset.js';
+export { characterSchema, personaSchema, type Character, type Persona } from './character.js';
 
 export const nodeSchema = z.object({
   id: z.string().min(1), type: z.string().min(1), config: z.record(z.string(), z.unknown()),
@@ -24,6 +25,7 @@ export const messageSchema = z.object({
 });
 export const sessionSchema = z.object({
   id: z.string(), title: z.string(), workflowId: z.string(), messages: z.array(messageSchema),
+  characterId: z.string().optional(), personaId: z.string().optional(),
   createdAt: z.string(), updatedAt: z.string()
 });
 export const nodeExecutionSchema = z.object({

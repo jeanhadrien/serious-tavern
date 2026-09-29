@@ -90,4 +90,20 @@ describe('renderPreset', () => {
     if (entry?.kind === 'message') entry.content = '{{input.missing}}';
     expect(() => renderPreset(invalid, options({}))).toThrow(/Unknown input: missing/);
   });
+
+  it('renders character and persona variables and expands variables inside character fields without recursion', () => {
+    const definition = preset([], [message('context',
+      '{{char}} | {{char.description}} | {{char.personality}} | {{char.first_mes}} | {{char.system_prompt}} | {{user}} | {{user.description}}')]);
+    expect(renderPreset(definition, {
+      inputs: {}, templateContext: {
+        trigger: { message: 'Hi', sessionId: 's' },
+        character: { id: 'c', name: 'Mira', description: 'A {{char.name}} in {{user.name}}', personality: '{{char.description}}',
+          scenario: '', first_mes: 'Hello {{user}}', mes_example: '', creator_notes: '', system_prompt: '{{char.personality}}',
+          post_history_instructions: '', alternate_greetings: [], tags: [], creator: '', character_version: '',
+          extensions: {}, avatar: false, createdAt: '', updatedAt: '' },
+        persona: { id: 'p', name: 'Alex', description: 'friend of {{char}}', avatar: false, createdAt: '', updatedAt: '' }
+      }
+    })).toEqual([{ role: 'system', content: 'Mira | A Mira in Alex | A Mira in Alex | Hello Alex | A Mira in Alex | Alex | friend of Mira' }]);
+    expect(renderPreset(definition, options({})).map(item => item.content)).toEqual([' |  |  |  |  | User | ']);
+  });
 });

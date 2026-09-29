@@ -16,7 +16,7 @@ Create a chat and choose a workflow. The seeded **Default Assistant** uses the D
 - `packages/engine`: validated DAG executor, event callback, template helper, preset renderer, provider registry, node registry, and individual node implementations in `src/nodes/<type>/index.ts`. Independent ready nodes execute concurrently; condition branches skip and merges ignore skipped inputs.
 - `packages/node-ui`: JSON-Schema-driven config form and optional custom panels.
 - `apps/server`: Fastify API, JSON-file repository, encryption, workflow seeds, and execution persistence. The server owns all data and secrets.
-- `apps/web`: React/Vite chat, React Flow workflow editor, Presets, and Settings. The UI calls the API; it does not execute workflows.
+- `apps/web`: React/Vite chat, React Flow workflow editor, Presets, Characters, Personas, and Settings. The UI calls the API; it does not execute workflows.
 
 Frontend notifications live in `apps/web/src/alerts/`. Import `alerts` and call `alerts.error(message)`, `.success`, `.info`, or `.warning` from any module; React components can use `useAlerts()`. API failures toast automatically unless a request uses `{ silent: true }` to handle an error inline.
 
@@ -26,9 +26,33 @@ To add a node type: (1) create `packages/engine/src/nodes/<type>/index.ts` expor
 
 A **preset** defines the final, ordered message list sent to an LLM. It has declared **inputs** (the values a workflow supplies) and an ordered list of discriminated **entries** (`message` or `slot`) that assembles those values with fixed prompts. Each input has an `id`, unique key, optional label and description, and type (`messages` or `text`). Every input becomes one correspondingly typed LLM input port named by its key; the port label defaults to the key. A `messages` input expands to its message list. A `text` input becomes one message using the slot's role (default `user`) and is skipped when empty. The same input may be placed by multiple slots.
 
-An enabled **message** entry has a system/user/assistant role and templated content; it can use `{{input.<key>}}`, `{{trigger.message}}` and `{{trigger.sessionId}}`. A **slot** places a declared input at its position in the final message list. Empty fixed messages are skipped. Inputs unused by any enabled slot or message template produce non-blocking warnings. Model and sampler settings belong to each LLM node. Preview and execution use the same renderer, and the preview accepts `{ preset, inputs?, sessionId? }` and returns `{ messages, warnings }`.
+An enabled **message** entry has a system/user/assistant role and templated content; it can use `{{input.<key>}}`, `{{trigger.message}}`, `{{trigger.sessionId}}`, `{{history}}`, and character/persona variables. Character and persona fields are also expanded when referenced, with recursive references guarded. Missing character fields render as empty text; `{{user}}` falls back to `User`. A **slot** places a declared input at its position in the final message list. Empty fixed messages are skipped. Inputs unused by any enabled slot or message template produce non-blocking warnings. Model and sampler settings belong to each LLM node. Preview and execution use the same renderer, and the preview accepts `{ preset, inputs?, sessionId? }` and returns `{ messages, warnings }`.
 
-The **Default** preset declares `history` (`messages`, label “Chat history”) and `message` (`text`, label “User message”). Its entries are a system message named “Main prompt” containing `You are a helpful assistant.`, a slot for `history`, and a user-role slot for `message`. The Default Assistant workflow connects Chat Input `history` and `message` to those LLM ports.
+The **Default** preset declares `history` (`messages`, label “Chat history”) and `message` (`text`, label “User message”). Its system message uses the active character's name, description, personality, scenario, example dialogue, system prompt, and post-history instructions, plus the active user's name and description; missing character fields render empty. It is followed by slots for `history` and `message`. The Default Assistant workflow connects Chat Input `history` and `message` to those LLM ports.
+
+## Characters and Personas
+
+Characters and personas are managed from the top-level **Characters** and **Personas** pages. Character cards store name, description, personality, scenario, first message, example dialogue, system and post-history prompts, alternate greetings, tags, creator metadata, extensions, and an optional avatar. The editor keeps the commonly used name, description, and personality fields prominent and places the rest under Advanced fields. Persona records contain a name, description, and optional avatar. JSON and avatar files are stored below `data/characters`, `data/personas`, and `data/avatars/`; uploads are limited to 20 MB per file.
+
+Character JSON cards may be flat V1, V2 (`spec: "chara_card_v2"`), or V3 (`spec: "chara_card_v3"`). PNG cards are parsed and exported server-side using `chara` and `ccv3` tEXt metadata; when both exist, V3 is preferred. PNG character imports require embedded card metadata, while plain persona images create a persona named from the file name. PNG exports include both V2 and V3 card metadata and use the stored avatar or a generated placeholder.
+
+The REST API exposes:
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET/POST /api/characters` | List or create a character |
+| `GET/PUT/DELETE /api/characters/:id` | Read, update, or delete a character |
+| `POST /api/characters/import` | Import one or more JSON cards or PNG cards as multipart files |
+| `GET/PUT /api/characters/:id/avatar` | Retrieve or upload the character avatar |
+| `GET /api/characters/:id/export?format=json\|png` | Export a character card |
+| `GET/POST /api/personas` | List or create a persona |
+| `GET/PUT/DELETE /api/personas/:id` | Read, update, or delete a persona |
+| `POST /api/personas/import` | Create personas from uploaded images (embedded card metadata is used when available) |
+| `GET/PUT /api/personas/:id/avatar` | Retrieve or upload the persona avatar |
+
+Import endpoints return `{ imported, failed }` for multi-file uploads and use the standard `{ error: { code, message, details? } }` API error shape for invalid requests. Sessions store optional `characterId` and `personaId`; selecting them in Chat persists the context used by preset and node templates. New chats select the first available persona when one exists.
+
+Supported template variables are `{{char}}`/`{{char.name}}`, `{{char.description}}`, `{{char.personality}}`, `{{char.scenario}}`, `{{char.first_mes}}`, `{{char.mes_example}}`, `{{char.system_prompt}}`, and `{{char.post_history_instructions}}`; and `{{user}}`/`{{user.name}}` and `{{user.description}}`. Character fields themselves can use these variables (for example, a description can address `{{user}}`). These variables are supported in preset entries and common node templates.
 
 Message placement defaults to **ordered**, at its position in the entry list. **Depth** placement references an enabled slot entry backed by a `messages` input and injects the message inside that slot's expanded conversation: depth 0 inserts *after* the last message, depth 1 inserts *before* the last message, and depths beyond the slot length clamp to the start. For example, history `[user: Hello, assistant: Hi]` plus a system note at depth 1 produces `[user: Hello, system: Note, assistant: Hi]`. Messages at the same depth preserve their order in the preset entry list. Changing/removing an input can make stale workflow edges invalid (shown red); validation catches stale handles.
 

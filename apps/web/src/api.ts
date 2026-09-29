@@ -1,4 +1,4 @@
-import type { Workflow, Session, ExecutionLog, NodeTypeDescriptor, Preset, PortDef } from '@st/shared';
+import type { Workflow, Session, ExecutionLog, NodeTypeDescriptor, Preset, PortDef, Character, Persona } from '@st/shared';
 import { alerts } from './alerts/store.js';
 export type SessionSummary = Omit<Session, 'messages'> & { messageCount: number };
 export type SecretSummary = { name: string; hint: string };
@@ -33,7 +33,8 @@ function notify(error: ApiError, silent: boolean) {
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { silent = false, ...requestOptions } = options;
   const headers = new Headers(requestOptions.headers);
-  if (requestOptions.body != null && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (requestOptions.body != null && !(requestOptions.body instanceof FormData) && !headers.has('Content-Type'))
+    headers.set('Content-Type', 'application/json');
   let response: Response;
   try { response = await fetch(`/api${path}`, { ...requestOptions, headers }); }
   catch (cause) {
@@ -57,5 +58,7 @@ export const getWorkflows = () => api<Workflow[]>('/workflows');
 export const getNodeTypes = () => api<NodeTypeDescriptor[]>('/node-types');
 export const getPresets = () => api<Preset[]>('/presets');
 export const getProviders = () => api<{ id: string; label: string; secretName: string }[]>('/providers');
+export const getCharacters = () => api<Character[]>('/characters');
+export const getPersonas = () => api<Persona[]>('/personas');
 export const resolvePorts = (type: string, config: Record<string, unknown>) =>
   api<{ inputs: PortDef[]; outputs: PortDef[] }>(`/node-types/${type}/ports`, json('POST', { config }));
