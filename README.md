@@ -28,7 +28,7 @@ A **preset** defines the final, ordered message list sent to an LLM. It has decl
 
 An enabled **message** entry has a system/user/assistant role and templated content; it can use `{{input.<key>}}`, `{{trigger.message}}`, `{{trigger.sessionId}}`, `{{history}}`, and character/persona variables. Character and persona fields are also expanded when referenced, with recursive references guarded. Missing character fields render as empty text; `{{user}}` falls back to `User`. A **slot** places a declared input at its position in the final message list. Fixed messages that render to whitespace only are omitted, as are empty text-slot values. Inputs unused by any enabled slot or message template produce non-blocking warnings. Model and sampler settings belong to each LLM node. Preview and execution use the same renderer, and the preview accepts `{ preset, inputs?, sessionId? }` and returns `{ messages, warnings }`.
 
-The **Default** preset declares `history` (`messages`, label “Chat history”) and `message` (`text`, label “User message”). Its ordered system entries are Main prompt (a short instruction plus `{{char.system_prompt}}`), Character description, Personality, Scenario, Persona, and Example dialogue; then the history slot; then Post-history instructions; then the user-message slot. Each character/persona field is a separate variable-only entry, so empty fields produce no blank prompt messages. The character's first greeting is not included. The Default Assistant workflow connects Chat Input `history` and `message` to those LLM ports.
+The **Default** preset declares `history` (`messages`, label “Chat history”) and `message` (`text`, label “User message”). Its ordered system entries are Main prompt (a short instruction plus `{{character.system_prompt}}`), Character description, Personality, Scenario, Persona (`{{persona.description}}`), and Example dialogue; then the history slot; then Post-history instructions; then the user-message slot. Each character/persona field is a separate variable-only entry, so empty fields produce no blank prompt messages. The character's first greeting is not included. The Default Assistant workflow connects Chat Input `history` and `message` to those LLM ports.
 
 ## Characters and Personas
 
@@ -52,7 +52,18 @@ The REST API exposes:
 
 Import endpoints return `{ imported, failed }` for multi-file uploads and use the standard `{ error: { code, message, details? } }` API error shape for invalid requests. Sessions store optional `characterId` and `personaId`; selecting them in Chat persists the context used by preset and node templates. New chats select the first available persona when one exists.
 
-Supported template variables are `{{char}}`/`{{char.name}}`, `{{char.description}}`, `{{char.personality}}`, `{{char.scenario}}`, `{{char.first_mes}}`, `{{char.mes_example}}`, `{{char.system_prompt}}`, and `{{char.post_history_instructions}}`; and `{{user}}`/`{{user.name}}` and `{{user.description}}`. Character fields themselves can use these variables (for example, a description can address `{{user}}`). These variables are supported in preset entries and common node templates.
+### Template macros
+
+The registry in `@st/shared` is the single source for engine resolution, preset validation, and editor hints. Preset entries and common node templates support:
+
+- `{{character.<field>}}`: `name`, `description`, `personality`, `scenario`, `first_mes`, `mes_example`, `creator_notes`, `system_prompt`, `post_history_instructions`, `creator`, and `character_version`.
+- `{{persona.name}}` and `{{persona.description}}`.
+- Short aliases: `{{char}}` → character name, `{{user}}` → persona name (or `User` when no persona is selected), `{{description}}`, `{{personality}}`, `{{scenario}}` → matching character fields, and `{{persona}}` → persona description.
+- `{{input.<key>}}` (or `{{inputs.<key>}}`), `{{trigger.message}}`, `{{trigger.sessionId}}`, and `{{history}}`. Node scope roots (`input`, `inputs`, `trigger`) and nested paths remain supported; preset message inputs/history render as transcripts, while node templates use JSON for structured values.
+
+Macro names, namespaces, fields, and input keys are **case-insensitive**, so `{{CHARACTER.Name}}` and `{{INPUT.MyKey}}` work. Input keys that differ only by casing are rejected in presets; for arbitrary node input objects, the first matching own key is used. Slots/port bindings still use their declared exact keys.
+
+Unknown macros are **left verbatim** and produce non-blocking warnings in enabled preset messages. Known macros without a value render as empty text (only `{{user}}` has the `User` fallback). Unknown input references remain validation errors. Character and persona fields can contain macros themselves, expanded recursively with cycles resolving to empty text. `{{char.*}}` and `{{user.*}}` are no longer supported; use `character.*` and `persona.*`. Legacy `<BOT>`/`<USER>` and SillyTavern scripting macros are not supported.
 
 Message placement defaults to **ordered**, at its position in the entry list. **Depth** placement references an enabled slot entry backed by a `messages` input and injects the message inside that slot's expanded conversation: depth 0 inserts *after* the last message, depth 1 inserts *before* the last message, and depths beyond the slot length clamp to the start. For example, history `[user: Hello, assistant: Hi]` plus a system note at depth 1 produces `[user: Hello, system: Note, assistant: Hi]`. Messages at the same depth preserve their order in the preset entry list. Changing/removing an input can make stale workflow edges invalid (shown red); validation catches stale handles.
 

@@ -1,4 +1,4 @@
-import { canConnect, presetSchema, type Character, type Persona, type PortDataType, type Preset, type PresetEntry, type PromptMessage } from '@st/shared';
+import { canConnect, caseInsensitiveValue, findMacro, presetSchema, type Character, type Persona, type PortDataType, type Preset, type PromptMessage } from '@st/shared';
 import { renderContextTemplate } from './template.js';
 
 function sourceType(value: unknown): PortDataType {
@@ -35,10 +35,10 @@ export function renderPreset(preset: Preset, options: {
       inputs: options.inputs, trigger: options.templateContext.trigger, history: options.templateContext.history,
       character: options.templateContext.character, persona: options.templateContext.persona
     }, path => {
-      if (path.startsWith('input.')) return toText(options.inputs[path.slice('input.'.length)]);
-      if (path === 'trigger.message') return options.templateContext.trigger.message;
-      if (path === 'trigger.sessionId') return options.templateContext.trigger.sessionId;
-      if (path === 'history') return toText(options.templateContext.history);
+      const macro = findMacro(path);
+      if (macro?.source === 'inputs')
+        return toText(path.split('.').slice(1).reduce<unknown>(caseInsensitiveValue, options.inputs));
+      if (macro?.source === 'history' && !macro.pattern) return toText(options.templateContext.history);
       return undefined;
     });
     if (content.trim()) renderedMessages.set(entry.id, { role: entry.role, content });

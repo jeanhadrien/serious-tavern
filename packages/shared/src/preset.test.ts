@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { presetSchema, presetWarnings } from './preset.js';
+import { findMacro, macroHints } from './macros.js';
 
 const base = () => ({
   id: 'e305f530-421a-492b-9d25-fbb054f28c04', name: 'Test', createdAt: '', updatedAt: '',
@@ -13,6 +14,30 @@ const base = () => ({
       placement: { mode: 'depth' as const, entryId: 'history-slot', depth: 0 } },
     { id: 'message-slot', kind: 'slot' as const, enabled: true, name: 'Message', inputKey: 'message' }
   ]
+});
+
+it('uses the registry for hints and warns on unknown macros only in enabled messages', () => {
+  const parsed = presetSchema.parse({ ...base(), entries: [
+    { id: 'active', kind: 'message', enabled: true, name: 'Active', role: 'system',
+      content: '{{unknown}} {{char.name}} {{user.description}} {{random::a::b}} {{CHARACTER.Name}} {{INPUT.MESSAGE}} {{inputs.HISTORY}}' },
+    { id: 'disabled', kind: 'message', enabled: false, name: 'Disabled', role: 'system', content: '{{disabled}}' }
+  ] });
+  expect(presetWarnings(parsed)).toEqual(['{{unknown}}', '{{char.name}}', '{{user.description}}', '{{random::a::b}}']
+    .map(expression => ({ path: ['entries', 0, 'content'], message: `Unknown macro: ${expression}` })));
+  const hints = macroHints(parsed.inputs);
+  expect(hints).toContainEqual(expect.objectContaining({ expression: '{{input.message}}', type: 'text' }));
+  expect(hints).toContainEqual(expect.objectContaining({ expression: '{{character.creator_notes}}' }));
+  expect(hints.every(hint => findMacro(hint.expression.slice(2, -2)) !== undefined)).toBe(true);
+  expect(hints.some(hint => hint.expression.startsWith('{{char.') || hint.expression.startsWith('{{user.'))).toBe(false);
+});
+
+it('validates input macros case-insensitively and rejects ambiguous input keys', () => {
+  const message = { id: 'm', kind: 'message', enabled: true, name: 'M', role: 'system' };
+  expect(presetSchema.safeParse({ ...base(), entries: [{ ...message, content: '{{INPUT.MESSAGE}}' }] }).success).toBe(true);
+  expect(presetSchema.safeParse({ ...base(), entries: [{ ...message, content: '{{INPUT.Missing}}' }] }).success).toBe(false);
+  expect(presetSchema.safeParse({ ...base(), inputs: [
+    ...base().inputs, { id: 'h', key: 'hISTORY', dataType: 'text' }
+  ] }).success).toBe(false);
 });
 
 describe('preset schema', () => {

@@ -6,6 +6,7 @@ export {
   type Preset, type PresetInput, type PresetEntry, type PresetWarning, type PromptMessage
 } from './preset.js';
 export { characterSchema, personaSchema, type Character, type Persona } from './character.js';
+export { macroRegistry, findMacro, templateMacros, macroInputKey, macroHints, caseInsensitiveValue, type MacroDefinition } from './macros.js';
 
 export const nodeSchema = z.object({
   id: z.string().min(1), type: z.string().min(1), config: z.record(z.string(), z.unknown()),

@@ -56,7 +56,7 @@ describe('renderPreset', () => {
   it('renders input and trigger variables, stringifies message inputs as transcripts, and skips empty content', () => {
     const definition = preset([input('history', 'messages'), input('message', 'text'), input('empty', 'text')], [
       message('empty-message', ' \t '),
-      message('filled', '{{input.history}}\n{{trigger.message}} {{trigger.sessionId}} {{input.message}}'),
+      message('filled', '{{INPUT.HISTORY}}\n{{TRIGGER.MESSAGE}} {{trigger.sessionId}} {{input.MESSAGE}}'),
       slot('empty-slot', 'empty'),
       message('disabled', '{{input.message}}', { mode: 'ordered' }, false)
     ]);
@@ -93,12 +93,12 @@ describe('renderPreset', () => {
 
   it('renders character and persona variables and expands variables inside character fields without recursion', () => {
     const definition = preset([], [message('context',
-      '{{char}} | {{char.description}} | {{char.personality}} | {{char.first_mes}} | {{char.system_prompt}} | {{user}} | {{user.description}}')]);
+      '{{char}} | {{character.description}} | {{character.personality}} | {{character.first_mes}} | {{character.system_prompt}} | {{user}} | {{persona.description}}')]);
     expect(renderPreset(definition, {
       inputs: {}, templateContext: {
         trigger: { message: 'Hi', sessionId: 's' },
-        character: { id: 'c', name: 'Mira', description: 'A {{char.name}} in {{user.name}}', personality: '{{char.description}}',
-          scenario: '', first_mes: 'Hello {{user}}', mes_example: '', creator_notes: '', system_prompt: '{{char.personality}}',
+        character: { id: 'c', name: 'Mira', description: 'A {{character.name}} in {{persona.name}}', personality: '{{character.description}}',
+          scenario: '', first_mes: 'Hello {{user}}', mes_example: '', creator_notes: '', system_prompt: '{{character.personality}}',
           post_history_instructions: '', alternate_greetings: [], tags: [], creator: '', character_version: '',
           extensions: {}, avatar: false, createdAt: '', updatedAt: '' },
         persona: { id: 'p', name: 'Alex', description: 'friend of {{char}}', avatar: false, createdAt: '', updatedAt: '' }

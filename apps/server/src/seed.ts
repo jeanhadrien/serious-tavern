@@ -23,21 +23,21 @@ export function defaultPreset(): Preset {
     { id: 'default-message', key: 'message', label: 'User message', dataType: 'text' }
   ], entries: [
     { id: 'default-main-prompt', name: 'Main prompt', enabled: true, kind: 'message', role: 'system',
-      content: 'Write a natural, in-character reply in this fictional chat.\n{{char.system_prompt}}',
+      content: 'Write a natural, in-character reply in this fictional chat.\n{{character.system_prompt}}',
       placement: { mode: 'ordered' } },
     { id: 'default-character-description', name: 'Character description', enabled: true, kind: 'message', role: 'system',
-      content: '{{char.description}}', placement: { mode: 'ordered' } },
+      content: '{{character.description}}', placement: { mode: 'ordered' } },
     { id: 'default-personality', name: 'Personality', enabled: true, kind: 'message', role: 'system',
-      content: '{{char.personality}}', placement: { mode: 'ordered' } },
+      content: '{{character.personality}}', placement: { mode: 'ordered' } },
     { id: 'default-scenario', name: 'Scenario', enabled: true, kind: 'message', role: 'system',
-      content: '{{char.scenario}}', placement: { mode: 'ordered' } },
+      content: '{{character.scenario}}', placement: { mode: 'ordered' } },
     { id: 'default-persona', name: 'Persona', enabled: true, kind: 'message', role: 'system',
-      content: '{{user.description}}', placement: { mode: 'ordered' } },
+      content: '{{persona.description}}', placement: { mode: 'ordered' } },
     { id: 'default-example-dialogue', name: 'Example dialogue', enabled: true, kind: 'message', role: 'system',
-      content: '{{char.mes_example}}', placement: { mode: 'ordered' } },
+      content: '{{character.mes_example}}', placement: { mode: 'ordered' } },
     { id: 'default-history-slot', name: 'Chat history', enabled: true, kind: 'slot', inputKey: 'history', role: 'user' },
     { id: 'default-post-history-instructions', name: 'Post-history instructions', enabled: true, kind: 'message', role: 'system',
-      content: '{{char.post_history_instructions}}', placement: { mode: 'ordered' } },
+      content: '{{character.post_history_instructions}}', placement: { mode: 'ordered' } },
     { id: 'default-message-slot', name: 'User message', enabled: true, kind: 'slot', inputKey: 'message', role: 'user' }
   ], createdAt: date, updatedAt: date };
 }

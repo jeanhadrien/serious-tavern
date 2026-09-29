@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { macroInputKey, templateMacros } from './macros.js';
 
 export const presetRoleSchema = z.enum(['system', 'user', 'assistant']);
 export const presetInputKeySchema = z.string().regex(/^[a-z][a-zA-Z0-9_]*$/, 'Input key must match /^[a-z][a-zA-Z0-9_]*$/');
@@ -34,9 +35,9 @@ export const presetSchema = z.object({
   const inputByKey = new Map(preset.inputs.map(input => [input.key, input]));
   const inputKeys = new Set<string>();
   preset.inputs.forEach((input, index) => {
-    if (inputKeys.has(input.key))
+    if (inputKeys.has(input.key.toLowerCase()))
       ctx.addIssue({ code: 'custom', path: ['inputs', index, 'key'], message: `Duplicate input key: ${input.key}` });
-    inputKeys.add(input.key);
+    inputKeys.add(input.key.toLowerCase());
   });
 
   const entryById = new Map(preset.entries.map(entry => [entry.id, entry]));
@@ -48,9 +49,9 @@ export const presetSchema = z.object({
     if (entry.kind === 'slot' && !inputByKey.has(entry.inputKey))
       ctx.addIssue({ code: 'custom', path: ['entries', index, 'inputKey'], message: `Unknown input: ${entry.inputKey}` });
     if (entry.kind === 'message') {
-      for (const match of entry.content.matchAll(/\{\{\s*input\.([a-zA-Z][a-zA-Z0-9_]*)\s*\}\}/g)) {
-        const key = match[1]!;
-        if (!inputByKey.has(key))
+      for (const macro of templateMacros(entry.content)) {
+        const key = macroInputKey(macro.name);
+        if (key !== undefined && !inputKeys.has(key))
           ctx.addIssue({ code: 'custom', path: ['entries', index, 'content'], message: `Unknown input: ${key}` });
       }
     }
@@ -78,9 +79,16 @@ export function presetWarnings(preset: Preset): PresetWarning[] {
   preset.inputs.forEach((input, index) => {
     const usedBySlot = preset.entries.some(entry => entry.kind === 'slot' && entry.enabled && entry.inputKey === input.key);
     const usedByTemplate = preset.entries.some(entry => entry.kind === 'message' && entry.enabled &&
-      [...entry.content.matchAll(/\{\{\s*input\.([a-zA-Z][a-zA-Z0-9_]*)\s*\}\}/g)].some(match => match[1] === input.key));
+      templateMacros(entry.content).some(macro => macroInputKey(macro.name) === input.key.toLowerCase()));
     if (!usedBySlot && !usedByTemplate)
       warnings.push({ path: ['inputs', index], message: `Input "${input.key}" is not used by an enabled entry.` });
+  });
+  preset.entries.forEach((entry, index) => {
+    if (entry.kind !== 'message' || !entry.enabled) return;
+    for (const macro of templateMacros(entry.content)) {
+      if (!macro.definition)
+        warnings.push({ path: ['entries', index, 'content'], message: `Unknown macro: ${macro.expression}` });
+    }
   });
   return warnings;
 }

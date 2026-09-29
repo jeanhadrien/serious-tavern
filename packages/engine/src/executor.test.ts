@@ -84,7 +84,7 @@ describe('executor', () => {
       .toBe('A 3 B hi C [] D {{input.foo.constructor()}}');
   });
   it('renders character and persona variables in node templates', () => {
-    expect(renderTemplate('{{char}}/{{char.description}}/{{user}}/{{user.description}}', {
+    expect(renderTemplate('{{char}}/{{character.description}}/{{user}}/{{persona.description}}', {
       inputs: {}, trigger: { message: '', sessionId: '' }, history: [],
       character: { id: 'c', name: 'Rin', description: 'A {{user}}', personality: '', scenario: '', first_mes: '',
         mes_example: '', creator_notes: '', system_prompt: '', post_history_instructions: '', alternate_greetings: [],

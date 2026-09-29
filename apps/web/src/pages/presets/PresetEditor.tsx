@@ -1,11 +1,11 @@
 import { useRef } from 'react';
-import { presetSchema, presetWarnings, type Preset, type PresetEntry, type PresetInput } from '@st/shared';
+import { macroInputKey, templateMacros, presetSchema, presetWarnings, type Preset, type PresetEntry, type PresetInput } from '@st/shared';
 
 const newId = () => crypto.randomUUID();
 const newInput = (inputs: PresetInput[]): PresetInput => {
   let key = 'context';
   let suffix = 2;
-  while (inputs.some(input => input.key === key)) key = `context${suffix++}`;
+  while (inputs.some(input => input.key.toLowerCase() === key.toLowerCase())) key = `context${suffix++}`;
   return { id: newId(), key, label: 'Context', dataType: 'text' };
 };
 const newMessage = (): PresetEntry => ({
@@ -32,10 +32,10 @@ function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void })
     const oldKey = lastValidKeys.current.get(input.id) ?? input.key;
     const isValidKey = /^[a-z][a-zA-Z0-9_]*$/.test(key);
     const escapedKey = oldKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const reference = new RegExp(`\\{\\{\\s*input\\.${escapedKey}\\s*\\}\\}`, 'g');
+    const reference = new RegExp(`(\\{\\{\\s*inputs?\\.)${escapedKey}(?=[.\\s}]|$)`, 'gi');
     const entries = isValidKey && oldKey !== key ? props.preset.entries.map(entry => {
       if (entry.kind === 'slot' && entry.inputKey === oldKey) return { ...entry, inputKey: key };
-      if (entry.kind === 'message') return { ...entry, content: entry.content.replace(reference, `{{input.${key}}}`) };
+      if (entry.kind === 'message') return { ...entry, content: entry.content.replace(reference, (_match, prefix: string) => `${prefix}${key}`) };
       return entry;
     }) : props.preset.entries;
     if (isValidKey) lastValidKeys.current.set(input.id, key);
@@ -45,8 +45,8 @@ function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void })
   };
   const isUsed = (input: PresetInput) => props.preset.entries.some(entry =>
     entry.kind === 'slot' && entry.inputKey === input.key ||
-    entry.kind === 'message' && [...entry.content.matchAll(/\{\{\s*input\.([a-zA-Z][a-zA-Z0-9_]*)\s*\}\}/g)]
-      .some(match => match[1] === input.key));
+    entry.kind === 'message' && templateMacros(entry.content)
+      .some(macro => macroInputKey(macro.name) === input.key.toLowerCase()));
   const warnings = parsed.success ? presetWarnings(parsed.data) : [];
   return <section className="preset-inputs">
     <div className="toolbar"><h3>Inputs</h3><button onClick={() => props.onChange({
@@ -77,7 +77,7 @@ function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void })
       </div>;
     })}
     {warnings.length > 0 && <div className="preset-warnings">
-      {warnings.map(warning => <p key={warning.path.join('.')}>{warning.message}</p>)}
+      {warnings.map((warning, index) => <p key={`${warning.path.join('.')}-${index}`}>{warning.message}</p>)}
     </div>}
     {props.preset.inputs.some(isUsed) && <small className="hint">To remove an input, first remove its slots and template references.</small>}
   </section>;

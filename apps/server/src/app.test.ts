@@ -387,7 +387,7 @@ it('supports character/persona CRUD, card import and export, avatars, and sessio
     await app.inject({ method: 'PUT', url: `/api/workflows/${workflow.id}`, payload: {
       name: 'Context echo', nodes: [
         { id: 'input', type: 'chat-input', config: {}, position: { x: 0, y: 0 } },
-        { id: 'output', type: 'chat-output', config: { template: '{{char.name}} meets {{user.name}}' }, position: { x: 200, y: 0 } }
+        { id: 'output', type: 'chat-output', config: { template: '{{character.name}} meets {{persona.name}}' }, position: { x: 200, y: 0 } }
       ], edges: [{ id: 'message', source: 'input', sourceHandle: 'message', target: 'output', targetHandle: 'value' }]
     } });
     const message = await app.inject({ method: 'POST', url: `/api/sessions/${session.id}/messages`, payload: { content: 'Hi' } });
