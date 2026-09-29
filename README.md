@@ -49,7 +49,7 @@ git config blame.ignoreRevsFile .git-blame-ignore-revs
 ## Architecture
 
 - `packages/shared`: entity models plus the endpoint contract in `src/api/` (body, params, query, response schemas and inferred `ApiBody`, `ApiParams`, `ApiQuery`, `ApiResponse` types). The contract covers sessions/messages/executions, workflows/validation, presets/preview, characters/personas/import/export/avatars, node types/dynamic ports/providers, secrets and the common error envelope. Binary upload/download schemas describe bytes, not JSON; card extension values and error details intentionally remain `unknown`.
-- `packages/engine`: validated DAG executor, event callback, template helper, preset renderer, provider registry, node registry, and individual node implementations in `src/nodes/<type>/index.ts`. Internal `text.ts` centralizes compact node/template serialization and pretty JSON/transcript coercion shared by execution and presets; their distinct formatting remains intentional. Only nodes backward-reachable from Chat Output execute; other nodes are logged as skipped. Independent ready nodes execute concurrently; condition branches skip and merges ignore skipped inputs.
+- `packages/engine`: validated DAG executor, event callback, template helper, preset renderer, provider registry, node registry, and individual node implementations in `src/nodes/<type>/index.ts`. Internal `text.ts` centralizes compact node/template serialization and pretty JSON/transcript coercion shared by execution and presets; their distinct formatting remains intentional. Nodes backward-reachable from **any** Chat Output execute (the union of their dependencies); other nodes are logged as skipped. Independent ready nodes execute concurrently; condition branches skip and merges ignore skipped inputs.
 - `packages/node-ui`: JSON-Schema-driven config form and optional custom panels.
 - `apps/server`: `app.ts` assembles Fastify parsers, errors and resource routes; `context.ts` wires repositories, secrets and seed initialization. `routes/` parses shared contract schemas and types Fastify replies with `ApiResponse`; `services/` owns locked chat execution, preset preview and character/persona imports/exports. `errors.ts` centralizes HTTP errors and missing-entity checks. `storage/` and `secrets/` retain atomic JSON writes, per-session locking and encryption. `card.ts` and `uploads.ts` handle card/image transport. The server owns all data and secrets.
 - `apps/web`: React/Vite chat, React Flow workflow editor, Presets, Characters, Personas, and Settings. `api/transport.ts` owns fetch, `ApiError`, JSON headers and automatic/silent toasts. Per-resource clients in `api/` use the shared request/response types; pages call methods such as `sessionsApi.sendMessage(id, body)` rather than declaring payloads or constructing route strings. The UI does not execute workflows.
@@ -62,7 +62,27 @@ Frontend notifications live in `apps/web/src/alerts/`. Import `alerts` and call 
 
 `pages/chat/` separates chat data/actions (`useChat.ts`) from rendering and execution details.
 
-To add a node type: (1) create `packages/engine/src/nodes/<type>/index.ts` exporting a `NodeDefinition` with Zod config, typed ports (`dataType`, optional `description`), defaults and `execute(ctx)`; (2) optionally add `resolvePorts(config, resources)` for instance-specific ports (resources provide read-only access to presets without importing server code), and declare `templateFields` for config fields accepting `{{...}}`; (3) register the definition in `packages/engine/src/registry.ts`; (4) optionally add a custom config panel. `/api/node-types/:type/ports` resolves dynamic ports for the editor; validation and execution use the same resolver.
+To add a node type: (1) create `packages/engine/src/nodes/<type>/index.ts` exporting a `NodeDefinition` with Zod config, typed ports (`dataType`, optional `description`), defaults and `execute(ctx)`; (2) optionally add `resolvePorts(config, resources)` for instance-specific ports (resources provide read-only access to presets and character cards without importing server code), and declare `templateFields` for config fields accepting `{{...}}`; (3) register the definition in `packages/engine/src/registry.ts`; (4) optionally add a custom config panel. `/api/node-types/:type/ports` resolves dynamic ports for the editor; validation and execution use the same resolver. Resource lookups are cached for each execution so validation and execution use the same cards/presets.
+
+### Chat Output and Character nodes
+
+A valid workflow has **exactly one Chat Input and one or more Chat Outputs**. Each successfully completed Chat Output appends one assistant message. An output skipped by a Condition branch appends nothing; a run where all outputs are skipped succeeds with no assistant messages and an execution warning.
+
+**Chat Output** takes required `value` (`text`) and optional `character` (`character`) inputs. Its config has `template` (default `''` uses `value`; a nonempty template is rendered), `name` (optional free text, default `''`) and `order` (number, default `0`). Speaker precedence is the connected character's name, then the configured name, then an unnamed assistant. Merely selecting a session character does not automatically name outputs. Its `reply` (`text`) output remains connectable: `foo.reply → bar's LLM preset input → bar.value` chains two speakers inside one workflow run.
+
+Produced messages use a dependency-respecting topological order: an output's upstream outputs come first; among dependency-ready outputs, smaller `order` wins, then node id (stable lexical comparison). Node finish times and canvas positions never decide message order. `order` controls message placement, not node scheduling.
+
+**Character** emits a character card on its `character` output. Choose “Session character” (`source: 'session'`, the default) or a specific card (`source: 'card'`, `characterId`). A missing session character fails with an actionable error. Missing selected cards are validation errors. Connect a Character to Chat Output for speaker attribution, to LLM for local prompt context, or both.
+
+The **LLM** has an optional `character` input in addition to preset inputs. A connected card replaces the session character only for that LLM's render context, including recursive `{{character.*}}` fields and aliases (`{{char}}`, `{{description}}`, `{{personality}}`, `{{scenario}}`). Without a connection, session behavior is unchanged. The preset input key `character` is reserved for this dedicated port; conflicting presets fail port resolution with an explicit error.
+
+### Message API and partial failures
+
+`POST /api/sessions/:id/messages` accepts `{ content }` and returns `{ userMessage, assistantMessages: [...], execution }`. The array may be empty. Assistant messages may have `name` and `characterId`; the name is snapshotted when the message is created, so renaming a card does not rename old messages. Older stored sessions without these fields still work. Both user and assistant messages reference their execution, allowing the UI to display warnings/errors even when no output ran.
+
+The engine returns `{ replies: Array<{ nodeId, content, name?, characterId? }>, execution }`. On failure it throws `ExecutionFailure` with `.execution` and ordered `.replies` containing only completed outputs. The server keeps those replies in the locked session before returning HTTP 500 with `{ error: { code: 'WORKFLOW_EXECUTION_FAILED', message, details: { userMessage, assistantMessages, execution } } }`.
+
+Error `details` uses the same shared schema as a successful message result. The chat client displays kept replies plus the error notification and execution details; named speakers show their snapshotted name and an available character avatar. Retrying sends a new user message, rather than rolling back the failed turn.
 
 ## Presets and LLM providers
 
@@ -113,7 +133,7 @@ The LLM node selects a **provider**, **model**, **preset**, temperature, max tok
 
 **Merge consecutive system messages** (`mergeSystemMessages`, default `false`) is an LLM node checkbox. When enabled, after preset rendering it joins each consecutive run of system messages without a `name` using `"\n\n"`. User/assistant messages and named system messages break a run and remain unchanged (even an explicitly empty name is treated as set). Request logs contain the actual merged messages sent to the provider. Preset preview remains the unmerged preset output because merging is a node-level setting.
 
-Message inputs may already carry an optional string `name`. Message slots preserve it (including through depth insertion and repeated slots), and OpenRouter forwards it only when present. No speaker names are inferred or generated and there is no speaker-name UI yet; message-slot expansion is isolated for future per-slot options.
+Chat history and message inputs carry an optional string `name`. Chat Input, Memory in `messages` format, preset history previews and message slots preserve it (including through depth insertion and repeated slots); OpenRouter forwards it only when present. No speaker-name prefix is added to message content. A future per-slot option may control such prefixing; currently speaker names are metadata chosen through Chat Output.
 
 Seeding uses stable IDs so concurrent initializers do not create duplicate Default presets or demo workflows. Seeds are added only when the corresponding store is empty.
 
@@ -121,7 +141,7 @@ To add a provider, implement `LlmProvider` in `packages/engine/src/providers/` w
 
 ## Ports & types
 
-Ports declare `text`, `number`, `boolean`, `object`, `array`, `messages`, or `any` (legacy ports default to `any`). The same compatibility rule is used in the editor and executor:
+Ports declare `text`, `number`, `boolean`, `object`, `array`, `messages`, `character`, or `any` (legacy ports default to `any`). The same compatibility rule is used in the editor and executor:
 
 | Output → input | Result |
 | --- | --- |
@@ -129,6 +149,8 @@ Ports declare `text`, `number`, `boolean`, `object`, `array`, `messages`, or `an
 | `number`, `boolean`, `object`, `array` → `text` | Convert to text (objects/arrays as pretty JSON) |
 | `messages` → `text` | Convert to a `role: content` transcript |
 | `messages` → `array` | Pass through unchanged |
+| `character` → `object` | Pass through unchanged (a character is an object) |
+| `character` → `text` | Rejected; no implicit character serialization |
 | All other differing types, including `text` → `number`/`boolean` | Rejected; no implicit parsing |
 
 Memory's `history` output is `any` because its `format` setting can emit either text or messages. Hover over a port to see its type and description; compatible connections that convert data are dashed. Invalid saved edges remain visible in red for correction.
@@ -137,4 +159,4 @@ Memory's `history` output is `any` because its `format` setting can emit either 
 
 `data/` is gitignored. Workflows, presets, sessions and execution logs are separate JSON files written via temporary-file-and-rename. Persistence is behind a `Repository<T>` interface for a future database. Secrets are AES-256-GCM encrypted in `data/secrets.enc.json`; a 32-byte key comes from `SECRETS_KEY` (64 hex characters), or is generated in `data/.master.key` on first start. **Back up both encrypted secrets and the master key.** The secrets API returns only names and masked hints; key values can only be set or deleted. For a production deployment, provide `SECRETS_KEY`, restrict access to the server and data directory, and put authentication in front of the API.
 
-Executions report node status, timing, outputs and errors. Nodes in a failed execution wave are aborted and allowed to settle before the failure is returned; siblings stopped by that abort have status `cancelled`, distinct from an unselected condition branch (`skipped`). A required output port with outgoing edges must be returned by its node; an output declared `optional` may be omitted (Condition's mutually exclusive branch outputs are optional). Engine events are available for a future streaming transport. Message requests for one session are serialized through the completed reply or failure, so each prompt sees the prior exchange; different sessions can still execute concurrently. Workflow edits affect subsequent messages in all sessions bound to that workflow.
+Executions report node status, timing, outputs, errors and a `warnings` list (older logs default to an empty list). Nodes in a failed execution wave are aborted and allowed to settle before the failure is returned; siblings stopped by that abort have status `cancelled`, distinct from an unselected condition branch (`skipped`). Completed Chat Output replies are retained even if another node later fails; cancelled and skipped outputs produce no messages. After a failed wave settles, logs and replies no longer change. A required output port with outgoing edges must be returned by its node; an output declared `optional` may be omitted (Condition's mutually exclusive branch outputs are optional). Engine events are available for a future streaming transport. Message requests for one session are serialized through all completed replies or failure, so each prompt sees the prior exchange; different sessions can still execute concurrently. Workflow edits affect subsequent messages in all sessions bound to that workflow.
