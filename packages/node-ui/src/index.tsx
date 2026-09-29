@@ -1,10 +1,11 @@
 import { useRef, type ChangeEvent } from 'react';
-import { macroHints, type NodeTypeDescriptor } from '@st/shared';
+import { macroHints, type Character, type NodeTypeDescriptor } from '@st/shared';
 
 type Props = {
   descriptor: NodeTypeDescriptor;
   config: Record<string, unknown>;
   onChange(config: Record<string, unknown>): void;
+  characters?: Character[];
 };
 type Field = {
   type?: string;
@@ -181,8 +182,39 @@ function ConditionPanel(props: Props) {
     </>
   );
 }
+function CharacterPanel({ config, onChange, characters = [] }: Props) {
+  const selected = config.source === 'card' ? String(config.characterId ?? '') : 'session';
+  return (
+    <label>
+      Character
+      <select
+        value={selected}
+        onChange={(event) =>
+          onChange({
+            ...config,
+            source: event.target.value === 'session' ? 'session' : 'card',
+            characterId: event.target.value === 'session' ? '' : event.target.value,
+          })
+        }
+      >
+        <option value="session">Session character</option>
+        {config.source === 'card' && !characters.some((card) => card.id === selected) && (
+          <option value={selected}>Missing character card</option>
+        )}
+        {characters.map((card) => (
+          <option key={card.id} value={card.id}>
+            {card.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 // Optional overrides are registered only here; all other node types use the schema-driven form.
-export const customPanels: Record<string, (props: Props) => React.JSX.Element> = { condition: ConditionPanel };
+export const customPanels: Record<string, (props: Props) => React.JSX.Element> = {
+  condition: ConditionPanel,
+  character: CharacterPanel,
+};
 export function NodeConfigPanel(props: Props) {
   const Panel = customPanels[props.descriptor.type] ?? GenericPanel;
   return <Panel {...props} />;

@@ -5,7 +5,7 @@ import type { AppContext } from '../context.js';
 import { errorMessage, HttpError, notFound } from '../errors.js';
 import type { ApiRoute } from './types.js';
 
-export function registerNodeTypes(app: FastifyInstance, { presets }: AppContext) {
+export function registerNodeTypes(app: FastifyInstance, { presets, characters }: AppContext) {
   app.get<ApiRoute<'listNodeTypes'>>('/api/node-types', async () => descriptors());
   app.get<ApiRoute<'listProviders'>>('/api/providers', async () =>
     [...providers.values()].map(({ id, label, secretName }) => ({ id, label, secretName })),
@@ -17,7 +17,7 @@ export function registerNodeTypes(app: FastifyInstance, { presets }: AppContext)
     const { config } = apiContract.resolvePorts.body.parse(request.body);
     try {
       return definition.resolvePorts
-        ? await definition.resolvePorts(config, { presets })
+        ? await definition.resolvePorts(config, { presets, characters })
         : { inputs: definition.inputs, outputs: definition.outputs };
     } catch (error) {
       throw new HttpError(422, 'PORT_RESOLUTION_FAILED', errorMessage(error));

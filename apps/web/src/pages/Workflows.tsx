@@ -19,6 +19,7 @@ function WorkflowEditor() {
     types,
     typesReady,
     presets,
+    characters,
     providersList,
     workflow,
     setWorkflow,
@@ -64,6 +65,7 @@ function WorkflowEditor() {
               <WorkflowConfigPanel
                 current={canvas.current}
                 presets={presets}
+                characters={characters}
                 providersList={providersList}
                 updateConfig={canvas.updateConfig}
                 onClose={() => canvas.setSelected(undefined)}

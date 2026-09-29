@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { Workflow, NodeTypeDescriptor, Preset, ApiResponse } from '@st/shared';
-import { workflowsApi, nodeTypesApi, presetsApi, providersApi } from '../../api.js';
+import type { Character, Workflow, NodeTypeDescriptor, Preset, ApiResponse } from '@st/shared';
+import { charactersApi, workflowsApi, nodeTypesApi, presetsApi, providersApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
 import { canvasToWorkflow } from './model.js';
 import { useWorkflowCanvas } from './useWorkflowCanvas.js';
@@ -10,12 +10,17 @@ export function useWorkflowEditor() {
   const [types, setTypes] = useState<NodeTypeDescriptor[]>([]);
   const [typesReady, setTypesReady] = useState(false);
   const [presets, setPresets] = useState<Preset[]>([]);
+  const [characters, setCharacters] = useState<Character[]>([]);
   const [providersList, setProvidersList] = useState<ApiResponse<'listProviders'>>([]);
   const [workflow, setWorkflow] = useState<Workflow>();
   const canvas = useWorkflowCanvas(types, presets);
   const refresh = () => workflowsApi.list().then(setWorkflows);
   useEffect(() => {
     void refresh().catch(() => {});
+    void charactersApi
+      .list()
+      .then(setCharacters)
+      .catch(() => {});
     void nodeTypesApi
       .list()
       .then(setTypes)
@@ -32,6 +37,10 @@ export function useWorkflowEditor() {
   }, []);
   useEffect(() => {
     const update = () => {
+      void charactersApi
+        .list()
+        .then(setCharacters)
+        .catch(() => {});
       void presetsApi
         .list()
         .then(setPresets)
@@ -97,6 +106,7 @@ export function useWorkflowEditor() {
     types,
     typesReady,
     presets,
+    characters,
     providersList,
     workflow,
     setWorkflow,

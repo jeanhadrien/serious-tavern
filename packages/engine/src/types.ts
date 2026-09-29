@@ -6,7 +6,11 @@ export type EngineEvent = {
   nodeId?: string;
   detail?: unknown;
 };
-export type NodeResources = { presets: { get(id: string): Promise<Preset | undefined> } };
+export type NodeResources = {
+  presets: { get(id: string): Promise<Preset | undefined> };
+  characters?: { get(id: string): Promise<Character | undefined> };
+};
+export type ChatReply = { nodeId: string; content: string; name?: string; characterId?: string };
 export type ExecutionContext = {
   inputs: Record<string, unknown>;
   config: Record<string, unknown>;

@@ -136,7 +136,7 @@ it('returns payloads conforming to every shared endpoint response contract', asy
       url: `/api/sessions/${session.id}/messages`,
       payload: { content: 'Contract reply' },
     });
-    expect(message.assistantMessage.content).toBe('Contract reply');
+    expect(message.assistantMessages[0]?.content).toBe('Contract reply');
     const sessions = await request('listSessions', { method: 'GET', url: '/api/sessions' });
     expect(sessions[0]?.messageCount).toBe(2);
     await request('getSession', { method: 'GET', url: `/api/sessions/${session.id}` });
@@ -174,7 +174,7 @@ it('supports workflow CRUD, secrets masking, and a chat execution through inject
   try {
     const types = (await app.inject({ method: 'GET', url: '/api/node-types' })).json();
     expect(types.find((type: { type: string }) => type.type === 'llm')).toMatchObject({
-      inputs: [],
+      inputs: [{ name: 'character', label: 'Character', dataType: 'character' }],
       outputs: expect.arrayContaining([{ name: 'text', label: 'Text', dataType: 'text' }]),
     });
     const create = await app.inject({ method: 'POST', url: '/api/workflows', payload: { name: 'Echo' } });
@@ -257,7 +257,7 @@ it('supports workflow CRUD, secrets masking, and a chat execution through inject
       payload: { content: 'hi' },
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json().assistantMessage.content).toBe('hi');
+    expect(response.json().assistantMessages[0]?.content).toBe('hi');
     const executionId = response.json().execution.id;
     expect((await app.inject({ method: 'GET', url: `/api/executions/${executionId}` })).json().status).toBe(
       'completed',
@@ -600,7 +600,7 @@ it('supports presets CRUD, preview with a session, dynamic ports, and deletion c
       )
         .json()
         .inputs.map((port: { name: string }) => port.name),
-    ).toEqual(['history', 'message']);
+    ).toEqual(['character', 'history', 'message']);
     const session = (
       await app.inject({ method: 'POST', url: '/api/sessions', payload: { workflowId: workflow.id } })
     ).json();
@@ -651,7 +651,7 @@ it('supports presets CRUD, preview with a session, dynamic ports, and deletion c
       )
         .json()
         .inputs.map((port: { name: string }) => port.name),
-    ).toEqual(['history']);
+    ).toEqual(['character', 'history']);
     const staleInputValidation = await app.inject({ method: 'POST', url: `/api/workflows/${workflow.id}/validate` });
     expect(staleInputValidation.statusCode).toBe(422);
     expect(staleInputValidation.json().error.details.join(' ')).toContain('invalid input port message');
@@ -843,7 +843,7 @@ it('supports character/persona CRUD, card import and export, avatars, and sessio
       url: `/api/sessions/${session.id}/messages`,
       payload: { content: 'Hi' },
     });
-    expect(message.json().assistantMessage.content).toBe('Test character meets Persona');
+    expect(message.json().assistantMessages[0]?.content).toBe('Test character meets Persona');
     const changed = await app.inject({
       method: 'PATCH',
       url: `/api/sessions/${session.id}`,

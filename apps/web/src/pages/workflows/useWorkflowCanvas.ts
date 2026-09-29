@@ -52,7 +52,13 @@ export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]
           try {
             return { id: node.id, ports: await nodeTypesApi.resolvePorts('llm', node.data.config) };
           } catch {
-            return { id: node.id, ports: { inputs: [], outputs: node.data.descriptor.outputs } };
+            return {
+              id: node.id,
+              ports: {
+                inputs: node.data.descriptor.inputs.filter((port) => port.name === 'character'),
+                outputs: node.data.descriptor.outputs,
+              },
+            };
           }
         }),
     ).then((results) => {

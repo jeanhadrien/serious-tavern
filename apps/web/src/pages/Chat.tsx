@@ -1,6 +1,6 @@
 import { charactersApi, personasApi } from '../api.js';
 import { useChat } from './chat/useChat.js';
-import { ExecutionDetails } from './chat/ExecutionDetails.js';
+import { ChatMessageView } from './chat/ChatMessageView.js';
 export function Chat() {
   const {
     workflows,
@@ -105,11 +105,12 @@ export function Chat() {
             </div>
             <div className="thread">
               {session.messages.map((m) => (
-                <article className={`message ${m.role}`} key={m.id}>
-                  <small>{m.role}</small>
-                  <p>{m.content}</p>
-                  {m.executionId && <ExecutionDetails id={m.executionId} cached={logs[m.executionId]} />}
-                </article>
+                <ChatMessageView
+                  key={m.id}
+                  message={m}
+                  character={characters.find((card) => card.id === m.characterId)}
+                  execution={m.executionId ? logs[m.executionId] : undefined}
+                />
               ))}
               {busy && <p className="hint">Running workflow…</p>}
             </div>

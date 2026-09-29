@@ -19,6 +19,11 @@ export function ExecutionDetails({ id, cached }: { id: string; cached?: Executio
           <small>
             {execution.status} · {execution.id}
           </small>
+          {execution.warnings?.map((warning) => (
+            <p className="hint" key={warning}>
+              {warning}
+            </p>
+          ))}
           {Object.entries(execution.nodes).map(([nodeId, node]) => (
             <div className="execution-node" key={nodeId}>
               <strong>{nodeId}</strong> · {node.status} · {node.durationMs ?? 0}ms

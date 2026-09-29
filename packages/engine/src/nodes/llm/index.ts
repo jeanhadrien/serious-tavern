@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { PromptMessage } from '@st/shared';
+import { characterSchema, type PromptMessage } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { renderPreset } from '../../preset.js';
 import { providers } from '../../providers/index.js';
@@ -26,7 +26,7 @@ export const llm: NodeDefinition = {
   label: 'LLM',
   description: 'Generate a completion using a preset and provider',
   category: 'AI',
-  inputs: [],
+  inputs: [{ name: 'character', label: 'Character', dataType: 'character' }],
   outputs: [
     { name: 'text', label: 'Text', dataType: 'text' },
     { name: 'raw', label: 'Raw', dataType: 'object' },
@@ -57,13 +57,18 @@ export const llm: NodeDefinition = {
   async resolvePorts(config, resources) {
     const preset = await resources.presets.get(String(config.presetId ?? ''));
     if (!preset) throw new Error(`Preset ${config.presetId || '(none)'} not found`);
+    if (preset.inputs.some((input) => input.key === 'character'))
+      throw new Error('Preset input "character" conflicts with the LLM character port');
     return {
-      inputs: preset.inputs.map((input) => ({
-        name: input.key,
-        label: input.label ?? input.key,
-        dataType: input.dataType,
-        description: input.description,
-      })),
+      inputs: [
+        ...llm.inputs,
+        ...preset.inputs.map((input) => ({
+          name: input.key,
+          label: input.label ?? input.key,
+          dataType: input.dataType,
+          description: input.description,
+        })),
+      ],
       outputs: llm.outputs,
     };
   },
@@ -79,7 +84,7 @@ export const llm: NodeDefinition = {
       templateContext: {
         trigger: ctx.trigger,
         history: ctx.history,
-        character: ctx.character,
+        character: Object.hasOwn(ctx.inputs, 'character') ? characterSchema.parse(ctx.inputs.character) : ctx.character,
         persona: ctx.persona,
       },
     });

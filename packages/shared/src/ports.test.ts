@@ -8,6 +8,13 @@ describe('port compatibility', () => {
     ['any', 'number', true, undefined],
     ['object', 'any', true, undefined],
     ['messages', 'array', true, undefined],
+    ['character', 'character', true, undefined],
+    ['character', 'any', true, undefined],
+    ['any', 'character', true, undefined],
+    ['character', 'object', true, undefined],
+    ['character', 'text', false, undefined],
+    ['object', 'character', false, undefined],
+    ['text', 'character', false, undefined],
     ['number', 'text', true, 'to-text'],
     ['boolean', 'text', true, 'to-text'],
     ['object', 'text', true, 'to-text'],
@@ -26,6 +33,6 @@ describe('port compatibility', () => {
   });
   it('defaults legacy port metadata to any', () => {
     expect(portSchema.parse({ name: 'value', label: 'Value' }).dataType).toBe('any');
-    expect(dataTypeSchema.options).toHaveLength(7);
+    expect(dataTypeSchema.options).toHaveLength(8);
   });
 });

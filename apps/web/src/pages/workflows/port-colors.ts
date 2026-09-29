@@ -7,5 +7,6 @@ export const portColors: Record<PortDataType, string> = {
   object: '#80cbaa',
   array: '#e9a98c',
   messages: '#e5accc',
+  character: '#87d7d9',
   any: '#b3b9c7',
 };

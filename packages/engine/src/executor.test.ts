@@ -93,7 +93,7 @@ describe('executor', () => {
     );
     const result = await executeWorkflow(graph, options);
     expect(started).toHaveLength(2);
-    expect(JSON.parse(result.reply)).toEqual({ a: 'done', b: 'done' });
+    expect(JSON.parse(result.replies[0]!.content)).toEqual({ a: 'done', b: 'done' });
     expect(result.execution.nodes.output?.status).toBe('completed');
   });
   it('propagates a condition skip and merges the taken branch', async () => {
@@ -112,7 +112,7 @@ describe('executor', () => {
       ],
     );
     const result = await executeWorkflow(graph, options);
-    expect(result.reply).toBe('{"a":"hello"}');
+    expect(result.replies[0]!.content).toBe('{"a":"hello"}');
     expect(result.execution.nodes.condition?.output).toEqual({ true: 'hello' });
     const skipped = workflow(
       [
@@ -132,7 +132,7 @@ describe('executor', () => {
     );
     const result2 = await executeWorkflow(skipped, options);
     expect(result2.execution.nodes.mid?.status).toBe('skipped');
-    expect(result2.reply).toBe('{"b":"hello"}');
+    expect(result2.replies[0]!.content).toBe('{"b":"hello"}');
     expect(result2.execution.nodes.condition?.output).toEqual({ false: 'hello' });
   });
   it('supports array and first-non-empty merge modes', async () => {
@@ -144,7 +144,7 @@ describe('executor', () => {
         [node('input', 'chat-input'), node('merge', 'merge', { mode }), node('output', 'chat-output')],
         [edge('input', 'message', 'merge', 'a'), edge('merge', 'value', 'output', 'value')],
       );
-      expect((await executeWorkflow(graph, options)).reply).toBe(expected);
+      expect((await executeWorkflow(graph, options)).replies[0]!.content).toBe(expected);
     }
   });
   it('reports unknown ports, invalid configs, duplicate inputs, missing nodes, and cycles', async () => {
@@ -241,6 +241,7 @@ describe('executor', () => {
     const resources = { presets: { get: async () => preset } };
     expect(await registry.get('llm')!.resolvePorts?.({ presetId: preset.id }, resources)).toMatchObject({
       inputs: [
+        { name: 'character', label: 'Character', dataType: 'character' },
         { name: 'prompt', label: 'Prompt', dataType: 'text' },
         { name: 'extra', label: 'extra', dataType: 'text' },
       ],
@@ -285,7 +286,9 @@ describe('executor', () => {
       [node('input', 'chat-input'), node('output', 'chat-output')],
       [edge('input', 'history', 'output', 'value')],
     );
-    expect((await executeWorkflow(transcript, { ...options, history })).reply).toBe('user: Hi\nassistant: Hello');
+    expect((await executeWorkflow(transcript, { ...options, history })).replies[0]!.content).toBe(
+      'user: Hi\nassistant: Hello',
+    );
     registry.set('typed-test', {
       type: 'typed-test',
       label: 'Typed',
@@ -303,7 +306,7 @@ describe('executor', () => {
       [node('input', 'chat-input'), node('object', 'typed-test'), node('output', 'chat-output')],
       [edge('object', 'value', 'output', 'value')],
     );
-    expect((await executeWorkflow(json, options)).reply).toBe('{\n  "hello": [\n    "world"\n  ]\n}');
+    expect((await executeWorkflow(json, options)).replies[0]!.content).toBe('{\n  "hello": [\n    "world"\n  ]\n}');
   });
   it('does not execute nodes disconnected from Chat Output', async () => {
     const run = vi.fn(async () => {
@@ -325,7 +328,7 @@ describe('executor', () => {
       [edge('input', 'message', 'output', 'value')],
     );
     const result = await executeWorkflow(graph, options);
-    expect(result.reply).toBe('hello');
+    expect(result.replies[0]!.content).toBe('hello');
     expect(run).not.toHaveBeenCalled();
     expect(result.execution.nodes.unused?.status).toBe('skipped');
   });
@@ -378,7 +381,7 @@ describe('executor', () => {
         edge('merge', 'value', 'output', 'value'),
       ],
     );
-    expect((await executeWorkflow(optional, options)).reply).toBe('{"b":"hello"}');
+    expect((await executeWorkflow(optional, options)).replies[0]!.content).toBe('{"b":"hello"}');
   });
   it('aborts and settles sibling nodes before returning the first real failure', async () => {
     let siblingSettled = false;

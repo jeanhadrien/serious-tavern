@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { canConnect } from '@st/shared/ports';
 import type { Character, Workflow, ChatMessage, ExecutionLog, Edge, Persona } from '@st/shared';
 import { registry } from './registry.js';
-import type { EngineEvent, ExecutionContext, NodeResources } from './types.js';
+import type { ChatReply, EngineEvent, ExecutionContext, NodeResources } from './types.js';
 import { stringify, coerceValue } from './text.js';
+import { orderReplies } from './replies.js';
 
 export async function validateWorkflow(
   workflow: Workflow,
@@ -36,9 +37,9 @@ export async function validateWorkflow(
       errors.push(`Node ${node.id}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  for (const type of ['chat-input', 'chat-output']) {
-    if (workflow.nodes.filter((n) => n.type === type).length !== 1) errors.push(`Expected exactly one ${type} node`);
-  }
+  if (workflow.nodes.filter((n) => n.type === 'chat-input').length !== 1)
+    errors.push('Expected exactly one chat-input node');
+  if (!workflow.nodes.some((n) => n.type === 'chat-output')) errors.push('Expected at least one chat-output node');
   const edgeIds = new Set<string>();
   const inbound = new Map<string, number>(workflow.nodes.map((n) => [n.id, 0]));
   const adjacency = new Map<string, string[]>(workflow.nodes.map((n) => [n.id, []]));
@@ -94,6 +95,7 @@ export class ExecutionFailure extends Error {
   constructor(
     message: string,
     public readonly execution: ExecutionLog,
+    public readonly replies: ChatReply[] = [],
   ) {
     super(message);
   }
@@ -113,13 +115,20 @@ export async function executeWorkflow(
     onEvent?: (event: EngineEvent) => void;
     nodeTimeoutMs?: number;
   },
-): Promise<{ reply: string; execution: ExecutionLog }> {
+): Promise<{ replies: ChatReply[]; execution: ExecutionLog }> {
   const snapshot = new Map<string, import('@st/shared').Preset | undefined>();
+  const characterSnapshot = new Map<string, Character | undefined>();
   const resources: NodeResources = {
     presets: {
       get: async (id) => {
         if (!snapshot.has(id)) snapshot.set(id, await options.resources?.presets.get(id));
         return snapshot.get(id);
+      },
+    },
+    characters: {
+      get: async (id) => {
+        if (!characterSnapshot.has(id)) characterSnapshot.set(id, await options.resources?.characters?.get(id));
+        return characterSnapshot.get(id);
       },
     },
   };
@@ -137,6 +146,7 @@ export async function executeWorkflow(
     status: 'running',
     startedAt: new Date().toISOString(),
     nodes: {},
+    warnings: [],
   };
   const controller = new AbortController();
   const onAbort = () => controller.abort(options.signal?.reason);
@@ -144,6 +154,7 @@ export async function executeWorkflow(
   if (options.signal?.aborted) onAbort();
   const emit = (event: EngineEvent) => options.onEvent?.(event);
   const resolved = new Map<string, { output: Record<string, unknown>; skipped: boolean }>();
+  const replies = new Map<string, ChatReply>();
   const ports = new Map(
     await Promise.all(
       workflow.nodes.map(async (node) => {
@@ -157,11 +168,11 @@ export async function executeWorkflow(
       }),
     ),
   );
-  const outputNode = workflow.nodes.find((n) => n.type === 'chat-output')!;
+  const outputNodes = workflow.nodes.filter((n) => n.type === 'chat-output');
   const upstream = new Map<string, string[]>(workflow.nodes.map((node) => [node.id, []]));
   for (const edge of workflow.edges) upstream.get(edge.target)?.push(edge.source);
   const reachable = new Set<string>();
-  const visit = [outputNode.id];
+  const visit = outputNodes.map((node) => node.id);
   while (visit.length) {
     const id = visit.pop()!;
     if (reachable.has(id)) continue;
@@ -286,6 +297,16 @@ export async function executeWorkflow(
               durationMs: Date.now() - start,
               output,
             };
+            if (node.type === 'chat-output') {
+              const character = inputs.character as Character | undefined;
+              const name = character?.name || String(node.config.name ?? '');
+              replies.set(node.id, {
+                nodeId: node.id,
+                content: stringify(output.reply),
+                ...(name ? { name } : {}),
+                ...(character ? { characterId: character.id } : {}),
+              });
+            }
             resolved.set(node.id, { output, skipped: false });
             emit({ type: 'node:complete', nodeId: node.id, detail: output });
           } catch (cause) {
@@ -331,14 +352,17 @@ export async function executeWorkflow(
         pending.delete(n.id);
       });
     }
-    const result = resolved.get(outputNode.id);
-    if (!result || result.skipped) throw new Error(`Chat output ${outputNode.id} was skipped`);
     execution.status = 'completed';
-    return { reply: stringify(result.output.reply), execution };
+    return { replies: orderReplies(workflow, replies), execution };
   } catch (cause) {
     execution.status = 'error';
-    throw new ExecutionFailure(cause instanceof Error ? cause.message : String(cause), execution);
+    throw new ExecutionFailure(
+      cause instanceof Error ? cause.message : String(cause),
+      execution,
+      orderReplies(workflow, replies),
+    );
   } finally {
+    if (!replies.size) execution.warnings.push('No Chat Output nodes ran; this turn produced no assistant messages.');
     execution.finishedAt = new Date().toISOString();
     emit({ type: 'execution:complete', detail: execution.status });
     options.signal?.removeEventListener('abort', onAbort);

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import type { Preset, PromptMessage } from '@st/shared';
 import { httpRequest } from './nodes/http-request/index.js';
+import { character } from './nodes/character/index.js';
 import { llm, mergeSystemMessages } from './nodes/llm/index.js';
 import { providers } from './providers/index.js';
 import { openrouter } from './providers/openrouter.js';
@@ -42,9 +43,29 @@ afterEach(() => {
   providers.delete('fake');
 });
 describe('integration nodes', () => {
+  it('fails clearly when a directly executed character card is missing', async () => {
+    await expect(character.execute(ctx({ source: 'card', characterId: 'missing' }))).rejects.toThrow(
+      'Character missing not found',
+    );
+  });
+  it('rejects a preset input that conflicts with the dedicated character port', async () => {
+    await expect(
+      llm.resolvePorts?.(
+        { presetId: preset.id },
+        {
+          presets: {
+            get: async () => ({ ...preset, inputs: [{ id: 'character', key: 'character', dataType: 'text' }] }),
+          },
+        },
+      ),
+    ).rejects.toThrow('conflicts with the LLM character port');
+  });
   it('resolves LLM input ports from preset inputs', async () => {
     const result = await llm.resolvePorts?.({ presetId: preset.id }, { presets: { get: async () => preset } });
-    expect(result?.inputs).toEqual([{ name: 'prompt', label: 'Prompt', dataType: 'text', description: undefined }]);
+    expect(result?.inputs).toEqual([
+      { name: 'character', label: 'Character', dataType: 'character' },
+      { name: 'prompt', label: 'Prompt', dataType: 'text', description: undefined },
+    ]);
   });
   it('templates the HTTP request and parses JSON', async () => {
     const fetchMock = vi

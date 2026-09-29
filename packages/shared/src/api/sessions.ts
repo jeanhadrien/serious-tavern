@@ -18,7 +18,7 @@ export const updateSessionSchema = z.object({
 export const sendMessageSchema = z.object({ content: z.string().trim().min(1) });
 export const sendMessageResultSchema = z.object({
   userMessage: messageSchema,
-  assistantMessage: messageSchema,
+  assistantMessages: z.array(messageSchema),
   execution: executionLogSchema,
 });
 export const sessionEndpoints = {

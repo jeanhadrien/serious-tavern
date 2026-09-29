@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { Workflow, Session, ExecutionLog, SessionSummary, ApiBody, Character, Persona } from '@st/shared';
+import { sendMessageResultSchema } from '@st/shared';
 import { sessionsApi, workflowsApi, charactersApi, personasApi } from '../../api.js';
+import { ApiError } from '../../api/transport.js';
 import { alerts } from '../../alerts/index.js';
 
 export function useChat() {
@@ -80,13 +82,23 @@ export function useChat() {
       const result = await sessionsApi.sendMessage(session.id, { content: text });
       setSession((prev) =>
         prev?.id === session.id
-          ? { ...prev, messages: [...prev.messages, result.userMessage, result.assistantMessage] }
+          ? { ...prev, messages: [...prev.messages, result.userMessage, ...result.assistantMessages] }
           : prev,
       );
       setLogs((prev) => ({ ...prev, [result.execution.id]: result.execution }));
       await refresh();
-    } catch {
-      await open(session.id);
+    } catch (error) {
+      const details = sendMessageResultSchema.safeParse(error instanceof ApiError ? error.details : undefined);
+      if (details.success) {
+        const result = details.data;
+        setSession((prev) =>
+          prev?.id === session.id
+            ? { ...prev, messages: [...prev.messages, result.userMessage, ...result.assistantMessages] }
+            : prev,
+        );
+        setLogs((prev) => ({ ...prev, [result.execution.id]: result.execution }));
+        await refresh();
+      } else await open(session.id);
     } finally {
       setBusy(false);
     }

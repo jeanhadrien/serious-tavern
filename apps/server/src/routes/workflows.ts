@@ -6,7 +6,7 @@ import { now, type AppContext } from '../context.js';
 import { HttpError, requireEntity } from '../errors.js';
 import type { ApiRoute } from './types.js';
 
-export function registerWorkflows(app: FastifyInstance, { workflows, sessions, presets }: AppContext) {
+export function registerWorkflows(app: FastifyInstance, { workflows, sessions, presets, characters }: AppContext) {
   app.get<ApiRoute<'listWorkflows'>>('/api/workflows', async () => workflows.list());
   app.post<ApiRoute<'createWorkflow'>>('/api/workflows', async (request, reply) => {
     const body = apiContract.createWorkflow.body.parse(request.body);
@@ -43,7 +43,7 @@ export function registerWorkflows(app: FastifyInstance, { workflows, sessions, p
   app.post<ApiRoute<'validateWorkflow'>>('/api/workflows/:id/validate', async (request) => {
     const { id } = apiContract.validateWorkflow.params.parse(request.params);
     const workflow = await requireEntity(workflows, id, 'Workflow');
-    const errors = await validateWorkflow(workflow, { presets });
+    const errors = await validateWorkflow(workflow, { presets, characters });
     if (errors.length) throw new HttpError(422, 'WORKFLOW_INVALID', 'Invalid workflow', errors);
     return { valid: true, errors: [] };
   });

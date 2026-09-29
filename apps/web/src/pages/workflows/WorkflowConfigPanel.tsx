@@ -1,17 +1,19 @@
 import { Link } from 'react-router-dom';
 import { NodeConfigPanel } from '@st/node-ui';
-import type { NodeInstance, Preset, ApiResponse } from '@st/shared';
+import type { Character, NodeInstance, Preset, ApiResponse } from '@st/shared';
 import type { CanvasNode } from './model.js';
 
 export function WorkflowConfigPanel({
   current,
   presets,
+  characters,
   providersList,
   updateConfig,
   onClose,
 }: {
   current: CanvasNode;
   presets: Preset[];
+  characters: Character[];
   providersList: ApiResponse<'listProviders'>;
   updateConfig: (config: NodeInstance['config']) => void;
   onClose: () => void;
@@ -117,7 +119,12 @@ export function WorkflowConfigPanel({
           </label>
         </div>
       ) : (
-        <NodeConfigPanel descriptor={currentDescriptor} config={current.data.config} onChange={updateConfig} />
+        <NodeConfigPanel
+          descriptor={currentDescriptor}
+          config={current.data.config}
+          onChange={updateConfig}
+          characters={characters}
+        />
       )}
     </aside>
   );

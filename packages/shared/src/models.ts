@@ -27,6 +27,8 @@ export const messageSchema = z.object({
   content: z.string(),
   createdAt: z.string(),
   executionId: z.string().optional(),
+  name: z.string().optional(),
+  characterId: z.string().optional(),
 });
 export const sessionSchema = z.object({
   id: z.string(),
@@ -55,6 +57,7 @@ export const executionLogSchema = z.object({
   startedAt: z.string(),
   finishedAt: z.string().optional(),
   nodes: z.record(z.string(), nodeExecutionSchema),
+  warnings: z.array(z.string()).default([]),
 });
 export const dataTypeSchema = z.enum(portDataTypes);
 export const portSchema = z.object({
