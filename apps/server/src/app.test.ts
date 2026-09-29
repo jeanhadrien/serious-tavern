@@ -124,6 +124,10 @@ it('serializes same-session message exchanges and merges concurrent session patc
   let pairCount = 0;
   let releasePair!: () => void;
   const pairStarted = new Promise<void>(resolve => { releasePair = resolve; });
+  let releasePatchExecution!: () => void;
+  const patchExecutionGate = new Promise<void>(resolve => { releasePatchExecution = resolve; });
+  let announcePatchExecution!: () => void;
+  const patchExecutionStarted = new Promise<void>(resolve => { announcePatchExecution = resolve; });
   registry.set('slow-echo-test', {
     type: 'slow-echo-test', label: 'Slow echo', description: '', category: 'Tests',
     inputs: [{ name: 'message', label: 'Message', dataType: 'any' },
@@ -135,7 +139,10 @@ it('serializes same-session message exchanges and merges concurrent session patc
       activeExecutions++;
       maxConcurrentExecutions = Math.max(maxConcurrentExecutions, activeExecutions);
       try {
-        if (waitForPair) {
+        if (inputs.message === 'patch-race') {
+          announcePatchExecution();
+          await patchExecutionGate;
+        } else if (waitForPair) {
           pairCount++;
           if (pairCount === 2) releasePair();
           await Promise.race([pairStarted, new Promise(resolve => setTimeout(resolve, 1000))]);
@@ -182,6 +189,21 @@ it('serializes same-session message exchanges and merges concurrent session patc
     expect(pairCount).toBe(2);
     expect(maxConcurrentExecutions).toBe(2);
 
+    const inFlightMessage = app.inject({ method: 'POST', url: `/api/sessions/${session.id}/messages`,
+      payload: { content: 'patch-race' } });
+    await patchExecutionStarted;
+    let patchFinished = false;
+    const inFlightPatch = app.inject({ method: 'PATCH', url: `/api/sessions/${session.id}`,
+      payload: { title: 'Patched during execution' } }).then(response => {
+      patchFinished = true;
+      return response;
+    });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(patchFinished).toBe(false);
+    releasePatchExecution();
+    expect((await inFlightMessage).statusCode).toBe(200);
+    expect((await inFlightPatch).statusCode).toBe(200);
+
     const [titlePatch, characterPatch] = await Promise.all([
       app.inject({ method: 'PATCH', url: `/api/sessions/${session.id}`, payload: { title: 'Updated title' } }),
       app.inject({ method: 'PATCH', url: `/api/sessions/${session.id}`, payload: { characterId: character.id } })
@@ -189,7 +211,10 @@ it('serializes same-session message exchanges and merges concurrent session patc
     expect(titlePatch.statusCode).toBe(200);
     expect(characterPatch.statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json())
-      .toMatchObject({ title: 'Updated title', characterId: character.id });
+      .toMatchObject({ title: 'Updated title', characterId: character.id, messages: expect.arrayContaining([
+        expect.objectContaining({ role: 'user', content: 'patch-race' }),
+        expect.objectContaining({ role: 'assistant', content: 'reply patch-race' })
+      ]) });
   } finally {
     registry.delete('slow-echo-test');
     await app.close();
