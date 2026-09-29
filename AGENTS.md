@@ -40,7 +40,15 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Add new types or rules there, together with their table-driven tests.
 - **Secrets are write-only:** the API only returns masked hints. The OpenRouter key is the secret named `openrouter`. The master key comes from env `SECRETS_KEY` or `data/.master.key`.
 - **Seeded workflows** ("Default Assistant", "Parallel demo") must keep validating. There's a test for this.
-- **Creating a session** requires a `workflowId`.
+- **Creating a session** requires a `workflowId`. Sessions also store `characterId` and `personaId`, which the server loads and passes to the executor.
+- **Characters/personas:**
+  - Card parsing and writing (PNG `tEXt` chunks `ccv3`, which takes precedence, then `chara`; V1/V2/V3 JSON) lives in `apps/server/src/card.ts` and runs on the server.
+  - Export writes both `chara` (V2) and `ccv3` (V3), like SillyTavern.
+  - Unknown card fields are kept in `extensions` so export round-trips.
+- **Template variables:** `{{char}}`, `{{user}}`, `{{char.*}}` and `{{user.*}}` are resolved by the engine template renderer, which both preset rendering and node templates use.
+  - These variables also resolve inside character fields.
+  - A missing value renders as empty text; `{{user}}` defaults to "User".
+  - When you add variables, update the hint lists in the web app.
 
 ## Adding a node type
 1. Create `packages/engine/src/nodes/<type>/index.ts` exporting a `NodeDefinition`: `type`, `label`, `category`, typed `inputs`/`outputs` with `dataType` and `description`, zod `configSchema`, `defaultConfig`, and `execute(ctx)`, which returns one key per output port.
