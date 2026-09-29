@@ -336,7 +336,9 @@ export async function executeWorkflow(
       );
       if (firstFailure) throw firstFailure;
       if (controller.signal.aborted) throw new Error('Execution aborted');
-      ready.forEach((n) => pending.delete(n.id));
+      ready.forEach((n) => {
+        pending.delete(n.id);
+      });
     }
     const result = resolved.get(outputNode.id);
     if (!result || result.skipped) throw new Error(`Chat output ${outputNode.id} was skipped`);

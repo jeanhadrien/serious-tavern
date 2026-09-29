@@ -77,7 +77,9 @@ export function Characters() {
   const importFiles = async (files: File[]) => {
     if (!files.length) return;
     const form = new FormData();
-    files.forEach((file) => form.append('files', file, file.name));
+    files.forEach((file) => {
+      form.append('files', file, file.name);
+    });
     try {
       const result = await api<ImportResult<Character>>('/characters/import', { method: 'POST', body: form });
       if (result.imported.length) {
@@ -408,7 +410,9 @@ export function Personas() {
       return;
     }
     const form = new FormData();
-    images.forEach((file) => form.append('files', file, file.name));
+    images.forEach((file) => {
+      form.append('files', file, file.name);
+    });
     try {
       const result = await api<ImportResult<Persona>>('/personas/import', { method: 'POST', body: form });
       if (result.imported.length) {

@@ -431,10 +431,9 @@ describe('executor', () => {
         edge('merge', 'value', 'output', 'value'),
       ],
     );
-    let failedExecution: import('@st/shared').ExecutionLog | undefined;
     const failure = await executeWorkflow(graph, options).catch((error) => error);
     expect(failure).toMatchObject({ message: 'Node fail (fast-fail-test): first failure' });
-    failedExecution = failure.execution;
+    const failedExecution: import('@st/shared').ExecutionLog | undefined = failure.execution;
     expect(siblingSettled).toBe(true);
     expect(failedExecution?.nodes.slow?.status).toBe('cancelled');
     const snapshot = structuredClone(failedExecution);
@@ -487,10 +486,9 @@ describe('executor', () => {
       ],
     );
     const started = Date.now();
-    let failedExecution: import('@st/shared').ExecutionLog | undefined;
     const failure = await executeWorkflow(graph, options).catch((error) => error);
     expect(failure).toMatchObject({ message: 'Node fail (fast-fail-test): first failure' });
-    failedExecution = failure.execution;
+    const failedExecution: import('@st/shared').ExecutionLog | undefined = failure.execution;
     expect(Date.now() - started).toBeGreaterThanOrEqual(30);
     expect(failedExecution?.nodes.slow).toMatchObject({ status: 'cancelled' });
     const snapshot = structuredClone(failedExecution);
