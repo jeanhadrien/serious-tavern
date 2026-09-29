@@ -40,6 +40,15 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Add new types or rules there, together with their table-driven tests.
 - **Secrets are write-only:** the API only returns masked hints. The OpenRouter key is the secret named `openrouter`. The master key comes from env `SECRETS_KEY` or `data/.master.key`.
 - **Seeded workflows** ("Default Assistant", "Parallel demo") must keep validating. There's a test for this.
+- **Session writes:** always go through the per-session lock and `update`, never `load → await → save`.
+  - Messages sent to one session are handled one after another; different sessions run concurrently.
+  - Repository writes are atomic: they write a temp file, then rename it.
+- **Execution semantics:**
+  - Only nodes that Chat Output depends on run; the rest are logged as `skipped`.
+  - A connected output port that a node doesn't return is an error, unless the port is marked `optional` (Condition branches are).
+  - On failure, the sibling nodes in the same wave are aborted and settled (status `cancelled`) before the error is thrown. After that, the execution log must never change.
+- **Editor:** never drop nodes. Unknown node types are kept as read-only placeholders and are saved unchanged.
+- **Presets:** fixed entries that render to empty text are dropped, so a template entry holding only one variable disappears when that variable is empty.
 - **Creating a session** requires a `workflowId`. Sessions also store `characterId` and `personaId`, which the server loads and passes to the executor.
 - **Characters/personas:**
   - Card parsing and writing (PNG `tEXt` chunks `ccv3`, which takes precedence, then `chara`; V1/V2/V3 JSON) lives in `apps/server/src/card.ts` and runs on the server.
