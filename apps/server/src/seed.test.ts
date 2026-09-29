@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import type { Workflow, Preset } from '@st/shared';
-import { validateWorkflow } from '@st/engine';
+import { renderPreset, validateWorkflow } from '@st/engine';
 import type { Repository } from './storage/repository.js';
 import { defaultPreset, seed } from './seed.js';
 
@@ -14,7 +14,30 @@ it('keeps the built-in preset and entry IDs stable', () => {
     ['history', 'messages', 'Chat history'], ['message', 'text', 'User message']
   ]);
   expect(first.entries.map(entry => [entry.kind, entry.name])).toEqual([
-    ['message', 'Main prompt'], ['slot', 'Chat history'], ['slot', 'User message']
+    ['message', 'Main prompt'], ['message', 'Character description'], ['message', 'Personality'],
+    ['message', 'Scenario'], ['message', 'Persona'], ['message', 'Example dialogue'],
+    ['slot', 'Chat history'], ['message', 'Post-history instructions'], ['slot', 'User message']
+  ]);
+  expect(first.entries.some(entry => entry.kind === 'message' && entry.content.includes('first_mes'))).toBe(false);
+});
+
+it('renders no blank default entries and preserves the character prompt field order', () => {
+  const preset = defaultPreset();
+  const templateContext = { trigger: { message: '', sessionId: 'session' }, history: [] };
+  expect(renderPreset(preset, { inputs: { history: [], message: '' }, templateContext })).toEqual([]);
+  const messages = renderPreset(preset, {
+    inputs: { history: [], message: '' },
+    templateContext: {
+      ...templateContext,
+      character: { id: 'c', name: 'Rin', description: 'description', personality: 'personality',
+        scenario: 'scenario', first_mes: 'must not appear', mes_example: 'examples', creator_notes: '',
+        system_prompt: 'main prompt', post_history_instructions: 'after history', alternate_greetings: [],
+        tags: [], creator: '', character_version: '', extensions: {}, avatar: false, createdAt: '', updatedAt: '' },
+      persona: { id: 'p', name: 'Sam', description: 'persona', avatar: false, createdAt: '', updatedAt: '' }
+    }
+  });
+  expect(messages.map(message => message.content)).toEqual([
+    'main prompt', 'description', 'personality', 'scenario', 'persona', 'examples', 'after history'
   ]);
 });
 
@@ -24,12 +47,27 @@ it('seeds two valid workflows only once', async () => {
     list: async () => [...items.values()],
     get: async id => items.get(id),
     save: async item => { items.set(item.id, item); },
+    update: async (id, mutator) => {
+      const current = items.get(id);
+      if (!current) return undefined;
+      const updated = await mutator(current);
+      items.set(id, updated);
+      return updated;
+    },
     delete: async id => { items.delete(id); }
   };
   const presets = new Map<string, Preset>();
   const presetRepository: Repository<Preset> = {
     list: async () => [...presets.values()], get: async key => presets.get(key),
-    save: async preset => { presets.set(preset.id, preset); }, delete: async key => { presets.delete(key); }
+    save: async preset => { presets.set(preset.id, preset); },
+    update: async (key, mutator) => {
+      const current = presets.get(key);
+      if (!current) return undefined;
+      const updated = await mutator(current);
+      presets.set(key, updated);
+      return updated;
+    },
+    delete: async key => { presets.delete(key); }
   };
   await seed(repository, presetRepository);
   expect(await Promise.all([...items.values()].map(async workflow => [workflow.name,
@@ -44,11 +82,27 @@ it('uses stable seed IDs when two initializers observe empty stores concurrently
   const presets = new Map<string, Preset>();
   const workflowRepository: Repository<Workflow> = {
     list: async () => [...workflows.values()], get: async key => workflows.get(key),
-    save: async workflow => { workflows.set(workflow.id, workflow); }, delete: async key => { workflows.delete(key); }
+    save: async workflow => { workflows.set(workflow.id, workflow); },
+    update: async (key, mutator) => {
+      const current = workflows.get(key);
+      if (!current) return undefined;
+      const updated = await mutator(current);
+      workflows.set(key, updated);
+      return updated;
+    },
+    delete: async key => { workflows.delete(key); }
   };
   const presetRepository: Repository<Preset> = {
     list: async () => [...presets.values()], get: async key => presets.get(key),
-    save: async preset => { presets.set(preset.id, preset); }, delete: async key => { presets.delete(key); }
+    save: async preset => { presets.set(preset.id, preset); },
+    update: async (key, mutator) => {
+      const current = presets.get(key);
+      if (!current) return undefined;
+      const updated = await mutator(current);
+      presets.set(key, updated);
+      return updated;
+    },
+    delete: async key => { presets.delete(key); }
   };
   await Promise.all([seed(workflowRepository, presetRepository), seed(workflowRepository, presetRepository)]);
   expect(presets.size).toBe(1);
