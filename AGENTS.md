@@ -19,12 +19,19 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 - `packages/shared`: zod schemas and types (workflow, ports, `canConnect` compatibility and coercion rules). This is the single source of truth for both front and back.
 - `packages/engine`: graph validation, wave-based parallel executor, templating (`{{input.x}}`, `{{trigger.message}}`, `{{history}}`, no code eval). Node types live in `src/nodes/<type>/index.ts` and are registered in `registry.ts`.
 - `packages/node-ui`: config forms generated from JSON Schema, custom panels, template-variable hints.
-- `apps/server`: Fastify 5 on port 3001 (run with `tsx`). JSON-file storage under `data/` (gitignored, atomic writes). AES-256-GCM secrets. Global error handler.
+- **API contract:** `packages/shared/src/api/` holds zod schemas and types for the request and response of every endpoint. It is the only definition of the API.
+  - To add or change an endpoint, update the contract first. The server parses its input with the contract and types its response from it; the web client uses the same types.
+  - Server tests check that responses match the contract schemas.
+  - Don't declare request or response types locally, and don't put inline `z.object` schemas in routes.
+- `apps/server`: Fastify 5 on port 3001 (run with `tsx`). JSON-file storage under `data/` (gitignored, atomic writes). AES-256-GCM secrets.
+  - `app.ts` only wires things together.
+  - `context.ts` sets up the repositories and secrets; `errors.ts` has HttpError and the error handler.
+  - `routes/<resource>.ts` holds thin handlers; the logic lives in `services/`: `chat.ts` (runs a message under the session lock), card import/export, preset preview.
 - `apps/web`: React 19 + Vite on port 5173, proxying `/api` to the server.
-  - `api.ts`: API client; throws `ApiError`.
+  - `api/`: typed clients per resource, built on `transport.ts` (ApiError, toasts, `{silent:true}`). Pages call these clients, never raw paths.
   - `alerts/`: toast store and `<Toaster/>`.
   - `connection.ts`: `isValidConnection`.
-  - `pages/`: Chat, Workflows (the editor), Settings.
+  - `pages/<area>/`: components and hooks per page (chat, workflows, entities, presets). Keep files focused, roughly under 250 lines.
 
 ## Commands
 - `npm run dev`: server and web together.
