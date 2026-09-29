@@ -1,0 +1,33 @@
+:root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#e5e7ed;background:#17191f;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0}button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid #424757;background:#303440;border-radius:7px;padding:8px 12px}
+button:hover{background:#414758}button:disabled{opacity:.5;cursor:not-allowed}
+button.primary{background:#6f7ddf;border-color:#8390eb;color:#fff}button.primary:hover{background:#8290e8}
+input,textarea,select{background:#242832;border:1px solid #444a58;border-radius:6px;padding:9px;min-width:0}
+textarea{resize:vertical}label{display:flex;flex-direction:column;gap:6px;text-transform:capitalize;font-size:.88rem}
+label.check{flex-direction:row;align-items:center}h1{font-size:1.8rem}h2{font-size:1.15rem}h3{font-size:1rem}
+p{line-height:1.5}.hint,small{color:#a7adbd}.error{color:#ffa8a8;white-space:pre-wrap}
+.app{height:100vh;display:flex;flex-direction:column}.app>nav{height:56px;flex-shrink:0;display:flex;align-items:center;gap:24px;background:#22252e;border-bottom:1px solid #3b4050;padding:0 24px}
+.app>nav strong{margin-right:20px}.app>nav a{color:#aeb5c7;text-decoration:none}.app>nav a.active{color:#c5cdff}
+main{flex:1;min-height:0}.page{padding:28px;overflow:auto;height:100%}.narrow{max-width:760px;margin:auto}.stack{display:grid;gap:18px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px}.list-row,.session-row{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #333846;padding:7px 5px;gap:8px}
+.list-row span{display:flex;gap:15px;align-items:center}.sidebar{width:245px;flex-shrink:0;padding:14px;background:#20232b;border-right:1px solid #343844;overflow:auto}
+.session-row.selected{background:#33394b;border-radius:6px}.session-link{background:none;border:0;flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis}
+.chat-layout,.workflow-layout{height:100%;display:flex}.chat-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.chat-header,.editor-toolbar{padding:12px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #363b46}
+.chat-header input{flex:1;font-weight:600}.chat-header select{max-width:290px}
+.thread{flex:1;overflow:auto;padding:30px max(24px,calc((100% - 780px)/2))}
+.message{padding:14px 18px;border:1px solid #3a4050;border-radius:12px;margin:0 0 16px;white-space:pre-wrap;overflow-wrap:anywhere}
+.message.user{margin-left:15%;background:#303750}.message.assistant{margin-right:15%;background:#242831}
+.message p{margin:8px 0}.message small{text-transform:capitalize}.composer{display:flex;gap:10px;padding:16px 24px;border-top:1px solid #343844}.composer input{flex:1}
+.chat-main>.error{padding:0 24px}.execution{border-top:1px solid #414652;padding-top:8px;font-size:.85rem}.execution-node{border-top:1px solid #3a4050;margin-top:8px;padding:8px 0}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;font-size:.75rem}.empty-state{margin:auto;text-align:center;padding:32px}
+.editor{flex:1;min-width:0;display:flex;flex-direction:column}.editor-body{display:flex;flex:1;min-height:0}
+.palette,.config-panel{width:220px;flex-shrink:0;padding:15px;overflow:auto;background:#22252e;border-right:1px solid #363b46}
+.palette button{width:100%;display:flex;justify-content:space-between;margin:8px 0;text-align:left}
+.config-panel{width:300px;border-right:0;border-left:1px solid #363b46}.config-fields{display:grid;gap:15px}.config-fields label{width:100%}
+.kv-list{display:grid;gap:8px}.kv-row{display:flex;gap:4px}.kv-row input{width:40%;padding:5px}.kv-row button{padding:3px}
+.canvas{flex:1;min-width:0;background:#1b1e26}.flow-node{min-width:175px;min-height:80px;background:#303542;border:1px solid #686f82;border-radius:10px;padding:11px 14px;box-shadow:0 4px 15px #0004}
+.flow-node.selected{border-color:#95a4ff}.flow-node>strong,.flow-node>small{display:block}.flow-node>small{margin-top:4px}
+.port{position:relative;height:25px;font-size:.78rem;color:#c7cede;display:flex;align-items:center}.output-port{justify-content:flex-end}
+.react-flow__handle{width:11px;height:11px;background:#9aabff;border:1px solid #20232b}

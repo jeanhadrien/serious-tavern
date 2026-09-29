@@ -1,0 +1,36 @@
+import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+
+export interface Repository<T extends { id: string }> {
+  list(): Promise<T[]>;
+  get(id: string): Promise<T | undefined>;
+  save(item: T): Promise<void>;
+  delete(id: string): Promise<void>;
+}
+export async function atomicWrite(path: string, content: string): Promise<void> {
+  const temp = `${path}.${randomUUID()}.tmp`;
+  await writeFile(temp, content, { flag: 'wx' });
+  try { await rename(temp, path); } finally { await rm(temp, { force: true }); }
+}
+export class JsonRepository<T extends { id: string }> implements Repository<T> {
+  constructor(private readonly directory: string) {}
+  private path(id: string) {
+    if (!/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error('Invalid id');
+    return join(this.directory, `${id}.json`);
+  }
+  async list(): Promise<T[]> {
+    await mkdir(this.directory, { recursive: true });
+    const files = (await readdir(this.directory)).filter(name => name.endsWith('.json'));
+    return Promise.all(files.map(async name => JSON.parse(await readFile(join(this.directory, name), 'utf8')) as T));
+  }
+  async get(id: string): Promise<T | undefined> {
+    try { return JSON.parse(await readFile(this.path(id), 'utf8')) as T; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined; throw error; }
+  }
+  async save(item: T): Promise<void> {
+    await mkdir(this.directory, { recursive: true });
+    await atomicWrite(this.path(item.id), JSON.stringify(item, null, 2));
+  }
+  async delete(id: string): Promise<void> { await rm(this.path(id), { force: true }); }
+}
