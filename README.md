@@ -69,6 +69,8 @@ Message placement defaults to **ordered**, at its position in the entry list. **
 
 The LLM node selects a **provider**, **model**, **preset**, temperature, max tokens and optional samplers (top-p, frequency/presence penalties, stop sequences). History is only supplied through a preset slot; it is never added implicitly. Its outputs are `text` and `raw`. Each execution log records provider, model, sampler parameters and the final messages sent, without recording API keys.
 
+**Merge consecutive system messages** (`mergeSystemMessages`, default `false`) is an LLM node checkbox. When enabled, after preset rendering it joins each consecutive run of system messages without a `name` using `"\n\n"`. User/assistant messages and named system messages break a run and remain unchanged (even an explicitly empty name is treated as set). Request logs contain the actual merged messages sent to the provider. Preset preview remains the unmerged preset output because merging is a node-level setting.
+
 Message inputs may already carry an optional string `name`. Message slots preserve it (including through depth insertion and repeated slots), and OpenRouter forwards it only when present. No speaker names are inferred or generated and there is no speaker-name UI yet; message-slot expansion is isolated for future per-slot options.
 
 Seeding uses stable IDs so concurrent initializers do not create duplicate Default presets or demo workflows. Seeds are added only when the corresponding store is empty.

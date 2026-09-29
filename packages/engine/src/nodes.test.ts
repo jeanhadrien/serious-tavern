@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import type { Preset } from '@st/shared';
+import type { Preset, PromptMessage } from '@st/shared';
 import { httpRequest } from './nodes/http-request/index.js';
-import { llm } from './nodes/llm/index.js';
+import { llm, mergeSystemMessages } from './nodes/llm/index.js';
 import { providers } from './providers/index.js';
 import { openrouter } from './providers/openrouter.js';
 import type { ExecutionContext } from './types.js';
@@ -80,5 +80,62 @@ describe('integration nodes', () => {
       { role: 'system', content: 'Empty name is still set', name: '' }
     ]);
     expect(Object.hasOwn(body.messages[1], 'name')).toBe(false);
+  });
+
+  it('defaults system-message merging to false in the schema and node defaults', () => {
+    expect(llm.defaultConfig.mergeSystemMessages).toBe(false);
+    expect(llm.configSchema.parse({ presetId: preset.id })).toMatchObject({ mergeSystemMessages: false });
+  });
+
+  it('merges only consecutive unnamed system messages without mutating the source', () => {
+    const messages: PromptMessage[] = [
+      { role: 'system', content: 'One' }, { role: 'system', content: 'Two' }, { role: 'system', content: 'Three' },
+      { role: 'user', content: 'User', name: 'Alex' },
+      { role: 'system', content: 'Four' }, { role: 'system', content: 'Named', name: 'Narrator' },
+      { role: 'system', content: 'Five' }, { role: 'system', content: 'Six' },
+      { role: 'assistant', content: 'Assistant' }, { role: 'system', content: 'Seven' },
+      { role: 'system', content: 'Explicit name', name: '' }, { role: 'system', content: 'Eight' }
+    ];
+    const snapshot = structuredClone(messages);
+    messages.forEach(Object.freeze);
+    Object.freeze(messages);
+    expect(mergeSystemMessages(messages)).toEqual([
+      { role: 'system', content: 'One\n\nTwo\n\nThree' },
+      messages[3], messages[4], messages[5], { role: 'system', content: 'Five\n\nSix' },
+      ...messages.slice(8)
+    ]);
+    expect(messages).toEqual(snapshot);
+    expect(mergeSystemMessages([])).toEqual([]);
+  });
+
+  it.each([undefined, false, true])('records and sends the final prompt with mergeSystemMessages=%s', async merge => {
+    const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
+    providers.set('fake', { id: 'fake', label: 'Fake', secretName: 'fake-key', chat });
+    const definition: Preset = {
+      ...preset, inputs: [{ id: 'history', key: 'history', dataType: 'messages' }], entries: [
+        preset.entries[0]!,
+        { kind: 'message', id: 'empty', name: 'Empty', enabled: true, role: 'system',
+          content: '{{character.scenario}}', placement: { mode: 'ordered' } },
+        { kind: 'message', id: 'second', name: 'Second', enabled: true, role: 'system',
+          content: 'Second', placement: { mode: 'ordered' } },
+        { kind: 'slot', id: 'history', name: 'History', enabled: true, inputKey: 'history', role: 'user' }
+      ]
+    };
+    const history: PromptMessage[] = [
+      { role: 'system', content: 'History system' },
+      { role: 'system', content: 'Named system', name: 'Narrator' },
+      { role: 'user', content: 'Hi', name: 'Alex' }
+    ];
+    const recordRequest = vi.fn();
+    await llm.execute({
+      ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', mergeSystemMessages: merge }),
+      inputs: { history }, resources: { presets: { get: async () => definition } }, recordRequest
+    });
+    const expected = merge ? [
+      { role: 'system', content: 'Hello hello\n\nSecond\n\nHistory system' }, ...history.slice(1)
+    ] : [{ role: 'system', content: 'Hello hello' }, { role: 'system', content: 'Second' }, ...history];
+    expect(chat.mock.calls[0]?.[0].messages).toEqual(expected);
+    expect(recordRequest.mock.calls[0]?.[0]).toEqual({ provider: 'fake', ...chat.mock.calls[0]?.[0] });
+    expect(history[0]?.content).toBe('History system');
   });
 });

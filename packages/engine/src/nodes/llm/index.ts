@@ -1,8 +1,20 @@
 import { z } from 'zod';
+import type { PromptMessage } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { renderPreset } from '../../preset.js';
 import { providers } from '../../providers/index.js';
 import '../../providers/openrouter.js';
+
+export function mergeSystemMessages(messages: readonly PromptMessage[]): PromptMessage[] {
+  const result: PromptMessage[] = [];
+  for (const message of messages) {
+    const previous = result.at(-1);
+    if (previous?.role === 'system' && previous.name === undefined && message.role === 'system' && message.name === undefined) {
+      result[result.length - 1] = { role: 'system', content: `${previous.content}\n\n${message.content}` };
+    } else result.push({ ...message });
+  }
+  return result;
+}
 
 export const llm: NodeDefinition = {
   type: 'llm', label: 'LLM', description: 'Generate a completion using a preset and provider', category: 'AI',
@@ -13,9 +25,11 @@ export const llm: NodeDefinition = {
     presetId: z.string().uuid(), temperature: z.number().min(0).max(2).default(0.7),
     maxTokens: z.number().int().positive().default(1024), topP: z.number().min(0).max(1).optional(),
     frequencyPenalty: z.number().min(-2).max(2).optional(), presencePenalty: z.number().min(-2).max(2).optional(),
-    stop: z.array(z.string()).optional()
+    stop: z.array(z.string()).optional(),
+    mergeSystemMessages: z.boolean().default(false).describe('Merge consecutive unnamed system messages with blank lines')
   }),
-  defaultConfig: { provider: 'openrouter', model: 'openai/gpt-4o-mini', presetId: '', temperature: 0.7, maxTokens: 1024 },
+  defaultConfig: { provider: 'openrouter', model: 'openai/gpt-4o-mini', presetId: '', temperature: 0.7, maxTokens: 1024,
+    mergeSystemMessages: false },
   async resolvePorts(config, resources) {
     const preset = await resources.presets.get(String(config.presetId ?? ''));
     if (!preset) throw new Error(`Preset ${config.presetId || '(none)'} not found`);
@@ -30,9 +44,10 @@ export const llm: NodeDefinition = {
     if (!preset) throw new Error(`Preset ${ctx.config.presetId} not found`);
     const key = await ctx.secrets.get(provider.secretName);
     if (!key) throw new Error(`Missing ${provider.secretName} secret. Add it in Settings.`);
-    const messages = renderPreset(preset, { inputs: ctx.inputs, templateContext: {
+    const rendered = renderPreset(preset, { inputs: ctx.inputs, templateContext: {
       trigger: ctx.trigger, history: ctx.history, character: ctx.character, persona: ctx.persona
     } });
+    const messages = ctx.config.mergeSystemMessages === true ? mergeSystemMessages(rendered) : rendered;
     const request = {
       model: String(ctx.config.model), messages, temperature: Number(ctx.config.temperature),
       maxTokens: Number(ctx.config.maxTokens),

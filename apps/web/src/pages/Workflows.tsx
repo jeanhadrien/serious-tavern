@@ -232,6 +232,11 @@ function WorkflowEditor() {
                 <span key={input.id}>{input.key} : {input.dataType}</span>)}
             </div>}
             {Boolean(current.data.config.presetId) && <Link to={`/presets?id=${current.data.config.presetId}`}>Edit preset ↗</Link>}
+            <label className="check"><input type="checkbox"
+              checked={current.data.config.mergeSystemMessages === true} onChange={e =>
+                updateConfig({ ...current.data.config, mergeSystemMessages: e.target.checked })} />
+              Merge consecutive system messages</label>
+            <p className="hint">Joins adjacent unnamed system messages with a blank line. Named messages stay separate.</p>
             {(['temperature', 'maxTokens', 'topP', 'frequencyPenalty', 'presencePenalty'] as const).map(key =>
               <label key={key}>{key}<input type="number" step={key === 'maxTokens' ? 1 : 0.1}
                 value={String(current.data.config[key] ?? '')} onChange={e => {
