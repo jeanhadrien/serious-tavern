@@ -1,6 +1,6 @@
 export const portDataTypes = ['text', 'number', 'boolean', 'object', 'array', 'messages', 'any'] as const;
 export type PortDataType = typeof portDataTypes[number];
-export type PortDef = { name: string; label: string; dataType: PortDataType; description?: string; required?: boolean };
+export type PortDef = { name: string; label: string; dataType: PortDataType; description?: string; required?: boolean; optional?: boolean };
 export type CoercionKind = 'to-text' | 'messages-to-text';
 export type ConnectionResult = { ok: true; coerce?: CoercionKind } | { ok: false; reason: string };
 

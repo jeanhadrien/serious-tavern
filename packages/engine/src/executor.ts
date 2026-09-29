@@ -113,14 +113,32 @@ export async function executeWorkflow(
     return [node.id, definition.resolvePorts ? await definition.resolvePorts(node.config, resources) :
       { inputs: definition.inputs, outputs: definition.outputs }] as const;
   })));
-  const pending = new Set(workflow.nodes.map(n => n.id));
+  const outputNode = workflow.nodes.find(n => n.type === 'chat-output')!;
+  const upstream = new Map<string, string[]>(workflow.nodes.map(node => [node.id, []]));
+  for (const edge of workflow.edges) upstream.get(edge.target)?.push(edge.source);
+  const reachable = new Set<string>();
+  const visit = [outputNode.id];
+  while (visit.length) {
+    const id = visit.pop()!;
+    if (reachable.has(id)) continue;
+    reachable.add(id);
+    visit.push(...(upstream.get(id) ?? []));
+  }
+  const pending = new Set(workflow.nodes.filter(node => reachable.has(node.id)).map(node => node.id));
+  for (const node of workflow.nodes.filter(item => !reachable.has(item.id))) {
+    const timestamp = new Date().toISOString();
+    execution.nodes[node.id] = { status: 'skipped', startedAt: timestamp, finishedAt: timestamp, durationMs: 0 };
+    resolved.set(node.id, { output: {}, skipped: true });
+    emit({ type: 'node:skipped', nodeId: node.id, detail: 'unreachable from chat output' });
+  }
   try {
     while (pending.size) {
       if (controller.signal.aborted) throw new Error('Execution aborted');
       const ready = workflow.nodes.filter(n => pending.has(n.id) &&
         workflow.edges.filter(e => e.target === n.id).every(e => resolved.has(e.source)));
       if (!ready.length) throw new Error('Workflow cannot make progress');
-      await Promise.all(ready.map(async node => {
+      let firstFailure: Error | undefined;
+      await Promise.allSettled(ready.map(async node => {
         const incoming: Edge[] = workflow.edges.filter(e => e.target === node.id);
         const active = incoming.filter(e => {
           const source = resolved.get(e.source)!;
@@ -150,38 +168,66 @@ export async function executeWorkflow(
         const timeoutMs = definition.timeoutMs ?? options.nodeTimeoutMs ?? 30000;
         const timer = AbortSignal.timeout(timeoutMs);
         const signal = AbortSignal.any([controller.signal, timer]);
+        let callbacksActive = true;
+        const task = Promise.resolve().then(() => definition.execute({
+          inputs, config: definition.configSchema.parse(node.config), trigger: { message: options.message, sessionId: options.sessionId },
+          history: options.history, character: options.character, persona: options.persona,
+          secrets: options.secrets, resources, signal, log: () => {},
+          recordRequest: request => {
+            if (callbacksActive) execution.nodes[node.id] = { ...execution.nodes[node.id]!, request };
+          },
+          emit: event => { if (callbacksActive) emit(event); }
+        }));
+        let abortListener: (() => void) | undefined;
+        const interrupted = new Promise<never>((_, reject) => {
+          abortListener = () => reject(signal.reason ?? new Error('Node execution aborted'));
+          if (signal.aborted) abortListener();
+          else signal.addEventListener('abort', abortListener, { once: true });
+        });
         try {
-          const output = await Promise.race([
-            definition.execute({
-              inputs, config: definition.configSchema.parse(node.config), trigger: { message: options.message, sessionId: options.sessionId },
-              history: options.history, character: options.character, persona: options.persona,
-              secrets: options.secrets, resources, signal, log: () => {}, emit,
-              recordRequest: request => { execution.nodes[node.id] = { ...execution.nodes[node.id]!, request }; }
-            }),
-            new Promise<never>((_, reject) => {
-              if (signal.aborted) reject(signal.reason);
-              else signal.addEventListener('abort', () => reject(signal.reason), { once: true });
-            })
-          ]);
+          const output = await Promise.race([task, interrupted]);
+          callbacksActive = false;
+          if (abortListener) signal.removeEventListener('abort', abortListener);
+          if (controller.signal.aborted) {
+            execution.nodes[node.id] = { ...execution.nodes[node.id], status: 'cancelled',
+              finishedAt: new Date().toISOString(), durationMs: Date.now() - start };
+            emit({ type: 'node:cancelled', nodeId: node.id });
+            return;
+          }
           if (!output || typeof output !== 'object' || Object.keys(output).some(key => !ports.get(node.id)!.outputs.some(p => p.name === key))) {
             throw new Error('Node returned invalid output ports');
+          }
+          for (const port of ports.get(node.id)!.outputs) {
+            if (!port.optional && workflow.edges.some(edge => edge.source === node.id && edge.sourceHandle === port.name) &&
+              !Object.hasOwn(output, port.name))
+              throw new Error(`Node did not produce output "${port.name}"`);
           }
           execution.nodes[node.id] = { ...execution.nodes[node.id], status: 'completed',
             finishedAt: new Date().toISOString(), durationMs: Date.now() - start, output };
           resolved.set(node.id, { output, skipped: false });
           emit({ type: 'node:complete', nodeId: node.id, detail: output });
         } catch (cause) {
+          callbacksActive = false;
+          if (abortListener) signal.removeEventListener('abort', abortListener);
+          if (controller.signal.aborted && !timer.aborted) await task.then(() => undefined, () => undefined);
           const reason = timer.aborted ? `timed out after ${timeoutMs}ms` : cause instanceof Error ? cause.message : String(cause);
-          execution.nodes[node.id] = { ...execution.nodes[node.id], status: 'error',
-            finishedAt: new Date().toISOString(), durationMs: Date.now() - start, error: reason };
-          emit({ type: 'node:error', nodeId: node.id, detail: reason });
-          controller.abort();
-          throw new Error(`Node ${node.id} (${node.type}): ${reason}`);
+          if (controller.signal.aborted && !timer.aborted) {
+            execution.nodes[node.id] = { ...execution.nodes[node.id], status: 'cancelled',
+              finishedAt: new Date().toISOString(), durationMs: Date.now() - start, error: reason };
+            emit({ type: 'node:cancelled', nodeId: node.id, detail: reason });
+          } else {
+            execution.nodes[node.id] = { ...execution.nodes[node.id], status: 'error',
+              finishedAt: new Date().toISOString(), durationMs: Date.now() - start, error: reason };
+            emit({ type: 'node:error', nodeId: node.id, detail: reason });
+            firstFailure ??= new Error(`Node ${node.id} (${node.type}): ${reason}`);
+            controller.abort(cause);
+          }
         }
       }));
+      if (firstFailure) throw firstFailure;
+      if (controller.signal.aborted) throw new Error('Execution aborted');
       ready.forEach(n => pending.delete(n.id));
     }
-    const outputNode = workflow.nodes.find(n => n.type === 'chat-output')!;
     const result = resolved.get(outputNode.id);
     if (!result || result.skipped) throw new Error(`Chat output ${outputNode.id} was skipped`);
     execution.status = 'completed';

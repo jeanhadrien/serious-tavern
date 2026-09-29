@@ -13,7 +13,11 @@ const workflow = (nodes: Workflow['nodes'], edges: Edge[]): Workflow =>
   ({ id: 'workflow', name: 'Test', nodes, edges, createdAt: '', updatedAt: '' });
 const options = { message: 'hello', sessionId: 'session', history: [] as ChatMessage[],
   secrets: { get: async () => undefined } };
-afterEach(() => { registry.delete('slow-test'); registry.delete('typed-test'); vi.restoreAllMocks(); });
+afterEach(() => {
+  for (const type of ['slow-test', 'typed-test', 'fail-test', 'missing-test', 'optional-test',
+    'fast-fail-test', 'abort-test', 'ignore-abort-test']) registry.delete(type);
+  vi.restoreAllMocks();
+});
 
 describe('executor', () => {
   it('runs independent slow nodes concurrently and respects dependencies', async () => {
@@ -58,6 +62,7 @@ describe('executor', () => {
     const result2 = await executeWorkflow(skipped, options);
     expect(result2.execution.nodes.mid?.status).toBe('skipped');
     expect(result2.reply).toBe('{"b":"hello"}');
+    expect(result2.execution.nodes.condition?.output).toEqual({ false: 'hello' });
   });
   it('supports array and first-non-empty merge modes', async () => {
     for (const [mode, expected] of [['array', '["hello"]'], ['first-non-empty', 'hello']] as const) {
@@ -147,5 +152,101 @@ describe('executor', () => {
     const json = workflow([node('input', 'chat-input'), node('object', 'typed-test'), node('output', 'chat-output')],
       [edge('object', 'value', 'output', 'value')]);
     expect((await executeWorkflow(json, options)).reply).toBe('{\n  "hello": [\n    "world"\n  ]\n}');
+  });
+  it('does not execute nodes disconnected from Chat Output', async () => {
+    const run = vi.fn(async () => { throw new Error('unreachable node ran'); });
+    registry.set('fail-test', { type: 'fail-test', label: 'Fail', description: '', category: '',
+      inputs: [], outputs: [{ name: 'out', label: 'Out', dataType: 'any' }],
+      configSchema: z.object({}), defaultConfig: {}, execute: run });
+    const graph = workflow([node('input', 'chat-input'), node('unused', 'fail-test'), node('output', 'chat-output')],
+      [edge('input', 'message', 'output', 'value')]);
+    const result = await executeWorkflow(graph, options);
+    expect(result.reply).toBe('hello');
+    expect(run).not.toHaveBeenCalled();
+    expect(result.execution.nodes.unused?.status).toBe('skipped');
+  });
+  it('fails when a connected required output is omitted but permits optional branch omission', async () => {
+    registry.set('missing-test', { type: 'missing-test', label: 'Missing', description: '', category: '',
+      inputs: [], outputs: [{ name: 'out', label: 'Out', dataType: 'any' }],
+      configSchema: z.object({}), defaultConfig: {}, async execute() { return {}; }
+    });
+    const missing = workflow([node('input', 'chat-input'), node('missing', 'missing-test'), node('output', 'chat-output')],
+      [edge('missing', 'out', 'output', 'value')]);
+    await expect(executeWorkflow(missing, options)).rejects.toMatchObject({
+      message: 'Node missing (missing-test): Node did not produce output "out"',
+      execution: { nodes: { missing: { status: 'error', error: 'Node did not produce output "out"' } } }
+    });
+
+    registry.set('optional-test', { type: 'optional-test', label: 'Optional', description: '', category: '',
+      inputs: [], outputs: [{ name: 'out', label: 'Out', dataType: 'any', optional: true }],
+      configSchema: z.object({}), defaultConfig: {}, async execute() { return {}; }
+    });
+    const optional = workflow([node('input', 'chat-input'), node('optional', 'optional-test'),
+      node('merge', 'merge'), node('output', 'chat-output')], [
+      edge('optional', 'out', 'merge', 'a'), edge('input', 'message', 'merge', 'b'),
+      edge('merge', 'value', 'output', 'value')
+    ]);
+    expect((await executeWorkflow(optional, options)).reply).toBe('{"b":"hello"}');
+  });
+  it('aborts and settles sibling nodes before returning the first real failure', async () => {
+    let siblingSettled = false;
+    registry.set('fast-fail-test', { type: 'fast-fail-test', label: 'Fast failure', description: '', category: '',
+      inputs: [{ name: 'in', label: 'In', dataType: 'any' }], outputs: [{ name: 'out', label: 'Out', dataType: 'any' }],
+      configSchema: z.object({}), defaultConfig: {}, async execute() { throw new Error('first failure'); }
+    });
+    registry.set('abort-test', { type: 'abort-test', label: 'Abort-aware', description: '', category: '',
+      inputs: [{ name: 'in', label: 'In', dataType: 'any' }], outputs: [{ name: 'out', label: 'Out', dataType: 'any' }],
+      configSchema: z.object({}), defaultConfig: {}, async execute({ signal }) {
+        return new Promise(resolve => {
+          const settle = () => { siblingSettled = true; resolve({ out: 'cancelled' }); };
+          if (signal.aborted) settle();
+          else signal.addEventListener('abort', settle, { once: true });
+        });
+      }
+    });
+    const graph = workflow([node('input', 'chat-input'), node('fail', 'fast-fail-test'), node('slow', 'abort-test'),
+      node('merge', 'merge'), node('output', 'chat-output')], [
+      edge('input', 'message', 'fail', 'in'), edge('input', 'message', 'slow', 'in'),
+      edge('fail', 'out', 'merge', 'a'), edge('slow', 'out', 'merge', 'b'), edge('merge', 'value', 'output', 'value')
+    ]);
+    let failedExecution: import('@st/shared').ExecutionLog | undefined;
+    const failure = await executeWorkflow(graph, options).catch(error => error);
+    expect(failure).toMatchObject({ message: 'Node fail (fast-fail-test): first failure' });
+    failedExecution = failure.execution;
+    expect(siblingSettled).toBe(true);
+    expect(failedExecution?.nodes.slow?.status).toBe('cancelled');
+    const snapshot = structuredClone(failedExecution);
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(failedExecution).toEqual(snapshot);
+  });
+  it('waits for an abort-ignoring sibling and prevents its late callbacks from changing the log', async () => {
+    registry.set('fast-fail-test', { type: 'fast-fail-test', label: 'Fast failure', description: '', category: '',
+      inputs: [{ name: 'in', label: 'In', dataType: 'any' }], outputs: [{ name: 'out', label: 'Out', dataType: 'any' }],
+      configSchema: z.object({}), defaultConfig: {}, async execute() { throw new Error('first failure'); }
+    });
+    registry.set('ignore-abort-test', { type: 'ignore-abort-test', label: 'Ignores abort', description: '', category: '',
+      inputs: [{ name: 'in', label: 'In', dataType: 'any' }], outputs: [{ name: 'out', label: 'Out', dataType: 'any' }],
+      configSchema: z.object({}), defaultConfig: {}, async execute({ recordRequest }) {
+        await new Promise(resolve => setTimeout(resolve, 40));
+        recordRequest({ late: true });
+        return { out: 'late' };
+      }
+    });
+    const graph = workflow([node('input', 'chat-input'), node('fail', 'fast-fail-test'), node('slow', 'ignore-abort-test'),
+      node('merge', 'merge'), node('output', 'chat-output')], [
+      edge('input', 'message', 'fail', 'in'), edge('input', 'message', 'slow', 'in'),
+      edge('fail', 'out', 'merge', 'a'), edge('slow', 'out', 'merge', 'b'), edge('merge', 'value', 'output', 'value')
+    ]);
+    const started = Date.now();
+    let failedExecution: import('@st/shared').ExecutionLog | undefined;
+    const failure = await executeWorkflow(graph, options).catch(error => error);
+    expect(failure).toMatchObject({ message: 'Node fail (fast-fail-test): first failure' });
+    failedExecution = failure.execution;
+    expect(Date.now() - started).toBeGreaterThanOrEqual(30);
+    expect(failedExecution?.nodes.slow).toMatchObject({ status: 'cancelled' });
+    const snapshot = structuredClone(failedExecution);
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(failedExecution).toEqual(snapshot);
+    expect(failedExecution?.nodes.slow).not.toHaveProperty('request');
   });
 });

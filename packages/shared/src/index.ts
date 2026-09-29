@@ -29,7 +29,7 @@ export const sessionSchema = z.object({
   createdAt: z.string(), updatedAt: z.string()
 });
 export const nodeExecutionSchema = z.object({
-  status: z.enum(['running', 'completed', 'skipped', 'error']), startedAt: z.string().optional(),
+  status: z.enum(['running', 'completed', 'skipped', 'cancelled', 'error']), startedAt: z.string().optional(),
   finishedAt: z.string().optional(), durationMs: z.number().optional(), output: z.unknown().optional(),
   error: z.string().optional(), request: z.unknown().optional()
 });
@@ -41,7 +41,7 @@ export const executionLogSchema = z.object({
 export const dataTypeSchema = z.enum(portDataTypes);
 export const portSchema = z.object({
   name: z.string(), label: z.string(), dataType: dataTypeSchema.default('any'),
-  description: z.string().optional(), required: z.boolean().optional()
+  description: z.string().optional(), required: z.boolean().optional(), optional: z.boolean().optional()
 });
 export const nodeTypeDescriptorSchema = z.object({
   type: z.string(), label: z.string(), description: z.string(), category: z.string(),

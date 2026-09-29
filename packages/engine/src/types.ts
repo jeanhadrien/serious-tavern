@@ -1,7 +1,7 @@
 import type { Character, ChatMessage, Persona, PortDef, Preset } from '@st/shared';
 import type { z } from 'zod';
 
-export type EngineEvent = { type: 'node:start' | 'node:complete' | 'node:skipped' | 'node:error' | 'execution:complete'; nodeId?: string; detail?: unknown };
+export type EngineEvent = { type: 'node:start' | 'node:complete' | 'node:skipped' | 'node:cancelled' | 'node:error' | 'execution:complete'; nodeId?: string; detail?: unknown };
 export type NodeResources = { presets: { get(id: string): Promise<Preset | undefined> } };
 export type ExecutionContext = {
   inputs: Record<string, unknown>;

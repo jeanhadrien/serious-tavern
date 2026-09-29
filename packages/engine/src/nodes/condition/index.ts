@@ -4,7 +4,10 @@ import { renderTemplate, stringify } from '../../template.js';
 export const condition: NodeDefinition = {
   type: 'condition', label: 'Condition', description: 'Route a value to one branch', category: 'Logic',
   inputs: [{ name: 'value', label: 'Value', dataType: 'any' }],
-  outputs: [{ name: 'true', label: 'True', dataType: 'any' }, { name: 'false', label: 'False', dataType: 'any' }],
+  outputs: [
+    { name: 'true', label: 'True', dataType: 'any', optional: true },
+    { name: 'false', label: 'False', dataType: 'any', optional: true }
+  ],
   templateFields: ['left', 'right'],
   configSchema: z.object({
     left: z.string().default('{{input.value}}'),
