@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow, ReactFlowProvider, Background, Controls, Handle, Position, useConnection, useReactFlow,
   addEdge, applyNodeChanges, applyEdgeChanges,
-  type Connection, type Edge as FlowEdge, type Node as FlowNode, type NodeProps, type OnNodesChange, type OnEdgesChange
+  type Connection, type NodeProps, type OnNodesChange, type OnEdgesChange
 } from '@xyflow/react';
 import { canConnect, portDataTypes, type PortDataType, type PortDef } from '@st/shared/ports';
 import type { Workflow, NodeTypeDescriptor, NodeInstance } from '@st/shared';
@@ -12,8 +12,8 @@ import type { Preset } from '@st/shared';
 import { api, getNodeTypes, getWorkflows, getPresets, getProviders, resolvePorts, json } from '../api.js';
 import { alerts } from '../alerts/index.js';
 import { checkConnection } from '../connection.js';
+import { canvasToWorkflow, workflowToCanvas, type CanvasNode } from './workflow-model.js';
 
-type CanvasNode = FlowNode<{ descriptor: NodeTypeDescriptor; config: NodeInstance['config'] }>;
 const portColors: Record<PortDataType, string> = {
   text: '#85c5f0', number: '#efd080', boolean: '#d2a7ef', object: '#80cbaa',
   array: '#e9a98c', messages: '#e5accc', any: '#b3b9c7'
@@ -31,7 +31,7 @@ function WorkflowNode({ id, data, selected }: NodeProps<CanvasNode>) {
     return !(type === 'target' ? canConnect(startPort, port) : canConnect(port, startPort)).ok;
   };
   const tooltip = (port: PortDef) => `${port.label} (${port.dataType})${port.description ? ` — ${port.description}` : ''}`;
-  return <div className={`flow-node ${selected ? 'selected' : ''}`}>
+  return <div className={`flow-node ${selected ? 'selected' : ''} ${data.unknown ? 'unknown-node' : ''}`}>
     <strong>{descriptor.label}</strong><small>{descriptor.category}</small>
     {descriptor.inputs.map(port => <div className="port input-port" key={port.name} title={tooltip(port)}>
       <Handle type="target" id={port.name} position={Position.Left}
@@ -54,11 +54,12 @@ export function Workflows() {
 function WorkflowEditor() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [types, setTypes] = useState<NodeTypeDescriptor[]>([]);
+  const [typesReady, setTypesReady] = useState(false);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [providersList, setProvidersList] = useState<{ id: string; label: string }[]>([]);
   const [workflow, setWorkflow] = useState<Workflow>();
   const [nodes, setNodes] = useState<CanvasNode[]>([]);
-  const [edges, setEdges] = useState<FlowEdge[]>([]);
+  const [edges, setEdges] = useState<import('@xyflow/react').Edge[]>([]);
   const [selected, setSelected] = useState<string>();
   const canvasRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
@@ -73,7 +74,7 @@ function WorkflowEditor() {
     };
   }), [edges, nodes]);
   const refresh = () => getWorkflows().then(setWorkflows);
-  useEffect(() => { void refresh().catch(() => {}); void getNodeTypes().then(setTypes).catch(() => {});
+  useEffect(() => { void refresh().catch(() => {}); void getNodeTypes().then(setTypes).catch(() => {}).finally(() => setTypesReady(true));
     void getPresets().then(setPresets).catch(() => {}); void getProviders().then(setProvidersList).catch(() => {});
   }, []);
   const llmConfigs = JSON.stringify(nodes.filter(node => node.data.descriptor.type === 'llm')
@@ -102,13 +103,12 @@ function WorkflowEditor() {
   }, []);
   const load = (next: Workflow) => {
     setWorkflow(next);
-    setNodes(next.nodes.flatMap(n => {
-      const descriptor = types.find(type => type.type === n.type);
-      return descriptor ? [{ id: n.id, type: 'workflow', position: n.position,
-        data: { descriptor, config: n.config } }] : [];
-    }));
-    setEdges(next.edges.map(e => ({ ...e })));
+    const canvas = workflowToCanvas(next, types);
+    setNodes(canvas.nodes);
+    setEdges(canvas.edges);
     setSelected(undefined);
+    if (canvas.unknownTypes.length)
+      alerts.warning(`Unknown node types are preserved read-only: ${canvas.unknownTypes.join(', ')}`);
   };
   const onNodesChange: OnNodesChange<CanvasNode> = useCallback(changes => {
     setNodes(prev => applyNodeChanges(changes, prev));
@@ -153,6 +153,7 @@ function WorkflowEditor() {
     if (descriptor) addNode(descriptor, screenToFlowPosition({ x: event.clientX, y: event.clientY }));
   };
   const create = async () => {
+    if (!typesReady) return;
     const name = window.prompt('Workflow name');
     if (!name?.trim()) return;
     try { const created = await api<Workflow>('/workflows', json('POST', { name })); await refresh(); load(created); }
@@ -160,10 +161,7 @@ function WorkflowEditor() {
   };
   const save = async (showToast = true): Promise<boolean> => {
     if (!workflow) return false;
-    const current = { ...workflow,
-      nodes: nodes.map(n => ({ id: n.id, type: n.data.descriptor.type, config: n.data.config, position: n.position })),
-      edges: edges.map(e => ({ id: e.id, source: e.source, sourceHandle: e.sourceHandle ?? '',
-        target: e.target, targetHandle: e.targetHandle ?? '' })) };
+    const current = canvasToWorkflow(workflow, nodes, edges);
     try { const updated = await api<Workflow>(`/workflows/${workflow.id}`, json('PUT', current));
       setWorkflow(prev => prev?.id === updated.id ? { ...prev, updatedAt: updated.updatedAt } : prev);
       if (showToast) alerts.success('Workflow saved');
@@ -192,9 +190,9 @@ function WorkflowEditor() {
     setNodes(prev => prev.map(n => n.id === selected ? { ...n, data: { ...n.data, config } } : n));
   };
   return <div className="workflow-layout"><aside className="sidebar"><div className="toolbar"><h2>Workflows</h2>
-    <button className="primary" onClick={() => void create()}>+ New</button></div>
+    <button className="primary" disabled={!typesReady} onClick={() => void create()}>+ New</button></div>
     {workflows.map(w => <div key={w.id} className={`session-row ${workflow?.id === w.id ? 'selected' : ''}`}>
-      <button className="session-link" disabled={!types.length} onClick={() => load(structuredClone(w))}>{w.name}</button>
+      <button className="session-link" disabled={!typesReady} onClick={() => load(structuredClone(w))}>{w.name}</button>
       <button title="Delete workflow" onClick={() => void remove(w.id)}>×</button></div>)}</aside>
     {workflow ? <div className="editor"><div className="editor-toolbar">
       <input aria-label="Workflow name" value={workflow.name} onChange={e => setWorkflow(prev => prev && ({ ...prev, name: e.target.value }))} />
@@ -217,7 +215,8 @@ function WorkflowEditor() {
           fitView><Background color="#414652" gap={20} /><Controls /></ReactFlow></div>
         {current && currentDescriptor && <aside className="config-panel"><div className="toolbar"><h3>{currentDescriptor.label}</h3>
           <button onClick={() => setSelected(undefined)}>×</button></div><p className="hint">{currentDescriptor.description}</p>
-          {currentDescriptor.type === 'llm' ? <div className="config-fields">
+          {current.data.unknown ? <pre className="unknown-config">{JSON.stringify(current.data.config, null, 2)}</pre> :
+          currentDescriptor.type === 'llm' ? <div className="config-fields">
             <label>Provider<select value={String(current.data.config.provider ?? 'openrouter')} onChange={e =>
               updateConfig({ ...current.data.config, provider: e.target.value })}>
               {providersList.map(provider => <option key={provider.id} value={provider.id}>{provider.label}</option>)}</select></label>

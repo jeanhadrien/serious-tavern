@@ -34,6 +34,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;f
 .template-hints em{font-style:normal;color:#b9cae9}
 .canvas{flex:1;min-width:0;height:100%;background:#1b1e26}.flow-node{min-width:175px;min-height:80px;background:#303542;border:1px solid #686f82;border-radius:10px;padding:11px 14px;box-shadow:0 4px 15px #0004}
 .flow-node.selected{border-color:#95a4ff}.flow-node>strong,.flow-node>small{display:block}.flow-node>small{margin-top:4px}
+.flow-node.unknown-node{border-color:#e8868b;background:#392d35}.unknown-config{white-space:pre-wrap;overflow-wrap:anywhere;background:#191b22;padding:12px;border-radius:6px}
 .port{position:relative;height:25px;font-size:.78rem;color:#c7cede;display:flex;align-items:center}.output-port{justify-content:flex-end}
 .react-flow__handle{width:11px;height:11px;background:#9aabff;border:1px solid #20232b}
 .port-type{font-size:.65rem;color:#a8b1c4;margin:0 5px}.react-flow__handle.invalid-handle{opacity:.45;border:2px solid #ef8186}
