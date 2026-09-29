@@ -56,7 +56,11 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Messages sent to one session are handled one after another; different sessions run concurrently.
   - Repository writes are atomic: they write a temp file, then rename it.
 - **Execution semantics:**
-  - Only nodes that Chat Output depends on run; the rest are logged as `skipped`.
+  - A workflow has exactly one Chat Input and **one or more** Chat Outputs. Only nodes that some Chat Output depends on run; the rest are logged as `skipped`.
+  - Each Chat Output that runs appends one assistant message. Message order is deterministic: dependency order first, then the output's `order` config, then node id. It never depends on which output finishes first.
+  - The speaker name is taken from the connected `character` input if there is one, otherwise from the `name` config, otherwise the message has no name. Messages store a snapshot of `name` plus `characterId`.
+  - If no output runs, the turn has no reply and the execution records a warning. On failure, the replies already completed are kept and returned in the error details.
+  - `character` is a port data type. The Character node outputs either the session's character or a specific card. A character connected to an LLM node replaces the session character for that node's `{{character.*}}` macros and aliases. The preset input key `character` is reserved.
   - A connected output port that a node doesn't return is an error, unless the port is marked `optional` (Condition branches are).
   - On failure, the sibling nodes in the same wave are aborted and settled (status `cancelled`) before the error is thrown. After that, the execution log must never change.
 - **Editor:** never drop nodes. Unknown node types are kept as read-only placeholders and are saved unchanged.

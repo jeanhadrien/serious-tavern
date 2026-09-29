@@ -46,17 +46,18 @@ Guiding principles: **high modularity**, a **simple baseline** the user can conf
 ## Execution model
 
 1. A user message is sent to a session → the backend loads the session's workflow.
-2. The graph is validated (one Chat Input, one Chat Output, no cycles, valid configs).
+2. The graph is validated (one Chat Input, one or more Chat Outputs, no cycles, valid configs).
 3. Nodes run in **waves**: all nodes whose inputs are ready execute concurrently.
 4. A **Condition** node routes to one branch; the other branch is marked *skipped*.
 5. A **Merge** node waits for its incoming branches and ignores skipped ones.
-6. The **Chat Output** node's value becomes the assistant reply; the session and execution log are saved.
+6. Each **Chat Output** node that ran adds one assistant message, which can be named (e.g. user, foo, bar). The order follows dependencies, then each output's `order` setting. Completed replies are kept even if a later node fails. The session and execution log are saved.
 7. The engine emits events (`node:start`, `node:complete`, …), which are collected into the execution log for now and ready to be streamed later.
 
 ## MVP node types
 
 - **Chat Input**: trigger; provides the user message and history.
-- **Chat Output**: produces the final reply.
+- **Chat Output**: produces one assistant message, optionally named directly or through a connected character. A workflow can have several; its `reply` port can feed other nodes.
+- **Character**: outputs the session's character or a specific card, for naming an output or setting the character used in an LLM node's macros.
 - **LLM**: provider, model, preset and samplers. Its input ports come from the preset's slots.
 - **HTTP Request**: call any API (method, URL, headers, body; templated).
 - **Condition**: if/else branching on a templated value.
