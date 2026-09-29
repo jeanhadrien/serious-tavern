@@ -22,12 +22,12 @@ main{flex:1;min-height:0}.page{padding:28px;overflow:auto;height:100%}.narrow{ma
 .message p{margin:8px 0}.message small{text-transform:capitalize}.composer{display:flex;gap:10px;padding:16px 24px;border-top:1px solid #343844}.composer input{flex:1}
 .chat-main>.error{padding:0 24px}.execution{border-top:1px solid #414652;padding-top:8px;font-size:.85rem}.execution-node{border-top:1px solid #3a4050;margin-top:8px;padding:8px 0}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;font-size:.75rem}.empty-state{margin:auto;text-align:center;padding:32px}
-.editor{flex:1;min-width:0;display:flex;flex-direction:column}.editor-body{display:flex;flex:1;min-height:0}
+.editor{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}.editor-body{display:flex;flex:1 1 0;min-height:0}
 .palette,.config-panel{width:220px;flex-shrink:0;padding:15px;overflow:auto;background:#22252e;border-right:1px solid #363b46}
 .palette button{width:100%;display:flex;justify-content:space-between;margin:8px 0;text-align:left}
 .config-panel{width:300px;border-right:0;border-left:1px solid #363b46}.config-fields{display:grid;gap:15px}.config-fields label{width:100%}
 .kv-list{display:grid;gap:8px}.kv-row{display:flex;gap:4px}.kv-row input{width:40%;padding:5px}.kv-row button{padding:3px}
-.canvas{flex:1;min-width:0;background:#1b1e26}.flow-node{min-width:175px;min-height:80px;background:#303542;border:1px solid #686f82;border-radius:10px;padding:11px 14px;box-shadow:0 4px 15px #0004}
+.canvas{flex:1;min-width:0;height:100%;background:#1b1e26}.flow-node{min-width:175px;min-height:80px;background:#303542;border:1px solid #686f82;border-radius:10px;padding:11px 14px;box-shadow:0 4px 15px #0004}
 .flow-node.selected{border-color:#95a4ff}.flow-node>strong,.flow-node>small{display:block}.flow-node>small{margin-top:4px}
 .port{position:relative;height:25px;font-size:.78rem;color:#c7cede;display:flex;align-items:center}.output-port{justify-content:flex-end}
 .react-flow__handle{width:11px;height:11px;background:#9aabff;border:1px solid #20232b}

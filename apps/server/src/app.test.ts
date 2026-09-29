@@ -28,6 +28,16 @@ it('supports workflow CRUD, secrets masking, and a chat execution through inject
     expect(update.statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: '/api/workflows' })).json()).toHaveLength(1);
     expect((await app.inject({ method: 'POST', url: `/api/workflows/${workflow.id}/validate` })).json().valid).toBe(true);
+    const emptyValidation = await app.inject({ method: 'POST', url: `/api/workflows/${workflow.id}/validate`,
+      headers: { 'content-type': 'application/json' }, payload: '' });
+    expect(emptyValidation.statusCode).toBe(200);
+    expect(emptyValidation.json().valid).toBe(true);
+    const emptyDelete = await app.inject({ method: 'DELETE', url: '/api/secrets/nonexistent',
+      headers: { 'content-type': 'application/json' }, payload: '' });
+    expect(emptyDelete.statusCode).toBe(204);
+    const malformed = await app.inject({ method: 'POST', url: `/api/workflows/${workflow.id}/validate`,
+      headers: { 'content-type': 'application/json' }, payload: '{' });
+    expect(malformed.statusCode).toBe(400);
     const created = (await app.inject({ method: 'POST', url: '/api/sessions', payload: { workflowId: workflow.id } })).json();
     const response = await app.inject({ method: 'POST', url: `/api/sessions/${created.id}/messages`, payload: { content: 'hi' } });
     expect(response.statusCode).toBe(200);

@@ -15,6 +15,12 @@ const errorMessage = (error: unknown) => error instanceof Error ? error.message 
 
 export async function createApp(dataDir = join(process.cwd(), 'data'), options: { seed?: boolean } = {}) {
   const app = Fastify({ logger: false });
+  const parseJson = app.getDefaultJsonParser('error', 'error');
+  app.removeContentTypeParser('application/json');
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (request, body, done) => {
+    if (body.length === 0) return done(null, {});
+    parseJson(request, typeof body === 'string' ? body : body.toString('utf8'), done);
+  });
   const workflows = new JsonRepository<Workflow>(join(dataDir, 'workflows'));
   const sessions = new JsonRepository<Session>(join(dataDir, 'sessions'));
   const executions = new JsonRepository<ExecutionLog>(join(dataDir, 'executions'));
@@ -130,7 +136,9 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
   });
   app.setErrorHandler((error, _request, reply) => {
     const invalid = error instanceof z.ZodError;
-    reply.code(invalid ? 400 : 500).send({ error: invalid ? error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ') : errorMessage(error) });
+    const code = typeof error === 'object' && error !== null && 'statusCode' in error ? error.statusCode : undefined;
+    const status = invalid ? 400 : typeof code === 'number' && code >= 400 && code < 500 ? code : 500;
+    reply.code(status).send({ error: invalid ? error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ') : errorMessage(error) });
   });
   return app;
 }

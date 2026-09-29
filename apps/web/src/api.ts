@@ -2,7 +2,9 @@ import type { Workflow, Session, ExecutionLog, NodeTypeDescriptor } from '@st/sh
 export type SessionSummary = Omit<Session, 'messages'> & { messageCount: number };
 export type SecretSummary = { name: string; hint: string };
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...options?.headers } });
+  const headers = new Headers(options?.headers);
+  if (options?.body != null && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  const response = await fetch(`/api${path}`, { ...options, headers });
   if (response.status === 204) return undefined as T;
   const body: unknown = await response.json();
   if (!response.ok) {
