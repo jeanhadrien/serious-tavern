@@ -72,8 +72,7 @@ export function Characters() {
   };
   const drop = (event: DragEvent) => {
     event.preventDefault(); setDragging(false);
-    void importFiles(imageFiles(event.dataTransfer.files).filter(file =>
-      file.type === 'image/png' || /\.png$/i.test(file.name) || /\.json$/i.test(file.name)));
+    void importFiles(imageFiles(event.dataTransfer.files));
   };
   const change = (field: keyof Character, value: unknown) => draft && setDraft({ ...draft, [field]: value });
   const filtered = list.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));

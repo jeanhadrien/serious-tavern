@@ -20,6 +20,7 @@ function GenericPanel({ descriptor, config, onChange }: Props) {
     { expression: '{{trigger.sessionId}}', type: 'text' },
     { expression: '{{history}}', type: 'messages' },
     { expression: '{{char}}', type: 'text' },
+    { expression: '{{char.name}}', type: 'text' },
     { expression: '{{char.description}}', type: 'text' },
     { expression: '{{char.personality}}', type: 'text' },
     { expression: '{{char.scenario}}', type: 'text' },
