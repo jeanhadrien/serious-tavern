@@ -13,7 +13,7 @@ const workflow = (nodes: Workflow['nodes'], edges: Edge[]): Workflow =>
   ({ id: 'workflow', name: 'Test', nodes, edges, createdAt: '', updatedAt: '' });
 const options = { message: 'hello', sessionId: 'session', history: [] as ChatMessage[],
   secrets: { get: async () => undefined } };
-afterEach(() => { registry.delete('slow-test'); vi.restoreAllMocks(); });
+afterEach(() => { registry.delete('slow-test'); registry.delete('typed-test'); vi.restoreAllMocks(); });
 
 describe('executor', () => {
   it('runs independent slow nodes concurrently and respects dependencies', async () => {
@@ -21,7 +21,7 @@ describe('executor', () => {
     let release!: () => void;
     const bothStarted = new Promise<void>(resolve => { release = resolve; });
     registry.set('slow-test', { type: 'slow-test', label: 'Slow', description: '', category: '',
-      inputs: [{ name: 'in', label: 'In' }], outputs: [{ name: 'out', label: 'Out' }],
+      inputs: [{ name: 'in', label: 'In', dataType: 'any' }], outputs: [{ name: 'out', label: 'Out', dataType: 'any' }],
       configSchema: z.object({}), defaultConfig: {},
       execute: async ({ trigger }) => {
         started.push(trigger.message);
@@ -80,7 +80,7 @@ describe('executor', () => {
   });
   it('marks a timed-out node failed and emits events', async () => {
     registry.set('slow-test', { type: 'slow-test', label: 'Slow', description: '', category: '',
-      inputs: [{ name: 'in', label: 'In' }], outputs: [{ name: 'out', label: 'Out' }],
+      inputs: [{ name: 'in', label: 'In', dataType: 'any' }], outputs: [{ name: 'out', label: 'Out', dataType: 'any' }],
       configSchema: z.object({}), defaultConfig: {},
       execute: async () => new Promise(() => {}) });
     const graph = workflow([node('input', 'chat-input'), node('slow', 'slow-test'), node('output', 'chat-output')],
@@ -90,5 +90,31 @@ describe('executor', () => {
       .rejects.toMatchObject({ execution: { status: 'error', nodes: { slow: { status: 'error' } } } });
     expect(events).toContain('node:error');
     expect(events.at(-1)).toBe('execution:complete');
+  });
+  it('rejects incompatible edges with node, port and type names', () => {
+    registry.set('typed-test', { type: 'typed-test', label: 'Typed', description: '', category: '',
+      inputs: [{ name: 'count', label: 'Count', dataType: 'number' }],
+      outputs: [{ name: 'text', label: 'Text', dataType: 'text' }],
+      configSchema: z.object({}), defaultConfig: {}, async execute() { return { text: 'done' }; }
+    });
+    const graph = workflow([node('input', 'chat-input'), node('convert', 'typed-test'), node('output', 'chat-output')],
+      [edge('input', 'message', 'convert', 'count'), edge('convert', 'text', 'output', 'value')]);
+    expect(validateWorkflow(graph).join(' ')).toMatch(/input \(chat-input\)\.message \[text\].*convert \(typed-test\)\.count \[number\]/);
+  });
+  it('converts messages to a transcript and objects to pretty JSON on text edges', async () => {
+    const history: ChatMessage[] = [
+      { id: '1', role: 'user', content: 'Hi', createdAt: '' },
+      { id: '2', role: 'assistant', content: 'Hello', createdAt: '' }
+    ];
+    const transcript = workflow([node('input', 'chat-input'), node('output', 'chat-output')],
+      [edge('input', 'history', 'output', 'value')]);
+    expect((await executeWorkflow(transcript, { ...options, history })).reply).toBe('user: Hi\nassistant: Hello');
+    registry.set('typed-test', { type: 'typed-test', label: 'Typed', description: '', category: '',
+      inputs: [], outputs: [{ name: 'value', label: 'Value', dataType: 'object' }],
+      configSchema: z.object({}), defaultConfig: {}, async execute() { return { value: { hello: ['world'] } }; }
+    });
+    const json = workflow([node('input', 'chat-input'), node('object', 'typed-test'), node('output', 'chat-output')],
+      [edge('object', 'value', 'output', 'value')]);
+    expect((await executeWorkflow(json, options)).reply).toBe('{\n  "hello": [\n    "world"\n  ]\n}');
   });
 });

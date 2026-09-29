@@ -3,8 +3,9 @@ import type { NodeDefinition } from '../../types.js';
 import { renderTemplate, stringify } from '../../template.js';
 export const llm: NodeDefinition = {
   type: 'llm', label: 'OpenRouter LLM', description: 'Generate a completion with OpenRouter', category: 'AI',
-  inputs: [{ name: 'prompt', label: 'Prompt' }, { name: 'context', label: 'Context' }],
-  outputs: [{ name: 'text', label: 'Text' }, { name: 'raw', label: 'Raw' }],
+  inputs: [{ name: 'prompt', label: 'Prompt', dataType: 'text' }, { name: 'context', label: 'Context', dataType: 'any' }],
+  outputs: [{ name: 'text', label: 'Text', dataType: 'text' }, { name: 'raw', label: 'Raw', dataType: 'object' }],
+  templateFields: ['systemPrompt', 'promptTemplate'],
   configSchema: z.object({
     model: z.string().min(1).default('openai/gpt-4o-mini'), systemPrompt: z.string().default(''),
     promptTemplate: z.string().default(''), temperature: z.number().min(0).max(2).default(0.7),

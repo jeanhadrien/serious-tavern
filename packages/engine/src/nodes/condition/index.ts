@@ -3,7 +3,9 @@ import type { NodeDefinition } from '../../types.js';
 import { renderTemplate, stringify } from '../../template.js';
 export const condition: NodeDefinition = {
   type: 'condition', label: 'Condition', description: 'Route a value to one branch', category: 'Logic',
-  inputs: [{ name: 'value', label: 'Value' }], outputs: [{ name: 'true', label: 'True' }, { name: 'false', label: 'False' }],
+  inputs: [{ name: 'value', label: 'Value', dataType: 'any' }],
+  outputs: [{ name: 'true', label: 'True', dataType: 'any' }, { name: 'false', label: 'False', dataType: 'any' }],
+  templateFields: ['left', 'right'],
   configSchema: z.object({
     left: z.string().default('{{input.value}}'),
     operator: z.enum(['equals', 'notEquals', 'contains', 'notContains', 'matchesRegex', 'isEmpty', 'isNotEmpty', 'gt', 'lt']).default('equals'),

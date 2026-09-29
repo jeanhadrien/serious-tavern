@@ -1,8 +1,18 @@
 import { randomUUID } from 'node:crypto';
+import { canConnect, type CoercionKind } from '@st/shared/ports';
 import type { Workflow, ChatMessage, ExecutionLog, Edge } from '@st/shared';
 import { registry } from './registry.js';
 import type { EngineEvent, ExecutionContext } from './types.js';
 import { stringify } from './template.js';
+
+function coerceValue(value: unknown, kind: CoercionKind): string {
+  if (kind === 'messages-to-text') {
+    if (!Array.isArray(value)) return stringify(value);
+    return value.map((message: ChatMessage) => `${message.role}: ${message.content}`).join('\n');
+  }
+  if (value != null && typeof value === 'object') return JSON.stringify(value, null, 2);
+  return value == null ? '' : String(value);
+}
 
 export function validateWorkflow(workflow: Workflow): string[] {
   const errors: string[] = [];
@@ -27,8 +37,15 @@ export function validateWorkflow(workflow: Workflow): string[] {
     const source = workflow.nodes.find(n => n.id === edge.source);
     const target = workflow.nodes.find(n => n.id === edge.target);
     if (!source || !target) { errors.push(`Edge ${edge.id}: missing source or target node`); continue; }
-    if (!registry.get(source.type)?.outputs.some(p => p.name === edge.sourceHandle)) errors.push(`Edge ${edge.id}: invalid output port ${edge.sourceHandle}`);
-    if (!registry.get(target.type)?.inputs.some(p => p.name === edge.targetHandle)) errors.push(`Edge ${edge.id}: invalid input port ${edge.targetHandle}`);
+    const sourcePort = registry.get(source.type)?.outputs.find(p => p.name === edge.sourceHandle);
+    const targetPort = registry.get(target.type)?.inputs.find(p => p.name === edge.targetHandle);
+    if (!sourcePort) errors.push(`Edge ${edge.id}: invalid output port ${edge.sourceHandle}`);
+    if (!targetPort) errors.push(`Edge ${edge.id}: invalid input port ${edge.targetHandle}`);
+    if (sourcePort && targetPort) {
+      const compatibility = canConnect(sourcePort, targetPort);
+      if (!compatibility.ok) errors.push(`Edge ${edge.id}: ${source.id} (${source.type}).${sourcePort.name} [${sourcePort.dataType}] → ` +
+        `${target.id} (${target.type}).${targetPort.name} [${targetPort.dataType}]: ${compatibility.reason}`);
+    }
     if (workflow.edges.some(e => e !== edge && e.target === edge.target && e.targetHandle === edge.targetHandle)) errors.push(`Edge ${edge.id}: input ${target.id}.${edge.targetHandle} has multiple connections`);
     inbound.set(edge.target, (inbound.get(edge.target) ?? 0) + 1);
     adjacency.get(edge.source)?.push(edge.target);
@@ -91,8 +108,15 @@ export async function executeWorkflow(
           const source = resolved.get(e.source)!;
           return !source.skipped && Object.hasOwn(source.output, e.sourceHandle);
         });
-        const inputs = Object.fromEntries(active.map(e => [e.targetHandle, resolved.get(e.source)!.output[e.sourceHandle]]));
         const definition = registry.get(node.type)!;
+        const inputs = Object.fromEntries(active.map(e => {
+          const source = workflow.nodes.find(item => item.id === e.source)!;
+          const fromPort = registry.get(source.type)!.outputs.find(port => port.name === e.sourceHandle)!;
+          const toPort = definition.inputs.find(port => port.name === e.targetHandle)!;
+          const connection = canConnect(fromPort, toPort);
+          const value = resolved.get(e.source)!.output[e.sourceHandle];
+          return [e.targetHandle, connection.ok && connection.coerce ? coerceValue(value, connection.coerce) : value];
+        }));
         const requiredSkipped = definition.inputs.some(p => p.required &&
           incoming.some(e => e.targetHandle === p.name) && !Object.hasOwn(inputs, p.name));
         if ((incoming.length > 0 && active.length === 0) || (node.type !== 'merge' && requiredSkipped)) {

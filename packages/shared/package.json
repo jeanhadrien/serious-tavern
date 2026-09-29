@@ -2,6 +2,9 @@
   "name": "@st/shared",
   "version": "0.1.0",
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ports": "./src/ports.ts"
+  },
   "dependencies": { "zod": "^4.6.5" }
 }

@@ -3,8 +3,10 @@ import type { NodeDefinition } from '../../types.js';
 import { renderTemplate } from '../../template.js';
 export const httpRequest: NodeDefinition = {
   type: 'http-request', label: 'HTTP Request', description: 'Fetch a remote endpoint', category: 'Integration',
-  inputs: [{ name: 'input', label: 'Input' }],
-  outputs: [{ name: 'body', label: 'Body' }, { name: 'status', label: 'Status' }, { name: 'headers', label: 'Headers' }],
+  inputs: [{ name: 'input', label: 'Input', dataType: 'any' }],
+  outputs: [{ name: 'body', label: 'Body', dataType: 'any' }, { name: 'status', label: 'Status', dataType: 'number' },
+    { name: 'headers', label: 'Headers', dataType: 'object' }],
+  templateFields: ['url', 'body', 'headers'],
   configSchema: z.object({
     method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']).default('GET'),
     url: z.string().min(1), headers: z.array(z.object({ key: z.string(), value: z.string() })).default([]),

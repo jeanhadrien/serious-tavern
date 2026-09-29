@@ -27,10 +27,19 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;f
 .palette button{width:100%;display:flex;justify-content:space-between;margin:8px 0;text-align:left}
 .config-panel{width:300px;border-right:0;border-left:1px solid #363b46}.config-fields{display:grid;gap:15px}.config-fields label{width:100%}
 .kv-list{display:grid;gap:8px}.kv-row{display:flex;gap:4px}.kv-row input{width:40%;padding:5px}.kv-row button{padding:3px}
+.config-field{display:grid;gap:6px;font-size:.88rem;text-transform:capitalize}
+.template-hints{display:flex;flex-wrap:wrap;gap:5px;text-transform:none}
+.template-hints small{width:100%;font-size:.72rem}
+.template-hints button{font-size:.68rem;padding:3px 5px;background:#363d4c;max-width:100%;overflow-wrap:anywhere;text-align:left}
+.template-hints em{font-style:normal;color:#b9cae9}
 .canvas{flex:1;min-width:0;height:100%;background:#1b1e26}.flow-node{min-width:175px;min-height:80px;background:#303542;border:1px solid #686f82;border-radius:10px;padding:11px 14px;box-shadow:0 4px 15px #0004}
 .flow-node.selected{border-color:#95a4ff}.flow-node>strong,.flow-node>small{display:block}.flow-node>small{margin-top:4px}
 .port{position:relative;height:25px;font-size:.78rem;color:#c7cede;display:flex;align-items:center}.output-port{justify-content:flex-end}
 .react-flow__handle{width:11px;height:11px;background:#9aabff;border:1px solid #20232b}
+.port-type{font-size:.65rem;color:#a8b1c4;margin:0 5px}.react-flow__handle.invalid-handle{opacity:.45;border:2px solid #ef8186}
+.port-legend{margin-top:20px;border-top:1px solid #414652;padding-top:8px;display:flex;gap:6px 12px;flex-wrap:wrap}
+.port-legend h3{width:100%;margin:5px 0}.port-legend span{display:flex;align-items:center;gap:5px;font-size:.7rem;color:#c4cada}
+.port-legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
 .toaster{position:fixed;right:20px;bottom:20px;width:min(380px,calc(100vw - 32px));z-index:1000;display:flex;flex-direction:column;gap:10px;pointer-events:none}
 .toast{pointer-events:auto;background:#292e39;border:1px solid #5b6376;border-left:4px solid #8897e9;border-radius:9px;padding:12px 14px;box-shadow:0 9px 30px #0009;overflow-wrap:anywhere}
 .toast-error{border-left-color:#ef8186}.toast-success{border-left-color:#80c9a2}.toast-warning{border-left-color:#ecc079}.toast-info{border-left-color:#8897e9}

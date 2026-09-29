@@ -20,7 +20,21 @@ Create a chat and choose a workflow. The seeded **Default Assistant** requires a
 
 Frontend notifications live in `apps/web/src/alerts/`. Import `alerts` and call `alerts.error(message)`, `.success`, `.info`, or `.warning` from any module; React components can use `useAlerts()`. API failures toast automatically unless a request uses `{ silent: true }` to handle an error inline.
 
-To add a node type: (1) create `packages/engine/src/nodes/<type>/index.ts` exporting a `NodeDefinition` with Zod config, ports, defaults and `execute(ctx)`; (2) add that definition to the list in `packages/engine/src/registry.ts`; (3) optionally add a component to `customPanels` in `packages/node-ui/src/index.tsx`. The editor automatically renders other types using the serialized config schema.
+To add a node type: (1) create `packages/engine/src/nodes/<type>/index.ts` exporting a `NodeDefinition` with Zod config, typed ports (`dataType`, optional `description`), defaults and `execute(ctx)`; (2) declare `templateFields` for config fields that accept `{{...}}` variables; (3) register the definition in `packages/engine/src/registry.ts`; (4) optionally add a component to `customPanels` in `packages/node-ui/src/index.tsx`. The editor automatically renders other types using the serialized config schema and port metadata.
+
+## Ports & types
+
+Ports declare `text`, `number`, `boolean`, `object`, `array`, `messages`, or `any` (legacy ports default to `any`). The same compatibility rule is used in the editor and executor:
+
+| Output → input | Result |
+| --- | --- |
+| Same type, or `any` on either side | Pass through unchanged |
+| `number`, `boolean`, `object`, `array` → `text` | Convert to text (objects/arrays as pretty JSON) |
+| `messages` → `text` | Convert to a `role: content` transcript |
+| `messages` → `array` | Pass through unchanged |
+| All other differing types, including `text` → `number`/`boolean` | Rejected; no implicit parsing |
+
+Memory's `history` output is `any` because its `format` setting can emit either text or messages. Hover over a port to see its type and description; compatible connections that convert data are dashed. Invalid saved edges remain visible in red for correction.
 
 ## Data and secrets
 

@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { portDataTypes } from './ports.js';
+export { canConnect, portDataTypes, type PortDataType, type PortDef, type CoercionKind, type ConnectionResult } from './ports.js';
 
 export const nodeSchema = z.object({
   id: z.string().min(1), type: z.string().min(1), config: z.record(z.string(), z.unknown()),
@@ -30,11 +32,15 @@ export const executionLogSchema = z.object({
   status: z.enum(['running', 'completed', 'error']), startedAt: z.string(), finishedAt: z.string().optional(),
   nodes: z.record(z.string(), nodeExecutionSchema)
 });
-export const portSchema = z.object({ name: z.string(), label: z.string(), required: z.boolean().optional() });
+export const dataTypeSchema = z.enum(portDataTypes);
+export const portSchema = z.object({
+  name: z.string(), label: z.string(), dataType: dataTypeSchema.default('any'),
+  description: z.string().optional(), required: z.boolean().optional()
+});
 export const nodeTypeDescriptorSchema = z.object({
   type: z.string(), label: z.string(), description: z.string(), category: z.string(),
   inputs: z.array(portSchema), outputs: z.array(portSchema), configSchema: z.record(z.string(), z.unknown()),
-  defaultConfig: z.record(z.string(), z.unknown())
+  defaultConfig: z.record(z.string(), z.unknown()), templateFields: z.array(z.string()).optional()
 });
 export type Workflow = z.infer<typeof workflowSchema>;
 export type NodeInstance = z.infer<typeof nodeSchema>;
@@ -43,4 +49,3 @@ export type ChatMessage = z.infer<typeof messageSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type ExecutionLog = z.infer<typeof executionLogSchema>;
 export type NodeTypeDescriptor = z.infer<typeof nodeTypeDescriptorSchema>;
-export type PortDef = z.infer<typeof portSchema>;

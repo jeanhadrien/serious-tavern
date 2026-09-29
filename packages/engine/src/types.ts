@@ -15,6 +15,7 @@ export type ExecutionContext = {
 export type NodeDefinition = {
   type: string; label: string; description: string; category: string;
   inputs: PortDef[]; outputs: PortDef[];
+  templateFields?: string[];
   configSchema: z.ZodType<Record<string, unknown>>;
   defaultConfig: Record<string, unknown>;
   timeoutMs?: number;

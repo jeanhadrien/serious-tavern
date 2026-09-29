@@ -14,6 +14,11 @@ it('supports workflow CRUD, secrets masking, and a chat execution through inject
   directories.push(directory);
   const app = await createApp(directory, { seed: false });
   try {
+    const types = (await app.inject({ method: 'GET', url: '/api/node-types' })).json();
+    expect(types.find((type: { type: string }) => type.type === 'llm')).toMatchObject({
+      inputs: [{ name: 'prompt', dataType: 'text' }, { name: 'context', dataType: 'any' }],
+      templateFields: ['systemPrompt', 'promptTemplate']
+    });
     const create = await app.inject({ method: 'POST', url: '/api/workflows', payload: { name: 'Echo' } });
     expect(create.statusCode).toBe(201);
     const workflow = create.json();

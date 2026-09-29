@@ -14,8 +14,8 @@ export const registry = new Map<string, NodeDefinition>(
   [chatInput, chatOutput, llm, httpRequest, condition, merge, memory].map(node => [node.type, node])
 );
 export function descriptors(): NodeTypeDescriptor[] {
-  return [...registry.values()].map(({ type, label, description, category, inputs, outputs, configSchema, defaultConfig }) => ({
-    type, label, description, category, inputs, outputs,
+  return [...registry.values()].map(({ type, label, description, category, inputs, outputs, configSchema, defaultConfig, templateFields }) => ({
+    type, label, description, category, inputs, outputs, templateFields,
     configSchema: z.toJSONSchema(configSchema) as Record<string, unknown>, defaultConfig
   }));
 }

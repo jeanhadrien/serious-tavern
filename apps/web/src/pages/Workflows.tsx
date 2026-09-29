@@ -1,23 +1,46 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ReactFlow, ReactFlowProvider, Background, Controls, Handle, Position, useReactFlow,
+  ReactFlow, ReactFlowProvider, Background, Controls, Handle, Position, useConnection, useReactFlow,
   addEdge, applyNodeChanges, applyEdgeChanges,
   type Connection, type Edge as FlowEdge, type Node as FlowNode, type NodeProps, type OnNodesChange, type OnEdgesChange
 } from '@xyflow/react';
+import { canConnect, portDataTypes, type PortDataType, type PortDef } from '@st/shared/ports';
 import type { Workflow, NodeTypeDescriptor, NodeInstance } from '@st/shared';
 import { NodeConfigPanel } from '@st/node-ui';
 import { api, getNodeTypes, getWorkflows, json } from '../api.js';
 import { alerts } from '../alerts/index.js';
+import { checkConnection } from '../connection.js';
 
 type CanvasNode = FlowNode<{ descriptor: NodeTypeDescriptor; config: NodeInstance['config'] }>;
-function WorkflowNode({ data, selected }: NodeProps<CanvasNode>) {
+const portColors: Record<PortDataType, string> = {
+  text: '#85c5f0', number: '#efd080', boolean: '#d2a7ef', object: '#80cbaa',
+  array: '#e9a98c', messages: '#e5accc', any: '#b3b9c7'
+};
+function WorkflowNode({ id, data, selected }: NodeProps<CanvasNode>) {
   const { descriptor } = data;
+  const connection = useConnection<CanvasNode>();
+  const incompatible = (port: PortDef, type: 'source' | 'target') => {
+    if (!connection.inProgress || !connection.fromHandle || connection.fromHandle.nodeId === id) return false;
+    const start = connection.fromHandle;
+    if (start.type === type) return true;
+    const startPort = (start.type === 'source' ? connection.fromNode?.data.descriptor.outputs :
+      connection.fromNode?.data.descriptor.inputs)?.find(item => item.name === start.id);
+    if (!startPort) return false;
+    return !(type === 'target' ? canConnect(startPort, port) : canConnect(port, startPort)).ok;
+  };
+  const tooltip = (port: PortDef) => `${port.label} (${port.dataType})${port.description ? ` — ${port.description}` : ''}`;
   return <div className={`flow-node ${selected ? 'selected' : ''}`}>
     <strong>{descriptor.label}</strong><small>{descriptor.category}</small>
-    {descriptor.inputs.map(port => <div className="port input-port" key={port.name}>
-      <Handle type="target" id={port.name} position={Position.Left} style={{ top: '50%' }} />{port.label}</div>)}
-    {descriptor.outputs.map(port => <div className="port output-port" key={port.name}>
-      {port.label}<Handle type="source" id={port.name} position={Position.Right} style={{ top: '50%' }} /></div>)}
+    {descriptor.inputs.map(port => <div className="port input-port" key={port.name} title={tooltip(port)}>
+      <Handle type="target" id={port.name} position={Position.Left}
+        className={incompatible(port, 'target') ? 'invalid-handle' : ''}
+        style={{ top: '50%', background: incompatible(port, 'target') ? '#ef8186' : portColors[port.dataType] }} />
+      {port.label}<span className="port-type">{port.dataType}</span></div>)}
+    {descriptor.outputs.map(port => <div className="port output-port" key={port.name} title={tooltip(port)}>
+      <span className="port-type">{port.dataType}</span>{port.label}
+      <Handle type="source" id={port.name} position={Position.Right}
+        className={incompatible(port, 'source') ? 'invalid-handle' : ''}
+        style={{ top: '50%', background: incompatible(port, 'source') ? '#ef8186' : portColors[port.dataType] }} /></div>)}
   </div>;
 }
 const nodeTypes = { workflow: WorkflowNode };
@@ -35,6 +58,16 @@ function WorkflowEditor() {
   const [selected, setSelected] = useState<string>();
   const canvasRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
+  const visibleEdges = useMemo(() => edges.map(edge => {
+    const result = checkConnection(edge, nodes);
+    return {
+      ...edge,
+      label: !result.ok ? 'incompatible' : result.coerce ? '→text' : undefined,
+      labelStyle: { fill: result.ok ? '#efcf9b' : '#ff8b93', fontSize: 11 },
+      style: !result.ok ? { stroke: '#ef8186', strokeWidth: 2 } :
+        result.coerce ? { stroke: '#e6bb77', strokeWidth: 2, strokeDasharray: '6 4' } : undefined
+    };
+  }), [edges, nodes]);
   const refresh = () => getWorkflows().then(setWorkflows);
   useEffect(() => { void refresh().catch(() => {}); void getNodeTypes().then(setTypes).catch(() => {}); }, []);
   const load = (next: Workflow) => {
@@ -60,9 +93,19 @@ function WorkflowEditor() {
   }, []);
   const connect = useCallback((connection: Connection) => {
     if (!connection.sourceHandle || !connection.targetHandle) return;
+    const result = checkConnection(connection, nodes);
+    if (!result.ok) { alerts.info(result.reason); return; }
     setEdges(prev => addEdge({ ...connection, id: crypto.randomUUID() },
       prev.filter(e => e.target !== connection.target || e.targetHandle !== connection.targetHandle)));
-  }, []);
+  }, [nodes]);
+  const onConnectEnd: React.ComponentProps<typeof ReactFlow>['onConnectEnd'] = (_, state) => {
+    if (state.isValid !== false || !state.fromHandle || !state.toHandle) return;
+    const source = state.fromHandle.type === 'source' ? state.fromHandle : state.toHandle;
+    const target = state.fromHandle.type === 'target' ? state.fromHandle : state.toHandle;
+    const result = checkConnection({ source: source.nodeId, sourceHandle: source.id ?? null,
+      target: target.nodeId, targetHandle: target.id ?? null }, nodes);
+    if (!result.ok) alerts.info(result.reason);
+  };
   const addNode = (descriptor: NodeTypeDescriptor, position: { x: number; y: number }) => {
     setNodes(prev => [...prev, { id: crypto.randomUUID(), type: 'workflow', position,
       data: { descriptor, config: { ...descriptor.defaultConfig } } }]);
@@ -131,10 +174,13 @@ function WorkflowEditor() {
           event.dataTransfer.setData('application/st-node-type', t.type);
           event.dataTransfer.effectAllowed = 'copy';
         }} onClick={() => addAtCenter(t)}><small>{t.category}</small>{t.label} +</button>)}
-        <p className="hint">Click to add at center or drag onto the canvas. Drag nodes to move; connect handles; press Delete to remove.</p></aside>
+        <p className="hint">Click to add at center or drag onto the canvas. Drag nodes to move; connect handles; press Delete to remove.</p>
+        <div className="port-legend"><h3>Port types</h3>{portDataTypes.map(type =>
+          <span key={type}><i style={{ background: portColors[type] }} />{type}</span>)}</div></aside>
         <div className="canvas" ref={canvasRef} onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }}
-          onDrop={onDrop}><ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connect}
+          onDrop={onDrop}><ReactFlow nodes={nodes} edges={visibleEdges} nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connect} onConnectEnd={onConnectEnd}
+          isValidConnection={connection => checkConnection(connection, nodes).ok}
           onNodeClick={(_, node) => setSelected(node.id)} onPaneClick={() => setSelected(undefined)}
           deleteKeyCode={['Backspace', 'Delete']}
           fitView><Background color="#414652" gap={20} /><Controls /></ReactFlow></div>
