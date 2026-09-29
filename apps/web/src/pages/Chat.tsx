@@ -1,132 +1,24 @@
-import { useEffect, useState } from 'react';
-import type { Workflow, Session, ExecutionLog, SessionSummary, ApiBody } from '@st/shared';
-import { sessionsApi, workflowsApi, charactersApi, personasApi, executionsApi } from '../api.js';
-import type { Character, Persona } from '@st/shared';
-import { alerts } from '../alerts/index.js';
-
-function ExecutionDetails({ id, cached }: { id: string; cached?: ExecutionLog }) {
-  const [execution, setExecution] = useState(cached);
-  useEffect(() => {
-    if (!execution)
-      void executionsApi
-        .get(id)
-        .then(setExecution)
-        .catch(() => {});
-  }, [id]);
-  return (
-    <details className="execution">
-      <summary>Execution details</summary>
-      {execution && (
-        <>
-          <small>
-            {execution.status} · {execution.id}
-          </small>
-          {Object.entries(execution.nodes).map(([nodeId, node]) => (
-            <div className="execution-node" key={nodeId}>
-              <strong>{nodeId}</strong> · {node.status} · {node.durationMs ?? 0}ms
-              {node.error && <p className="error">{node.error}</p>}
-              {node.request !== undefined && (
-                <details>
-                  <summary>LLM request (no secrets)</summary>
-                  <pre>{JSON.stringify(node.request, null, 2)}</pre>
-                </details>
-              )}
-              {node.output !== undefined && <pre>{JSON.stringify(node.output, null, 2)}</pre>}
-            </div>
-          ))}
-        </>
-      )}
-    </details>
-  );
-}
+import { charactersApi, personasApi } from '../api.js';
+import { useChat } from './chat/useChat.js';
+import { ExecutionDetails } from './chat/ExecutionDetails.js';
 export function Chat() {
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
-  const [characters, setCharacters] = useState<Character[]>([]);
-  const [personas, setPersonas] = useState<Persona[]>([]);
-  const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [session, setSession] = useState<Session>();
-  const [content, setContent] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [logs, setLogs] = useState<Record<string, ExecutionLog>>({});
-  const refresh = () =>
-    sessionsApi.list().then((list) => setSessions(list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))));
-  useEffect(() => {
-    void workflowsApi
-      .list()
-      .then(setWorkflows)
-      .catch(() => {});
-    void charactersApi
-      .list()
-      .then(setCharacters)
-      .catch(() => {});
-    void personasApi
-      .list()
-      .then(setPersonas)
-      .catch(() => {});
-    void refresh().catch(() => {});
-  }, []);
-  const open = async (id: string) => {
-    try {
-      setSession(await sessionsApi.get(id));
-    } catch {
-      /* API errors are toasted. */
-    }
-  };
-  const create = async () => {
-    const initialWorkflow = workflows.find((w) => w.name === 'Default Assistant') ?? workflows[0];
-    if (!initialWorkflow) return;
-    try {
-      const next = await sessionsApi.create({
-        workflowId: initialWorkflow.id,
-        personaId: session?.personaId ?? personas[0]?.id,
-      });
-      setSession(next);
-      alerts.info('Chat created');
-      await refresh();
-    } catch {
-      /* API errors are toasted. */
-    }
-  };
-  const update = async (changes: ApiBody<'updateSession'>) => {
-    if (!session) return;
-    try {
-      const next = await sessionsApi.update(session.id, changes);
-      setSession(next);
-      await refresh();
-    } catch {
-      /* API errors are toasted. */
-    }
-  };
-  const remove = async (id: string) => {
-    try {
-      await sessionsApi.delete(id);
-      if (session?.id === id) setSession(undefined);
-      alerts.info('Chat deleted');
-      await refresh();
-    } catch {
-      /* API errors are toasted. */
-    }
-  };
-  const send = async () => {
-    if (!session || !content.trim() || busy) return;
-    const text = content.trim();
-    setContent('');
-    setBusy(true);
-    try {
-      const result = await sessionsApi.sendMessage(session.id, { content: text });
-      setSession((prev) =>
-        prev?.id === session.id
-          ? { ...prev, messages: [...prev.messages, result.userMessage, result.assistantMessage] }
-          : prev,
-      );
-      setLogs((prev) => ({ ...prev, [result.execution.id]: result.execution }));
-      await refresh();
-    } catch {
-      await open(session.id);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const {
+    workflows,
+    characters,
+    personas,
+    sessions,
+    session,
+    setSession,
+    content,
+    setContent,
+    busy,
+    logs,
+    open,
+    create,
+    update,
+    remove,
+    send,
+  } = useChat();
   return (
     <div className="chat-layout">
       <aside className="sidebar">
