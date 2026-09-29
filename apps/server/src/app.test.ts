@@ -14,7 +14,7 @@ afterEach(async () => {
   await Promise.all(directories.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 it('supports workflow CRUD, secrets masking, and a chat execution through inject', async () => {
-  const directory = join(process.cwd(), 'data', `test-${randomUUID()}`);
+  const directory = join(process.cwd(), '.test-data', `test-${randomUUID()}`);
   directories.push(directory);
   const app = await createApp(directory, { seed: false });
   try {
@@ -188,7 +188,7 @@ it('supports workflow CRUD, secrets masking, and a chat execution through inject
   }
 });
 it('hides unexpected error stacks and logs them server-side', async () => {
-  const directory = join(process.cwd(), 'data', `test-${randomUUID()}`);
+  const directory = join(process.cwd(), '.test-data', `test-${randomUUID()}`);
   directories.push(directory);
   const app = await createApp(directory, { seed: false });
   const log = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -206,7 +206,7 @@ it('hides unexpected error stacks and logs them server-side', async () => {
   }
 });
 it('serializes same-session message exchanges and merges concurrent session patches', async () => {
-  const directory = join(process.cwd(), 'data', `test-${randomUUID()}`);
+  const directory = join(process.cwd(), '.test-data', `test-${randomUUID()}`);
   directories.push(directory);
   const histories: string[][] = [];
   let activeExecutions = 0;
@@ -354,7 +354,7 @@ it('serializes same-session message exchanges and merges concurrent session patc
   }
 });
 it('supports presets CRUD, preview with a session, dynamic ports, and deletion conflicts', async () => {
-  const directory = join(process.cwd(), 'data', `test-${randomUUID()}`);
+  const directory = join(process.cwd(), '.test-data', `test-${randomUUID()}`);
   directories.push(directory);
   const app = await createApp(directory, { seed: false });
   try {
@@ -516,7 +516,7 @@ it('supports presets CRUD, preview with a session, dynamic ports, and deletion c
   }
 });
 it('keeps one Default preset and both valid seed workflows across server restarts', async () => {
-  const directory = join(process.cwd(), 'data', `test-${randomUUID()}`);
+  const directory = join(process.cwd(), '.test-data', `test-${randomUUID()}`);
   directories.push(directory);
   const first = await createApp(directory);
   const presets = (await first.inject({ method: 'GET', url: '/api/presets' })).json();
@@ -557,7 +557,7 @@ function multipart(files: { filename: string; mime: string; data: Buffer }[]) {
 }
 
 it('supports character/persona CRUD, card import and export, avatars, and session context persistence', async () => {
-  const directory = join(process.cwd(), 'data', `test-${randomUUID()}`);
+  const directory = join(process.cwd(), '.test-data', `test-${randomUUID()}`);
   directories.push(directory);
   const app = await createApp(directory, { seed: false });
   try {

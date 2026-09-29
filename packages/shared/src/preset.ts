@@ -38,15 +38,12 @@ export const presetEntrySchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
-export const presetSchema = z
+export const presetFieldsSchema = z
   .object({
-    id: z.string().uuid(),
     name: z.string().trim().min(1),
     description: z.string().optional(),
     inputs: z.array(presetInputSchema),
     entries: z.array(presetEntrySchema),
-    createdAt: z.string(),
-    updatedAt: z.string(),
   })
   .superRefine((preset, ctx) => {
     const inputByKey = new Map(preset.inputs.map((input) => [input.key, input]));
@@ -92,11 +89,26 @@ export const presetSchema = z
     });
   });
 
+export const presetSchema = presetFieldsSchema.safeExtend({
+  id: z.string().uuid(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 export type Preset = z.infer<typeof presetSchema>;
 export type PresetInput = z.infer<typeof presetInputSchema>;
 export type PresetEntry = z.infer<typeof presetEntrySchema>;
-export type PromptMessage = { role: z.infer<typeof presetRoleSchema>; content: string; name?: string };
-export type PresetWarning = { path: (string | number)[]; message: string };
+export const promptMessageSchema = z.object({
+  role: presetRoleSchema,
+  content: z.string(),
+  name: z.string().optional(),
+});
+export const presetWarningSchema = z.object({
+  path: z.array(z.union([z.string(), z.number()])),
+  message: z.string(),
+});
+export type PromptMessage = z.infer<typeof promptMessageSchema>;
+export type PresetWarning = z.infer<typeof presetWarningSchema>;
 
 export function presetWarnings(preset: Preset): PresetWarning[] {
   const warnings: PresetWarning[] = [];
