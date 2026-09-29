@@ -7,6 +7,10 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 
 ## Workflow conventions
 - **Orchestration:** the main assistant acts as the orchestrator. It delegates substantial coding to a coding sub-agent (gpt-6-sol), then **verifies the work itself** before reporting back.
+- **Coding agents are not persistent.** Spawn a **fresh agent per task**; don't rely on or reuse an agent's memory from earlier tasks.
+  - Each brief must be self-contained. Tell the agent to read `AGENTS.md`, `README.md` and `PLAN.md` first, and include the task spec, relevant file paths, constraints, verification commands and commit rules.
+  - Any knowledge worth keeping goes into the repo (this file, README, code comments/tests), not into an agent's context.
+  - After a task, the orchestrator updates this file with any new conventions, contracts or gotchas the agent discovered.
 - **PLAN.md is owned by the orchestrator/user.** Coding agents must not modify or delete it; they update `README.md` for technical docs.
 - **Commits:** commit each feature separately. Include the trailer `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`. Commit any pending changes before starting new work.
 - **Scope:** keep it modular and simple. Prefer no new dependencies; justify any you add.
