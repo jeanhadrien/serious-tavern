@@ -162,3 +162,23 @@ it('supports presets CRUD, preview with a session, dynamic ports, and deletion c
     expect((await app.inject({ method: 'DELETE', url: `/api/presets/${preset.id}` })).statusCode).toBe(204);
   } finally { await app.close(); }
 });
+it('keeps one Default preset and both valid seed workflows across server restarts', async () => {
+  const directory = join(process.cwd(), 'data', `test-${randomUUID()}`);
+  directories.push(directory);
+  const first = await createApp(directory);
+  const presets = (await first.inject({ method: 'GET', url: '/api/presets' })).json();
+  const workflows = (await first.inject({ method: 'GET', url: '/api/workflows' })).json();
+  expect(presets.map((preset: { name: string }) => preset.name)).toEqual(['Default']);
+  expect(workflows.map((workflow: { name: string }) => workflow.name).sort())
+    .toEqual(['Default Assistant', 'Parallel demo']);
+  await first.close();
+  const second = await createApp(directory);
+  try {
+    expect((await second.inject({ method: 'GET', url: '/api/presets' })).json()).toEqual(presets);
+    expect((await second.inject({ method: 'GET', url: '/api/workflows' })).json()).toEqual(workflows);
+    for (const workflow of workflows) {
+      const response = await second.inject({ method: 'POST', url: `/api/workflows/${workflow.id}/validate` });
+      expect(response.json()).toEqual({ valid: true, errors: [] });
+    }
+  } finally { await second.close(); }
+});

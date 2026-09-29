@@ -7,7 +7,6 @@ import { descriptors, executeWorkflow, ExecutionFailure, registry, validateWorkf
 import { JsonRepository } from './storage/repository.js';
 import { SecretStore } from './secrets/store.js';
 import { seed } from './seed.js';
-import { migrateLegacyLlm } from './migrate.js';
 import { HttpError, notFound } from './errors.js';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -30,7 +29,6 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
   const secrets = new SecretStore(dataDir);
   await secrets.init();
   if (options.seed !== false) await seed(workflows, presets);
-  for (const item of await migrateLegacyLlm(workflows, presets)) console.info(`Migrated LLM node: ${item}`);
 
   app.get('/api/node-types', async () => descriptors());
   app.get('/api/providers', async () => [...providers.values()].map(({ id, label, secretName }) => ({ id, label, secretName })));
