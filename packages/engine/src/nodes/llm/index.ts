@@ -19,8 +19,8 @@ export const llm: NodeDefinition = {
   async resolvePorts(config, resources) {
     const preset = await resources.presets.get(String(config.presetId ?? ''));
     if (!preset) throw new Error(`Preset ${config.presetId || '(none)'} not found`);
-    return { inputs: preset.inputs.filter(input => input.enabled)
-      .map(input => ({ name: input.key, label: input.name, dataType: input.dataType, description: input.description })),
+    return { inputs: preset.inputs
+      .map(input => ({ name: input.key, label: input.label ?? input.key, dataType: input.dataType, description: input.description })),
       outputs: llm.outputs };
   },
   async execute(ctx) {

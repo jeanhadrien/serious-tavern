@@ -1,86 +1,86 @@
 import { z } from 'zod';
 
-export const slotKeySchema = z.string().regex(/^[a-z][a-zA-Z0-9_]*$/, 'Input key must start with a lowercase letter and contain only letters, digits or underscores');
 export const presetRoleSchema = z.enum(['system', 'user', 'assistant']);
+export const presetInputKeySchema = z.string().regex(/^[a-z][a-zA-Z0-9_]*$/, 'Input key must match /^[a-z][a-zA-Z0-9_]*$/');
 export const presetInputSchema = z.object({
-  key: slotKeySchema,
-  name: z.string().trim().min(1),
-  enabled: z.boolean().default(true),
+  id: z.string().min(1),
+  key: presetInputKeySchema,
+  label: z.string().optional(),
   dataType: z.enum(['messages', 'text']),
   description: z.string().optional()
 });
+
+const depthPlacementSchema = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('ordered') }),
+  z.object({ mode: z.literal('depth'), entryId: z.string().min(1), depth: z.number().int().nonnegative() })
+]);
+
 export const presetEntrySchema = z.discriminatedUnion('kind', [
   z.object({
-    id: z.string().min(1), name: z.string().min(1), enabled: z.boolean(), kind: z.literal('message'),
-    role: presetRoleSchema, content: z.string(),
-    placement: z.discriminatedUnion('mode', [
-      z.object({ mode: z.literal('ordered') }),
-      z.object({ mode: z.literal('depth'), inputKey: slotKeySchema, depth: z.number().int().nonnegative() })
-    ]).default({ mode: 'ordered' })
+    id: z.string().min(1), name: z.string().trim().min(1), enabled: z.boolean(), kind: z.literal('message'),
+    role: presetRoleSchema, content: z.string(), placement: depthPlacementSchema.default({ mode: 'ordered' })
   }),
   z.object({
-    id: z.string().min(1), name: z.string().min(1), enabled: z.boolean(), kind: z.literal('input'),
-    inputKey: slotKeySchema, role: presetRoleSchema.default('user')
+    id: z.string().min(1), name: z.string().trim().min(1), enabled: z.boolean(), kind: z.literal('slot'),
+    inputKey: presetInputKeySchema, role: presetRoleSchema.default('user')
   })
 ]);
+
 export const presetSchema = z.object({
   id: z.string().uuid(), name: z.string().trim().min(1), description: z.string().optional(),
-  inputs: z.array(presetInputSchema).default([]), entries: z.array(presetEntrySchema),
+  inputs: z.array(presetInputSchema), entries: z.array(presetEntrySchema),
   createdAt: z.string(), updatedAt: z.string()
 }).superRefine((preset, ctx) => {
-  const inputByKey = new Map<string, (typeof preset.inputs)[number]>();
-  const ids = new Set<string>();
-  const usedInputEntries = new Set<string>();
+  const inputByKey = new Map(preset.inputs.map(input => [input.key, input]));
+  const inputKeys = new Set<string>();
   preset.inputs.forEach((input, index) => {
-    if (inputByKey.has(input.key))
+    if (inputKeys.has(input.key))
       ctx.addIssue({ code: 'custom', path: ['inputs', index, 'key'], message: `Duplicate input key: ${input.key}` });
-    inputByKey.set(input.key, input);
+    inputKeys.add(input.key);
   });
+
+  const entryById = new Map(preset.entries.map(entry => [entry.id, entry]));
+  const ids = new Set<string>();
   preset.entries.forEach((entry, index) => {
-    if (ids.has(entry.id)) ctx.addIssue({ code: 'custom', path: ['entries', index, 'id'], message: `Duplicate entry id: ${entry.id}` });
+    if (ids.has(entry.id))
+      ctx.addIssue({ code: 'custom', path: ['entries', index, 'id'], message: `Duplicate entry id: ${entry.id}` });
     ids.add(entry.id);
-    if (entry.kind !== 'input') return;
-    const input = inputByKey.get(entry.inputKey);
-    if (!input) {
+    if (entry.kind === 'slot' && !inputByKey.has(entry.inputKey))
       ctx.addIssue({ code: 'custom', path: ['entries', index, 'inputKey'], message: `Unknown input: ${entry.inputKey}` });
-      return;
+    if (entry.kind === 'message') {
+      for (const match of entry.content.matchAll(/\{\{\s*input\.([a-zA-Z][a-zA-Z0-9_]*)\s*\}\}/g)) {
+        const key = match[1]!;
+        if (!inputByKey.has(key))
+          ctx.addIssue({ code: 'custom', path: ['entries', index, 'content'], message: `Unknown input: ${key}` });
+      }
     }
-    if (entry.enabled && !input.enabled)
-      ctx.addIssue({ code: 'custom', path: ['entries', index, 'inputKey'], message: `Enabled entry references disabled input: ${entry.inputKey}` });
-    if (entry.enabled && usedInputEntries.has(entry.inputKey))
-      ctx.addIssue({ code: 'custom', path: ['entries', index, 'inputKey'], message: `Input is placed more than once: ${entry.inputKey}` });
-    if (entry.enabled) usedInputEntries.add(entry.inputKey);
   });
+
   preset.entries.forEach((entry, index) => {
     if (entry.kind !== 'message' || entry.placement.mode !== 'depth') return;
-    const input = inputByKey.get(entry.placement.inputKey);
-    if (!input || !input.enabled || input.dataType !== 'messages' || !usedInputEntries.has(input.key)) {
-      ctx.addIssue({ code: 'custom', path: ['entries', index, 'placement', 'inputKey'],
-        message: `Depth placement requires an enabled messages input placed by an enabled entry: ${entry.placement.inputKey}` });
+    const slot = entryById.get(entry.placement.entryId);
+    const input = slot?.kind === 'slot' ? inputByKey.get(slot.inputKey) : undefined;
+    if (!slot || slot.kind !== 'slot' || !slot.enabled || !input || input.dataType !== 'messages') {
+      ctx.addIssue({ code: 'custom', path: ['entries', index, 'placement', 'entryId'],
+        message: 'Depth placement must reference an enabled slot entry for a messages input.' });
     }
   });
 });
+
 export type Preset = z.infer<typeof presetSchema>;
 export type PresetInput = z.infer<typeof presetInputSchema>;
 export type PresetEntry = z.infer<typeof presetEntrySchema>;
 export type PromptMessage = { role: z.infer<typeof presetRoleSchema>; content: string };
+export type PresetWarning = { path: (string | number)[]; message: string };
 
-export function presetWarnings(preset: Preset): string[] {
-  const warnings: string[] = [];
-  const activeInputs = new Set(preset.inputs.filter(input => input.enabled).map(input => input.key));
-  const placedInputs = new Set(preset.entries.filter((entry): entry is Extract<PresetEntry, { kind: 'input' }> =>
-    entry.kind === 'input' && entry.enabled).map(entry => entry.inputKey));
-  for (const input of preset.inputs) {
-    if (input.enabled && !placedInputs.has(input.key))
-      warnings.push(`Input "${input.key}" is enabled but is not placed in the message list.`);
-  }
-  for (const entry of preset.entries) {
-    if (!entry.enabled || entry.kind !== 'message') continue;
-    for (const [, key] of entry.content.matchAll(/\{\{\s*input\.([a-zA-Z0-9_]+)\s*\}\}/g)) {
-      if (!activeInputs.has(key!)) warnings.push(`Message "${entry.name}" references unavailable input "${key}".`);
-    }
-  }
-  if (!preset.entries.some(entry => entry.enabled))
-    warnings.push('No entries are enabled, so this preset will render no messages.');
-  return [...new Set(warnings)];
+export function presetWarnings(preset: Preset): PresetWarning[] {
+  const warnings: PresetWarning[] = [];
+  preset.inputs.forEach((input, index) => {
+    const usedBySlot = preset.entries.some(entry => entry.kind === 'slot' && entry.enabled && entry.inputKey === input.key);
+    const usedByTemplate = preset.entries.some(entry => entry.kind === 'message' && entry.enabled &&
+      [...entry.content.matchAll(/\{\{\s*input\.([a-zA-Z][a-zA-Z0-9_]*)\s*\}\}/g)].some(match => match[1] === input.key));
+    if (!usedBySlot && !usedByTemplate)
+      warnings.push({ path: ['inputs', index], message: `Input "${input.key}" is not used by an enabled entry.` });
+  });
+  return warnings;
 }

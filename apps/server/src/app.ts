@@ -44,15 +44,14 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
   app.get('/api/presets', async () => presets.list());
   app.post('/api/presets/preview', async request => {
     const { preset, inputs = {}, sessionId } = z.object({
-      preset: presetSchema, inputs: z.record(z.string(), z.unknown()).optional(), sessionId: z.string().uuid().optional()
+      preset: presetSchema, inputs: z.record(z.string(), z.string()).optional(), sessionId: z.string().uuid().optional()
     }).parse(request.body);
     const session = sessionId ? await sessions.get(sessionId) : undefined;
     if (sessionId && !session) throw notFound('Session');
-    const values = { ...inputs };
+    const values: Record<string, unknown> = { ...inputs };
     const sample = [{ role: 'user', content: 'Hello!' }, { role: 'assistant', content: 'Hi! How can I help?' }];
     for (const input of preset.inputs) {
-      if (!input.enabled) continue;
-      if (input.dataType === 'messages') values[input.key] ??= session ? session.messages : sample;
+      if (input.dataType === 'messages') values[input.key] = session ? session.messages : sample;
       else values[input.key] ??= `<${input.key}>`;
     }
     try {

@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { portDataTypes } from './ports.js';
 export { canConnect, portDataTypes, type PortDataType, type PortDef, type CoercionKind, type ConnectionResult } from './ports.js';
 export {
-  presetSchema, presetInputSchema, presetEntrySchema, slotKeySchema, presetRoleSchema, presetWarnings,
-  type Preset, type PresetInput, type PresetEntry, type PromptMessage
+  presetSchema, presetInputSchema, presetEntrySchema, presetInputKeySchema, presetRoleSchema, presetWarnings,
+  type Preset, type PresetInput, type PresetEntry, type PresetWarning, type PromptMessage
 } from './preset.js';
 
 export const nodeSchema = z.object({

@@ -10,6 +10,12 @@ it('keeps the built-in preset and entry IDs stable', () => {
   expect(first.id).toBe('5d6c72c7-5185-4963-8227-527f12ef9eea');
   expect(first.entries.map(entry => entry.id)).toEqual(second.entries.map(entry => entry.id));
   expect(first.inputs.map(input => input.key)).toEqual(['history', 'message']);
+  expect(first.inputs.map(input => [input.key, input.dataType, input.label])).toEqual([
+    ['history', 'messages', 'Chat history'], ['message', 'text', 'User message']
+  ]);
+  expect(first.entries.map(entry => [entry.kind, entry.name])).toEqual([
+    ['message', 'Main prompt'], ['slot', 'Chat history'], ['slot', 'User message']
+  ]);
 });
 
 it('seeds two valid workflows only once', async () => {

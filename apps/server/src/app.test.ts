@@ -70,8 +70,8 @@ it('supports workflow CRUD, secrets masking, and a chat execution through inject
     expect(invalidGraph.statusCode).toBe(400);
     expect(invalidGraph.json().error).toMatchObject({ code: 'WORKFLOW_INVALID', details: expect.arrayContaining([expect.stringContaining('chat-input')]) });
     const preset = (await app.inject({ method: 'POST', url: '/api/presets', payload: { name: 'Test',
-      inputs: [{ key: 'message', name: 'Message', dataType: 'text' }],
-      entries: [{ kind: 'input', id: 'message', name: 'Message', enabled: true, inputKey: 'message' }]
+      inputs: [{ id: 'message-input', key: 'message', label: 'Message', dataType: 'text' }],
+      entries: [{ kind: 'slot', id: 'message-slot', name: 'Message', enabled: true, inputKey: 'message' }]
     } })).json();
     await app.inject({ method: 'PUT', url: `/api/workflows/${workflow.id}`, payload: {
       name: 'LLM', nodes: [nodes[0], { id: 'llm', type: 'llm', config: { presetId: preset.id }, position: { x: 100, y: 0 } }, nodes[3]],
@@ -117,20 +117,20 @@ it('supports presets CRUD, preview with a session, dynamic ports, and deletion c
   try {
     const created = await app.inject({ method: 'POST', url: '/api/presets', payload: {
       name: 'Demo', inputs: [
-        { key: 'history', name: 'History', dataType: 'messages' },
-        { key: 'message', name: 'Message', dataType: 'text' }
+        { id: 'history-input', key: 'history', label: 'Chat history', dataType: 'messages' },
+        { id: 'message-input', key: 'message', label: 'User message', dataType: 'text' }
       ], entries: [
         { id: 'system', kind: 'message', name: 'System', enabled: true, role: 'system',
           content: '{{trigger.message}}' },
-        { id: 'history', kind: 'input', name: 'History', enabled: true, inputKey: 'history' },
-        { id: 'message', kind: 'input', name: 'Message', enabled: true, inputKey: 'message' }
+        { id: 'history', kind: 'slot', name: 'History', enabled: true, inputKey: 'history' },
+        { id: 'message', kind: 'slot', name: 'Message', enabled: true, inputKey: 'message' }
       ]
     } });
     expect(created.statusCode).toBe(201);
     const preset = created.json();
     expect((await app.inject({ method: 'GET', url: '/api/presets' })).json()).toHaveLength(1);
     const draft = { ...preset, entries: [...preset.entries, { id: 'note', kind: 'message', name: 'Note',
-      enabled: true, role: 'system', content: 'Last', placement: { mode: 'depth', inputKey: 'history', depth: 0 } }] };
+      enabled: true, role: 'system', content: 'Last', placement: { mode: 'depth', entryId: 'history', depth: 0 } }] };
     const updated = await app.inject({ method: 'PUT', url: `/api/presets/${preset.id}`, payload: draft });
     expect(updated.statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: `/api/presets/${preset.id}` })).json().entries).toHaveLength(4);
@@ -160,14 +160,15 @@ it('supports presets CRUD, preview with a session, dynamic ports, and deletion c
     expect(withSession.json().messages.map((message: { content: string }) => message.content))
       .toEqual(['Sample message', 'Last', 'With session']);
     const warnedPreview = await app.inject({ method: 'POST', url: '/api/presets/preview', payload: {
-      preset: { ...draft, inputs: [...draft.inputs, { key: 'unused', name: 'Unused', enabled: true, dataType: 'text' }] }
+      preset: { ...draft, inputs: [...draft.inputs, { id: 'unused-input', key: 'unused', dataType: 'text' }] }
     } });
-    expect(warnedPreview.json().warnings).toContain('Input "unused" is enabled but is not placed in the message list.');
-    const disabledDraft = { ...draft, inputs: draft.inputs.map((input: { key: string }) =>
-      input.key === 'message' ? { ...input, enabled: false } : input),
-      entries: draft.entries.map((entry: { kind: string; inputKey?: string }) =>
-        entry.kind === 'input' && entry.inputKey === 'message' ? { ...entry, enabled: false } : entry) };
-    expect((await app.inject({ method: 'PUT', url: `/api/presets/${preset.id}`, payload: disabledDraft })).statusCode).toBe(200);
+    expect(warnedPreview.json().warnings).toContainEqual({
+      path: ['inputs', 2], message: 'Input "unused" is not used by an enabled entry.'
+    });
+    const removedInputDraft = { ...draft, inputs: draft.inputs.filter((input: { key: string }) => input.key !== 'message'),
+      entries: draft.entries.filter((entry: { kind: string; inputKey?: string }) =>
+        entry.kind !== 'slot' || entry.inputKey !== 'message') };
+    expect((await app.inject({ method: 'PUT', url: `/api/presets/${preset.id}`, payload: removedInputDraft })).statusCode).toBe(200);
     expect((await app.inject({ method: 'POST', url: '/api/node-types/llm/ports', payload: {
       config: { presetId: preset.id }
     } })).json().inputs.map((port: { name: string }) => port.name)).toEqual(['history']);

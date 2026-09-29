@@ -7,11 +7,11 @@ import { openrouter } from './providers/openrouter.js';
 import type { ExecutionContext } from './types.js';
 
 const preset: Preset = { id: '8f1fe1a9-3480-4e52-834c-f25d90684d71', name: 'Test', createdAt: '', updatedAt: '',
-  inputs: [{ name: 'Prompt', key: 'prompt', enabled: true, dataType: 'text' }],
+  inputs: [{ id: 'prompt-input', label: 'Prompt', key: 'prompt', dataType: 'text' }],
   entries: [
     { kind: 'message', id: 'system', name: 'System', enabled: true, role: 'system',
       content: 'Hello {{trigger.message}}', placement: { mode: 'ordered' } },
-    { kind: 'input', id: 'prompt', name: 'Prompt', enabled: true, inputKey: 'prompt', role: 'user' }
+    { kind: 'slot', id: 'prompt-slot', name: 'Prompt', enabled: true, inputKey: 'prompt', role: 'user' }
   ] };
 const ctx = (config: Record<string, unknown>): ExecutionContext => ({
   config, inputs: { input: 'hi', prompt: 'What is up?' }, trigger: { message: 'hello', sessionId: 's' },
@@ -21,6 +21,10 @@ const ctx = (config: Record<string, unknown>): ExecutionContext => ({
 });
 afterEach(() => { vi.restoreAllMocks(); providers.delete('fake'); });
 describe('integration nodes', () => {
+  it('resolves LLM input ports from preset inputs', async () => {
+    const result = await llm.resolvePorts?.({ presetId: preset.id }, { presets: { get: async () => preset } });
+    expect(result?.inputs).toEqual([{ name: 'prompt', label: 'Prompt', dataType: 'text', description: undefined }]);
+  });
   it('templates the HTTP request and parses JSON', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"ok":true}',
       { status: 200, headers: { 'content-type': 'application/json' } }));

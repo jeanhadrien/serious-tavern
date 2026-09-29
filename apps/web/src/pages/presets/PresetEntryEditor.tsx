@@ -1,79 +1,93 @@
 import { useRef } from 'react';
-import type { Preset, PresetEntry } from '@st/shared';
+import { presetSchema, type Preset, type PresetEntry } from '@st/shared';
 
 export function PresetEntryEditor(props: {
   preset: Preset;
   entry?: PresetEntry;
   onChange(entry: PresetEntry): void;
 }) {
-  const focusedContent = useRef<HTMLTextAreaElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const { entry, preset } = props;
   if (!entry) return <section className="preset-entry-detail empty-entry">
-    <h3>Entry editor</h3><p>Select an entry from the message list, or add a new one.</p>
+    <h3>Entry editor</h3><p>Select an entry from the list, or add a new one.</p>
   </section>;
 
-  const eligibleDepthInputs = preset.inputs.filter(input => input.enabled && input.dataType === 'messages' &&
-    preset.entries.some(item => item.kind === 'input' && item.inputKey === input.key && item.enabled));
-  const depthPlacement = entry.kind === 'message' && entry.placement.mode === 'depth' ? entry.placement : undefined;
+  const index = preset.entries.findIndex(item => item.id === entry.id);
+  const parsed = presetSchema.safeParse(preset);
+  const issues = parsed.success ? [] : parsed.error.issues.filter(issue =>
+    issue.path[0] === 'entries' && issue.path[1] === index);
+  const slots = preset.entries.filter((item): item is Extract<PresetEntry, { kind: 'slot' }> =>
+    item.kind === 'slot' && item.enabled && preset.inputs.find(input =>
+      input.key === item.inputKey)?.dataType === 'messages');
+  const placement = entry.kind === 'message' ? entry.placement : undefined;
   const update = (partial: Partial<PresetEntry>) => props.onChange({ ...entry, ...partial } as PresetEntry);
-  const insertHint = (hint: string) => {
+  const insert = (token: string) => {
     if (entry.kind !== 'message') return;
-    const candidate = focusedContent.current;
-    const textarea = candidate?.dataset.entryId === entry.id ? candidate : null;
+    const textarea = textareaRef.current;
     const start = textarea?.selectionStart ?? entry.content.length;
     const end = textarea?.selectionEnd ?? start;
-    props.onChange({ ...entry, content: entry.content.slice(0, start) + hint + entry.content.slice(end) });
-    if (textarea) requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + hint.length, start + hint.length);
+    update({ content: entry.content.slice(0, start) + token + entry.content.slice(end) });
+    requestAnimationFrame(() => {
+      textarea?.focus();
+      textarea?.setSelectionRange(start + token.length, start + token.length);
     });
   };
 
   return <section className="preset-entry-detail">
-    <h3>Entry editor</h3>
+    <h3>Edit entry</h3>
     <label>Name <input value={entry.name} onChange={event => update({ name: event.target.value })} /></label>
-    {entry.kind === 'input' ? <>
-      <label>Input <select value={entry.inputKey} onChange={event =>
-        update({ inputKey: event.target.value } as Partial<PresetEntry>)}>
-        {preset.inputs.filter(input => input.enabled || input.key === entry.inputKey).map(input =>
-          <option key={input.key} value={input.key}>{input.name} ({input.key}) · {input.dataType}</option>)}
+    <label className="check"><input type="checkbox" checked={entry.enabled}
+      onChange={event => update({ enabled: event.target.checked })} />Enabled</label>
+    {entry.kind === 'slot' ? <>
+      <label>Input <select value={entry.inputKey} onChange={event => update({ inputKey: event.target.value } as Partial<PresetEntry>)}>
+        {preset.inputs.map(input => <option value={input.key} key={input.id}>
+          {input.label ?? input.key} ({input.key}) · {input.dataType}
+        </option>)}
         {!preset.inputs.some(input => input.key === entry.inputKey) &&
           <option value={entry.inputKey}>{entry.inputKey} · missing</option>}
       </select></label>
-      <p className="hint">This entry inserts the selected input at this position. Input types and port names are managed in the middle column.</p>
+      <p className="hint">This slot places the selected input at this position in the final message list.</p>
       {preset.inputs.find(input => input.key === entry.inputKey)?.dataType === 'text' &&
-        <label>Message role <select value={entry.role} onChange={event =>
+        <label>Role <select value={entry.role} onChange={event =>
           update({ role: event.target.value as 'system' | 'user' | 'assistant' })}>
-          {['system', 'user', 'assistant'].map(role => <option key={role}>{role}</option>)}</select></label>}
+          {['system', 'user', 'assistant'].map(role => <option key={role}>{role}</option>)}
+        </select></label>}
     </> : <>
       <label>Role <select value={entry.role} onChange={event =>
         update({ role: event.target.value as 'system' | 'user' | 'assistant' })}>
-        {['system', 'user', 'assistant'].map(role => <option key={role}>{role}</option>)}</select></label>
-      <label>Content <textarea rows={8} data-entry-id={entry.id} value={entry.content}
-        onFocus={event => { focusedContent.current = event.currentTarget; }}
-        onBlur={() => { focusedContent.current = null; }}
+        {['system', 'user', 'assistant'].map(role => <option key={role}>{role}</option>)}
+      </select></label>
+      <label>Content <textarea ref={textareaRef} rows={12} value={entry.content}
         onChange={event => update({ content: event.target.value })} /></label>
-      <div className="template-hints"><small>Variables (click to insert)</small>
-        {['{{trigger.message}}', '{{trigger.sessionId}}', ...preset.inputs.filter(input => input.enabled)
-          .map(input => `{{input.${input.key}}}`)].map(hint =>
-          <button type="button" key={hint} onMouseDown={event => event.preventDefault()}
-            onClick={() => insertHint(hint)}>{hint}</button>)}</div>
-      <label>Placement <select value={entry.placement.mode} onChange={event => {
-        if (event.target.value === 'ordered') update({ placement: { mode: 'ordered' } });
-        else update({ placement: { mode: 'depth', inputKey: eligibleDepthInputs[0]?.key ?? '', depth: 0 } });
-      }}><option value="ordered">Ordered list</option><option value="depth">Inside messages input</option></select></label>
-      {depthPlacement && <>
-        <label>Messages input <select value={depthPlacement.inputKey} onChange={event =>
-          update({ placement: { mode: 'depth', inputKey: event.target.value, depth: depthPlacement.depth } })}>
-          {eligibleDepthInputs.map(input =>
-            <option value={input.key} key={input.key}>{input.name} ({input.key})</option>)}
-          {!eligibleDepthInputs.some(input => input.key === depthPlacement.inputKey) &&
-            <option value={depthPlacement.inputKey}>{depthPlacement.inputKey || 'Choose an input'}</option>}
+      <div className="template-hints"><small>Insert variable at cursor</small>
+        {[...preset.inputs.map(input => `{{input.${input.key}}}`),
+          '{{trigger.message}}', '{{trigger.sessionId}}'].map(token =>
+          <button type="button" key={token} onMouseDown={event => event.preventDefault()}
+            onClick={() => insert(token)}>{token}</button>)}
+      </div>
+      <label>Placement <select value={placement?.mode ?? 'ordered'} onChange={event => {
+        update({ placement: event.target.value === 'ordered'
+          ? { mode: 'ordered' }
+          : { mode: 'depth', entryId: slots[0]?.id ?? '', depth: 0 } });
+      }}>
+        <option value="ordered">Ordered</option><option value="depth">Inside a messages slot</option>
+      </select></label>
+      {placement?.mode === 'depth' && <>
+        <label>Messages slot <select value={placement.entryId} onChange={event =>
+          update({ placement: { ...placement, entryId: event.target.value } })}>
+          {slots.map(slot => <option value={slot.id} key={slot.id}>
+            {slot.name} · {slot.inputKey}
+          </option>)}
+          {!slots.some(slot => slot.id === placement.entryId) &&
+            <option value={placement.entryId}>{placement.entryId || 'Choose a slot'}</option>}
         </select></label>
-        <label>Depth from end <input type="number" min="0" step="1" value={depthPlacement.depth}
-          onChange={event => update({ placement: { mode: 'depth', inputKey: depthPlacement.inputKey, depth: Number(event.target.value) } })} /></label>
-        {!eligibleDepthInputs.length && <p className="preset-warning">Add and place an enabled messages input to use depth placement.</p>}
+        <label>Depth from end <input type="number" min="0" step="1" value={placement.depth}
+          onChange={event => update({ placement: { ...placement, depth: Number(event.target.value) } })} /></label>
+        {slots.length === 0 && <p className="preset-warning">Add an enabled slot for a messages input to use depth placement.</p>}
       </>}
     </>}
+    {issues.length > 0 && <div className="preset-warnings" role="alert">
+      {issues.map((issue, issueIndex) => <p key={issueIndex}>{issue.message}</p>)}
+    </div>}
   </section>;
 }

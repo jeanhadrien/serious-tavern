@@ -91,23 +91,26 @@ describe('executor', () => {
     expect(events).toContain('node:error');
     expect(events.at(-1)).toBe('execution:complete');
   });
-  it('resolves preset inputs and reports edges to disabled inputs', async () => {
+  it('resolves preset inputs and reports edges to removed inputs', async () => {
       const preset: Preset = { id: '2b041793-416b-4c94-a541-99ab866230b7', name: 'Dynamic',
         createdAt: '', updatedAt: '', inputs: [
-          { name: 'Prompt', key: 'prompt', enabled: true, dataType: 'text' },
-          { name: 'Extra', key: 'extra', enabled: true, dataType: 'text' }
+          { id: 'prompt-input', label: 'Prompt', key: 'prompt', dataType: 'text' },
+          { id: 'extra-input', key: 'extra', dataType: 'text' }
         ], entries: [
-          { id: 'one', name: 'Prompt', kind: 'input', enabled: true, inputKey: 'prompt', role: 'user' },
-          { id: 'two', name: 'Extra', kind: 'input', enabled: true, inputKey: 'extra', role: 'user' }
+          { id: 'one', name: 'Prompt', kind: 'slot', enabled: true, inputKey: 'prompt', role: 'user' },
+          { id: 'two', name: 'Extra', kind: 'slot', enabled: true, inputKey: 'extra', role: 'user' }
         ] };
       const resources = { presets: { get: async () => preset } };
+      expect(await registry.get('llm')!.resolvePorts?.({ presetId: preset.id }, resources)).toMatchObject({
+        inputs: [{ name: 'prompt', label: 'Prompt', dataType: 'text' }, { name: 'extra', label: 'extra', dataType: 'text' }]
+      });
       const graph = workflow([node('input', 'chat-input'), node('llm', 'llm', { presetId: preset.id }),
         node('output', 'chat-output')], [
         edge('input', 'message', 'llm', 'extra'), edge('llm', 'text', 'output', 'value')
       ]);
       expect(await validateWorkflow(graph, resources)).toEqual([]);
-      preset.inputs[1]!.enabled = false;
-      preset.entries[1]!.enabled = false;
+      preset.inputs.splice(1, 1);
+      preset.entries.splice(1, 1);
       expect((await validateWorkflow(graph, resources)).join(' ')).toContain('invalid input port extra');
   });
   it('rejects incompatible edges with node, port and type names after port resolution', async () => {

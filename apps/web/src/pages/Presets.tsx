@@ -56,8 +56,13 @@ export function Presets() {
   };
   const duplicate = async (preset: Preset) => {
     try {
+      const entryIds = new Map(preset.entries.map(item => [item.id, id()]));
       const copy = await api<Preset>('/presets', json('POST', { ...preset, name: `${preset.name} copy`,
-        entries: preset.entries.map(item => ({ ...item, id: id() })) }));
+        inputs: preset.inputs.map(input => ({ ...input, id: id() })),
+        entries: preset.entries.map(item => item.kind === 'message' && item.placement.mode === 'depth'
+          ? { ...item, id: entryIds.get(item.id)!, placement: { ...item.placement,
+            entryId: entryIds.get(item.placement.entryId) ?? item.placement.entryId } }
+          : { ...item, id: entryIds.get(item.id)! }) }));
       await refresh();
       choose(copy);
       alerts.success('Preset duplicated');
@@ -78,7 +83,7 @@ export function Presets() {
   const selectedEntry = draft?.entries.find(entry => entry.id === selectedEntryId);
 
   return <div className="presets-layout">
-    <PresetList presets={list} selectedId={draft?.id} onSelect={choose}
+    <PresetList presets={list} selectedId={draft?.id} dirtyId={dirty ? draft?.id : undefined} onSelect={choose}
       onCreate={() => void create()} onDuplicate={preset => void duplicate(preset)} onDelete={preset => void remove(preset)} />
     {draft ? <>
       <PresetEditor preset={draft} dirty={dirty} onChange={change} onSave={() => void save()}

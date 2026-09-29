@@ -187,6 +187,7 @@ function WorkflowEditor() {
   };
   const current = nodes.find(n => n.id === selected);
   const currentDescriptor = current?.data.descriptor;
+  const selectedPreset = presets.find(preset => preset.id === current?.data.config.presetId);
   const updateConfig = (config: NodeInstance['config']) => {
     setNodes(prev => prev.map(n => n.id === selected ? { ...n, data: { ...n.data, config } } : n));
   };
@@ -226,6 +227,11 @@ function WorkflowEditor() {
               updateConfig({ ...current.data.config, presetId: e.target.value })}>
               <option value="">Choose a preset</option>{presets.map(preset =>
                 <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label>
+            {selectedPreset && <div className="preset-port-summary">
+              <small>LLM input ports from this preset</small>
+              {selectedPreset.inputs.map(input =>
+                <span key={input.id}>{input.key} : {input.dataType}</span>)}
+            </div>}
             {Boolean(current.data.config.presetId) && <Link to={`/presets?id=${current.data.config.presetId}`}>Edit preset ↗</Link>}
             {(['temperature', 'maxTokens', 'topP', 'frequencyPenalty', 'presencePenalty'] as const).map(key =>
               <label key={key}>{key}<input type="number" step={key === 'maxTokens' ? 1 : 0.1}
