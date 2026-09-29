@@ -26,7 +26,7 @@ export function workflowToCanvas(workflow: Workflow, types: NodeTypeDescriptor[]
         unknown: true,
         config: node.config,
         descriptor: {
-          type: node.type, label: `Unknown node: ${node.type}`,
+          type: node.type, label: `Unknown node type: ${node.type}`,
           description: 'This node type is not currently available. Its configuration is preserved as read-only.',
           category: 'Unknown',
           inputs: inputs.map(name => ({ name, label: name, dataType: 'any' as const })),
