@@ -6,9 +6,45 @@ See [Plan & Vision](PLAN.md) for the product vision and planned next steps.
 
 ## Run
 
-Requires Node.js 24 and npm. Run `npm install`, then `npm run dev`. Open the Vite URL shown in the terminal (normally http://127.0.0.1:5173). The API runs on http://127.0.0.1:3001; Vite proxies `/api`. Run `npm run typecheck`, `npm test`, and `npm run build` for validation.
+Requires Node.js 24 and npm. Run `npm install`, then `npm run dev`. Open the Vite URL shown in the terminal (normally http://127.0.0.1:5173). The API runs on http://127.0.0.1:3001; Vite proxies `/api`. Run `npm run check` before committing and `npm run build` to verify the production bundle.
 
 Create a chat and choose a workflow. The seeded **Default Assistant** uses the Default preset and requires an `openrouter` secret in Settings. **Parallel demo** makes two HTTP calls to httpbin.org and needs network access. To try a local echo without keys, make a workflow with Chat Input `message` → Chat Output `value`.
+
+## Tooling
+
+Run these commands from the repository root; the configuration covers all npm workspaces:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run check` | The single pre-commit command for agents and contributors: Biome formatting/lint checks (no writes), then TypeScript checks, all Vitest tests, and Knip. Stops at the first failing step. |
+| `npm run lint` | Check lint rules only, without writing files. |
+| `npm run format` | Apply Biome formatting. |
+| `npm run fix` | Apply formatting and Biome's safe lint fixes. Does not enable unsafe fixes. |
+| `npm run knip` | Find unused source files, exports, types, and dependencies across workspaces. |
+| `npm run build` | Typecheck and build the production web bundle. |
+
+Biome uses the recommended lint preset, two-space indentation, single-quoted JavaScript/TypeScript strings, semicolons, and a 120-column target. Import organizing and other assists are **disabled** to avoid noisy import-order changes. Generated output, `node_modules`, data directories, coverage, Playwright reports/results, TypeScript build metadata, and the lockfile are excluded. `AGENTS.md` and `PLAN.md` are owned by the orchestrator and excluded from automated changes.
+
+Rule tuning intentionally keeps this tooling adoption behavior-preserving:
+
+- `noNonNullAssertion` and `noExplicitAny` are off: existing validated graph lookups and flexible node/provider boundaries should not be rewritten just to satisfy stylistic checks.
+- `useExhaustiveDependencies` is off: changing existing effect dependencies or callback identities can change fetching and editor state behavior; that needs a separate React-focused change.
+- `noArrayIndexKey` is off: changing keys in existing ordered lists could alter component identity and state.
+- `useButtonType`, `useAltText`, `noStaticElementInteractions`, `noLabelWithoutControl`, and `useAriaPropsSupportedByRole` are off: retrofitting form defaults, image descriptions, labels, and keyboard/ARIA interactions belongs in a dedicated accessibility pass, not mechanical lint adoption. Other recommended accessibility rules remain enabled.
+- `noDescendingSpecificity` is off: the existing stylesheet deliberately layers page/component overrides; reordering selectors could change rendering.
+- `noUnsafeOptionalChaining` is off **only in `apps/web/src/api.test.ts`**: those assertions inspect mock calls immediately after awaiting the corresponding requests. The rule remains enabled for application code.
+
+Two existing `useOptionalChain` warnings are retained rather than applying fixes Biome classifies as unsafe.
+
+Knip explicitly lists server startup, the web entry and Vite config, package entry points (including the shared `./ports` subpath), and test files. Its project patterns are scoped to source/config files, so live data and generated outputs are not scanned. Package entry exports are intentional workspace APIs, and tests/configs are independent roots, not dead application files. No dependency or symbol ignore list is needed. Knip may print harmless redundancy hints because its plugins also infer the explicit entry points; these do not fail `check`.
+
+The initial Knip cleanup removed only the unused internal server `pngSignature` alias and three unused alert-barrel type re-exports (`Alert`, `AlertOptions`, `AlertLevel`); their underlying type definitions remain. No unused files or dependencies were found.
+
+The mechanical formatting commit is listed in `.git-blame-ignore-revs`. To hide that churn in local blame:
+
+```powershell
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
 
 ## Architecture
 
