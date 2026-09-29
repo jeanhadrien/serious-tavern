@@ -22,8 +22,8 @@ Guiding principles: **high modularity**, a **simple baseline** the user can conf
 | **Session** | A chat conversation bound to a workflow. Many sessions can use the same workflow. |
 | **Execution** | One run of a workflow for one chat message, with a per-node log (status, duration, output, error). |
 | **Preset** | Defines the final message list sent to an LLM. It has two parts:<br>• **Inputs**: what the workflow provides, each with a key and a type (`messages`, e.g. `history`, or `text`, e.g. `message`). Each input becomes an **input port** on the LLM node that uses the preset.<br>• **Entries**: an ordered list, each **enabled** or disabled. A **fixed message** is system/user/assistant text that can reference inputs as `{{input.x}}`; it is placed in list order, or inserted *inside* a messages slot at a **depth** from the end. A **slot** places an input at that point: a `messages` input expands to its list, a `text` input becomes one message.<br>A preset contains only messages; model and samplers live on the LLM node. Edited in the **Presets** page with three columns (preset list, the preset's inputs and entries, entry editor) and a preview of the rendered messages. |
-| **Character** | A SillyTavern-compatible character card: name, description, personality, scenario, first message, examples and so on, plus an avatar. Can be imported by dropping a PNG card (`ccv3`/`chara` metadata) or a JSON card, and exported as a PNG card. It is chosen per chat session and exposed to templates as `{{char}}` and `{{char.*}}`. |
-| **Persona** | The user's identity: name, description and avatar. Dropping an image creates a persona; if the image contains card metadata, name and description are pre-filled. It is chosen per chat session and exposed as `{{user}}` and `{{user.*}}`. |
+| **Character** | A SillyTavern-compatible character card: name, description, personality, scenario, first message, examples and so on, plus an avatar. Can be imported by dropping a PNG card (`ccv3`/`chara` metadata) or a JSON card, and exported as a PNG card. It is chosen per chat session and exposed to templates as `{{character.*}}` (short form `{{char}}` for the name). |
+| **Persona** | The user's identity: name, description and avatar. Dropping an image creates a persona; if the image contains card metadata, name and description are pre-filled. It is chosen per chat session and exposed as `{{persona.*}}` (short forms `{{user}}` for the name, `{{persona}}` for the description). |
 | **Provider** | An LLM backend behind a common interface (`chat(messages, model, params)`). The LLM node picks a provider, so it is provider-agnostic. OpenRouter is the first provider. |
 
 ## Key decisions
@@ -117,10 +117,18 @@ Adding a node type = add one folder in the engine + register it (and optionally 
   - SillyTavern's markers become typed **slots**, bound to LLM node input ports.
   - Samplers stay on the LLM node.
   - Depth injection is supported.
-- **Later:**
+  - **Macro registry** (done): `{{character.*}}`, `{{persona.*}}`, `{{input.*}}`, `{{trigger.*}}` and short aliases. Matching ignores case; unknown macros are kept and trigger a warning.
+  - Nothing is automatic: users build SillyTavern-like behaviour in their presets (for example `{{character.system_prompt}}`).
+  - "Merge consecutive system messages" is an option on the LLM node (done).
+- **Later (backlog):**
   - Trim history to a token budget.
+  - Speaker names: an option on the history slot (messages already carry an optional `name`).
+  - Assistant Name override: always use a given name on assistant messages (from the user's SillyTavern fork).
+  - Per-entry custom fields in YAML, merged into the message sent to the provider (from the fork).
+  - Additional parameters on the LLM node: extra request body and headers in YAML (from the fork).
+  - More request options: reasoning, provider routing, seed, top_k, min_p, repetition_penalty, response format, streaming.
+  - Per-entry triggers (normal, continue, swipe, impersonate).
   - Import SillyTavern presets.
-  - A single **macro engine** (`{{char}}`, `{{user}}`, `{{random::a::b}}`, `{{getvar::x}}`…) with a registry of handlers, applied to all templated fields.
 
 ### Characters, personas, lorebooks *(unverified)*
 - Character cards (V2/V3 spec, embedded in PNG): name, description, personality, scenario, first message, example dialogue, system prompt, post-history instructions, alternate greetings, embedded lorebook.

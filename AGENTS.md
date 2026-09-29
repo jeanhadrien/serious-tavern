@@ -54,10 +54,18 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Card parsing and writing (PNG `tEXt` chunks `ccv3`, which takes precedence, then `chara`; V1/V2/V3 JSON) lives in `apps/server/src/card.ts` and runs on the server.
   - Export writes both `chara` (V2) and `ccv3` (V3), like SillyTavern.
   - Unknown card fields are kept in `extensions` so export round-trips.
-- **Template variables:** `{{char}}`, `{{user}}`, `{{char.*}}` and `{{user.*}}` are resolved by the engine template renderer, which both preset rendering and node templates use.
-  - These variables also resolve inside character fields.
-  - A missing value renders as empty text; `{{user}}` defaults to "User".
-  - When you add variables, update the hint lists in the web app.
+- **Macros:** the macro registry in `packages/shared/src/macros.ts` is the single source of truth. The engine resolves macros through it, and the editor hints and preset warnings come from it. Never hand-write hint lists.
+  - Macro names are namespaced by source: `{{character.<field>}}`, `{{persona.name|description}}`, `{{input.<key>}}`, `{{trigger.*}}`.
+  - Short aliases: `{{char}}`, `{{user}}` (defaults to "User"), `{{description}}`, `{{personality}}`, `{{scenario}}`, and `{{persona}}` (the persona description).
+  - `{{char.*}}`/`{{user.*}}` were removed on purpose. Don't add legacy `<BOT>`/`<USER>` or SillyTavern's extra macros unless asked.
+  - Matching ignores case.
+  - Unknown macros are **left as-is** and produce a preset warning.
+  - A known macro with no value renders as empty text.
+  - Macros also resolve inside character and persona fields, with protection against cycles.
+  - Unknown `{{input.x}}` is a preset validation **error**.
+- **Prompt behaviour is chosen by the user:** the engine never applies automatic SillyTavern rules (card system prompt overriding the main prompt, splitting examples at `<START>`, and so on). Users reference fields in their presets themselves.
+- **Prompt messages** have an optional `name`, passed through to the provider only when set. This is groundwork for a future "speaker names" option on the history slot.
+- **LLM node option** `mergeSystemMessages`: merges consecutive system messages that have no name, after rendering.
 
 ## Adding a node type
 1. Create `packages/engine/src/nodes/<type>/index.ts` exporting a `NodeDefinition`: `type`, `label`, `category`, typed `inputs`/`outputs` with `dataType` and `description`, zod `configSchema`, `defaultConfig`, and `execute(ctx)`, which returns one key per output port.
