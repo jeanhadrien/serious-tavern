@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { portDataTypes } from './ports.js';
 export { canConnect, portDataTypes, type PortDataType, type PortDef, type CoercionKind, type ConnectionResult } from './ports.js';
+export { presetSchema, presetEntrySchema, slotKeySchema, presetRoleSchema, type Preset, type PresetEntry, type PromptMessage } from './preset.js';
 
 export const nodeSchema = z.object({
   id: z.string().min(1), type: z.string().min(1), config: z.record(z.string(), z.unknown()),
@@ -25,7 +26,7 @@ export const sessionSchema = z.object({
 export const nodeExecutionSchema = z.object({
   status: z.enum(['running', 'completed', 'skipped', 'error']), startedAt: z.string().optional(),
   finishedAt: z.string().optional(), durationMs: z.number().optional(), output: z.unknown().optional(),
-  error: z.string().optional()
+  error: z.string().optional(), request: z.unknown().optional()
 });
 export const executionLogSchema = z.object({
   id: z.string(), workflowId: z.string(), sessionId: z.string(),

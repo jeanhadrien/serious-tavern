@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import type { Workflow, Edge, ChatMessage } from '@st/shared';
+import type { Workflow, Edge, ChatMessage, Preset } from '@st/shared';
 import { executeWorkflow, validateWorkflow } from './executor.js';
 import { renderTemplate } from './template.js';
 import { registry } from './registry.js';
@@ -66,12 +66,12 @@ describe('executor', () => {
       expect((await executeWorkflow(graph, options)).reply).toBe(expected);
     }
   });
-  it('reports unknown ports, invalid configs, duplicate inputs, missing nodes, and cycles', () => {
+  it('reports unknown ports, invalid configs, duplicate inputs, missing nodes, and cycles', async () => {
     const graph = workflow([node('input', 'chat-input'), node('output', 'chat-output')],
       [edge('input', 'wrong', 'output', 'value'), edge('input', 'message', 'output', 'value'),
         edge('output', 'reply', 'input', 'wrong')]);
     graph.nodes[1]!.config = { template: 123 };
-    expect(validateWorkflow(graph).join(' ')).toMatch(/invalid config.*invalid output port.*multiple connections.*invalid input port.*cycle/i);
+    expect((await validateWorkflow(graph)).join(' ')).toMatch(/invalid config.*invalid output port.*multiple connections.*invalid input port.*cycle/i);
   });
   it('renders paths without evaluating expressions', () => {
     expect(renderTemplate('A {{input.foo}} B {{trigger.message}} C {{history}} D {{input.foo.constructor()}}',
@@ -91,7 +91,22 @@ describe('executor', () => {
     expect(events).toContain('node:error');
     expect(events.at(-1)).toBe('execution:complete');
   });
-  it('rejects incompatible edges with node, port and type names', () => {
+  it('resolves preset slots and reports edges to removed slots', async () => {
+      const preset: Preset = { id: '2b041793-416b-4c94-a541-99ab866230b7', name: 'Dynamic',
+        createdAt: '', updatedAt: '', entries: [
+          { id: 'one', name: 'Prompt', kind: 'slot', enabled: true, key: 'prompt', dataType: 'text', role: 'user' },
+          { id: 'two', name: 'Extra', kind: 'slot', enabled: true, key: 'extra', dataType: 'text', role: 'user' }
+        ] };
+      const resources = { presets: { get: async () => preset } };
+      const graph = workflow([node('input', 'chat-input'), node('llm', 'llm', { presetId: preset.id }),
+        node('output', 'chat-output')], [
+        edge('input', 'message', 'llm', 'extra'), edge('llm', 'text', 'output', 'value')
+      ]);
+      expect(await validateWorkflow(graph, resources)).toEqual([]);
+      preset.entries[1]!.enabled = false;
+      expect((await validateWorkflow(graph, resources)).join(' ')).toContain('invalid input port extra');
+  });
+  it('rejects incompatible edges with node, port and type names after port resolution', async () => {
     registry.set('typed-test', { type: 'typed-test', label: 'Typed', description: '', category: '',
       inputs: [{ name: 'count', label: 'Count', dataType: 'number' }],
       outputs: [{ name: 'text', label: 'Text', dataType: 'text' }],
@@ -99,7 +114,7 @@ describe('executor', () => {
     });
     const graph = workflow([node('input', 'chat-input'), node('convert', 'typed-test'), node('output', 'chat-output')],
       [edge('input', 'message', 'convert', 'count'), edge('convert', 'text', 'output', 'value')]);
-    expect(validateWorkflow(graph).join(' ')).toMatch(/input \(chat-input\)\.message \[text\].*convert \(typed-test\)\.count \[number\]/);
+    expect((await validateWorkflow(graph)).join(' ')).toMatch(/input \(chat-input\)\.message \[text\].*convert \(typed-test\)\.count \[number\]/);
   });
   it('converts messages to a transcript and objects to pretty JSON on text edges', async () => {
     const history: ChatMessage[] = [

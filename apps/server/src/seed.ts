@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Workflow, NodeInstance, Edge } from '@st/shared';
+import type { Workflow, NodeInstance, Edge, Preset } from '@st/shared';
 import { registry } from '@st/engine';
 import type { Repository } from './storage/repository.js';
 
@@ -16,11 +16,21 @@ function makeWorkflow(name: string, specs: { id: string; type: string; config?: 
       ({ id: randomUUID(), source, sourceHandle, target, targetHandle }))
   };
 }
-export async function seed(workflows: Repository<Workflow>): Promise<void> {
+export function defaultPreset(): Preset {
+  const date = new Date().toISOString();
+  return { id: randomUUID(), name: 'Default', entries: [
+    { id: randomUUID(), name: 'Main prompt', enabled: true, kind: 'message', role: 'system', content: 'You are a helpful assistant.', placement: { mode: 'ordered' } },
+    { id: randomUUID(), name: 'History', enabled: true, kind: 'slot', key: 'history', dataType: 'messages', role: 'user' },
+    { id: randomUUID(), name: 'Message', enabled: true, kind: 'slot', key: 'message', dataType: 'text', role: 'user' }
+  ], createdAt: date, updatedAt: date };
+}
+export async function seed(workflows: Repository<Workflow>, presets: Repository<Preset>): Promise<void> {
+  let available = await presets.list();
+  if (!available.length) { const preset = defaultPreset(); await presets.save(preset); available = [preset]; }
   if ((await workflows.list()).length) return;
   await workflows.save(makeWorkflow('Default Assistant',
-    [{ id: 'input', type: 'chat-input' }, { id: 'memory', type: 'memory' }, { id: 'llm', type: 'llm' }, { id: 'output', type: 'chat-output' }],
-    [['input', 'message', 'llm', 'prompt'], ['memory', 'history', 'llm', 'context'], ['llm', 'text', 'output', 'value']]));
+    [{ id: 'input', type: 'chat-input' }, { id: 'llm', type: 'llm', config: { presetId: available[0]!.id } }, { id: 'output', type: 'chat-output' }],
+    [['input', 'message', 'llm', 'message'], ['input', 'history', 'llm', 'history'], ['llm', 'text', 'output', 'value']]));
   await workflows.save(makeWorkflow('Parallel demo',
     [{ id: 'input', type: 'chat-input' }, { id: 'http-a', type: 'http-request', config: { url: 'https://httpbin.org/anything?source=a' } },
       { id: 'http-b', type: 'http-request', config: { url: 'https://httpbin.org/anything?source=b' } },

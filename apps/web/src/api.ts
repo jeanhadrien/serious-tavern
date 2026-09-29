@@ -1,4 +1,4 @@
-import type { Workflow, Session, ExecutionLog, NodeTypeDescriptor } from '@st/shared';
+import type { Workflow, Session, ExecutionLog, NodeTypeDescriptor, Preset, PortDef } from '@st/shared';
 import { alerts } from './alerts/store.js';
 export type SessionSummary = Omit<Session, 'messages'> & { messageCount: number };
 export type SecretSummary = { name: string; hint: string };
@@ -55,3 +55,7 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
 export const json = (method: string, body?: unknown): RequestInit => ({ method, body: body === undefined ? undefined : JSON.stringify(body) });
 export const getWorkflows = () => api<Workflow[]>('/workflows');
 export const getNodeTypes = () => api<NodeTypeDescriptor[]>('/node-types');
+export const getPresets = () => api<Preset[]>('/presets');
+export const getProviders = () => api<{ id: string; label: string; secretName: string }[]>('/providers');
+export const resolvePorts = (type: string, config: Record<string, unknown>) =>
+  api<{ inputs: PortDef[]; outputs: PortDef[] }>(`/node-types/${type}/ports`, json('POST', { config }));

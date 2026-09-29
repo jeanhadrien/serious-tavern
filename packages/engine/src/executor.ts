@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { canConnect, type CoercionKind } from '@st/shared/ports';
 import type { Workflow, ChatMessage, ExecutionLog, Edge } from '@st/shared';
 import { registry } from './registry.js';
-import type { EngineEvent, ExecutionContext } from './types.js';
+import type { EngineEvent, ExecutionContext, NodeResources } from './types.js';
 import { stringify } from './template.js';
 
 function coerceValue(value: unknown, kind: CoercionKind): string {
@@ -14,9 +14,10 @@ function coerceValue(value: unknown, kind: CoercionKind): string {
   return value == null ? '' : String(value);
 }
 
-export function validateWorkflow(workflow: Workflow): string[] {
+export async function validateWorkflow(workflow: Workflow, resources: NodeResources = { presets: { get: async () => undefined } }): Promise<string[]> {
   const errors: string[] = [];
   const ids = new Set<string>();
+  const ports = new Map<string, { inputs: import('@st/shared').PortDef[]; outputs: import('@st/shared').PortDef[] }>();
   for (const node of workflow.nodes) {
     if (ids.has(node.id)) errors.push(`Duplicate node id: ${node.id}`);
     ids.add(node.id);
@@ -24,6 +25,10 @@ export function validateWorkflow(workflow: Workflow): string[] {
     if (!definition) { errors.push(`Node ${node.id}: unknown type ${node.type}`); continue; }
     const parsed = definition.configSchema.safeParse(node.config);
     if (!parsed.success) errors.push(`Node ${node.id}: invalid config: ${parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ')}`);
+    try {
+      ports.set(node.id, definition.resolvePorts ? await definition.resolvePorts(node.config, resources) :
+        { inputs: definition.inputs, outputs: definition.outputs });
+    } catch (error) { errors.push(`Node ${node.id}: ${error instanceof Error ? error.message : String(error)}`); }
   }
   for (const type of ['chat-input', 'chat-output']) {
     if (workflow.nodes.filter(n => n.type === type).length !== 1) errors.push(`Expected exactly one ${type} node`);
@@ -37,8 +42,8 @@ export function validateWorkflow(workflow: Workflow): string[] {
     const source = workflow.nodes.find(n => n.id === edge.source);
     const target = workflow.nodes.find(n => n.id === edge.target);
     if (!source || !target) { errors.push(`Edge ${edge.id}: missing source or target node`); continue; }
-    const sourcePort = registry.get(source.type)?.outputs.find(p => p.name === edge.sourceHandle);
-    const targetPort = registry.get(target.type)?.inputs.find(p => p.name === edge.targetHandle);
+    const sourcePort = ports.get(source.id)?.outputs.find(p => p.name === edge.sourceHandle);
+    const targetPort = ports.get(target.id)?.inputs.find(p => p.name === edge.targetHandle);
     if (!sourcePort) errors.push(`Edge ${edge.id}: invalid output port ${edge.sourceHandle}`);
     if (!targetPort) errors.push(`Edge ${edge.id}: invalid input port ${edge.targetHandle}`);
     if (sourcePort && targetPort) {
@@ -51,8 +56,7 @@ export function validateWorkflow(workflow: Workflow): string[] {
     adjacency.get(edge.source)?.push(edge.target);
   }
   for (const node of workflow.nodes) {
-    const definition = registry.get(node.type);
-    for (const port of definition?.inputs.filter(p => p.required) ?? []) {
+    for (const port of ports.get(node.id)?.inputs.filter(p => p.required) ?? []) {
       if (!workflow.edges.some(e => e.target === node.id && e.targetHandle === port.name)) errors.push(`Node ${node.id}: required input ${port.name} is not connected`);
     }
     if (node.type === 'chat-input' && (inbound.get(node.id) ?? 0)) errors.push('Chat input cannot have incoming edges');
@@ -80,10 +84,18 @@ export async function executeWorkflow(
   options: {
     message: string; sessionId: string; history: ChatMessage[];
     secrets: ExecutionContext['secrets']; signal?: AbortSignal;
+    resources?: NodeResources;
     onEvent?: (event: EngineEvent) => void; nodeTimeoutMs?: number;
   }
 ): Promise<{ reply: string; execution: ExecutionLog }> {
-  const errors = validateWorkflow(workflow);
+  const snapshot = new Map<string, import('@st/shared').Preset | undefined>();
+  const resources: NodeResources = { presets: { get: async id => {
+    if (!snapshot.has(id)) snapshot.set(id, await options.resources?.presets.get(id));
+    return snapshot.get(id);
+  } } };
+  await Promise.all([...new Set(workflow.nodes.filter(n => n.type === 'llm').map(n => String(n.config.presetId ?? '')))]
+    .map(id => resources.presets.get(id)));
+  const errors = await validateWorkflow(workflow, resources);
   if (errors.length) throw new Error(`Invalid workflow: ${errors.join('; ')}`);
   const execution: ExecutionLog = {
     id: randomUUID(), workflowId: workflow.id, sessionId: options.sessionId,
@@ -95,6 +107,11 @@ export async function executeWorkflow(
   if (options.signal?.aborted) onAbort();
   const emit = (event: EngineEvent) => options.onEvent?.(event);
   const resolved = new Map<string, { output: Record<string, unknown>; skipped: boolean }>();
+  const ports = new Map(await Promise.all(workflow.nodes.map(async node => {
+    const definition = registry.get(node.type)!;
+    return [node.id, definition.resolvePorts ? await definition.resolvePorts(node.config, resources) :
+      { inputs: definition.inputs, outputs: definition.outputs }] as const;
+  })));
   const pending = new Set(workflow.nodes.map(n => n.id));
   try {
     while (pending.size) {
@@ -111,13 +128,13 @@ export async function executeWorkflow(
         const definition = registry.get(node.type)!;
         const inputs = Object.fromEntries(active.map(e => {
           const source = workflow.nodes.find(item => item.id === e.source)!;
-          const fromPort = registry.get(source.type)!.outputs.find(port => port.name === e.sourceHandle)!;
-          const toPort = definition.inputs.find(port => port.name === e.targetHandle)!;
+          const fromPort = ports.get(source.id)!.outputs.find(port => port.name === e.sourceHandle)!;
+          const toPort = ports.get(node.id)!.inputs.find(port => port.name === e.targetHandle)!;
           const connection = canConnect(fromPort, toPort);
           const value = resolved.get(e.source)!.output[e.sourceHandle];
           return [e.targetHandle, connection.ok && connection.coerce ? coerceValue(value, connection.coerce) : value];
         }));
-        const requiredSkipped = definition.inputs.some(p => p.required &&
+        const requiredSkipped = ports.get(node.id)!.inputs.some(p => p.required &&
           incoming.some(e => e.targetHandle === p.name) && !Object.hasOwn(inputs, p.name));
         if ((incoming.length > 0 && active.length === 0) || (node.type !== 'merge' && requiredSkipped)) {
           const now = new Date().toISOString();
@@ -136,14 +153,15 @@ export async function executeWorkflow(
           const output = await Promise.race([
             definition.execute({
               inputs, config: definition.configSchema.parse(node.config), trigger: { message: options.message, sessionId: options.sessionId },
-              history: options.history, secrets: options.secrets, signal, log: () => {}, emit
+              history: options.history, secrets: options.secrets, resources, signal, log: () => {}, emit,
+              recordRequest: request => { execution.nodes[node.id] = { ...execution.nodes[node.id]!, request }; }
             }),
             new Promise<never>((_, reject) => {
               if (signal.aborted) reject(signal.reason);
               else signal.addEventListener('abort', () => reject(signal.reason), { once: true });
             })
           ]);
-          if (!output || typeof output !== 'object' || Object.keys(output).some(key => !definition.outputs.some(p => p.name === key))) {
+          if (!output || typeof output !== 'object' || Object.keys(output).some(key => !ports.get(node.id)!.outputs.some(p => p.name === key))) {
             throw new Error('Node returned invalid output ports');
           }
           execution.nodes[node.id] = { ...execution.nodes[node.id], status: 'completed',

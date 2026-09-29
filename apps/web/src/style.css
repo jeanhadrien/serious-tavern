@@ -46,3 +46,14 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:180px;overflow:auto;f
 .toast-heading{display:flex;align-items:center;gap:8px;text-transform:capitalize}.toast-heading button{margin-left:auto;border:0;background:transparent;padding:0 5px;font-size:1.35rem}
 .toast p{margin:6px 0 0;font-size:.92rem}.toast details{font-size:.82rem;margin-top:8px}.toast pre{margin:8px 0 0;max-height:170px}
 .toast-count{background:#424959;color:#fff;border-radius:12px;padding:1px 7px;font-size:.75rem}
+.preset-editor{flex:1;overflow:auto;min-width:0;padding:0 24px 32px;display:grid;align-content:start;gap:16px;max-width:980px}
+.preset-editor .editor-toolbar{margin:0 -24px;padding-left:24px}
+.preset-editor .editor-toolbar input{flex:1}
+.preset-entry{padding:16px;border:1px solid #414757;border-radius:10px;background:#222630;display:grid;gap:12px}
+.preset-entry .toolbar{justify-content:flex-start}
+.preset-entry .toolbar strong,.preset-entry .toolbar h3{margin-right:auto}
+.preset-entry textarea{width:100%}
+.preset-error{margin:0;color:#ffa8a8}
+.preview-message{border:1px solid #414757;border-radius:8px;padding:10px 14px;white-space:pre-wrap;overflow-wrap:anywhere}
+.preview-message strong{text-transform:capitalize;color:#b8c9fd}
+.preview-message p{margin:6px 0 0}

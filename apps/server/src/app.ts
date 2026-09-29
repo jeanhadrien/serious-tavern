@@ -2,11 +2,12 @@ import Fastify from 'fastify';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { workflowSchema, type Workflow, type Session, type ExecutionLog } from '@st/shared';
-import { descriptors, executeWorkflow, ExecutionFailure, registry, validateWorkflow } from '@st/engine';
+import { workflowSchema, presetSchema, type Preset, type Workflow, type Session, type ExecutionLog } from '@st/shared';
+import { descriptors, executeWorkflow, ExecutionFailure, registry, validateWorkflow, renderPreset, providers } from '@st/engine';
 import { JsonRepository } from './storage/repository.js';
 import { SecretStore } from './secrets/store.js';
 import { seed } from './seed.js';
+import { migrateLegacyLlm } from './migrate.js';
 import { HttpError, notFound } from './errors.js';
 
 const idParam = z.object({ id: z.string().uuid() });
@@ -23,13 +24,75 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
     parseJson(request, typeof body === 'string' ? body : body.toString('utf8'), done);
   });
   const workflows = new JsonRepository<Workflow>(join(dataDir, 'workflows'));
+  const presets = new JsonRepository<Preset>(join(dataDir, 'presets'));
   const sessions = new JsonRepository<Session>(join(dataDir, 'sessions'));
   const executions = new JsonRepository<ExecutionLog>(join(dataDir, 'executions'));
   const secrets = new SecretStore(dataDir);
   await secrets.init();
-  if (options.seed !== false) await seed(workflows);
+  if (options.seed !== false) await seed(workflows, presets);
+  for (const item of await migrateLegacyLlm(workflows, presets)) console.info(`Migrated LLM node: ${item}`);
 
   app.get('/api/node-types', async () => descriptors());
+  app.get('/api/providers', async () => [...providers.values()].map(({ id, label, secretName }) => ({ id, label, secretName })));
+  app.post('/api/node-types/:type/ports', async request => {
+    const type = z.object({ type: z.string() }).parse(request.params).type;
+    const definition = registry.get(type);
+    if (!definition) throw notFound('Node type');
+    const config = z.object({ config: z.record(z.string(), z.unknown()) }).parse(request.body).config;
+    try { return definition.resolvePorts ? await definition.resolvePorts(config, { presets }) :
+      { inputs: definition.inputs, outputs: definition.outputs }; }
+    catch (error) { throw new HttpError(422, 'PORT_RESOLUTION_FAILED', errorMessage(error)); }
+  });
+  app.get('/api/presets', async () => presets.list());
+  app.post('/api/presets/preview', async request => {
+    const { preset, slots = {}, sessionId } = z.object({
+      preset: presetSchema, slots: z.record(z.string(), z.unknown()).optional(), sessionId: z.string().uuid().optional()
+    }).parse(request.body);
+    const session = sessionId ? await sessions.get(sessionId) : undefined;
+    if (sessionId && !session) throw notFound('Session');
+    const values = { ...slots };
+    const sample = [{ role: 'user', content: 'Hello!' }, { role: 'assistant', content: 'Hi! How can I help?' }];
+    for (const entry of preset.entries) {
+      if (entry.kind !== 'slot') continue;
+      if (entry.dataType === 'messages') values[entry.key] = session ? session.messages : sample;
+      else values[entry.key] ??= '<context>';
+    }
+    try {
+      return { messages: renderPreset(preset, { slots: values, templateContext: {
+        trigger: { message: 'Sample message', sessionId: sessionId ?? 'sample-session' },
+        history: session?.messages
+      } }) };
+    } catch (error) { throw new HttpError(400, 'PRESET_PREVIEW_INVALID', errorMessage(error)); }
+  });
+  app.post('/api/presets', async (request, reply) => {
+    const date = now();
+    const preset = presetSchema.parse({ ...request.body as object, id: randomUUID(), createdAt: date, updatedAt: date });
+    await presets.save(preset);
+    return reply.code(201).send(preset);
+  });
+  app.get('/api/presets/:id', async request => {
+    const preset = await presets.get(idParam.parse(request.params).id);
+    if (!preset) throw notFound('Preset');
+    return preset;
+  });
+  app.put('/api/presets/:id', async request => {
+    const { id } = idParam.parse(request.params);
+    const old = await presets.get(id);
+    if (!old) throw notFound('Preset');
+    const fields = presetSchema.safeParse({ ...request.body as object, id, createdAt: old.createdAt, updatedAt: now() });
+    if (!fields.success) throw fields.error;
+    await presets.save(fields.data);
+    return fields.data;
+  });
+  app.delete('/api/presets/:id', async (request, reply) => {
+    const { id } = idParam.parse(request.params);
+    if (!await presets.get(id)) throw notFound('Preset');
+    const users = (await workflows.list()).filter(workflow =>
+      workflow.nodes.some(node => node.type === 'llm' && node.config.presetId === id)).map(workflow => workflow.name);
+    if (users.length) throw new HttpError(409, 'PRESET_IN_USE', 'Preset is used by workflows', users);
+    await presets.delete(id);
+    return reply.code(204).send();
+  });
   app.get('/api/workflows', async () => workflows.list());
   app.post('/api/workflows', async (request, reply) => {
     const body = z.object({ name: z.string().trim().min(1) }).parse(request.body);
@@ -63,7 +126,7 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
     const { id } = idParam.parse(request.params);
     const workflow = await workflows.get(id);
     if (!workflow) throw notFound('Workflow');
-    const errors = validateWorkflow(workflow);
+    const errors = await validateWorkflow(workflow, { presets });
     if (errors.length) throw new HttpError(422, 'WORKFLOW_INVALID', 'Invalid workflow', errors);
     return { valid: true, errors: [] };
   });
@@ -105,7 +168,7 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
     if (!session) throw notFound('Session');
     const workflow = await workflows.get(session.workflowId);
     if (!workflow) throw notFound('Workflow');
-    const errors = validateWorkflow(workflow);
+    const errors = await validateWorkflow(workflow, { presets });
     if (errors.length) throw new HttpError(400, 'WORKFLOW_INVALID', 'Invalid workflow', errors);
     const history = [...session.messages];
     const userMessage = { id: randomUUID(), role: 'user' as const, content, createdAt: now() };
@@ -114,7 +177,7 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
     await sessions.save(session);
     try {
       const { reply: text, execution } = await executeWorkflow(workflow, {
-        message: content, sessionId: id, history, secrets
+        message: content, sessionId: id, history, secrets, resources: { presets }
       });
       const assistantMessage = { id: randomUUID(), role: 'assistant' as const, content: text, createdAt: now(), executionId: execution.id };
       session.messages.push(assistantMessage);

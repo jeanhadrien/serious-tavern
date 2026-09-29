@@ -7,7 +7,9 @@ import {
 import { canConnect, portDataTypes, type PortDataType, type PortDef } from '@st/shared/ports';
 import type { Workflow, NodeTypeDescriptor, NodeInstance } from '@st/shared';
 import { NodeConfigPanel } from '@st/node-ui';
-import { api, getNodeTypes, getWorkflows, json } from '../api.js';
+import { Link } from 'react-router-dom';
+import type { Preset } from '@st/shared';
+import { api, getNodeTypes, getWorkflows, getPresets, getProviders, resolvePorts, json } from '../api.js';
 import { alerts } from '../alerts/index.js';
 import { checkConnection } from '../connection.js';
 
@@ -52,6 +54,8 @@ export function Workflows() {
 function WorkflowEditor() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [types, setTypes] = useState<NodeTypeDescriptor[]>([]);
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [providersList, setProvidersList] = useState<{ id: string; label: string }[]>([]);
   const [workflow, setWorkflow] = useState<Workflow>();
   const [nodes, setNodes] = useState<CanvasNode[]>([]);
   const [edges, setEdges] = useState<FlowEdge[]>([]);
@@ -69,7 +73,33 @@ function WorkflowEditor() {
     };
   }), [edges, nodes]);
   const refresh = () => getWorkflows().then(setWorkflows);
-  useEffect(() => { void refresh().catch(() => {}); void getNodeTypes().then(setTypes).catch(() => {}); }, []);
+  useEffect(() => { void refresh().catch(() => {}); void getNodeTypes().then(setTypes).catch(() => {});
+    void getPresets().then(setPresets).catch(() => {}); void getProviders().then(setProvidersList).catch(() => {});
+  }, []);
+  const llmConfigs = JSON.stringify(nodes.filter(node => node.data.descriptor.type === 'llm')
+    .map(node => [node.id, node.data.config.presetId]));
+  useEffect(() => {
+    let active = true;
+    void Promise.all(nodes.filter(node => node.data.descriptor.type === 'llm')
+      .map(async node => {
+        if (!node.data.config.presetId) return undefined;
+        try { return { id: node.id, ports: await resolvePorts('llm', node.data.config) }; }
+        catch { return { id: node.id, ports: { inputs: [], outputs: node.data.descriptor.outputs } }; }
+      })).then(results => {
+        if (!active) return;
+        setNodes(previous => previous.map(node => {
+          const result = results.find(item => item?.id === node.id);
+          if (!result || JSON.stringify(node.data.descriptor.inputs) === JSON.stringify(result.ports.inputs)) return node;
+          return { ...node, data: { ...node.data, descriptor: { ...node.data.descriptor, ...result.ports } } };
+        }));
+      });
+    return () => { active = false; };
+  }, [llmConfigs, presets]);
+  useEffect(() => {
+    const update = () => { void getPresets().then(setPresets).catch(() => {}); };
+    window.addEventListener('focus', update);
+    return () => window.removeEventListener('focus', update);
+  }, []);
   const load = (next: Workflow) => {
     setWorkflow(next);
     setNodes(next.nodes.flatMap(n => {
@@ -186,6 +216,27 @@ function WorkflowEditor() {
           fitView><Background color="#414652" gap={20} /><Controls /></ReactFlow></div>
         {current && currentDescriptor && <aside className="config-panel"><div className="toolbar"><h3>{currentDescriptor.label}</h3>
           <button onClick={() => setSelected(undefined)}>×</button></div><p className="hint">{currentDescriptor.description}</p>
-          <NodeConfigPanel descriptor={currentDescriptor} config={current.data.config} onChange={updateConfig} /></aside>}</div></div> :
+          {currentDescriptor.type === 'llm' ? <div className="config-fields">
+            <label>Provider<select value={String(current.data.config.provider ?? 'openrouter')} onChange={e =>
+              updateConfig({ ...current.data.config, provider: e.target.value })}>
+              {providersList.map(provider => <option key={provider.id} value={provider.id}>{provider.label}</option>)}</select></label>
+            <label>Model<input value={String(current.data.config.model ?? '')} onChange={e =>
+              updateConfig({ ...current.data.config, model: e.target.value })} /></label>
+            <label>Preset<select value={String(current.data.config.presetId ?? '')} onChange={e =>
+              updateConfig({ ...current.data.config, presetId: e.target.value })}>
+              <option value="">Choose a preset</option>{presets.map(preset =>
+                <option key={preset.id} value={preset.id}>{preset.name}</option>)}</select></label>
+            {Boolean(current.data.config.presetId) && <Link to={`/presets?id=${current.data.config.presetId}`}>Edit preset ↗</Link>}
+            {(['temperature', 'maxTokens', 'topP', 'frequencyPenalty', 'presencePenalty'] as const).map(key =>
+              <label key={key}>{key}<input type="number" step={key === 'maxTokens' ? 1 : 0.1}
+                value={String(current.data.config[key] ?? '')} onChange={e => {
+                  const config = { ...current.data.config };
+                  if (e.target.value === '') delete config[key]; else config[key] = Number(e.target.value);
+                  updateConfig(config);
+                }} /></label>)}
+            <label>Stop sequences (one per line)<textarea value={Array.isArray(current.data.config.stop) ?
+              current.data.config.stop.join('\n') : ''} onChange={e => updateConfig({ ...current.data.config,
+              stop: e.target.value ? e.target.value.split('\n').filter(Boolean) : undefined })} /></label>
+          </div> : <NodeConfigPanel descriptor={currentDescriptor} config={current.data.config} onChange={updateConfig} />}</aside>}</div></div> :
       <div className="empty-state"><h1>Build a workflow</h1><p>Choose a workflow or create a new one.</p></div>}</div>;
 }
