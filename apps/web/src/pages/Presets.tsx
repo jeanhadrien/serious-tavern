@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { presetSchema, type Preset } from '@st/shared';
-import { api, getPresets, json } from '../api.js';
+import { presetsApi } from '../api.js';
 import { alerts } from '../alerts/index.js';
 import { PresetList } from './presets/PresetList.js';
 import { PresetEditor } from './presets/PresetEditor.js';
@@ -17,7 +17,7 @@ export function Presets() {
   const [saved, setSaved] = useState('');
   const [selectedEntryId, setSelectedEntryId] = useState('');
   const dirty = !!draft && JSON.stringify(draft) !== saved;
-  const refresh = async () => setList(await getPresets());
+  const refresh = async () => setList(await presetsApi.list());
 
   useEffect(() => {
     void refresh().catch(() => {});
@@ -35,7 +35,7 @@ export function Presets() {
   const change = (next: Preset) => setDraft(next);
   const create = async () => {
     try {
-      const created = await api<Preset>('/presets', json('POST', { name: 'New preset', inputs: [], entries: [] }));
+      const created = await presetsApi.create({ name: 'New preset', inputs: [], entries: [] });
       await refresh();
       choose(created);
     } catch {
@@ -53,7 +53,7 @@ export function Presets() {
       return;
     }
     try {
-      const result = await api<Preset>(`/presets/${draft.id}`, json('PUT', draft));
+      const result = await presetsApi.update(draft.id, draft);
       choose(result);
       await refresh();
       alerts.success('Preset saved');
@@ -64,26 +64,23 @@ export function Presets() {
   const duplicate = async (preset: Preset) => {
     try {
       const entryIds = new Map(preset.entries.map((item) => [item.id, id()]));
-      const copy = await api<Preset>(
-        '/presets',
-        json('POST', {
-          ...preset,
-          name: `${preset.name} copy`,
-          inputs: preset.inputs.map((input) => ({ ...input, id: id() })),
-          entries: preset.entries.map((item) =>
-            item.kind === 'message' && item.placement.mode === 'depth'
-              ? {
-                  ...item,
-                  id: entryIds.get(item.id)!,
-                  placement: {
-                    ...item.placement,
-                    entryId: entryIds.get(item.placement.entryId) ?? item.placement.entryId,
-                  },
-                }
-              : { ...item, id: entryIds.get(item.id)! },
-          ),
-        }),
-      );
+      const copy = await presetsApi.create({
+        ...preset,
+        name: `${preset.name} copy`,
+        inputs: preset.inputs.map((input) => ({ ...input, id: id() })),
+        entries: preset.entries.map((item) =>
+          item.kind === 'message' && item.placement.mode === 'depth'
+            ? {
+                ...item,
+                id: entryIds.get(item.id)!,
+                placement: {
+                  ...item.placement,
+                  entryId: entryIds.get(item.placement.entryId) ?? item.placement.entryId,
+                },
+              }
+            : { ...item, id: entryIds.get(item.id)! },
+        ),
+      });
       await refresh();
       choose(copy);
       alerts.success('Preset duplicated');
@@ -94,7 +91,7 @@ export function Presets() {
   const remove = async (preset: Preset) => {
     if (!window.confirm(`Delete ${preset.name}?`)) return;
     try {
-      await api(`/presets/${preset.id}`, json('DELETE'));
+      await presetsApi.delete(preset.id);
       if (draft?.id === preset.id) {
         setDraft(undefined);
         setSaved('');

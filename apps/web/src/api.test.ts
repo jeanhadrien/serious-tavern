@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { alerts } from './alerts/store.js';
-import { ApiError, api, json } from './api.js';
+import { ApiError, api, json, sessionsApi, workflowsApi, charactersApi, nodeTypesApi, secretsApi } from './api.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -46,4 +46,28 @@ it('reports network failures as toasts', async () => {
   vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
   await expect(api('/sessions')).rejects.toMatchObject({ status: 0, code: 'NETWORK_ERROR' });
   expect(alerts.getSnapshot()[0]?.message).toBe('Could not reach the server');
+});
+it('uses resource methods for typed JSON, multipart and bodyless requests', async () => {
+  const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+  await sessionsApi.sendMessage('session-id', { content: 'Hello' });
+  await nodeTypesApi.resolvePorts('llm', { presetId: 'preset-id' });
+  const form = new FormData();
+  form.append('files', new Blob(['{"name":"Card"}'], { type: 'application/json' }), 'card.json');
+  await charactersApi.import(form);
+  await secretsApi.delete('test key');
+  expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/sessions/session-id/messages');
+  expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: 'POST', body: '{"content":"Hello"}' });
+  expect(fetchMock.mock.calls[1]?.[1]?.body).toBe('{"config":{"presetId":"preset-id"}}');
+  expect(fetchMock.mock.calls[2]?.[1]?.body).toBe(form);
+  expect(new Headers(fetchMock.mock.calls[2]?.[1]?.headers).has('content-type')).toBe(false);
+  expect(fetchMock.mock.calls[3]?.[0]).toBe('/api/secrets/test%20key');
+  expect(fetchMock.mock.calls[3]?.[1]?.body).toBeUndefined();
+  expect(charactersApi.exportUrl('card-id', 'png')).toBe('/api/characters/card-id/export?format=png');
+});
+it('preserves silent errors through resource clients', async () => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    new Response(JSON.stringify({ error: { code: 'WORKFLOW_INVALID', message: 'Invalid workflow' } }), { status: 422 }),
+  );
+  await expect(workflowsApi.validate('workflow-id', { silent: true })).rejects.toBeInstanceOf(ApiError);
+  expect(alerts.getSnapshot()).toHaveLength(0);
 });

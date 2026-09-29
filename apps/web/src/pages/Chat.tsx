@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { Workflow, Session, ExecutionLog, ChatMessage } from '@st/shared';
-import { api, json, getWorkflows, getCharacters, getPersonas, type SessionSummary } from '../api.js';
+import type { Workflow, Session, ExecutionLog, SessionSummary, ApiBody } from '@st/shared';
+import { sessionsApi, workflowsApi, charactersApi, personasApi, executionsApi } from '../api.js';
 import type { Character, Persona } from '@st/shared';
 import { alerts } from '../alerts/index.js';
 
@@ -8,7 +8,8 @@ function ExecutionDetails({ id, cached }: { id: string; cached?: ExecutionLog })
   const [execution, setExecution] = useState(cached);
   useEffect(() => {
     if (!execution)
-      void api<ExecutionLog>(`/executions/${id}`)
+      void executionsApi
+        .get(id)
         .then(setExecution)
         .catch(() => {});
   }, [id]);
@@ -48,24 +49,25 @@ export function Chat() {
   const [busy, setBusy] = useState(false);
   const [logs, setLogs] = useState<Record<string, ExecutionLog>>({});
   const refresh = () =>
-    api<SessionSummary[]>('/sessions').then((list) =>
-      setSessions(list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))),
-    );
+    sessionsApi.list().then((list) => setSessions(list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))));
   useEffect(() => {
-    void getWorkflows()
+    void workflowsApi
+      .list()
       .then(setWorkflows)
       .catch(() => {});
-    void getCharacters()
+    void charactersApi
+      .list()
       .then(setCharacters)
       .catch(() => {});
-    void getPersonas()
+    void personasApi
+      .list()
       .then(setPersonas)
       .catch(() => {});
     void refresh().catch(() => {});
   }, []);
   const open = async (id: string) => {
     try {
-      setSession(await api<Session>(`/sessions/${id}`));
+      setSession(await sessionsApi.get(id));
     } catch {
       /* API errors are toasted. */
     }
@@ -74,10 +76,10 @@ export function Chat() {
     const initialWorkflow = workflows.find((w) => w.name === 'Default Assistant') ?? workflows[0];
     if (!initialWorkflow) return;
     try {
-      const next = await api<Session>(
-        '/sessions',
-        json('POST', { workflowId: initialWorkflow.id, personaId: session?.personaId ?? personas[0]?.id }),
-      );
+      const next = await sessionsApi.create({
+        workflowId: initialWorkflow.id,
+        personaId: session?.personaId ?? personas[0]?.id,
+      });
       setSession(next);
       alerts.info('Chat created');
       await refresh();
@@ -85,15 +87,10 @@ export function Chat() {
       /* API errors are toasted. */
     }
   };
-  const update = async (changes: {
-    title?: string;
-    workflowId?: string;
-    characterId?: string | null;
-    personaId?: string | null;
-  }) => {
+  const update = async (changes: ApiBody<'updateSession'>) => {
     if (!session) return;
     try {
-      const next = await api<Session>(`/sessions/${session.id}`, json('PATCH', changes));
+      const next = await sessionsApi.update(session.id, changes);
       setSession(next);
       await refresh();
     } catch {
@@ -102,7 +99,7 @@ export function Chat() {
   };
   const remove = async (id: string) => {
     try {
-      await api(`/sessions/${id}`, json('DELETE'));
+      await sessionsApi.delete(id);
       if (session?.id === id) setSession(undefined);
       alerts.info('Chat deleted');
       await refresh();
@@ -116,10 +113,7 @@ export function Chat() {
     setContent('');
     setBusy(true);
     try {
-      const result = await api<{ userMessage: ChatMessage; assistantMessage: ChatMessage; execution: ExecutionLog }>(
-        `/sessions/${session.id}/messages`,
-        json('POST', { content: text }),
-      );
+      const result = await sessionsApi.sendMessage(session.id, { content: text });
       setSession((prev) =>
         prev?.id === session.id
           ? { ...prev, messages: [...prev.messages, result.userMessage, result.assistantMessage] }
@@ -181,7 +175,7 @@ export function Chat() {
                 {session.characterId &&
                   characters.some((item) => item.id === session.characterId) &&
                   (typeof characters.find((item) => item.id === session.characterId)?.avatar === 'string' ? (
-                    <img src={`/api/characters/${session.characterId}/avatar`} />
+                    <img src={charactersApi.avatarUrl(session.characterId)} />
                   ) : null)}
                 <select
                   aria-label="Active character"
@@ -201,7 +195,7 @@ export function Chat() {
                 {session.personaId &&
                   personas.some((item) => item.id === session.personaId) &&
                   (typeof personas.find((item) => item.id === session.personaId)?.avatar === 'string' ? (
-                    <img src={`/api/personas/${session.personaId}/avatar`} />
+                    <img src={personasApi.avatarUrl(session.personaId)} />
                   ) : null)}
                 <select
                   aria-label="Active persona"

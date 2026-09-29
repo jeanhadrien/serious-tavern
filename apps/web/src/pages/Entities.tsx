@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { characterSchema, personaSchema, type Character, type Persona } from '@st/shared';
-import { api, getCharacters, getPersonas, json } from '../api.js';
+import { charactersApi, personasApi } from '../api.js';
 import { alerts } from '../alerts/index.js';
 
-type ImportResult<T> = { imported: T[]; failed: { filename: string; error: { code: string; message: string } }[] };
 const avatarUrl = (type: 'characters' | 'personas', item: Character | Persona) =>
-  typeof item.avatar === 'string' ? `/api/${type}/${item.id}/avatar` : '';
+  typeof item.avatar === 'string' ? (type === 'characters' ? charactersApi : personasApi).avatarUrl(item.id) : '';
 const imageFiles = (files: FileList | File[]) => Array.from(files);
 
 function DropOverlay({ visible, label }: { visible: boolean; label: string }) {
@@ -24,7 +23,7 @@ export function Characters() {
   const [dragging, setDragging] = useState(false);
   const importInput = useRef<HTMLInputElement>(null);
   const avatarInput = useRef<HTMLInputElement>(null);
-  const refresh = async () => setList((await getCharacters()).sort((a, b) => a.name.localeCompare(b.name)));
+  const refresh = async () => setList((await charactersApi.list()).sort((a, b) => a.name.localeCompare(b.name)));
   const choose = (character: Character) => {
     setDraft(structuredClone(character));
     setSaved(JSON.stringify(character));
@@ -36,7 +35,7 @@ export function Characters() {
   }, []);
   const create = async () => {
     try {
-      const character = await api<Character>('/characters', json('POST', { name: 'New character' }));
+      const character = await charactersApi.create({ name: 'New character' });
       await refresh();
       choose(character);
       alerts.success('Character created');
@@ -54,7 +53,7 @@ export function Characters() {
       return;
     }
     try {
-      const character = await api<Character>(`/characters/${draft.id}`, json('PUT', draft));
+      const character = await charactersApi.update(draft.id, draft);
       choose(character);
       await refresh();
       alerts.success('Character saved');
@@ -65,7 +64,7 @@ export function Characters() {
   const remove = async () => {
     if (!draft || !window.confirm(`Delete ${draft.name}?`)) return;
     try {
-      await api(`/characters/${draft.id}`, json('DELETE'));
+      await charactersApi.delete(draft.id);
       setDraft(undefined);
       setSaved('');
       await refresh();
@@ -81,7 +80,7 @@ export function Characters() {
       form.append('files', file, file.name);
     });
     try {
-      const result = await api<ImportResult<Character>>('/characters/import', { method: 'POST', body: form });
+      const result = await charactersApi.import(form);
       if (result.imported.length) {
         await refresh();
         choose(result.imported.at(-1)!);
@@ -101,7 +100,7 @@ export function Characters() {
     const form = new FormData();
     form.append('file', file, file.name);
     try {
-      const character = await api<Character>(`/characters/${draft.id}/avatar`, { method: 'PUT', body: form });
+      const character = await charactersApi.uploadAvatar(draft.id, form);
       choose(character);
       await refresh();
       alerts.success('Avatar updated');
@@ -183,10 +182,10 @@ export function Characters() {
               {dirty && <span className="dirty-dot">Unsaved</span>}
             </div>
             <div className="toolbar">
-              <button onClick={() => window.open(`/api/characters/${draft.id}/export?format=json`, '_blank')}>
+              <button onClick={() => window.open(charactersApi.exportUrl(draft.id, 'json'), '_blank')}>
                 Export JSON
               </button>
-              <button onClick={() => window.open(`/api/characters/${draft.id}/export?format=png`, '_blank')}>
+              <button onClick={() => window.open(charactersApi.exportUrl(draft.id, 'png'), '_blank')}>
                 Export PNG card
               </button>
               <button onClick={() => void remove()}>Delete</button>
@@ -357,7 +356,7 @@ export function Personas() {
   const [dragging, setDragging] = useState(false);
   const importInput = useRef<HTMLInputElement>(null);
   const avatarInput = useRef<HTMLInputElement>(null);
-  const refresh = async () => setList((await getPersonas()).sort((a, b) => a.name.localeCompare(b.name)));
+  const refresh = async () => setList((await personasApi.list()).sort((a, b) => a.name.localeCompare(b.name)));
   const choose = (persona: Persona) => {
     setDraft(structuredClone(persona));
     setSaved(JSON.stringify(persona));
@@ -367,7 +366,7 @@ export function Personas() {
   }, []);
   const create = async () => {
     try {
-      const persona = await api<Persona>('/personas', json('POST', { name: 'New persona' }));
+      const persona = await personasApi.create({ name: 'New persona' });
       await refresh();
       choose(persona);
       alerts.success('Persona created');
@@ -383,7 +382,7 @@ export function Personas() {
       return;
     }
     try {
-      const persona = await api<Persona>(`/personas/${draft.id}`, json('PUT', draft));
+      const persona = await personasApi.update(draft.id, draft);
       choose(persona);
       await refresh();
       alerts.success('Persona saved');
@@ -394,7 +393,7 @@ export function Personas() {
   const remove = async () => {
     if (!draft || !window.confirm(`Delete ${draft.name}?`)) return;
     try {
-      await api(`/personas/${draft.id}`, json('DELETE'));
+      await personasApi.delete(draft.id);
       setDraft(undefined);
       setSaved('');
       await refresh();
@@ -414,7 +413,7 @@ export function Personas() {
       form.append('files', file, file.name);
     });
     try {
-      const result = await api<ImportResult<Persona>>('/personas/import', { method: 'POST', body: form });
+      const result = await personasApi.import(form);
       if (result.imported.length) {
         await refresh();
         choose(result.imported.at(-1)!);
@@ -435,7 +434,7 @@ export function Personas() {
     const form = new FormData();
     form.append('file', file, file.name);
     try {
-      const persona = await api<Persona>(`/personas/${draft.id}/avatar`, { method: 'PUT', body: form });
+      const persona = await personasApi.uploadAvatar(draft.id, form);
       choose(persona);
       await refresh();
       alerts.success('Avatar updated');

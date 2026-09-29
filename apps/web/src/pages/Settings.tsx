@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
-import { api, json, type SecretSummary } from '../api.js';
+import type { SecretSummary } from '@st/shared';
+import { secretsApi } from '../api.js';
 import { alerts } from '../alerts/index.js';
 export function Settings() {
   const [secrets, setSecrets] = useState<SecretSummary[]>([]);
   const [name, setName] = useState('openrouter');
   const [value, setValue] = useState('');
-  const refresh = () => api<SecretSummary[]>('/secrets').then(setSecrets);
+  const refresh = () => secretsApi.list().then(setSecrets);
   useEffect(() => {
     void refresh().catch(() => {});
   }, []);
   const save = async () => {
     try {
-      await api(`/secrets/${encodeURIComponent(name)}`, json('PUT', { value }));
+      await secretsApi.set(name, { value });
       setValue('');
       alerts.success('Secret saved');
       await refresh();
@@ -21,7 +22,7 @@ export function Settings() {
   };
   const remove = async (secret: string) => {
     try {
-      await api(`/secrets/${encodeURIComponent(secret)}`, json('DELETE'));
+      await secretsApi.delete(secret);
       await refresh();
     } catch {
       /* API errors are toasted. */

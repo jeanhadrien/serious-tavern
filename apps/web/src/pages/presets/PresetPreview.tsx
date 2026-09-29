@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { presetSchema, presetWarnings, type Preset, type PresetWarning, type PromptMessage } from '@st/shared';
-import { api, json, type SessionSummary } from '../../api.js';
+import {
+  presetSchema,
+  presetWarnings,
+  type Preset,
+  type PresetWarning,
+  type PromptMessage,
+  type SessionSummary,
+} from '@st/shared';
+import { presetsApi, sessionsApi } from '../../api.js';
 
 export function PresetPreview(props: { preset: Preset }) {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -14,7 +21,8 @@ export function PresetPreview(props: { preset: Preset }) {
   const warnings = parsed.success ? presetWarnings(parsed.data) : [];
 
   useEffect(() => {
-    void api<SessionSummary[]>('/sessions')
+    void sessionsApi
+      .list()
       .then(setSessions)
       .catch(() => {});
   }, []);
@@ -25,14 +33,11 @@ export function PresetPreview(props: { preset: Preset }) {
   const preview = async () => {
     if (!parsed.success) return;
     try {
-      const result = await api<{ messages: PromptMessage[]; warnings: PresetWarning[] }>(
-        '/presets/preview',
-        json('POST', {
-          preset: parsed.data,
-          inputs: samples,
-          ...(sessionId ? { sessionId } : {}),
-        }),
-      );
+      const result = await presetsApi.preview({
+        preset: parsed.data,
+        inputs: samples,
+        ...(sessionId ? { sessionId } : {}),
+      });
       setMessages(result.messages);
       setServerWarnings(result.warnings);
       setPreviewed(true);

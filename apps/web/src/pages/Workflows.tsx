@@ -17,11 +17,11 @@ import {
   type OnEdgesChange,
 } from '@xyflow/react';
 import { canConnect, portDataTypes, type PortDataType, type PortDef } from '@st/shared/ports';
-import type { Workflow, NodeTypeDescriptor, NodeInstance } from '@st/shared';
+import type { Workflow, NodeTypeDescriptor, NodeInstance, ApiResponse } from '@st/shared';
 import { NodeConfigPanel } from '@st/node-ui';
 import { Link } from 'react-router-dom';
 import type { Preset } from '@st/shared';
-import { api, getNodeTypes, getWorkflows, getPresets, getProviders, resolvePorts, json } from '../api.js';
+import { workflowsApi, nodeTypesApi, presetsApi, providersApi } from '../api.js';
 import { alerts } from '../alerts/index.js';
 import { checkConnection } from '../connection.js';
 import { canvasToWorkflow, workflowToCanvas, type CanvasNode } from './workflow-model.js';
@@ -100,7 +100,7 @@ function WorkflowEditor() {
   const [types, setTypes] = useState<NodeTypeDescriptor[]>([]);
   const [typesReady, setTypesReady] = useState(false);
   const [presets, setPresets] = useState<Preset[]>([]);
-  const [providersList, setProvidersList] = useState<{ id: string; label: string }[]>([]);
+  const [providersList, setProvidersList] = useState<ApiResponse<'listProviders'>>([]);
   const [workflow, setWorkflow] = useState<Workflow>();
   const [nodes, setNodes] = useState<CanvasNode[]>([]);
   const [edges, setEdges] = useState<import('@xyflow/react').Edge[]>([]);
@@ -124,17 +124,20 @@ function WorkflowEditor() {
       }),
     [edges, nodes],
   );
-  const refresh = () => getWorkflows().then(setWorkflows);
+  const refresh = () => workflowsApi.list().then(setWorkflows);
   useEffect(() => {
     void refresh().catch(() => {});
-    void getNodeTypes()
+    void nodeTypesApi
+      .list()
       .then(setTypes)
       .catch(() => {})
       .finally(() => setTypesReady(true));
-    void getPresets()
+    void presetsApi
+      .list()
       .then(setPresets)
       .catch(() => {});
-    void getProviders()
+    void providersApi
+      .list()
       .then(setProvidersList)
       .catch(() => {});
   }, []);
@@ -149,7 +152,7 @@ function WorkflowEditor() {
         .map(async (node) => {
           if (!node.data.config.presetId) return undefined;
           try {
-            return { id: node.id, ports: await resolvePorts('llm', node.data.config) };
+            return { id: node.id, ports: await nodeTypesApi.resolvePorts('llm', node.data.config) };
           } catch {
             return { id: node.id, ports: { inputs: [], outputs: node.data.descriptor.outputs } };
           }
@@ -171,7 +174,8 @@ function WorkflowEditor() {
   }, [llmConfigs, presets]);
   useEffect(() => {
     const update = () => {
-      void getPresets()
+      void presetsApi
+        .list()
         .then(setPresets)
         .catch(() => {});
     };
@@ -258,7 +262,7 @@ function WorkflowEditor() {
     const name = window.prompt('Workflow name');
     if (!name?.trim()) return;
     try {
-      const created = await api<Workflow>('/workflows', json('POST', { name }));
+      const created = await workflowsApi.create({ name });
       await refresh();
       load(created);
     } catch {
@@ -269,7 +273,7 @@ function WorkflowEditor() {
     if (!workflow) return false;
     const current = canvasToWorkflow(workflow, nodes, edges);
     try {
-      const updated = await api<Workflow>(`/workflows/${workflow.id}`, json('PUT', current));
+      const updated = await workflowsApi.update(workflow.id, current);
       setWorkflow((prev) => (prev?.id === updated.id ? { ...prev, updatedAt: updated.updatedAt } : prev));
       if (showToast) alerts.success('Workflow saved');
       await refresh();
@@ -282,7 +286,7 @@ function WorkflowEditor() {
     if (!workflow) return;
     try {
       if (!(await save(false))) return;
-      await api(`/workflows/${workflow.id}/validate`, json('POST'));
+      await workflowsApi.validate(workflow.id);
       alerts.success('Workflow is valid');
     } catch {
       /* API errors are toasted. */
@@ -291,7 +295,7 @@ function WorkflowEditor() {
   const remove = async (id: string) => {
     if (!window.confirm('Delete this workflow?')) return;
     try {
-      await api(`/workflows/${id}`, json('DELETE'));
+      await workflowsApi.delete(id);
       if (workflow?.id === id) {
         setWorkflow(undefined);
         setNodes([]);
