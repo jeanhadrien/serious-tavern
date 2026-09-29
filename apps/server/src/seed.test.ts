@@ -24,7 +24,11 @@ it('keeps the built-in preset and entry IDs stable', () => {
 it('renders no blank default entries and preserves the character prompt field order', () => {
   const preset = defaultPreset();
   const templateContext = { trigger: { message: '', sessionId: 'session' }, history: [] };
-  expect(renderPreset(preset, { inputs: { history: [], message: '' }, templateContext })).toEqual([]);
+  const withoutCharacter = renderPreset(preset, { inputs: { history: [], message: '' }, templateContext });
+  expect(withoutCharacter.map(message => message.content.trim())).toEqual([
+    'Write a natural, in-character reply in this fictional chat.'
+  ]);
+  expect(withoutCharacter.every(message => message.content.trim().length > 0)).toBe(true);
   const messages = renderPreset(preset, {
     inputs: { history: [], message: '' },
     templateContext: {
@@ -37,7 +41,8 @@ it('renders no blank default entries and preserves the character prompt field or
     }
   });
   expect(messages.map(message => message.content)).toEqual([
-    'main prompt', 'description', 'personality', 'scenario', 'persona', 'examples', 'after history'
+    'Write a natural, in-character reply in this fictional chat.\nmain prompt',
+    'description', 'personality', 'scenario', 'persona', 'examples', 'after history'
   ]);
 });
 

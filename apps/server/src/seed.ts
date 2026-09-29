@@ -23,7 +23,7 @@ export function defaultPreset(): Preset {
     { id: 'default-message', key: 'message', label: 'User message', dataType: 'text' }
   ], entries: [
     { id: 'default-main-prompt', name: 'Main prompt', enabled: true, kind: 'message', role: 'system',
-      content: '{{char.system_prompt}}',
+      content: 'Write a natural, in-character reply in this fictional chat.\n{{char.system_prompt}}',
       placement: { mode: 'ordered' } },
     { id: 'default-character-description', name: 'Character description', enabled: true, kind: 'message', role: 'system',
       content: '{{char.description}}', placement: { mode: 'ordered' } },
