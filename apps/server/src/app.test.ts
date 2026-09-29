@@ -2,9 +2,11 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { join } from 'node:path';
 import { rm } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { createApp } from './app.js';
 import { placeholderPng, writePngCard } from './card.js';
 import type { Character, Persona } from '@st/shared';
+import { registry } from '@st/engine';
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -111,6 +113,87 @@ it('hides unexpected error stacks and logs them server-side', async () => {
     expect(response.body).not.toContain('sensitive internal details');
     expect(log).toHaveBeenCalled();
   } finally { await app.close(); }
+});
+it('serializes same-session message exchanges and merges concurrent session patches', async () => {
+  const directory = join(process.cwd(), 'data', `test-${randomUUID()}`);
+  directories.push(directory);
+  const histories: string[][] = [];
+  let activeExecutions = 0;
+  let maxConcurrentExecutions = 0;
+  let waitForPair = false;
+  let pairCount = 0;
+  let releasePair!: () => void;
+  const pairStarted = new Promise<void>(resolve => { releasePair = resolve; });
+  registry.set('slow-echo-test', {
+    type: 'slow-echo-test', label: 'Slow echo', description: '', category: 'Tests',
+    inputs: [{ name: 'message', label: 'Message', dataType: 'any' },
+      { name: 'history', label: 'History', dataType: 'any' }],
+    outputs: [{ name: 'reply', label: 'Reply', dataType: 'text' }],
+    configSchema: z.object({}), defaultConfig: {},
+    async execute({ inputs, history }) {
+      histories.push(history.map(message => `${message.role}:${message.content}`));
+      activeExecutions++;
+      maxConcurrentExecutions = Math.max(maxConcurrentExecutions, activeExecutions);
+      try {
+        if (waitForPair) {
+          pairCount++;
+          if (pairCount === 2) releasePair();
+          await Promise.race([pairStarted, new Promise(resolve => setTimeout(resolve, 1000))]);
+        } else await new Promise(resolve => setTimeout(resolve, 30));
+        return { reply: `reply ${String(inputs.message)}` };
+      } finally { activeExecutions--; }
+    }
+  });
+  const app = await createApp(directory, { seed: false });
+  try {
+    const workflow = (await app.inject({ method: 'POST', url: '/api/workflows', payload: { name: 'Slow echo' } })).json();
+    const saved = await app.inject({ method: 'PUT', url: `/api/workflows/${workflow.id}`, payload: {
+      name: 'Slow echo', nodes: [
+        { id: 'input', type: 'chat-input', config: {}, position: { x: 0, y: 0 } },
+        { id: 'echo', type: 'slow-echo-test', config: {}, position: { x: 100, y: 0 } },
+        { id: 'output', type: 'chat-output', config: {}, position: { x: 200, y: 0 } }
+      ], edges: [
+        { id: 'message', source: 'input', sourceHandle: 'message', target: 'echo', targetHandle: 'message' },
+        { id: 'history', source: 'input', sourceHandle: 'history', target: 'echo', targetHandle: 'history' },
+        { id: 'reply', source: 'echo', sourceHandle: 'reply', target: 'output', targetHandle: 'value' }
+      ]
+    } });
+    expect(saved.statusCode).toBe(200);
+    const character = (await app.inject({ method: 'POST', url: '/api/characters', payload: { name: 'Patch target' } })).json();
+    const session = (await app.inject({ method: 'POST', url: '/api/sessions', payload: { workflowId: workflow.id } })).json();
+    const [first, second] = await Promise.all(['first', 'second'].map(content =>
+      app.inject({ method: 'POST', url: `/api/sessions/${session.id}/messages`, payload: { content } })));
+    expect(first!.statusCode).toBe(200);
+    expect(second!.statusCode).toBe(200);
+    expect(histories).toEqual([[], ['user:first', 'assistant:reply first']]);
+    expect((await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json().messages.map(
+      (message: { role: string; content: string }) => `${message.role}:${message.content}`)).toEqual([
+      'user:first', 'assistant:reply first', 'user:second', 'assistant:reply second'
+    ]);
+
+    const sessionTwo = (await app.inject({ method: 'POST', url: '/api/sessions',
+      payload: { workflowId: workflow.id } })).json();
+    waitForPair = true;
+    const crossSession = await Promise.all([
+      app.inject({ method: 'POST', url: `/api/sessions/${session.id}/messages`, payload: { content: 'parallel one' } }),
+      app.inject({ method: 'POST', url: `/api/sessions/${sessionTwo.id}/messages`, payload: { content: 'parallel two' } })
+    ]);
+    expect(crossSession.map(response => response.statusCode)).toEqual([200, 200]);
+    expect(pairCount).toBe(2);
+    expect(maxConcurrentExecutions).toBe(2);
+
+    const [titlePatch, characterPatch] = await Promise.all([
+      app.inject({ method: 'PATCH', url: `/api/sessions/${session.id}`, payload: { title: 'Updated title' } }),
+      app.inject({ method: 'PATCH', url: `/api/sessions/${session.id}`, payload: { characterId: character.id } })
+    ]);
+    expect(titlePatch.statusCode).toBe(200);
+    expect(characterPatch.statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json())
+      .toMatchObject({ title: 'Updated title', characterId: character.id });
+  } finally {
+    registry.delete('slow-echo-test');
+    await app.close();
+  }
 });
 it('supports presets CRUD, preview with a session, dynamic ports, and deletion conflicts', async () => {
   const directory = join(process.cwd(), 'data', `test-${randomUUID()}`);

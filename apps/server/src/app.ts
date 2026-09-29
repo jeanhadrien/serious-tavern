@@ -367,15 +367,16 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
     const { id } = idParam.parse(request.params);
     const body = z.object({ title: z.string().trim().min(1).optional(), workflowId: z.string().uuid().optional(),
       characterId: z.string().uuid().nullable().optional(), personaId: z.string().uuid().nullable().optional() }).parse(request.body);
-    const session = await sessions.get(id);
+    const session = await sessions.update(id, async current => {
+      if (body.workflowId && !await workflows.get(body.workflowId)) throw notFound('Workflow');
+      if (body.characterId && !await characters.get(body.characterId)) throw notFound('Character');
+      if (body.personaId && !await personas.get(body.personaId)) throw notFound('Persona');
+      if (body.characterId === null) delete current.characterId;
+      if (body.personaId === null) delete current.personaId;
+      Object.assign(current, Object.fromEntries(Object.entries(body).filter(([, value]) => value !== null)), { updatedAt: now() });
+      return current;
+    });
     if (!session) throw notFound('Session');
-    if (body.workflowId && !await workflows.get(body.workflowId)) throw notFound('Workflow');
-    if (body.characterId && !await characters.get(body.characterId)) throw notFound('Character');
-    if (body.personaId && !await personas.get(body.personaId)) throw notFound('Persona');
-    if (body.characterId === null) delete session.characterId;
-    if (body.personaId === null) delete session.personaId;
-    Object.assign(session, Object.fromEntries(Object.entries(body).filter(([, value]) => value !== null)), { updatedAt: now() });
-    await sessions.save(session);
     return session;
   });
   app.delete('/api/sessions/:id', async (request, reply) => {
@@ -385,42 +386,48 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
   app.post('/api/sessions/:id/messages', async (request, reply) => {
     const { id } = idParam.parse(request.params);
     const { content } = z.object({ content: z.string().trim().min(1) }).parse(request.body);
-    const session = await sessions.get(id);
-    if (!session) throw notFound('Session');
-    const workflow = await workflows.get(session.workflowId);
-    if (!workflow) throw notFound('Workflow');
-    const errors = await validateWorkflow(workflow, { presets });
-    if (errors.length) throw new HttpError(400, 'WORKFLOW_INVALID', 'Invalid workflow', errors);
-    const history = [...session.messages];
-    const character = session.characterId ? await characters.get(session.characterId) : undefined;
-    const persona = session.personaId ? await personas.get(session.personaId) : undefined;
-    const userMessage = { id: randomUUID(), role: 'user' as const, content, createdAt: now() };
-    session.messages.push(userMessage);
-    session.updatedAt = now();
-    await sessions.save(session);
-    try {
-      const { reply: text, execution } = await executeWorkflow(workflow, {
-        message: content, sessionId: id, history, secrets, resources: { presets }, character, persona
-      });
-      const assistantMessage = { id: randomUUID(), role: 'assistant' as const, content: text, createdAt: now(), executionId: execution.id };
-      session.messages.push(assistantMessage);
-      session.updatedAt = now();
-      await Promise.all([sessions.save(session), executions.save(execution)]);
-      return { userMessage, assistantMessage, execution };
-    } catch (error) {
-      if (error instanceof ExecutionFailure) {
-        await executions.save(error.execution);
-        const failedId = /^Node ([^ ]+) \(/.exec(error.message)?.[1];
-        const failedNode = workflow.nodes.find(node => node.id === failedId);
-        const label = failedNode && registry.get(failedNode.type)?.label;
-        const message = label && failedId
-          ? `${label} (${failedId}): ${error.execution.nodes[failedId]?.error ?? error.message}` : error.message;
-        throw new HttpError(500, 'WORKFLOW_EXECUTION_FAILED', message, {
-          execution: error.execution, userMessage
+    let result: { userMessage: Session['messages'][number]; assistantMessage: Session['messages'][number]; execution: ExecutionLog } | undefined;
+    let failure: unknown;
+    const session = await sessions.update(id, async current => {
+      const workflow = await workflows.get(current.workflowId);
+      if (!workflow) throw notFound('Workflow');
+      const errors = await validateWorkflow(workflow, { presets });
+      if (errors.length) throw new HttpError(400, 'WORKFLOW_INVALID', 'Invalid workflow', errors);
+      const history = [...current.messages];
+      const character = current.characterId ? await characters.get(current.characterId) : undefined;
+      const persona = current.personaId ? await personas.get(current.personaId) : undefined;
+      const userMessage = { id: randomUUID(), role: 'user' as const, content, createdAt: now() };
+      current.messages.push(userMessage);
+      current.updatedAt = now();
+      await sessions.save(current);
+      try {
+        const { reply: text, execution } = await executeWorkflow(workflow, {
+          message: content, sessionId: id, history, secrets, resources: { presets }, character, persona
         });
+        const assistantMessage = { id: randomUUID(), role: 'assistant' as const, content: text,
+          createdAt: now(), executionId: execution.id };
+        current.messages.push(assistantMessage);
+        current.updatedAt = now();
+        await executions.save(execution);
+        result = { userMessage, assistantMessage, execution };
+      } catch (error) {
+        if (error instanceof ExecutionFailure) {
+          await executions.save(error.execution);
+          const failedId = /^Node ([^ ]+) \(/.exec(error.message)?.[1];
+          const failedNode = workflow.nodes.find(node => node.id === failedId);
+          const label = failedNode && registry.get(failedNode.type)?.label;
+          const message = label && failedId
+            ? `${label} (${failedId}): ${error.execution.nodes[failedId]?.error ?? error.message}` : error.message;
+          failure = new HttpError(500, 'WORKFLOW_EXECUTION_FAILED', message, {
+            execution: error.execution, userMessage
+          });
+        } else failure = error;
       }
-      throw error;
-    }
+      return current;
+    });
+    if (!session) throw notFound('Session');
+    if (failure) throw failure;
+    return reply.send(result);
   });
   app.get('/api/executions/:id', async request => {
     const execution = await executions.get(idParam.parse(request.params).id);
