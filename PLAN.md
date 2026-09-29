@@ -21,6 +21,8 @@ Guiding principles: **high modularity**, a **simple baseline** the user can conf
 | **Edge** | Connects an output port of one node to an input port of another. |
 | **Session** | A chat conversation bound to a workflow. Many sessions can use the same workflow. |
 | **Execution** | One run of a workflow for one chat message, with a per-node log (status, duration, output, error). |
+| **Preset** | Defines the final message list sent to an LLM. It is an ordered list of entries, each **enabled** or disabled:<br>• **Fixed messages** (system/user/assistant, templated). They are placed in list order, or inserted *inside* the chat history at a given **depth** from the end.<br>• **Slots**, filled at runtime. A `messages` slot (e.g. `history`) expands to a message list; a `text` slot (e.g. `message`, `context`) becomes one message.<br>Each slot becomes an **input port** on the LLM node that uses the preset, so the workflow decides what fills it. A preset contains only messages; model and samplers live on the LLM node. Edited in its own **Presets** page, with a preview of the rendered messages. |
+| **Provider** | An LLM backend behind a common interface (`chat(messages, model, params)`). The LLM node picks a provider, so it is provider-agnostic. OpenRouter is the first provider. |
 
 ## Key decisions
 
@@ -29,11 +31,14 @@ Guiding principles: **high modularity**, a **simple baseline** the user can conf
   - `packages/engine`: pure TS workflow executor + node registry (no HTTP/storage dependencies).
   - `packages/node-ui`: React config panels, auto-generated from each node's config schema, with optional custom panels.
   - `apps/server`: Fastify backend (API, storage, secrets, execution).
-  - `apps/web`: React + Vite + React Flow frontend (Chat, Workflows, Settings).
+  - `apps/web`: React + Vite + React Flow frontend (Chat, Workflows, Presets, Settings).
 - **Thin frontend, backend owns everything:** workflows, sessions, message history, executions and secrets are all stored and executed server-side. The frontend only holds transient UI state.
 - **Storage:** JSON files on disk (`data/`) for the MVP, behind a repository interface so SQLite/Postgres can be swapped in later.
 - **Secrets / API keys:** entered by the user in the frontend, stored **encrypted** on the backend, and **write-only** (the UI only ever sees a masked hint). Only the engine uses them when calling external APIs.
-- **LLM provider:** OpenRouter (OpenAI-compatible API), which gives access to many models through a single key.
+- **LLM providers:** behind a provider interface. OpenRouter comes first (OpenAI-compatible API, many models through a single key); others can be added without touching the LLM node.
+- **Presets drive prompt assembly:**
+  - The LLM node takes a preset. Its inputs are the preset's slots (dynamic ports).
+  - Chat history reaches the LLM only through a preset slot; there is no "include history" toggle.
 - **Users:** single user for now; auth comes later.
 
 ## Execution model
@@ -50,7 +55,7 @@ Guiding principles: **high modularity**, a **simple baseline** the user can conf
 
 - **Chat Input**: trigger; provides the user message and history.
 - **Chat Output**: produces the final reply.
-- **LLM (OpenRouter)**: model, system prompt, prompt template, temperature, history toggle.
+- **LLM**: provider, model, preset and samplers. Its input ports come from the preset's slots.
 - **HTTP Request**: call any API (method, URL, headers, body; templated).
 - **Condition**: if/else branching on a templated value.
 - **Merge**: joins parallel branches.
@@ -101,9 +106,18 @@ Adding a node type = add one folder in the engine + register it (and optionally 
   2. Add the fixed prompts.
   3. Add depth injections.
   4. Fill chat history from newest to oldest until the token budget runs out.
-- **For us:**
-  - A **Prompt Builder node** (template blocks + history + token budget → messages).
-  - Sampler presets that the LLM node can reference.
+- **Verified** against `default/content/presets/openai/Default.json`:
+  - `prompts[]` with `marker` flags (chatHistory, charDescription, worldInfoBefore/After, personaDescription, dialogueExamples…).
+  - A separate `prompt_order[]` with `enabled` flags.
+  - Sampler settings in the same file.
+- **For us (decided):**
+  - **Presets** merge prompts and order into a single ordered `entries` list.
+  - SillyTavern's markers become typed **slots**, bound to LLM node input ports.
+  - Samplers stay on the LLM node.
+  - Depth injection is supported.
+- **Later:**
+  - Trim history to a token budget.
+  - Import SillyTavern presets.
   - A single **macro engine** (`{{char}}`, `{{user}}`, `{{random::a::b}}`, `{{getvar::x}}`…) with a registry of handlers, applied to all templated fields.
 
 ### Characters, personas, lorebooks *(unverified)*
