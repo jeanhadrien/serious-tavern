@@ -2,16 +2,26 @@
   "name": "serious-tavern",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "dev": "concurrently \"npm run dev -w @st/server\" \"npm run dev -w @st/web\"",
     "build": "npm run typecheck && npm run build -w @st/web",
     "typecheck": "tsc --noEmit -p packages/shared && tsc --noEmit -p packages/engine && tsc --noEmit -p packages/node-ui && tsc --noEmit -p apps/server && tsc --noEmit -p apps/web",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "fix": "biome check --write .",
+    "knip": "knip",
+    "check": "biome check . && npm run typecheck && npm test && npm run knip"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
     "@types/node": "^24.0.0",
     "concurrently": "^9.2.1",
+    "knip": "^6.38.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.3",
     "vitest": "^5.0.2"
