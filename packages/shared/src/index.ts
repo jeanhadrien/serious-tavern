@@ -1,7 +1,10 @@
 import { z } from 'zod';
 import { portDataTypes } from './ports.js';
 export { canConnect, portDataTypes, type PortDataType, type PortDef, type CoercionKind, type ConnectionResult } from './ports.js';
-export { presetSchema, presetEntrySchema, slotKeySchema, presetRoleSchema, type Preset, type PresetEntry, type PromptMessage } from './preset.js';
+export {
+  presetSchema, presetInputSchema, presetEntrySchema, slotKeySchema, presetRoleSchema, presetWarnings,
+  type Preset, type PresetInput, type PresetEntry, type PromptMessage
+} from './preset.js';
 
 export const nodeSchema = z.object({
   id: z.string().min(1), type: z.string().min(1), config: z.record(z.string(), z.unknown()),

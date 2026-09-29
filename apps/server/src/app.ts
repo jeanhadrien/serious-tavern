@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { workflowSchema, presetSchema, type Preset, type Workflow, type Session, type ExecutionLog } from '@st/shared';
+import { workflowSchema, presetSchema, presetWarnings, type Preset, type Workflow, type Session, type ExecutionLog } from '@st/shared';
 import { descriptors, executeWorkflow, ExecutionFailure, registry, validateWorkflow, renderPreset, providers } from '@st/engine';
 import { JsonRepository } from './storage/repository.js';
 import { SecretStore } from './secrets/store.js';
@@ -43,23 +43,23 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
   });
   app.get('/api/presets', async () => presets.list());
   app.post('/api/presets/preview', async request => {
-    const { preset, slots = {}, sessionId } = z.object({
-      preset: presetSchema, slots: z.record(z.string(), z.unknown()).optional(), sessionId: z.string().uuid().optional()
+    const { preset, inputs = {}, sessionId } = z.object({
+      preset: presetSchema, inputs: z.record(z.string(), z.unknown()).optional(), sessionId: z.string().uuid().optional()
     }).parse(request.body);
     const session = sessionId ? await sessions.get(sessionId) : undefined;
     if (sessionId && !session) throw notFound('Session');
-    const values = { ...slots };
+    const values = { ...inputs };
     const sample = [{ role: 'user', content: 'Hello!' }, { role: 'assistant', content: 'Hi! How can I help?' }];
-    for (const entry of preset.entries) {
-      if (entry.kind !== 'slot') continue;
-      if (entry.dataType === 'messages') values[entry.key] = session ? session.messages : sample;
-      else values[entry.key] ??= '<context>';
+    for (const input of preset.inputs) {
+      if (!input.enabled) continue;
+      if (input.dataType === 'messages') values[input.key] ??= session ? session.messages : sample;
+      else values[input.key] ??= `<${input.key}>`;
     }
     try {
-      return { messages: renderPreset(preset, { slots: values, templateContext: {
+      return { messages: renderPreset(preset, { inputs: values, templateContext: {
         trigger: { message: 'Sample message', sessionId: sessionId ?? 'sample-session' },
         history: session?.messages
-      } }) };
+      } }), warnings: presetWarnings(preset) };
     } catch (error) { throw new HttpError(400, 'PRESET_PREVIEW_INVALID', errorMessage(error)); }
   });
   app.post('/api/presets', async (request, reply) => {

@@ -91,11 +91,14 @@ describe('executor', () => {
     expect(events).toContain('node:error');
     expect(events.at(-1)).toBe('execution:complete');
   });
-  it('resolves preset slots and reports edges to removed slots', async () => {
+  it('resolves preset inputs and reports edges to disabled inputs', async () => {
       const preset: Preset = { id: '2b041793-416b-4c94-a541-99ab866230b7', name: 'Dynamic',
-        createdAt: '', updatedAt: '', entries: [
-          { id: 'one', name: 'Prompt', kind: 'slot', enabled: true, key: 'prompt', dataType: 'text', role: 'user' },
-          { id: 'two', name: 'Extra', kind: 'slot', enabled: true, key: 'extra', dataType: 'text', role: 'user' }
+        createdAt: '', updatedAt: '', inputs: [
+          { name: 'Prompt', key: 'prompt', enabled: true, dataType: 'text' },
+          { name: 'Extra', key: 'extra', enabled: true, dataType: 'text' }
+        ], entries: [
+          { id: 'one', name: 'Prompt', kind: 'input', enabled: true, inputKey: 'prompt', role: 'user' },
+          { id: 'two', name: 'Extra', kind: 'input', enabled: true, inputKey: 'extra', role: 'user' }
         ] };
       const resources = { presets: { get: async () => preset } };
       const graph = workflow([node('input', 'chat-input'), node('llm', 'llm', { presetId: preset.id }),
@@ -103,6 +106,7 @@ describe('executor', () => {
         edge('input', 'message', 'llm', 'extra'), edge('llm', 'text', 'output', 'value')
       ]);
       expect(await validateWorkflow(graph, resources)).toEqual([]);
+      preset.inputs[1]!.enabled = false;
       preset.entries[1]!.enabled = false;
       expect((await validateWorkflow(graph, resources)).join(' ')).toContain('invalid input port extra');
   });

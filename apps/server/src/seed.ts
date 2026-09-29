@@ -18,10 +18,13 @@ function makeWorkflow(id: string, name: string, specs: { id: string; type: strin
 }
 export function defaultPreset(): Preset {
   const date = new Date().toISOString();
-  return { id: '5d6c72c7-5185-4963-8227-527f12ef9eea', name: 'Default', entries: [
-    { id: randomUUID(), name: 'Main prompt', enabled: true, kind: 'message', role: 'system', content: 'You are a helpful assistant.', placement: { mode: 'ordered' } },
-    { id: randomUUID(), name: 'History', enabled: true, kind: 'slot', key: 'history', dataType: 'messages', role: 'user' },
-    { id: randomUUID(), name: 'Message', enabled: true, kind: 'slot', key: 'message', dataType: 'text', role: 'user' }
+  return { id: '5d6c72c7-5185-4963-8227-527f12ef9eea', name: 'Default', inputs: [
+    { key: 'history', name: 'History', enabled: true, dataType: 'messages' },
+    { key: 'message', name: 'Message', enabled: true, dataType: 'text' }
+  ], entries: [
+    { id: 'default-main-prompt', name: 'Main prompt', enabled: true, kind: 'message', role: 'system', content: 'You are a helpful assistant.', placement: { mode: 'ordered' } },
+    { id: 'default-history-input', name: 'History', enabled: true, kind: 'input', inputKey: 'history', role: 'user' },
+    { id: 'default-message-input', name: 'Message', enabled: true, kind: 'input', inputKey: 'message', role: 'user' }
   ], createdAt: date, updatedAt: date };
 }
 export async function seed(workflows: Repository<Workflow>, presets: Repository<Preset>): Promise<void> {

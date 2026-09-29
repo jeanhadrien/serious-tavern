@@ -69,9 +69,10 @@ it('supports workflow CRUD, secrets masking, and a chat execution through inject
     const invalidGraph = await app.inject({ method: 'POST', url: `/api/sessions/${created.id}/messages`, payload: { content: 'hi' } });
     expect(invalidGraph.statusCode).toBe(400);
     expect(invalidGraph.json().error).toMatchObject({ code: 'WORKFLOW_INVALID', details: expect.arrayContaining([expect.stringContaining('chat-input')]) });
-    const preset = (await app.inject({ method: 'POST', url: '/api/presets', payload: { name: 'Test', entries: [
-      { kind: 'slot', id: 'message', name: 'Message', enabled: true, key: 'message', dataType: 'text' }
-    ] } })).json();
+    const preset = (await app.inject({ method: 'POST', url: '/api/presets', payload: { name: 'Test',
+      inputs: [{ key: 'message', name: 'Message', dataType: 'text' }],
+      entries: [{ kind: 'input', id: 'message', name: 'Message', enabled: true, inputKey: 'message' }]
+    } })).json();
     await app.inject({ method: 'PUT', url: `/api/workflows/${workflow.id}`, payload: {
       name: 'LLM', nodes: [nodes[0], { id: 'llm', type: 'llm', config: { presetId: preset.id }, position: { x: 100, y: 0 } }, nodes[3]],
       edges: [{ id: 'prompt', source: 'input', sourceHandle: 'message', target: 'llm', targetHandle: 'message' },
@@ -115,22 +116,26 @@ it('supports presets CRUD, preview with a session, dynamic ports, and deletion c
   const app = await createApp(directory, { seed: false });
   try {
     const created = await app.inject({ method: 'POST', url: '/api/presets', payload: {
-      name: 'Demo', entries: [
+      name: 'Demo', inputs: [
+        { key: 'history', name: 'History', dataType: 'messages' },
+        { key: 'message', name: 'Message', dataType: 'text' }
+      ], entries: [
         { id: 'system', kind: 'message', name: 'System', enabled: true, role: 'system',
           content: '{{trigger.message}}' },
-        { id: 'history', kind: 'slot', name: 'History', enabled: true, key: 'history', dataType: 'messages' },
-        { id: 'message', kind: 'slot', name: 'Message', enabled: true, key: 'message', dataType: 'text' }
+        { id: 'history', kind: 'input', name: 'History', enabled: true, inputKey: 'history' },
+        { id: 'message', kind: 'input', name: 'Message', enabled: true, inputKey: 'message' }
       ]
     } });
     expect(created.statusCode).toBe(201);
     const preset = created.json();
     expect((await app.inject({ method: 'GET', url: '/api/presets' })).json()).toHaveLength(1);
     const draft = { ...preset, entries: [...preset.entries, { id: 'note', kind: 'message', name: 'Note',
-      enabled: true, role: 'system', content: 'Last', placement: { mode: 'depth', slot: 'history', depth: 0 } }] };
+      enabled: true, role: 'system', content: 'Last', placement: { mode: 'depth', inputKey: 'history', depth: 0 } }] };
     const updated = await app.inject({ method: 'PUT', url: `/api/presets/${preset.id}`, payload: draft });
     expect(updated.statusCode).toBe(200);
     expect((await app.inject({ method: 'GET', url: `/api/presets/${preset.id}` })).json().entries).toHaveLength(4);
-    const preview = await app.inject({ method: 'POST', url: '/api/presets/preview', payload: { preset: draft, slots: { message: 'Example' } } });
+    const preview = await app.inject({ method: 'POST', url: '/api/presets/preview', payload: { preset: draft, inputs: { message: 'Example' } } });
+    expect(preview.json().warnings).toEqual([]);
     expect(preview.json().messages.map((message: { content: string }) => message.content)).toEqual([
       'Sample message', 'Hello!', 'Hi! How can I help?', 'Last', 'Example'
     ]);
@@ -150,10 +155,25 @@ it('supports presets CRUD, preview with a session, dynamic ports, and deletion c
     } })).json().inputs.map((port: { name: string }) => port.name)).toEqual(['history', 'message']);
     const session = (await app.inject({ method: 'POST', url: '/api/sessions', payload: { workflowId: workflow.id } })).json();
     const withSession = await app.inject({ method: 'POST', url: '/api/presets/preview', payload: {
-      preset: draft, sessionId: session.id, slots: { message: 'With session' }
+      preset: draft, sessionId: session.id, inputs: { message: 'With session' }
     } });
     expect(withSession.json().messages.map((message: { content: string }) => message.content))
       .toEqual(['Sample message', 'Last', 'With session']);
+    const warnedPreview = await app.inject({ method: 'POST', url: '/api/presets/preview', payload: {
+      preset: { ...draft, inputs: [...draft.inputs, { key: 'unused', name: 'Unused', enabled: true, dataType: 'text' }] }
+    } });
+    expect(warnedPreview.json().warnings).toContain('Input "unused" is enabled but is not placed in the message list.');
+    const disabledDraft = { ...draft, inputs: draft.inputs.map((input: { key: string }) =>
+      input.key === 'message' ? { ...input, enabled: false } : input),
+      entries: draft.entries.map((entry: { kind: string; inputKey?: string }) =>
+        entry.kind === 'input' && entry.inputKey === 'message' ? { ...entry, enabled: false } : entry) };
+    expect((await app.inject({ method: 'PUT', url: `/api/presets/${preset.id}`, payload: disabledDraft })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'POST', url: '/api/node-types/llm/ports', payload: {
+      config: { presetId: preset.id }
+    } })).json().inputs.map((port: { name: string }) => port.name)).toEqual(['history']);
+    const staleInputValidation = await app.inject({ method: 'POST', url: `/api/workflows/${workflow.id}/validate` });
+    expect(staleInputValidation.statusCode).toBe(422);
+    expect(staleInputValidation.json().error.details.join(' ')).toContain('invalid input port message');
     const inUse = await app.inject({ method: 'DELETE', url: `/api/presets/${preset.id}` });
     expect(inUse.statusCode).toBe(409);
     expect(inUse.json().error).toEqual({ code: 'PRESET_IN_USE', message: 'Preset is used by workflows', details: ['Using demo'] });

@@ -1,7 +1,7 @@
 import { canConnect, presetSchema, type Preset, type PromptMessage } from '@st/shared';
 import { renderTemplate } from './template.js';
 
-function slotText(value: unknown): string {
+function toText(value: unknown, dataType: 'messages' | 'text'): string {
   if (value == null) return '';
   const messages = Array.isArray(value) && value.every(item => item && typeof item === 'object' &&
     typeof item.role === 'string' && typeof item.content === 'string');
@@ -11,56 +11,59 @@ function slotText(value: unknown): string {
   if (!compatibility.ok) throw new Error(compatibility.reason);
   if (compatibility.coerce === 'messages-to-text') return (value as PromptMessage[])
     .map(message => `${message.role}: ${message.content}`).join('\n');
+  if (dataType === 'messages' && Array.isArray(value))
+    throw new Error('Messages input requires messages with role and content');
   return typeof value === 'string' ? value : typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
 }
 
 export function renderPreset(preset: Preset, options: {
-  slots: Record<string, unknown>;
+  inputs: Record<string, unknown>;
   templateContext: { trigger: { message: string; sessionId: string }; history?: unknown[] };
 }): PromptMessage[] {
   const valid = presetSchema.parse(preset);
   const result: PromptMessage[] = [];
+  const activeInputs = new Map(valid.inputs.filter(input => input.enabled).map(input => [input.key, input]));
   const injections = new Map<string, { depth: number; message: PromptMessage }[]>();
-  for (const entry of valid.entries) {
-    if (!entry.enabled || entry.kind !== 'message') continue;
+  const renderMessage = (entry: Extract<Preset['entries'][number], { kind: 'message' }>) => {
     const content = renderTemplate(entry.content, {
-      inputs: options.slots, trigger: options.templateContext.trigger,
+      inputs: options.inputs, trigger: options.templateContext.trigger,
       history: (options.templateContext.history ?? []) as never[]
     });
-    if (!content.trim()) continue;
-    const message = { role: entry.role, content };
-    if (entry.placement.mode === 'ordered') continue;
-    const list = injections.get(entry.placement.slot) ?? [];
+    return content.trim() ? { role: entry.role, content } : undefined;
+  };
+  for (const entry of valid.entries) {
+    if (!entry.enabled || entry.kind !== 'message' || entry.placement.mode !== 'depth') continue;
+    const message = renderMessage(entry);
+    if (!message) continue;
+    const list = injections.get(entry.placement.inputKey) ?? [];
     list.push({ depth: entry.placement.depth, message });
-    injections.set(entry.placement.slot, list);
+    injections.set(entry.placement.inputKey, list);
   }
   for (const entry of valid.entries) {
     if (!entry.enabled) continue;
     if (entry.kind === 'message') {
       if (entry.placement.mode === 'ordered') {
-        const content = renderTemplate(entry.content, {
-          inputs: options.slots, trigger: options.templateContext.trigger,
-          history: (options.templateContext.history ?? []) as never[]
-        });
-        if (content.trim()) result.push({ role: entry.role, content });
+        const message = renderMessage(entry);
+        if (message) result.push(message);
       }
       continue;
     }
-    if (entry.dataType === 'text') {
-      const text = slotText(options.slots[entry.key]);
+    const input = activeInputs.get(entry.inputKey)!;
+    const value = options.inputs[entry.inputKey];
+    if (input.dataType === 'text') {
+      const text = toText(value, input.dataType);
       if (text.trim()) result.push({ role: entry.role, content: text });
       continue;
     }
-    const value = options.slots[entry.key];
-    if (value != null && !Array.isArray(value)) throw new Error(`Slot ${entry.key} requires messages`);
+    if (value != null && !Array.isArray(value)) throw new Error(`Input ${input.key} requires messages`);
     const messages: PromptMessage[] = (value ?? []).map((message: unknown) => {
       const parsed = message as PromptMessage;
       if (!parsed || !['system', 'user', 'assistant'].includes(parsed.role) || typeof parsed.content !== 'string')
-        throw new Error(`Slot ${entry.key} requires messages with role and content`);
+        throw new Error(`Input ${input.key} requires messages with role and content`);
       return { role: parsed.role, content: parsed.content };
     });
     const buckets = new Map<number, PromptMessage[]>();
-    for (const injection of injections.get(entry.key) ?? []) {
+    for (const injection of injections.get(input.key) ?? []) {
       const position = Math.max(0, messages.length - injection.depth);
       buckets.set(position, [...(buckets.get(position) ?? []), injection.message]);
     }

@@ -7,10 +7,11 @@ import { openrouter } from './providers/openrouter.js';
 import type { ExecutionContext } from './types.js';
 
 const preset: Preset = { id: '8f1fe1a9-3480-4e52-834c-f25d90684d71', name: 'Test', createdAt: '', updatedAt: '',
+  inputs: [{ name: 'Prompt', key: 'prompt', enabled: true, dataType: 'text' }],
   entries: [
     { kind: 'message', id: 'system', name: 'System', enabled: true, role: 'system',
       content: 'Hello {{trigger.message}}', placement: { mode: 'ordered' } },
-    { kind: 'slot', id: 'prompt', name: 'Prompt', enabled: true, key: 'prompt', dataType: 'text', role: 'user' }
+    { kind: 'input', id: 'prompt', name: 'Prompt', enabled: true, inputKey: 'prompt', role: 'user' }
   ] };
 const ctx = (config: Record<string, unknown>): ExecutionContext => ({
   config, inputs: { input: 'hi', prompt: 'What is up?' }, trigger: { message: 'hello', sessionId: 's' },

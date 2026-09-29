@@ -19,8 +19,8 @@ export const llm: NodeDefinition = {
   async resolvePorts(config, resources) {
     const preset = await resources.presets.get(String(config.presetId ?? ''));
     if (!preset) throw new Error(`Preset ${config.presetId || '(none)'} not found`);
-    return { inputs: preset.entries.filter((entry): entry is Extract<typeof entry, { kind: 'slot' }> => entry.kind === 'slot' && entry.enabled)
-      .map(entry => ({ name: entry.key, label: entry.name, dataType: entry.dataType })),
+    return { inputs: preset.inputs.filter(input => input.enabled)
+      .map(input => ({ name: input.key, label: input.name, dataType: input.dataType, description: input.description })),
       outputs: llm.outputs };
   },
   async execute(ctx) {
@@ -30,7 +30,7 @@ export const llm: NodeDefinition = {
     if (!preset) throw new Error(`Preset ${ctx.config.presetId} not found`);
     const key = await ctx.secrets.get(provider.secretName);
     if (!key) throw new Error(`Missing ${provider.secretName} secret. Add it in Settings.`);
-    const messages = renderPreset(preset, { slots: ctx.inputs, templateContext: { trigger: ctx.trigger, history: ctx.history } });
+    const messages = renderPreset(preset, { inputs: ctx.inputs, templateContext: { trigger: ctx.trigger, history: ctx.history } });
     const request = {
       model: String(ctx.config.model), messages, temperature: Number(ctx.config.temperature),
       maxTokens: Number(ctx.config.maxTokens),

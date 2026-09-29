@@ -2,7 +2,15 @@ import { expect, it } from 'vitest';
 import type { Workflow, Preset } from '@st/shared';
 import { validateWorkflow } from '@st/engine';
 import type { Repository } from './storage/repository.js';
-import { seed } from './seed.js';
+import { defaultPreset, seed } from './seed.js';
+
+it('keeps the built-in preset and entry IDs stable', () => {
+  const first = defaultPreset();
+  const second = defaultPreset();
+  expect(first.id).toBe('5d6c72c7-5185-4963-8227-527f12ef9eea');
+  expect(first.entries.map(entry => entry.id)).toEqual(second.entries.map(entry => entry.id));
+  expect(first.inputs.map(input => input.key)).toEqual(['history', 'message']);
+});
 
 it('seeds two valid workflows only once', async () => {
   const items = new Map<string, Workflow>();
