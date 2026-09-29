@@ -35,7 +35,7 @@ export const personaImportResultSchema = z.object({
   failed: z.array(importFailureSchema),
 });
 // Card extensions are flattened into the export alongside the known card fields.
-export const characterCardDataSchema = characterFieldsSchema.catchall(z.unknown());
+export const characterCardDataSchema = characterFieldsSchema.omit({ extensions: true }).catchall(z.unknown());
 export const characterExportQuerySchema = z.object({ format: z.enum(['png', 'json']).default('json') });
 export const entityEndpoints = {
   listCharacters: endpoint(z.array(characterSchema)),

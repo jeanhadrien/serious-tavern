@@ -1,13 +1,15 @@
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import type { FastifyReply } from 'fastify';
+import { extname, join } from 'node:path';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import { binarySchema } from '@st/shared';
 import { HttpError } from './errors.js';
 
 export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 export type UploadedFile = { name: string; mime: string; data: Buffer };
 
-export function parseMultipart(body: unknown, contentType: string): UploadedFile[] {
+function parseMultipart(body: unknown, contentType: string): UploadedFile[] {
   if (!Buffer.isBuffer(body)) throw new HttpError(400, 'INVALID_UPLOAD', 'Expected a multipart file upload');
+  binarySchema.parse(body);
   const boundary = /(?:^|;)\s*boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType);
   if (!boundary) throw new HttpError(400, 'INVALID_UPLOAD', 'Multipart boundary is missing');
   const marker = Buffer.from(`--${(boundary[1] ?? boundary[2]!).trim()}`);
@@ -39,10 +41,41 @@ export function parseMultipart(body: unknown, contentType: string): UploadedFile
         mime: /content-type:\s*([^\r\n;]+)/i.exec(headers)?.[1]?.trim().toLowerCase() ?? 'application/octet-stream',
       });
     }
+
     cursor = next;
   }
   if (!files.length) throw new HttpError(400, 'INVALID_UPLOAD', 'No files were uploaded');
   return files;
+}
+
+export function normalizeImage(file: UploadedFile): UploadedFile {
+  if (file.mime !== 'application/octet-stream') return file;
+  const suffix = extname(file.name).toLowerCase();
+  const mime = (
+    {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+    } as Record<string, string>
+  )[suffix];
+  return { ...file, mime: mime ?? file.mime };
+}
+
+export const uploadedFiles = (request: FastifyRequest) =>
+  parseMultipart(request.body, String(request.headers['content-type'] ?? ''));
+
+export function parseImageRequest(request: FastifyRequest): UploadedFile {
+  if (
+    String(request.headers['content-type'] ?? '')
+      .toLowerCase()
+      .startsWith('multipart/')
+  )
+    return normalizeImage(uploadedFiles(request)[0]!);
+  if (!Buffer.isBuffer(request.body)) throw new HttpError(400, 'INVALID_UPLOAD', 'Expected an image upload');
+  binarySchema.parse(request.body);
+  return normalizeImage({ name: 'avatar', mime: String(request.headers['content-type'] ?? ''), data: request.body });
 }
 
 export function imageExtension(mime: string): string {

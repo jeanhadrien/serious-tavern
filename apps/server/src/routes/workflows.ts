@@ -1,0 +1,50 @@
+import { randomUUID } from 'node:crypto';
+import type { FastifyInstance } from 'fastify';
+import { apiContract, type ApiResponse } from '@st/shared';
+import { validateWorkflow } from '@st/engine';
+import { now, type AppContext } from '../context.js';
+import { HttpError, requireEntity } from '../errors.js';
+import type { ApiRoute } from './types.js';
+
+export function registerWorkflows(app: FastifyInstance, { workflows, sessions, presets }: AppContext) {
+  app.get<ApiRoute<'listWorkflows'>>('/api/workflows', async () => workflows.list());
+  app.post<ApiRoute<'createWorkflow'>>('/api/workflows', async (request, reply) => {
+    const body = apiContract.createWorkflow.body.parse(request.body);
+    const date = now();
+    const workflow: ApiResponse<'createWorkflow'> = {
+      id: randomUUID(),
+      name: body.name,
+      nodes: [],
+      edges: [],
+      createdAt: date,
+      updatedAt: date,
+    };
+    await workflows.save(workflow);
+    return reply.code(201).send(workflow);
+  });
+  app.get<ApiRoute<'getWorkflow'>>('/api/workflows/:id', async (request) =>
+    requireEntity(workflows, apiContract.getWorkflow.params.parse(request.params).id, 'Workflow'),
+  );
+  app.put<ApiRoute<'updateWorkflow'>>('/api/workflows/:id', async (request) => {
+    const { id } = apiContract.updateWorkflow.params.parse(request.params);
+    const old = await requireEntity(workflows, id, 'Workflow');
+    const body = apiContract.updateWorkflow.body.parse(request.body);
+    const workflow = { ...old, ...body, updatedAt: now() };
+    await workflows.save(workflow);
+    return workflow;
+  });
+  app.delete<ApiRoute<'deleteWorkflow'>>('/api/workflows/:id', async (request, reply) => {
+    const { id } = apiContract.deleteWorkflow.params.parse(request.params);
+    if ((await sessions.list()).some((s) => s.workflowId === id))
+      throw new HttpError(409, 'WORKFLOW_IN_USE', 'Workflow is used by a session');
+    await workflows.delete(id);
+    return reply.code(204).send();
+  });
+  app.post<ApiRoute<'validateWorkflow'>>('/api/workflows/:id/validate', async (request) => {
+    const { id } = apiContract.validateWorkflow.params.parse(request.params);
+    const workflow = await requireEntity(workflows, id, 'Workflow');
+    const errors = await validateWorkflow(workflow, { presets });
+    if (errors.length) throw new HttpError(422, 'WORKFLOW_INVALID', 'Invalid workflow', errors);
+    return { valid: true, errors: [] };
+  });
+}

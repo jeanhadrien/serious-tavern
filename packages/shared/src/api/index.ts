@@ -21,6 +21,7 @@ export const apiContract = {
 };
 export type ApiEndpoint = keyof typeof apiContract;
 export type ApiBody<K extends ApiEndpoint> = z.input<(typeof apiContract)[K]['body']>;
+export type ApiParsedBody<K extends ApiEndpoint> = z.output<(typeof apiContract)[K]['body']>;
 export type ApiParams<K extends ApiEndpoint> = z.input<(typeof apiContract)[K]['params']>;
 export type ApiQuery<K extends ApiEndpoint> = z.input<(typeof apiContract)[K]['query']>;
 export type ApiResponse<K extends ApiEndpoint> = z.output<(typeof apiContract)[K]['response']>;

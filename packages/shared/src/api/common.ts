@@ -7,7 +7,7 @@ export const errorEnvelopeSchema = z.object({
 export type ErrorEnvelope = z.infer<typeof errorEnvelopeSchema>;
 
 // Upload bodies and binary responses are bytes on the wire, not JSON.
-export const binarySchema = z.instanceof(Uint8Array);
+export const binarySchema = z.custom<Uint8Array>((value) => value instanceof Uint8Array);
 export const noContentSchema = z.undefined();
 const emptySchema = z.object({});
 const noBodySchema = z.unknown();

@@ -5,13 +5,167 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { createApp } from './app.js';
 import { placeholderPng, writePngCard } from './card.js';
-import type { Character, Persona } from '@st/shared';
+import {
+  apiContract,
+  errorEnvelopeSchema,
+  type ApiEndpoint,
+  type ApiResponse,
+  type Character,
+  type Persona,
+} from '@st/shared';
+import type { InjectOptions } from 'fastify';
 import { registry } from '@st/engine';
 
 const directories: string[] = [];
 afterEach(async () => {
   vi.restoreAllMocks();
   await Promise.all(directories.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+});
+it('returns payloads conforming to every shared endpoint response contract', async () => {
+  const directory = join(process.cwd(), '.test-data', `test-${randomUUID()}`);
+  directories.push(directory);
+  const app = await createApp(directory, { seed: false });
+  const covered = new Set<ApiEndpoint>();
+  const request = async <K extends ApiEndpoint>(key: K, options: InjectOptions): Promise<ApiResponse<K>> => {
+    const response = await app.inject(options);
+    expect(response.statusCode, `${key}: ${response.body}`).toBeGreaterThanOrEqual(200);
+    expect(response.statusCode, `${key}: ${response.body}`).toBeLessThan(300);
+    const payload =
+      response.statusCode === 204
+        ? undefined
+        : String(response.headers['content-type']).includes('application/json')
+          ? response.json()
+          : response.rawPayload;
+    covered.add(key);
+    return apiContract[key].response.parse(payload) as ApiResponse<K>;
+  };
+  try {
+    await request('listNodeTypes', { method: 'GET', url: '/api/node-types' });
+    await request('listProviders', { method: 'GET', url: '/api/providers' });
+    const workflow = await request('createWorkflow', {
+      method: 'POST',
+      url: '/api/workflows',
+      payload: { name: 'Contract echo' },
+    });
+    await request('updateWorkflow', {
+      method: 'PUT',
+      url: `/api/workflows/${workflow.id}`,
+      payload: {
+        name: 'Contract echo',
+        nodes: [
+          { id: 'input', type: 'chat-input', config: {}, position: { x: 0, y: 0 } },
+          { id: 'output', type: 'chat-output', config: {}, position: { x: 100, y: 0 } },
+        ],
+        edges: [{ id: 'reply', source: 'input', sourceHandle: 'message', target: 'output', targetHandle: 'value' }],
+      },
+    });
+    await request('getWorkflow', { method: 'GET', url: `/api/workflows/${workflow.id}` });
+    await request('listWorkflows', { method: 'GET', url: '/api/workflows' });
+    await request('validateWorkflow', { method: 'POST', url: `/api/workflows/${workflow.id}/validate` });
+    const preset = await request('createPreset', {
+      method: 'POST',
+      url: '/api/presets',
+      payload: { name: 'Contract preset', inputs: [], entries: [] },
+    });
+    await request('updatePreset', { method: 'PUT', url: `/api/presets/${preset.id}`, payload: preset });
+    await request('getPreset', { method: 'GET', url: `/api/presets/${preset.id}` });
+    await request('listPresets', { method: 'GET', url: '/api/presets' });
+    await request('resolvePorts', {
+      method: 'POST',
+      url: '/api/node-types/llm/ports',
+      payload: { config: { presetId: preset.id } },
+    });
+    const character = await request('createCharacter', {
+      method: 'POST',
+      url: '/api/characters',
+      payload: { name: 'Contract character' },
+    });
+    await request('updateCharacter', { method: 'PUT', url: `/api/characters/${character.id}`, payload: character });
+    await request('getCharacter', { method: 'GET', url: `/api/characters/${character.id}` });
+    await request('listCharacters', { method: 'GET', url: '/api/characters' });
+    const persona = await request('createPersona', {
+      method: 'POST',
+      url: '/api/personas',
+      payload: { name: 'Contract persona' },
+    });
+    await request('updatePersona', { method: 'PUT', url: `/api/personas/${persona.id}`, payload: persona });
+    await request('getPersona', { method: 'GET', url: `/api/personas/${persona.id}` });
+    await request('listPersonas', { method: 'GET', url: '/api/personas' });
+    for (const [resource, id, updateKey, getKey] of [
+      ['characters', character.id, 'updateCharacterAvatar', 'getCharacterAvatar'],
+      ['personas', persona.id, 'updatePersonaAvatar', 'getPersonaAvatar'],
+    ] as const) {
+      await request(updateKey, {
+        method: 'PUT',
+        url: `/api/${resource}/${id}/avatar`,
+        headers: { 'content-type': 'image/png' },
+        payload: placeholderPng(),
+      });
+      await request(getKey, { method: 'GET', url: `/api/${resource}/${id}/avatar` });
+    }
+    await request('exportCharacter', { method: 'GET', url: `/api/characters/${character.id}/export?format=json` });
+    await request('exportCharacter', { method: 'GET', url: `/api/characters/${character.id}/export?format=png` });
+    const cards = multipart([
+      { filename: 'card.json', mime: 'application/json', data: Buffer.from('{"name":"Imported"}') },
+    ]);
+    await request('importCharacters', {
+      method: 'POST',
+      url: '/api/characters/import',
+      payload: cards.payload,
+      headers: { 'content-type': `multipart/form-data; boundary=${cards.boundary}` },
+    });
+    const images = multipart([{ filename: 'persona.png', mime: 'image/png', data: placeholderPng() }]);
+    await request('importPersonas', {
+      method: 'POST',
+      url: '/api/personas/import',
+      payload: images.payload,
+      headers: { 'content-type': `multipart/form-data; boundary=${images.boundary}` },
+    });
+    const session = await request('createSession', {
+      method: 'POST',
+      url: '/api/sessions',
+      payload: { workflowId: workflow.id, characterId: character.id, personaId: persona.id },
+    });
+    await request('updateSession', {
+      method: 'PATCH',
+      url: `/api/sessions/${session.id}`,
+      payload: { title: 'Contract chat' },
+    });
+    const message = await request('sendMessage', {
+      method: 'POST',
+      url: `/api/sessions/${session.id}/messages`,
+      payload: { content: 'Contract reply' },
+    });
+    expect(message.assistantMessage.content).toBe('Contract reply');
+    const sessions = await request('listSessions', { method: 'GET', url: '/api/sessions' });
+    expect(sessions[0]?.messageCount).toBe(2);
+    await request('getSession', { method: 'GET', url: `/api/sessions/${session.id}` });
+    await request('getExecution', { method: 'GET', url: `/api/executions/${message.execution.id}` });
+    await request('previewPreset', {
+      method: 'POST',
+      url: '/api/presets/preview',
+      payload: { preset, sessionId: session.id },
+    });
+    await request('setSecret', { method: 'PUT', url: '/api/secrets/contract', payload: { value: 'secret-value' } });
+    await request('listSecrets', { method: 'GET', url: '/api/secrets' });
+    await request('deleteSecret', { method: 'DELETE', url: '/api/secrets/contract' });
+    await request('deleteSession', { method: 'DELETE', url: `/api/sessions/${session.id}` });
+    await request('deleteWorkflow', { method: 'DELETE', url: `/api/workflows/${workflow.id}` });
+    await request('deletePreset', { method: 'DELETE', url: `/api/presets/${preset.id}` });
+    await request('deleteCharacter', { method: 'DELETE', url: `/api/characters/${character.id}` });
+    await request('deletePersona', { method: 'DELETE', url: `/api/personas/${persona.id}` });
+    expect([...covered].sort()).toEqual(Object.keys(apiContract).sort());
+    for (const options of [
+      { method: 'GET', url: `/api/sessions/${randomUUID()}` },
+      { method: 'POST', url: '/api/sessions', payload: {} },
+    ] as const) {
+      const response = await app.inject(options);
+      expect(response.statusCode).toBeGreaterThanOrEqual(400);
+      errorEnvelopeSchema.parse(response.json());
+    }
+  } finally {
+    await app.close();
+  }
 });
 it('supports workflow CRUD, secrets masking, and a chat execution through inject', async () => {
   const directory = join(process.cwd(), '.test-data', `test-${randomUUID()}`);
