@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Workflow, NodeTypeDescriptor } from '@st/shared';
-import { canvasToWorkflow, workflowToCanvas } from './workflow-model.js';
+import { canvasToWorkflow, workflowToCanvas } from './model.js';
 
 const workflow: Workflow = {
   id: 'workflow',

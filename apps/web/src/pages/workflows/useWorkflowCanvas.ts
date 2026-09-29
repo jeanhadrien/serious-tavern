@@ -1,0 +1,173 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  addEdge,
+  applyNodeChanges,
+  applyEdgeChanges,
+  useReactFlow,
+  type Connection,
+  type OnNodesChange,
+  type OnEdgesChange,
+  type Edge,
+  type ReactFlow,
+} from '@xyflow/react';
+import type { Workflow, NodeTypeDescriptor, NodeInstance, Preset } from '@st/shared';
+import { nodeTypesApi } from '../../api.js';
+import { alerts } from '../../alerts/index.js';
+import { checkConnection } from '../../connection.js';
+import { workflowToCanvas, type CanvasNode } from './model.js';
+
+export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]) {
+  const [nodes, setNodes] = useState<CanvasNode[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
+  const [selected, setSelected] = useState<string>();
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const { screenToFlowPosition } = useReactFlow();
+  const visibleEdges = useMemo(
+    () =>
+      edges.map((edge) => {
+        const result = checkConnection(edge, nodes);
+        return {
+          ...edge,
+          label: !result.ok ? 'incompatible' : result.coerce ? '→text' : undefined,
+          labelStyle: { fill: result.ok ? '#efcf9b' : '#ff8b93', fontSize: 11 },
+          style: !result.ok
+            ? { stroke: '#ef8186', strokeWidth: 2 }
+            : result.coerce
+              ? { stroke: '#e6bb77', strokeWidth: 2, strokeDasharray: '6 4' }
+              : undefined,
+        };
+      }),
+    [edges, nodes],
+  );
+  const llmConfigs = JSON.stringify(
+    nodes.filter((node) => node.data.descriptor.type === 'llm').map((node) => [node.id, node.data.config.presetId]),
+  );
+  useEffect(() => {
+    let active = true;
+    void Promise.all(
+      nodes
+        .filter((node) => node.data.descriptor.type === 'llm')
+        .map(async (node) => {
+          if (!node.data.config.presetId) return undefined;
+          try {
+            return { id: node.id, ports: await nodeTypesApi.resolvePorts('llm', node.data.config) };
+          } catch {
+            return { id: node.id, ports: { inputs: [], outputs: node.data.descriptor.outputs } };
+          }
+        }),
+    ).then((results) => {
+      if (!active) return;
+      setNodes((previous) =>
+        previous.map((node) => {
+          const result = results.find((item) => item?.id === node.id);
+          if (!result || JSON.stringify(node.data.descriptor.inputs) === JSON.stringify(result.ports.inputs))
+            return node;
+          return { ...node, data: { ...node.data, descriptor: { ...node.data.descriptor, ...result.ports } } };
+        }),
+      );
+    });
+    return () => {
+      active = false;
+    };
+  }, [llmConfigs, presets]);
+  const load = (next: Workflow) => {
+    const canvas = workflowToCanvas(next, types);
+    setNodes(canvas.nodes);
+    setEdges(canvas.edges);
+    setSelected(undefined);
+    if (canvas.unknownTypes.length)
+      alerts.warning(`Unknown node types are preserved read-only: ${canvas.unknownTypes.join(', ')}`);
+  };
+  const clear = () => {
+    setNodes([]);
+    setEdges([]);
+    setSelected(undefined);
+  };
+  const onNodesChange: OnNodesChange<CanvasNode> = useCallback((changes) => {
+    setNodes((prev) => applyNodeChanges(changes, prev));
+    const removed = changes.filter((change) => change.type === 'remove').map((change) => change.id);
+    if (removed.length) {
+      setEdges((prev) => prev.filter((e) => !removed.includes(e.source) && !removed.includes(e.target)));
+      setSelected((prev) => (prev && removed.includes(prev) ? undefined : prev));
+    }
+  }, []);
+  const onEdgesChange: OnEdgesChange = useCallback((changes) => {
+    setEdges((prev) => applyEdgeChanges(changes, prev));
+  }, []);
+  const connect = useCallback(
+    (connection: Connection) => {
+      if (!connection.sourceHandle || !connection.targetHandle) return;
+      const result = checkConnection(connection, nodes);
+      if (!result.ok) {
+        alerts.info(result.reason);
+        return;
+      }
+      setEdges((prev) =>
+        addEdge(
+          { ...connection, id: crypto.randomUUID() },
+          prev.filter((e) => e.target !== connection.target || e.targetHandle !== connection.targetHandle),
+        ),
+      );
+    },
+    [nodes],
+  );
+  const onConnectEnd: React.ComponentProps<typeof ReactFlow>['onConnectEnd'] = (_, state) => {
+    if (state.isValid !== false || !state.fromHandle || !state.toHandle) return;
+    const source = state.fromHandle.type === 'source' ? state.fromHandle : state.toHandle;
+    const target = state.fromHandle.type === 'target' ? state.fromHandle : state.toHandle;
+    const result = checkConnection(
+      {
+        source: source.nodeId,
+        sourceHandle: source.id ?? null,
+        target: target.nodeId,
+        targetHandle: target.id ?? null,
+      },
+      nodes,
+    );
+    if (!result.ok) alerts.info(result.reason);
+  };
+  const addNode = (descriptor: NodeTypeDescriptor, position: { x: number; y: number }) => {
+    setNodes((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        type: 'workflow',
+        position,
+        data: { descriptor, config: { ...descriptor.defaultConfig } },
+      },
+    ]);
+  };
+  const addAtCenter = (descriptor: NodeTypeDescriptor) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const position = screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+    addNode(descriptor, { x: position.x - 90, y: position.y - 40 });
+  };
+  const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const type = event.dataTransfer.getData('application/st-node-type');
+    const descriptor = types.find((item) => item.type === type);
+    if (descriptor) addNode(descriptor, screenToFlowPosition({ x: event.clientX, y: event.clientY }));
+  };
+  const current = nodes.find((n) => n.id === selected);
+  const updateConfig = (config: NodeInstance['config']) => {
+    setNodes((prev) => prev.map((n) => (n.id === selected ? { ...n, data: { ...n.data, config } } : n)));
+  };
+  return {
+    nodes,
+    edges,
+    visibleEdges,
+    current,
+    canvasRef,
+    setSelected,
+    load,
+    clear,
+    onNodesChange,
+    onEdgesChange,
+    connect,
+    onConnectEnd,
+    addAtCenter,
+    onDrop,
+    updateConfig,
+  };
+}
