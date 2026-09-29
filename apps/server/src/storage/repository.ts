@@ -12,7 +12,11 @@ export interface Repository<T extends { id: string }> {
 export async function atomicWrite(path: string, content: string): Promise<void> {
   const temp = `${path}.${randomUUID()}.tmp`;
   await writeFile(temp, content, { flag: 'wx' });
-  try { await rename(temp, path); } finally { await rm(temp, { force: true }); }
+  try {
+    await rename(temp, path);
+  } finally {
+    await rm(temp, { force: true });
+  }
 }
 export class JsonRepository<T extends { id: string }> implements Repository<T> {
   private readonly locks = new Map<string, Promise<void>>();
@@ -23,12 +27,16 @@ export class JsonRepository<T extends { id: string }> implements Repository<T> {
   }
   async list(): Promise<T[]> {
     await mkdir(this.directory, { recursive: true });
-    const files = (await readdir(this.directory)).filter(name => name.endsWith('.json'));
-    return Promise.all(files.map(async name => JSON.parse(await readFile(join(this.directory, name), 'utf8')) as T));
+    const files = (await readdir(this.directory)).filter((name) => name.endsWith('.json'));
+    return Promise.all(files.map(async (name) => JSON.parse(await readFile(join(this.directory, name), 'utf8')) as T));
   }
   async get(id: string): Promise<T | undefined> {
-    try { return JSON.parse(await readFile(this.path(id), 'utf8')) as T; }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined; throw error; }
+    try {
+      return JSON.parse(await readFile(this.path(id), 'utf8')) as T;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+      throw error;
+    }
   }
   async save(item: T): Promise<void> {
     await mkdir(this.directory, { recursive: true });
@@ -50,11 +58,14 @@ export class JsonRepository<T extends { id: string }> implements Repository<T> {
   private async withLock<R>(id: string, action: () => Promise<R>): Promise<R> {
     const previous = this.locks.get(id) ?? Promise.resolve();
     let release!: () => void;
-    const current = new Promise<void>(resolve => { release = resolve; });
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     this.locks.set(id, current);
     await previous;
-    try { return await action(); }
-    finally {
+    try {
+      return await action();
+    } finally {
       release();
       if (this.locks.get(id) === current) this.locks.delete(id);
     }

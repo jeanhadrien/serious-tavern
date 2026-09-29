@@ -2,14 +2,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AlertStore } from './store.js';
 
 let store: AlertStore;
-beforeEach(() => { vi.useFakeTimers(); store = new AlertStore(); });
-afterEach(() => { store.clear(); vi.useRealTimers(); });
+beforeEach(() => {
+  vi.useFakeTimers();
+  store = new AlertStore();
+});
+afterEach(() => {
+  store.clear();
+  vi.useRealTimers();
+});
 describe('alert store', () => {
   it('adds and dismisses alerts, notifying subscribers', () => {
     const listener = vi.fn();
     const unsubscribe = store.subscribe(listener);
     const id = store.error('Failed', { title: 'Error', details: 'trace' });
-    expect(store.getSnapshot()[0]).toMatchObject({ id, level: 'error', title: 'Error', details: 'trace', count: 1, timeoutMs: 0 });
+    expect(store.getSnapshot()[0]).toMatchObject({
+      id,
+      level: 'error',
+      title: 'Error',
+      details: 'trace',
+      count: 1,
+      timeoutMs: 0,
+    });
     vi.advanceTimersByTime(60_000);
     expect(store.getSnapshot()).toHaveLength(1);
     store.dismiss(id);
@@ -40,7 +53,13 @@ describe('alert store', () => {
   });
   it('caps the visible alerts at five', () => {
     for (let i = 0; i < 7; i++) store.info(`Message ${i}`);
-    expect(store.getSnapshot().map(item => item.message)).toEqual(['Message 2', 'Message 3', 'Message 4', 'Message 5', 'Message 6']);
+    expect(store.getSnapshot().map((item) => item.message)).toEqual([
+      'Message 2',
+      'Message 3',
+      'Message 4',
+      'Message 5',
+      'Message 6',
+    ]);
     store.clear();
     expect(store.getSnapshot()).toHaveLength(0);
   });

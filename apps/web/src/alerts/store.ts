@@ -1,7 +1,13 @@
 export type AlertLevel = 'error' | 'success' | 'info' | 'warning';
 export type Alert = {
-  id: string; level: AlertLevel; title?: string; message: string; details?: string;
-  createdAt: number; timeoutMs: number; count: number;
+  id: string;
+  level: AlertLevel;
+  title?: string;
+  message: string;
+  details?: string;
+  createdAt: number;
+  timeoutMs: number;
+  count: number;
 };
 export type AlertOptions = { title?: string; details?: string; timeoutMs?: number };
 
@@ -18,9 +24,13 @@ export class AlertStore {
   getSnapshot = (): Alert[] => this.items;
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
-    return () => { this.listeners.delete(listener); };
+    return () => {
+      this.listeners.delete(listener);
+    };
   };
-  private notify() { for (const listener of this.listeners) listener(); }
+  private notify() {
+    for (const listener of this.listeners) listener();
+  }
   private key(alert: Pick<Alert, 'level' | 'title' | 'message' | 'details'>) {
     return JSON.stringify([alert.level, alert.title, alert.message, alert.details]);
   }
@@ -32,24 +42,36 @@ export class AlertStore {
   }
   private schedule(id: string, duration: number) {
     this.cancel(id);
-    if (duration <= 0) { this.remaining.delete(id); return; }
+    if (duration <= 0) {
+      this.remaining.delete(id);
+      return;
+    }
     this.deadlines.set(id, Date.now() + duration);
-    this.timers.set(id, setTimeout(() => this.dismiss(id), duration));
+    this.timers.set(
+      id,
+      setTimeout(() => this.dismiss(id), duration),
+    );
   }
   add(level: AlertLevel, message: string, options: AlertOptions = {}): string {
     const now = Date.now();
     const candidate = { level, title: options.title, message, details: options.details };
     const key = this.key(candidate);
-    const duplicate = this.items.find(item => this.key(item) === key && now - (this.lastSeen.get(item.id) ?? 0) < 2000);
+    const duplicate = this.items.find(
+      (item) => this.key(item) === key && now - (this.lastSeen.get(item.id) ?? 0) < 2000,
+    );
     if (duplicate) {
       this.lastSeen.set(duplicate.id, now);
-      this.items = this.items.map(item => item.id === duplicate.id ? { ...item, count: item.count + 1 } : item);
+      this.items = this.items.map((item) => (item.id === duplicate.id ? { ...item, count: item.count + 1 } : item));
       if (!this.remaining.has(duplicate.id)) this.schedule(duplicate.id, duplicate.timeoutMs);
       this.notify();
       return duplicate.id;
     }
     const alert: Alert = {
-      id: crypto.randomUUID(), ...candidate, createdAt: now, timeoutMs: options.timeoutMs ?? defaults[level], count: 1
+      id: crypto.randomUUID(),
+      ...candidate,
+      createdAt: now,
+      timeoutMs: options.timeoutMs ?? defaults[level],
+      count: 1,
     };
     if (this.items.length >= 5) this.dismiss(this.items[0]!.id);
     this.items = [...this.items, alert];
@@ -78,8 +100,8 @@ export class AlertStore {
     this.cancel(id);
     this.remaining.delete(id);
     this.lastSeen.delete(id);
-    if (!this.items.some(item => item.id === id)) return;
-    this.items = this.items.filter(item => item.id !== id);
+    if (!this.items.some((item) => item.id === id)) return;
+    this.items = this.items.filter((item) => item.id !== id);
     this.notify();
   };
   clear = () => {

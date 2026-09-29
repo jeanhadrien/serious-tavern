@@ -6,5 +6,7 @@
     ".": "./src/index.ts",
     "./ports": "./src/ports.ts"
   },
-  "dependencies": { "zod": "^4.6.5" }
+  "dependencies": {
+    "zod": "^4.6.5"
+  }
 }

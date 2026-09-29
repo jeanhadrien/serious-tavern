@@ -24,15 +24,20 @@ export function parseMultipart(body: unknown, contentType: string): UploadedFile
     let partEnd = next;
     if (body.subarray(partEnd - 2, partEnd).toString() === '\r\n') partEnd -= 2;
     const separator = body.indexOf(Buffer.from('\r\n\r\n'), partStart);
-    if (separator < 0 || separator >= partEnd) throw new HttpError(400, 'INVALID_UPLOAD', 'Malformed multipart request');
+    if (separator < 0 || separator >= partEnd)
+      throw new HttpError(400, 'INVALID_UPLOAD', 'Malformed multipart request');
     const headers = body.toString('latin1', partStart, separator);
     const disposition = /content-disposition:\s*form-data;([^\r\n]+)/i.exec(headers)?.[1] ?? '';
     const fileName = /(?:^|;)\s*filename="([^"]*)"/i.exec(disposition)?.[1];
     if (fileName !== undefined && fileName.length) {
       const data = body.subarray(separator + 4, partEnd);
-      if (data.length > MAX_UPLOAD_BYTES) throw new HttpError(413, 'UPLOAD_TOO_LARGE', 'Each upload must be 20 MB or smaller');
-      files.push({ name: fileName.replace(/\\/g, '/').split('/').pop() ?? 'upload', data,
-        mime: /content-type:\s*([^\r\n;]+)/i.exec(headers)?.[1]?.trim().toLowerCase() ?? 'application/octet-stream' });
+      if (data.length > MAX_UPLOAD_BYTES)
+        throw new HttpError(413, 'UPLOAD_TOO_LARGE', 'Each upload must be 20 MB or smaller');
+      files.push({
+        name: fileName.replace(/\\/g, '/').split('/').pop() ?? 'upload',
+        data,
+        mime: /content-type:\s*([^\r\n;]+)/i.exec(headers)?.[1]?.trim().toLowerCase() ?? 'application/octet-stream',
+      });
     }
     cursor = next;
   }
@@ -42,7 +47,10 @@ export function parseMultipart(body: unknown, contentType: string): UploadedFile
 
 export function imageExtension(mime: string): string {
   const extension: Record<string, string> = {
-    'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif', 'image/webp': '.webp'
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
   };
   const result = extension[mime.toLowerCase()];
   if (!result) throw new HttpError(415, 'UNSUPPORTED_IMAGE', 'Upload a PNG, JPEG, GIF, or WebP image');
@@ -51,29 +59,45 @@ export function imageExtension(mime: string): string {
 
 export async function storeAvatar(directory: string, id: string, file: UploadedFile): Promise<string> {
   const extension = imageExtension(file.mime);
-  if (file.data.length > MAX_UPLOAD_BYTES) throw new HttpError(413, 'UPLOAD_TOO_LARGE', 'Image must be 20 MB or smaller');
+  if (file.data.length > MAX_UPLOAD_BYTES)
+    throw new HttpError(413, 'UPLOAD_TOO_LARGE', 'Image must be 20 MB or smaller');
   await mkdir(directory, { recursive: true });
-  for (const name of await readdir(directory)) if (name.startsWith(`${id}.`)) await rm(join(directory, name), { force: true });
+  for (const name of await readdir(directory))
+    if (name.startsWith(`${id}.`)) await rm(join(directory, name), { force: true });
   const name = `${id}${extension}`;
   await writeFile(join(directory, name), file.data, { flag: 'w' });
   return name;
 }
 
 export async function removeAvatar(directory: string, id: string): Promise<void> {
-  try { for (const name of await readdir(directory)) if (name.startsWith(`${id}.`)) await rm(join(directory, name), { force: true }); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  try {
+    for (const name of await readdir(directory))
+      if (name.startsWith(`${id}.`)) await rm(join(directory, name), { force: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
 }
 
-export async function sendAvatar(reply: FastifyReply, directory: string, filename: string | boolean): Promise<FastifyReply> {
+export async function sendAvatar(
+  reply: FastifyReply,
+  directory: string,
+  filename: string | boolean,
+): Promise<FastifyReply> {
   if (typeof filename !== 'string' || filename.includes('/') || filename.includes('\\'))
     throw new HttpError(404, 'NOT_FOUND', 'Avatar not found');
   let data: Buffer;
-  try { data = await readFile(join(directory, filename)); }
-  catch (error) {
+  try {
+    data = await readFile(join(directory, filename));
+  } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') throw new HttpError(404, 'NOT_FOUND', 'Avatar not found');
     throw error;
   }
-  const mime = ({ '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' } as Record<string, string>)
-    [filename.slice(filename.lastIndexOf('.'))] ?? 'application/octet-stream';
+  const mime =
+    (
+      { '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' } as Record<
+        string,
+        string
+      >
+    )[filename.slice(filename.lastIndexOf('.'))] ?? 'application/octet-stream';
   return reply.type(mime).header('Cache-Control', 'private, max-age=3600').send(data);
 }

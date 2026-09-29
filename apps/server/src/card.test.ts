@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { characterFromCard, InvalidCardError, placeholderPng, readCharacterCardPng, readPngTextChunks, writePngCard } from './card.js';
+import {
+  characterFromCard,
+  InvalidCardError,
+  placeholderPng,
+  readCharacterCardPng,
+  readPngTextChunks,
+  writePngCard,
+} from './card.js';
 
 const v1 = { name: 'Legacy', description: 'Old card', personality: 'kind', first_mes: 'Hello', custom_extension: 42 };
 const v2 = { spec: 'chara_card_v2', spec_version: '2.0', data: { name: 'Second', scenario: 'Rainy day' } };
@@ -24,7 +31,8 @@ describe('character card parser and PNG metadata', () => {
 
   it('returns clear invalid-card errors for malformed JSON and PNGs without card metadata', () => {
     expect(() => characterFromCard('{', 'id', 'date')).toThrow(InvalidCardError);
-    expect(() => readCharacterCardPng(placeholderPng(), 'id', 'date', 'id.png'))
-      .toThrow('PNG image does not contain a character card');
+    expect(() => readCharacterCardPng(placeholderPng(), 'id', 'date', 'id.png')).toThrow(
+      'PNG image does not contain a character card',
+    );
   });
 });

@@ -17,7 +17,7 @@ describe('port compatibility', () => {
     ['text', 'boolean', false, undefined],
     ['array', 'object', false, undefined],
     ['object', 'messages', false, undefined],
-    ['boolean', 'number', false, undefined]
+    ['boolean', 'number', false, undefined],
   ] as const)('%s → %s', (from, to, ok, coerce) => {
     const result = canConnect(from, to);
     expect(result.ok).toBe(ok);

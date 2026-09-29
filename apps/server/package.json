@@ -2,6 +2,13 @@
   "name": "@st/server",
   "version": "0.1.0",
   "type": "module",
-  "scripts": { "dev": "tsx watch src/main.ts" },
-  "dependencies": { "@st/shared": "*", "@st/engine": "*", "fastify": "^5.12.5", "zod": "^4.6.5" }
+  "scripts": {
+    "dev": "tsx watch src/main.ts"
+  },
+  "dependencies": {
+    "@st/shared": "*",
+    "@st/engine": "*",
+    "fastify": "^5.12.5",
+    "zod": "^4.6.5"
+  }
 }

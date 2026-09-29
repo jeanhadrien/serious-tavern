@@ -11,11 +11,20 @@ import { memory } from './nodes/memory/index.js';
 
 // Register a new backend node here; the UI uses its descriptor and generic editor automatically.
 export const registry = new Map<string, NodeDefinition>(
-  [chatInput, chatOutput, llm, httpRequest, condition, merge, memory].map(node => [node.type, node])
+  [chatInput, chatOutput, llm, httpRequest, condition, merge, memory].map((node) => [node.type, node]),
 );
 export function descriptors(): NodeTypeDescriptor[] {
-  return [...registry.values()].map(({ type, label, description, category, inputs, outputs, configSchema, defaultConfig, templateFields }) => ({
-    type, label, description, category, inputs, outputs, templateFields,
-    configSchema: z.toJSONSchema(configSchema) as Record<string, unknown>, defaultConfig
-  }));
+  return [...registry.values()].map(
+    ({ type, label, description, category, inputs, outputs, configSchema, defaultConfig, templateFields }) => ({
+      type,
+      label,
+      description,
+      category,
+      inputs,
+      outputs,
+      templateFields,
+      configSchema: z.toJSONSchema(configSchema) as Record<string, unknown>,
+      defaultConfig,
+    }),
+  );
 }

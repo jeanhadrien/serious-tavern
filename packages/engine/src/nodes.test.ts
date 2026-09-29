@@ -6,33 +6,68 @@ import { providers } from './providers/index.js';
 import { openrouter } from './providers/openrouter.js';
 import type { ExecutionContext } from './types.js';
 
-const preset: Preset = { id: '8f1fe1a9-3480-4e52-834c-f25d90684d71', name: 'Test', createdAt: '', updatedAt: '',
+const preset: Preset = {
+  id: '8f1fe1a9-3480-4e52-834c-f25d90684d71',
+  name: 'Test',
+  createdAt: '',
+  updatedAt: '',
   inputs: [{ id: 'prompt-input', label: 'Prompt', key: 'prompt', dataType: 'text' }],
   entries: [
-    { kind: 'message', id: 'system', name: 'System', enabled: true, role: 'system',
-      content: 'Hello {{trigger.message}}', placement: { mode: 'ordered' } },
-    { kind: 'slot', id: 'prompt-slot', name: 'Prompt', enabled: true, inputKey: 'prompt', role: 'user' }
-  ] };
+    {
+      kind: 'message',
+      id: 'system',
+      name: 'System',
+      enabled: true,
+      role: 'system',
+      content: 'Hello {{trigger.message}}',
+      placement: { mode: 'ordered' },
+    },
+    { kind: 'slot', id: 'prompt-slot', name: 'Prompt', enabled: true, inputKey: 'prompt', role: 'user' },
+  ],
+};
 const ctx = (config: Record<string, unknown>): ExecutionContext => ({
-  config, inputs: { input: 'hi', prompt: 'What is up?' }, trigger: { message: 'hello', sessionId: 's' },
-  history: [], secrets: { get: async () => 'test-key' }, signal: new AbortController().signal,
-  resources: { presets: { get: async () => preset } }, recordRequest: () => {},
-  log: () => {}, emit: () => {}
+  config,
+  inputs: { input: 'hi', prompt: 'What is up?' },
+  trigger: { message: 'hello', sessionId: 's' },
+  history: [],
+  secrets: { get: async () => 'test-key' },
+  signal: new AbortController().signal,
+  resources: { presets: { get: async () => preset } },
+  recordRequest: () => {},
+  log: () => {},
+  emit: () => {},
 });
-afterEach(() => { vi.restoreAllMocks(); providers.delete('fake'); });
+afterEach(() => {
+  vi.restoreAllMocks();
+  providers.delete('fake');
+});
 describe('integration nodes', () => {
   it('resolves LLM input ports from preset inputs', async () => {
     const result = await llm.resolvePorts?.({ presetId: preset.id }, { presets: { get: async () => preset } });
     expect(result?.inputs).toEqual([{ name: 'prompt', label: 'Prompt', dataType: 'text', description: undefined }]);
   });
   it('templates the HTTP request and parses JSON', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"ok":true}',
-      { status: 200, headers: { 'content-type': 'application/json' } }));
-    const result = await httpRequest.execute(ctx({ method: 'POST', url: 'https://example.com/{{trigger.message}}',
-      headers: [{ key: 'x-test', value: '{{input.input}}' }], body: '{{input.input}}', responseType: 'json', timeoutMs: 1000 }));
-    expect(fetchMock).toHaveBeenCalledWith('https://example.com/hello', expect.objectContaining({
-      method: 'POST', headers: { 'x-test': 'hi' }, body: 'hi'
-    }));
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{"ok":true}', { status: 200, headers: { 'content-type': 'application/json' } }));
+    const result = await httpRequest.execute(
+      ctx({
+        method: 'POST',
+        url: 'https://example.com/{{trigger.message}}',
+        headers: [{ key: 'x-test', value: '{{input.input}}' }],
+        body: '{{input.input}}',
+        responseType: 'json',
+        timeoutMs: 1000,
+      }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://example.com/hello',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'x-test': 'hi' },
+        body: 'hi',
+      }),
+    );
     expect(result.body).toEqual({ ok: true });
   });
   it('uses a fake provider, rendered preset, secretName and request log', async () => {
@@ -43,41 +78,72 @@ describe('integration nodes', () => {
     const config = { ...llm.defaultConfig, presetId: preset.id, provider: 'fake' };
     expect((await llm.execute({ ...ctx(config), secrets: { get }, recordRequest: request })).text).toBe('reply');
     expect(get).toHaveBeenCalledWith('fake-key');
-    expect(chat).toHaveBeenCalledWith(expect.objectContaining({ messages: [
-      { role: 'system', content: 'Hello hello' }, { role: 'user', content: 'What is up?' }
-    ] }), expect.objectContaining({ apiKey: 'test-key' }));
+    expect(chat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [
+          { role: 'system', content: 'Hello hello' },
+          { role: 'user', content: 'What is up?' },
+        ],
+      }),
+      expect.objectContaining({ apiKey: 'test-key' }),
+    );
     expect(request).toHaveBeenCalledWith(expect.objectContaining({ provider: 'fake' }));
-    await expect(llm.execute({ ...ctx(config), secrets: { get: async () => undefined } })).rejects.toThrow('Missing fake-key secret');
+    await expect(llm.execute({ ...ctx(config), secrets: { get: async () => undefined } })).rejects.toThrow(
+      'Missing fake-key secret',
+    );
   });
   it('sends OpenRouter request and decodes upstream errors', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
-      JSON.stringify({ choices: [{ message: { content: 'reply' } }] }), { status: 200 }));
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ choices: [{ message: { content: 'reply' } }] }), { status: 200 }),
+      );
     const config = { ...llm.defaultConfig, presetId: preset.id, topP: 0.9 };
     expect((await llm.execute(ctx(config))).text).toBe('reply');
-    expect(fetchMock).toHaveBeenCalledWith('https://openrouter.ai/api/v1/chat/completions',
-      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer test-key',
-        'HTTP-Referer': expect.any(String), 'X-Title': 'Serious Tavern' }),
-        body: expect.stringContaining('"top_p":0.9') }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/chat/completions',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-key',
+          'HTTP-Referer': expect.any(String),
+          'X-Title': 'Serious Tavern',
+        }),
+        body: expect.stringContaining('"top_p":0.9'),
+      }),
+    );
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: { message: 'limited' } }), { status: 429 }));
-    await expect(openrouter.chat({ model: 'test', messages: [], temperature: 0.7, maxTokens: 10 },
-      { apiKey: 'test-key', signal: new AbortController().signal })).rejects.toThrow('OpenRouter 429: limited');
+    await expect(
+      openrouter.chat(
+        { model: 'test', messages: [], temperature: 0.7, maxTokens: 10 },
+        { apiKey: 'test-key', signal: new AbortController().signal },
+      ),
+    ).rejects.toThrow('OpenRouter 429: limited');
   });
 
   it('includes message names in the OpenRouter body only when present', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
-      JSON.stringify({ choices: [{ message: { content: 'reply' } }] }), { status: 200 }));
-    await openrouter.chat({
-      model: 'test', temperature: 0.7, maxTokens: 10, messages: [
-        { role: 'user', content: 'Hi', name: 'Alex' },
-        { role: 'assistant', content: 'Hello' },
-        { role: 'system', content: 'Empty name is still set', name: '' }
-      ]
-    }, { apiKey: 'test-key', signal: new AbortController().signal });
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ choices: [{ message: { content: 'reply' } }] }), { status: 200 }),
+      );
+    await openrouter.chat(
+      {
+        model: 'test',
+        temperature: 0.7,
+        maxTokens: 10,
+        messages: [
+          { role: 'user', content: 'Hi', name: 'Alex' },
+          { role: 'assistant', content: 'Hello' },
+          { role: 'system', content: 'Empty name is still set', name: '' },
+        ],
+      },
+      { apiKey: 'test-key', signal: new AbortController().signal },
+    );
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     expect(body.messages).toEqual([
       { role: 'user', content: 'Hi', name: 'Alex' },
       { role: 'assistant', content: 'Hello' },
-      { role: 'system', content: 'Empty name is still set', name: '' }
+      { role: 'system', content: 'Empty name is still set', name: '' },
     ]);
     expect(Object.hasOwn(body.messages[1], 'name')).toBe(false);
   });
@@ -89,51 +155,78 @@ describe('integration nodes', () => {
 
   it('merges only consecutive unnamed system messages without mutating the source', () => {
     const messages: PromptMessage[] = [
-      { role: 'system', content: 'One' }, { role: 'system', content: 'Two' }, { role: 'system', content: 'Three' },
+      { role: 'system', content: 'One' },
+      { role: 'system', content: 'Two' },
+      { role: 'system', content: 'Three' },
       { role: 'user', content: 'User', name: 'Alex' },
-      { role: 'system', content: 'Four' }, { role: 'system', content: 'Named', name: 'Narrator' },
-      { role: 'system', content: 'Five' }, { role: 'system', content: 'Six' },
-      { role: 'assistant', content: 'Assistant' }, { role: 'system', content: 'Seven' },
-      { role: 'system', content: 'Explicit name', name: '' }, { role: 'system', content: 'Eight' }
+      { role: 'system', content: 'Four' },
+      { role: 'system', content: 'Named', name: 'Narrator' },
+      { role: 'system', content: 'Five' },
+      { role: 'system', content: 'Six' },
+      { role: 'assistant', content: 'Assistant' },
+      { role: 'system', content: 'Seven' },
+      { role: 'system', content: 'Explicit name', name: '' },
+      { role: 'system', content: 'Eight' },
     ];
     const snapshot = structuredClone(messages);
     messages.forEach(Object.freeze);
     Object.freeze(messages);
     expect(mergeSystemMessages(messages)).toEqual([
       { role: 'system', content: 'One\n\nTwo\n\nThree' },
-      messages[3], messages[4], messages[5], { role: 'system', content: 'Five\n\nSix' },
-      ...messages.slice(8)
+      messages[3],
+      messages[4],
+      messages[5],
+      { role: 'system', content: 'Five\n\nSix' },
+      ...messages.slice(8),
     ]);
     expect(messages).toEqual(snapshot);
     expect(mergeSystemMessages([])).toEqual([]);
   });
 
-  it.each([undefined, false, true])('records and sends the final prompt with mergeSystemMessages=%s', async merge => {
+  it.each([undefined, false, true])('records and sends the final prompt with mergeSystemMessages=%s', async (merge) => {
     const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
     providers.set('fake', { id: 'fake', label: 'Fake', secretName: 'fake-key', chat });
     const definition: Preset = {
-      ...preset, inputs: [{ id: 'history', key: 'history', dataType: 'messages' }], entries: [
+      ...preset,
+      inputs: [{ id: 'history', key: 'history', dataType: 'messages' }],
+      entries: [
         preset.entries[0]!,
-        { kind: 'message', id: 'empty', name: 'Empty', enabled: true, role: 'system',
-          content: '{{character.scenario}}', placement: { mode: 'ordered' } },
-        { kind: 'message', id: 'second', name: 'Second', enabled: true, role: 'system',
-          content: 'Second', placement: { mode: 'ordered' } },
-        { kind: 'slot', id: 'history', name: 'History', enabled: true, inputKey: 'history', role: 'user' }
-      ]
+        {
+          kind: 'message',
+          id: 'empty',
+          name: 'Empty',
+          enabled: true,
+          role: 'system',
+          content: '{{character.scenario}}',
+          placement: { mode: 'ordered' },
+        },
+        {
+          kind: 'message',
+          id: 'second',
+          name: 'Second',
+          enabled: true,
+          role: 'system',
+          content: 'Second',
+          placement: { mode: 'ordered' },
+        },
+        { kind: 'slot', id: 'history', name: 'History', enabled: true, inputKey: 'history', role: 'user' },
+      ],
     };
     const history: PromptMessage[] = [
       { role: 'system', content: 'History system' },
       { role: 'system', content: 'Named system', name: 'Narrator' },
-      { role: 'user', content: 'Hi', name: 'Alex' }
+      { role: 'user', content: 'Hi', name: 'Alex' },
     ];
     const recordRequest = vi.fn();
     await llm.execute({
       ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', mergeSystemMessages: merge }),
-      inputs: { history }, resources: { presets: { get: async () => definition } }, recordRequest
+      inputs: { history },
+      resources: { presets: { get: async () => definition } },
+      recordRequest,
     });
-    const expected = merge ? [
-      { role: 'system', content: 'Hello hello\n\nSecond\n\nHistory system' }, ...history.slice(1)
-    ] : [{ role: 'system', content: 'Hello hello' }, { role: 'system', content: 'Second' }, ...history];
+    const expected = merge
+      ? [{ role: 'system', content: 'Hello hello\n\nSecond\n\nHistory system' }, ...history.slice(1)]
+      : [{ role: 'system', content: 'Hello hello' }, { role: 'system', content: 'Second' }, ...history];
     expect(chat.mock.calls[0]?.[0].messages).toEqual(expected);
     expect(recordRequest.mock.calls[0]?.[0]).toEqual({ provider: 'fake', ...chat.mock.calls[0]?.[0] });
     expect(history[0]?.content).toBe('History system');
