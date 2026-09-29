@@ -49,6 +49,9 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 4. The UI picks it up automatically through `/api/node-types`. Add a custom panel in `node-ui` only if the generated form isn't enough.
 
 ## Gotchas
+- **POC stage, no data migrations:** the data in `apps/server/data` is disposable. On schema changes, don't write migrations; the data can be reset. The exception is `secrets.enc.json` and `.master.key`, which hold the user's API key and must be kept.
+- **Never run tests or scripts against `apps/server/data`.** Tests use temp dirs. For live checks, run the server from a temp cwd or against a copy of the data.
+- **Seeds must be idempotent:** they only create what's missing, so restarts never duplicate anything.
 - **React Flow editor:** keep nodes and edges as **controlled state**. Don't rebuild them from workflow data on every render; that breaks dragging and selection. This was a past bug.
 - **Environment:** Windows/PowerShell.
   - Stop processes only by PID. Find them with `Get-NetTCPConnection -LocalPort 3001,5173 -State Listen`.
