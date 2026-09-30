@@ -18,8 +18,9 @@ export async function previewPreset(
     { role: 'assistant', content: 'Hi! How can I help?' },
   ];
   for (const input of preset.inputs) {
-    if (input.dataType === 'messages') values[input.key] = session ? session.messages : sample;
-    else values[input.key] ??= `<${input.key}>`;
+    if (input.dataType === 'messages') {
+      if (!Object.hasOwn(inputs, input.key)) values[input.key] = session ? session.messages : sample;
+    } else values[input.key] ??= `<${input.key}>`;
   }
   try {
     return {

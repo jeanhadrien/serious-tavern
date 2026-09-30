@@ -12,7 +12,7 @@ export const presetEndpoints = {
     z.object({ messages: z.array(promptMessageSchema), warnings: z.array(presetWarningSchema) }),
     z.object({
       preset: presetSchema,
-      inputs: z.record(z.string(), z.string()).optional(),
+      inputs: z.record(z.string(), z.union([z.string(), z.array(promptMessageSchema)])).optional(),
       sessionId: z.string().uuid().optional(),
     }),
   ),
