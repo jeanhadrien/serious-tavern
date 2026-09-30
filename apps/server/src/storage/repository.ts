@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { KeyedLock } from './lock.js';
 
 export interface Repository<T extends { id: string }> {
   list(): Promise<T[]>;
@@ -19,7 +20,7 @@ export async function atomicWrite(path: string, content: string): Promise<void> 
   }
 }
 export class JsonRepository<T extends { id: string }> implements Repository<T> {
-  private readonly locks = new Map<string, Promise<void>>();
+  private readonly locks = new KeyedLock();
   constructor(private readonly directory: string) {}
   private path(id: string) {
     if (!/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error('Invalid id');
@@ -43,7 +44,7 @@ export class JsonRepository<T extends { id: string }> implements Repository<T> {
     await atomicWrite(this.path(item.id), JSON.stringify(item, null, 2));
   }
   async update(id: string, mutator: (current: T) => T | Promise<T>): Promise<T | undefined> {
-    return this.withLock(id, async () => {
+    return this.locks.run(id, async () => {
       const current = await this.get(id);
       if (!current) return undefined;
       const updated = await mutator(current);
@@ -53,21 +54,6 @@ export class JsonRepository<T extends { id: string }> implements Repository<T> {
     });
   }
   async delete(id: string): Promise<void> {
-    await this.withLock(id, () => rm(this.path(id), { force: true }));
-  }
-  private async withLock<R>(id: string, action: () => Promise<R>): Promise<R> {
-    const previous = this.locks.get(id) ?? Promise.resolve();
-    let release!: () => void;
-    const current = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    this.locks.set(id, current);
-    await previous;
-    try {
-      return await action();
-    } finally {
-      release();
-      if (this.locks.get(id) === current) this.locks.delete(id);
-    }
+    await this.locks.run(id, () => rm(this.path(id), { force: true }));
   }
 }

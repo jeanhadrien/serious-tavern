@@ -2,11 +2,13 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { atomicWrite } from '../storage/repository.js';
+import { KeyedLock } from '../storage/lock.js';
 
 type CipherText = { iv: string; tag: string; ciphertext: string; hint: string };
 export class SecretStore {
   private key!: Buffer;
   private readonly file: string;
+  private readonly mutations = new KeyedLock();
   constructor(private readonly directory: string) {
     this.file = join(directory, 'secrets.enc.json');
   }
@@ -46,21 +48,25 @@ export class SecretStore {
     return Buffer.concat([decipher.update(Buffer.from(entry.ciphertext, 'base64')), decipher.final()]).toString('utf8');
   }
   async set(name: string, value: string): Promise<void> {
-    const entries = await this.read();
-    const iv = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', this.key, iv);
-    const ciphertext = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
-    entries[name] = {
-      iv: iv.toString('base64'),
-      tag: cipher.getAuthTag().toString('base64'),
-      ciphertext: ciphertext.toString('base64'),
-      hint: value.length > 7 ? `${value.slice(0, 5)}…${value.slice(-3)}` : '••••',
-    };
-    await atomicWrite(this.file, JSON.stringify(entries, null, 2));
+    await this.mutations.run(this.file, async () => {
+      const entries = await this.read();
+      const iv = randomBytes(12);
+      const cipher = createCipheriv('aes-256-gcm', this.key, iv);
+      const ciphertext = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+      entries[name] = {
+        iv: iv.toString('base64'),
+        tag: cipher.getAuthTag().toString('base64'),
+        ciphertext: ciphertext.toString('base64'),
+        hint: value.length > 7 ? `${value.slice(0, 5)}…${value.slice(-3)}` : '••••',
+      };
+      await atomicWrite(this.file, JSON.stringify(entries, null, 2));
+    });
   }
   async delete(name: string): Promise<void> {
-    const entries = await this.read();
-    delete entries[name];
-    await atomicWrite(this.file, JSON.stringify(entries, null, 2));
+    await this.mutations.run(this.file, async () => {
+      const entries = await this.read();
+      delete entries[name];
+      await atomicWrite(this.file, JSON.stringify(entries, null, 2));
+    });
   }
 }
