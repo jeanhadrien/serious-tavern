@@ -18,7 +18,11 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 ## Layout (npm workspaces, TypeScript strict, ESM, packages consumed as TS source)
 - `packages/shared`: zod schemas and types (workflow, ports, `canConnect` compatibility and coercion rules). This is the single source of truth for both front and back.
 - `packages/engine`: graph validation, wave-based parallel executor, templating (`{{input.x}}`, `{{trigger.message}}`, `{{history}}`, no code eval). Node types live in `src/nodes/<type>/index.ts` and are registered in `registry.ts`.
-- `packages/node-ui`: config forms generated from JSON Schema, custom panels, template-variable hints.
+  - `prepareWorkflow` (in `prepare.ts`) parses configs, resolves ports and snapshots resources **once**. `validateWorkflow` wraps it, and `executeWorkflow` accepts its result. Prepare again for each turn, and load node resources through the resolvers.
+  - Execution failures carry `nodeId`/`nodeType` as data. Never parse error messages.
+- `packages/node-ui`: config forms generated from JSON Schema, custom panels (`src/panels/`), template-variable hints.
+  - Panels get catalogs (presets, characters, providers) and `renderLink` through a typed `context` prop. node-ui never imports react-router or the web API clients.
+  - Array fields in any shape other than `{key,value}[]` are shown as read-only JSON.
 - **API contract:** `packages/shared/src/api/` holds zod schemas and types for the request and response of every endpoint. It is the only definition of the API.
   - To add or change an endpoint, update the contract first. The server parses its input with the contract and types its response from it; the web client uses the same types.
   - Server tests check that responses match the contract schemas.
@@ -95,6 +99,9 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 2. Register it in `registry.ts`.
 3. Add tests in `nodes.test.ts`.
 4. The UI picks it up automatically through `/api/node-types`. Add a custom panel in `node-ui` only if the generated form isn't enough.
+   - If the definition has `resolvePorts`, its descriptor gets `dynamicPorts: true`, and the editor resolves inputs and outputs for it. Never add per-type branches in the web app.
+   - After handles change, refresh React Flow's node internals.
+   - Edges to ports that disappear are kept and shown as invalid until the port comes back.
 
 ## Gotchas
 - **POC stage, no data migrations:** the data in `apps/server/data` is disposable. On schema changes, don't write migrations; the data can be reset. The exception is `secrets.enc.json` and `.master.key`, which hold the user's API key and must be kept.
