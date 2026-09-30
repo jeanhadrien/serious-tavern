@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ApiResponse } from '@st/shared';
-import type { CanvasNode } from './model.js';
+import { canvasToWorkflow, type CanvasNode } from './model.js';
+import { checkConnection } from '../../connection.js';
 import { applyResolvedPorts, portRequests, portsEqual, resolvePortRequests } from './dynamicPorts.js';
 
 const base: ApiResponse<'resolvePorts'> = {
@@ -74,6 +75,21 @@ describe('dynamic ports', () => {
     for (const stale of [changed, unknown, changedType])
       expect(applyResolvedPorts([stale], request, { inputs: [], outputs: [] })[0]).toBe(stale);
     expect(applyResolvedPorts([], request, base)).toEqual([]);
+  });
+
+  it('keeps edges attached to disappearing output ports unchanged when saving', () => {
+    const nodes = [node(), node('target', false)];
+    const workflow = {
+      id: 'workflow',
+      name: 'Edges',
+      createdAt: '',
+      updatedAt: '',
+      nodes: [],
+      edges: [{ id: 'edge', source: 'plugin', sourceHandle: 'output', target: 'target', targetHandle: 'input' }],
+    };
+    const updated = applyResolvedPorts(nodes, portRequests(nodes)[0]!, { ...base, outputs: [] });
+    expect(checkConnection(workflow.edges[0]!, updated).ok).toBe(false);
+    expect(canvasToWorkflow(workflow, updated, workflow.edges).edges).toEqual(workflow.edges);
   });
 
   it('ignores a slower cancelled batch, even if a newer canvas has the same node id and config', async () => {

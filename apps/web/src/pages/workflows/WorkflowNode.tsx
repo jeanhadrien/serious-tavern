@@ -1,10 +1,15 @@
-import { Handle, Position, useConnection, type NodeProps } from '@xyflow/react';
+import { useEffect } from 'react';
+import { Handle, Position, useConnection, useUpdateNodeInternals, type NodeProps } from '@xyflow/react';
 import { canConnect, type PortDef } from '@st/shared/ports';
 import type { CanvasNode } from './model.js';
 import { portColors } from './port-colors.js';
 
 export function WorkflowNode({ id, data, selected }: NodeProps<CanvasNode>) {
   const { descriptor } = data;
+  const updateNodeInternals = useUpdateNodeInternals();
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [id, descriptor.inputs, descriptor.outputs, updateNodeInternals]);
   const connection = useConnection<CanvasNode>();
   const incompatible = (port: PortDef, type: 'source' | 'target') => {
     if (!connection.inProgress || !connection.fromHandle || connection.fromHandle.nodeId === id) return false;
