@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { apiContract, presetSchema } from '@st/shared';
 import { now, type AppContext } from '../context.js';
-import { HttpError, requireEntity } from '../errors.js';
+import { HttpError, notFound, requireEntity } from '../errors.js';
 import { previewPreset } from '../services/preset-preview.js';
 import type { ApiRoute } from './types.js';
 
@@ -24,10 +24,11 @@ export function registerPresets(app: FastifyInstance, context: AppContext) {
   );
   app.put<ApiRoute<'updatePreset'>>('/api/presets/:id', async (request) => {
     const { id } = apiContract.updatePreset.params.parse(request.params);
-    const old = await requireEntity(presets, id, 'Preset');
     const body = apiContract.updatePreset.body.parse({ ...(request.body as object) });
-    const preset = presetSchema.parse({ ...body, id, createdAt: old.createdAt, updatedAt: now() });
-    await presets.save(preset);
+    const preset = await presets.update(id, (old) =>
+      presetSchema.parse({ ...body, id, createdAt: old.createdAt, updatedAt: now() }),
+    );
+    if (!preset) throw notFound('Preset');
     return preset;
   });
   app.delete<ApiRoute<'deletePreset'>>('/api/presets/:id', async (request, reply) => {

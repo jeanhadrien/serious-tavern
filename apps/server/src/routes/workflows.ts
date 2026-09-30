@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { apiContract, type ApiResponse } from '@st/shared';
 import { validateWorkflow } from '@st/engine';
 import { now, type AppContext } from '../context.js';
-import { HttpError, requireEntity } from '../errors.js';
+import { HttpError, notFound, requireEntity } from '../errors.js';
 import type { ApiRoute } from './types.js';
 
 export function registerWorkflows(app: FastifyInstance, { workflows, sessions, presets, characters }: AppContext) {
@@ -27,10 +27,9 @@ export function registerWorkflows(app: FastifyInstance, { workflows, sessions, p
   );
   app.put<ApiRoute<'updateWorkflow'>>('/api/workflows/:id', async (request) => {
     const { id } = apiContract.updateWorkflow.params.parse(request.params);
-    const old = await requireEntity(workflows, id, 'Workflow');
     const body = apiContract.updateWorkflow.body.parse(request.body);
-    const workflow = { ...old, ...body, updatedAt: now() };
-    await workflows.save(workflow);
+    const workflow = await workflows.update(id, (old) => ({ ...old, ...body, updatedAt: now() }));
+    if (!workflow) throw notFound('Workflow');
     return workflow;
   });
   app.delete<ApiRoute<'deleteWorkflow'>>('/api/workflows/:id', async (request, reply) => {
