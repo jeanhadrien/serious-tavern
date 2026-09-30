@@ -8,7 +8,7 @@ export interface Repository<T extends { id: string }> {
   get(id: string): Promise<T | undefined>;
   save(item: T): Promise<void>;
   update(id: string, mutator: (current: T) => T | Promise<T>): Promise<T | undefined>;
-  delete(id: string): Promise<void>;
+  delete(id: string, beforeDelete?: (current: T | undefined) => void | Promise<void>): Promise<void>;
 }
 export async function atomicWrite(path: string, content: string): Promise<void> {
   const temp = `${path}.${randomUUID()}.tmp`;
@@ -53,7 +53,10 @@ export class JsonRepository<T extends { id: string }> implements Repository<T> {
       return updated;
     });
   }
-  async delete(id: string): Promise<void> {
-    await this.locks.run(id, () => rm(this.path(id), { force: true }));
+  async delete(id: string, beforeDelete?: (current: T | undefined) => void | Promise<void>): Promise<void> {
+    await this.locks.run(id, async () => {
+      if (beforeDelete) await beforeDelete(await this.get(id));
+      await rm(this.path(id), { force: true });
+    });
   }
 }

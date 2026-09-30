@@ -4,7 +4,8 @@ import { apiContract, personaSchema } from '@st/shared';
 import { now, type AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
 import { importPersonas } from '../services/persona-import.js';
-import { parseImageRequest, removeAvatar, sendAvatar, storeAvatar, uploadedFiles } from '../uploads.js';
+import { deleteEntity, updateEntity, updateEntityAvatar } from '../services/entity-mutations.js';
+import { parseImageRequest, sendAvatar, uploadedFiles } from '../uploads.js';
 import type { ApiRoute } from './types.js';
 
 export function registerPersonas(app: FastifyInstance, context: AppContext) {
@@ -22,23 +23,12 @@ export function registerPersonas(app: FastifyInstance, context: AppContext) {
   );
   app.put<ApiRoute<'updatePersona'>>('/api/personas/:id', async (request) => {
     const { id } = apiContract.updatePersona.params.parse(request.params);
-    const old = await requireEntity(personas, id, 'Persona');
     const body = apiContract.updatePersona.body.parse(request.body);
-    const persona = personaSchema.parse({
-      ...old,
-      ...body,
-      id,
-      avatar: old.avatar,
-      createdAt: old.createdAt,
-      updatedAt: now(),
-    });
-    await personas.save(persona);
-    return persona;
+    return updateEntity(personas, id, body, personaSchema, 'Persona');
   });
   app.delete<ApiRoute<'deletePersona'>>('/api/personas/:id', async (request, reply) => {
     const { id } = apiContract.deletePersona.params.parse(request.params);
-    await requireEntity(personas, id, 'Persona');
-    await Promise.all([personas.delete(id), removeAvatar(personaAvatars, id)]);
+    await deleteEntity(personas, personaAvatars, id, 'Persona');
     return reply.code(204).send();
   });
   app.get<ApiRoute<'getPersonaAvatar'>>('/api/personas/:id/avatar', async (request, reply) => {
@@ -48,10 +38,7 @@ export function registerPersonas(app: FastifyInstance, context: AppContext) {
   });
   app.put<ApiRoute<'updatePersonaAvatar'>>('/api/personas/:id/avatar', async (request, reply) => {
     const { id } = apiContract.updatePersonaAvatar.params.parse(request.params);
-    const old = await requireEntity(personas, id, 'Persona');
-    const avatar = await storeAvatar(personaAvatars, id, parseImageRequest(request));
-    const persona = { ...old, avatar, updatedAt: now() };
-    await personas.save(persona);
+    const persona = await updateEntityAvatar(personas, personaAvatars, id, parseImageRequest(request), 'Persona');
     return reply.send(persona);
   });
   app.post<ApiRoute<'importPersonas'>>('/api/personas/import', async (request) =>

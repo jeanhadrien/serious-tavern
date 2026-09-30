@@ -4,7 +4,8 @@ import { apiContract, characterSchema } from '@st/shared';
 import { now, type AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
 import { cardData, exportCharacterPng, importCharacters } from '../services/character-cards.js';
-import { parseImageRequest, removeAvatar, sendAvatar, storeAvatar, uploadedFiles } from '../uploads.js';
+import { deleteEntity, updateEntity, updateEntityAvatar } from '../services/entity-mutations.js';
+import { parseImageRequest, sendAvatar, uploadedFiles } from '../uploads.js';
 import type { ApiRoute } from './types.js';
 
 export function registerCharacters(app: FastifyInstance, context: AppContext) {
@@ -28,23 +29,12 @@ export function registerCharacters(app: FastifyInstance, context: AppContext) {
   );
   app.put<ApiRoute<'updateCharacter'>>('/api/characters/:id', async (request) => {
     const { id } = apiContract.updateCharacter.params.parse(request.params);
-    const old = await requireEntity(characters, id, 'Character');
     const body = apiContract.updateCharacter.body.parse(request.body);
-    const character = characterSchema.parse({
-      ...old,
-      ...body,
-      id,
-      avatar: old.avatar,
-      createdAt: old.createdAt,
-      updatedAt: now(),
-    });
-    await characters.save(character);
-    return character;
+    return updateEntity(characters, id, body, characterSchema, 'Character');
   });
   app.delete<ApiRoute<'deleteCharacter'>>('/api/characters/:id', async (request, reply) => {
     const { id } = apiContract.deleteCharacter.params.parse(request.params);
-    await requireEntity(characters, id, 'Character');
-    await Promise.all([characters.delete(id), removeAvatar(characterAvatars, id)]);
+    await deleteEntity(characters, characterAvatars, id, 'Character');
     return reply.code(204).send();
   });
   app.get<ApiRoute<'getCharacterAvatar'>>('/api/characters/:id/avatar', async (request, reply) => {
@@ -54,11 +44,8 @@ export function registerCharacters(app: FastifyInstance, context: AppContext) {
   });
   app.put<ApiRoute<'updateCharacterAvatar'>>('/api/characters/:id/avatar', async (request, reply) => {
     const { id } = apiContract.updateCharacterAvatar.params.parse(request.params);
-    const old = await requireEntity(characters, id, 'Character');
     const file = parseImageRequest(request);
-    const avatar = await storeAvatar(characterAvatars, id, file);
-    const character = { ...old, avatar, updatedAt: now() };
-    await characters.save(character);
+    const character = await updateEntityAvatar(characters, characterAvatars, id, file, 'Character');
     return reply.send(character);
   });
   app.post<ApiRoute<'importCharacters'>>('/api/characters/import', async (request) =>
