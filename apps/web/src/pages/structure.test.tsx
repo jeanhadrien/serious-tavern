@@ -121,7 +121,7 @@ it('renders output name/order controls and a character picker', () => {
     <NodeConfigPanel
       descriptor={{ ...descriptor, type: 'character' }}
       config={{ source: 'card', characterId: 'card' }}
-      characters={[card]}
+      context={{ characters: [card], presets: [], providers: [] }}
       onChange={() => {}}
     />,
   );
