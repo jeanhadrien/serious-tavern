@@ -130,8 +130,7 @@ main {
   align-items: center;
   gap: 10px;
 }
-.list-row,
-.session-row {
+.list-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -152,92 +151,16 @@ main {
   border-right: 1px solid #343844;
   overflow: auto;
 }
-.session-row.selected {
-  background: #33394b;
-  border-radius: 6px;
-}
-.session-link {
-  background: none;
-  border: 0;
-  flex: 1;
-  text-align: left;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.chat-layout,
 .workflow-layout {
   height: 100%;
   display: flex;
 }
-.chat-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.chat-header,
 .editor-toolbar {
   padding: 12px 20px;
   display: flex;
   align-items: center;
   gap: 12px;
   border-bottom: 1px solid #363b46;
-}
-.chat-header input {
-  flex: 1;
-  font-weight: 600;
-}
-.chat-header select {
-  max-width: 290px;
-}
-.thread {
-  flex: 1;
-  overflow: auto;
-  padding: 30px max(24px, calc((100% - 780px) / 2));
-}
-.message {
-  padding: 14px 18px;
-  border: 1px solid #3a4050;
-  border-radius: 12px;
-  margin: 0 0 16px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.message.user {
-  margin-left: 15%;
-  background: #303750;
-}
-.message.assistant {
-  margin-right: 15%;
-  background: #242831;
-}
-.message p {
-  margin: 8px 0;
-}
-.message small {
-  text-transform: capitalize;
-}
-.composer {
-  display: flex;
-  gap: 10px;
-  padding: 16px 24px;
-  border-top: 1px solid #343844;
-}
-.composer input {
-  flex: 1;
-}
-.chat-main > .error {
-  padding: 0 24px;
-}
-.execution {
-  border-top: 1px solid #414652;
-  padding-top: 8px;
-  font-size: 0.85rem;
-}
-.execution-node {
-  border-top: 1px solid #3a4050;
-  margin-top: 8px;
-  padding: 8px 0;
 }
 pre {
   white-space: pre-wrap;
@@ -836,30 +759,6 @@ pre {
   padding: 18px 28px;
   background: #32394e;
   border-radius: 12px;
-}
-.session-context-selectors {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 20px;
-  border-bottom: 1px solid #363b46;
-}
-.context-selector {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  text-transform: none;
-  color: #a7adbd;
-}
-.context-selector select {
-  max-width: 220px;
-}
-.context-selector img {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  object-fit: cover;
 }
 @media (max-width: 900px) {
   .entity-list {

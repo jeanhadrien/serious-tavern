@@ -71,3 +71,18 @@ it('preserves silent errors through resource clients', async () => {
   await expect(workflowsApi.validate('workflow-id', { silent: true })).rejects.toBeInstanceOf(ApiError);
   expect(alerts.getSnapshot()).toHaveLength(0);
 });
+
+it('uses PATCH with JSON for message edits and bodyless DELETE for message removal', async () => {
+  const fetchMock = vi
+    .spyOn(globalThis, 'fetch')
+    .mockResolvedValueOnce(new Response('{}'))
+    .mockResolvedValueOnce(new Response(null, { status: 204 }));
+  await sessionsApi.updateMessage('session-id', 'message-id', { content: 'Edited' });
+  await sessionsApi.deleteMessage('session-id', 'message-id');
+  expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/sessions/session-id/messages/message-id');
+  expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: 'PATCH', body: '{"content":"Edited"}' });
+  expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/sessions/session-id/messages/message-id');
+  expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'DELETE' });
+  expect(fetchMock.mock.calls[1]?.[1]?.body).toBeUndefined();
+  expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).has('content-type')).toBe(false);
+});

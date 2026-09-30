@@ -1,0 +1,11 @@
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  flex-shrink: 0;
+}
+.icon-button:focus-visible {
+  outline: 2px solid #9aa8ff;
+  outline-offset: 2px;
+}

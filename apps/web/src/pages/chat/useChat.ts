@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Workflow, Session, ExecutionLog, SessionSummary, ApiBody, Character, Persona } from '@st/shared';
 import { sendMessageResultSchema } from '@st/shared';
 import { sessionsApi, workflowsApi, charactersApi, personasApi } from '../../api.js';
 import { ApiError } from '../../api/transport.js';
 import { alerts } from '../../alerts/index.js';
+import { useMessageActions } from './useMessageActions.js';
 
 export function useChat() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -13,9 +14,12 @@ export function useChat() {
   const [session, setSession] = useState<Session>();
   const [content, setContent] = useState('');
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  const opening = useRef(0);
   const [logs, setLogs] = useState<Record<string, ExecutionLog>>({});
   const refresh = () =>
     sessionsApi.list().then((list) => setSessions(list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))));
+  const messageActions = useMessageActions(session, setSession, refresh, () => busyRef.current);
   useEffect(() => {
     void workflowsApi
       .list()
@@ -32,13 +36,21 @@ export function useChat() {
     void refresh().catch(() => {});
   }, []);
   const open = async (id: string) => {
+    if (busyRef.current || messageActions.isPending()) return;
+    const request = ++opening.current;
     try {
-      setSession(await sessionsApi.get(id));
+      const next = await sessionsApi.get(id);
+      if (opening.current === request) {
+        setSession(next);
+        setContent('');
+      }
     } catch {
       /* API errors are toasted. */
     }
   };
   const create = async () => {
+    if (busyRef.current || messageActions.isPending()) return;
+    const request = ++opening.current;
     const initialWorkflow = workflows.find((w) => w.name === 'Default Assistant') ?? workflows[0];
     if (!initialWorkflow) return;
     try {
@@ -46,7 +58,10 @@ export function useChat() {
         workflowId: initialWorkflow.id,
         personaId: session?.personaId ?? personas[0]?.id,
       });
-      setSession(next);
+      if (request === opening.current) {
+        setSession(next);
+        setContent('');
+      }
       alerts.info('Chat created');
       await refresh();
     } catch {
@@ -54,19 +69,21 @@ export function useChat() {
     }
   };
   const update = async (changes: ApiBody<'updateSession'>) => {
-    if (!session) return;
+    if (!session || busyRef.current || messageActions.isPending()) return;
     try {
       const next = await sessionsApi.update(session.id, changes);
-      setSession(next);
+      setSession((current) => (current?.id === next.id ? { ...next, messages: current.messages } : current));
       await refresh();
     } catch {
       /* API errors are toasted. */
     }
   };
   const remove = async (id: string) => {
+    if (busyRef.current || messageActions.isPending()) return;
+    ++opening.current;
     try {
       await sessionsApi.delete(id);
-      if (session?.id === id) setSession(undefined);
+      setSession((current) => (current?.id === id ? undefined : current));
       alerts.info('Chat deleted');
       await refresh();
     } catch {
@@ -74,7 +91,9 @@ export function useChat() {
     }
   };
   const send = async () => {
-    if (!session || !content.trim() || busy) return;
+    if (!session || !content.trim() || busyRef.current || messageActions.isPending()) return;
+    ++opening.current;
+    busyRef.current = true;
     const text = content.trim();
     setContent('');
     setBusy(true);
@@ -86,7 +105,7 @@ export function useChat() {
           : prev,
       );
       setLogs((prev) => ({ ...prev, [result.execution.id]: result.execution }));
-      await refresh();
+      await refresh().catch(() => {});
     } catch (error) {
       const details = sendMessageResultSchema.safeParse(error instanceof ApiError ? error.details : undefined);
       if (details.success) {
@@ -97,9 +116,17 @@ export function useChat() {
             : prev,
         );
         setLogs((prev) => ({ ...prev, [result.execution.id]: result.execution }));
-        await refresh();
-      } else await open(session.id);
+        await refresh().catch(() => {});
+      } else {
+        await sessionsApi
+          .get(session.id)
+          .then((current) => {
+            setSession((previous) => (previous?.id === current.id ? current : previous));
+          })
+          .catch(() => {});
+      }
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -109,7 +136,6 @@ export function useChat() {
     personas,
     sessions,
     session,
-    setSession,
     content,
     setContent,
     busy,
@@ -119,5 +145,8 @@ export function useChat() {
     update,
     remove,
     send,
+    mutating: messageActions.mutating,
+    editMessage: messageActions.editMessage,
+    deleteMessage: messageActions.deleteMessage,
   };
 }
