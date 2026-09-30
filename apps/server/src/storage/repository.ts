@@ -14,9 +14,22 @@ export async function atomicWrite(path: string, content: string): Promise<void> 
   const temp = `${path}.${randomUUID()}.tmp`;
   await writeFile(temp, content, { flag: 'wx' });
   try {
-    await rename(temp, path);
+    await renameWithRetry(temp, path);
   } finally {
     await rm(temp, { force: true });
+  }
+}
+// On Windows, antivirus/indexers briefly hold freshly written files, so replacing them can fail
+// transiently with EPERM/EACCES/EBUSY. Retry with a short backoff, like graceful-fs does.
+async function renameWithRetry(from: string, to: string, attempts = 10): Promise<void> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await rename(from, to);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (attempt >= attempts || !['EPERM', 'EACCES', 'EBUSY'].includes(code ?? '')) throw error;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 10));
+    }
   }
 }
 export class JsonRepository<T extends { id: string }> implements Repository<T> {
