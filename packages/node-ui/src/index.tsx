@@ -3,15 +3,9 @@ import { macroHints } from '@st/shared';
 import type { NodeConfigPanelProps as Props } from './panels/types.js';
 import { CharacterPanel } from './panels/character.js';
 import { LlmPanel } from './panels/llm.js';
+import { supportsKeyValueArray, isKeyValueRows, type Field } from './fields.js';
 export type { NodePanelContext, NodeConfigPanelProps } from './panels/types.js';
 
-type Field = {
-  type?: string;
-  enum?: unknown[];
-  default?: unknown;
-  description?: string;
-  items?: { properties?: Record<string, Field> };
-};
 function GenericPanel({ descriptor, config, onChange }: Props) {
   const configRef = useRef(config);
   configRef.current = config;
@@ -41,7 +35,9 @@ function GenericPanel({ descriptor, config, onChange }: Props) {
         target.element.setSelectionRange(start + expression.length, start + expression.length);
       });
     } else if (fields[field]?.type === 'array') {
-      update(field, [...((configRef.current[field] ?? []) as unknown[]), { key: '', value: expression }]);
+      const rows = configRef.current[field] ?? [];
+      if (supportsKeyValueArray(fields[field]) && isKeyValueRows(rows))
+        update(field, [...rows, { key: '', value: expression }]);
     } else {
       update(field, `${String(configRef.current[field] ?? '')}${expression}`);
     }
@@ -69,7 +65,18 @@ function GenericPanel({ descriptor, config, onChange }: Props) {
         const value = config[key] ?? field.default ?? '';
         const label = key.replace(/([A-Z])/g, ' $1');
         if (field.type === 'array') {
-          const rows = (Array.isArray(value) ? value : []) as { key: string; value: string }[];
+          const rows = config[key] === undefined ? (field.default ?? []) : config[key];
+          if (!supportsKeyValueArray(field) || !isKeyValueRows(rows))
+            return (
+              <div className="config-field" key={key}>
+                <span>{label}</span>
+                <p className="hint">
+                  Read-only: this array schema or value is not supported by the generic form. Use a custom panel to edit
+                  it.
+                </p>
+                <pre>{JSON.stringify(rows, null, 2)}</pre>
+              </div>
+            );
           return (
             <div className="config-field" key={key}>
               <span>{label}</span>

@@ -87,3 +87,70 @@ it('keeps generic template hints sourced from the macro registry', () => {
   expect(html).toContain('{{user}}');
   expect(html).not.toContain('{{char.name}}');
 });
+
+it('renders only key/value arrays as editable rows, preserving unsupported shapes as read-only JSON', () => {
+  const html = renderToStaticMarkup(
+    <NodeConfigPanel
+      descriptor={{
+        ...descriptor,
+        type: 'custom-array',
+        templateFields: ['headers', 'tags'],
+        configSchema: {
+          properties: {
+            headers: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: { key: { type: 'string' }, value: { type: 'string' } },
+                required: ['key', 'value'],
+              },
+            },
+            tags: { type: 'array', items: { type: 'string' } },
+            other: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' } } } },
+          },
+        },
+      }}
+      config={{
+        headers: [{ key: 'Accept', value: 'application/json' }],
+        tags: ['keep me'],
+        other: [{ name: 'original' }],
+      }}
+      onChange={() => {}}
+    />,
+  );
+  expect(html.match(/class="kv-list"/g)).toHaveLength(1);
+  expect(html).toContain('value="Accept"');
+  expect(html).toContain('value="application/json"');
+  expect(html.match(/Read-only:/g)).toHaveLength(2);
+  expect(html).toContain('keep me');
+  expect(html).toContain('original');
+  expect(html).not.toContain('tags key');
+});
+
+it('renders malformed values in supported array schemas read-only instead of crashing or dropping rows', () => {
+  const html = renderToStaticMarkup(
+    <NodeConfigPanel
+      descriptor={{
+        ...descriptor,
+        type: 'custom-array',
+        configSchema: {
+          properties: {
+            headers: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: { key: { type: 'string' }, value: { type: 'string' } },
+                required: ['key', 'value'],
+              },
+            },
+          },
+        },
+      }}
+      config={{ headers: [null, 'original'] }}
+      onChange={() => {}}
+    />,
+  );
+  expect(html).toContain('Read-only:');
+  expect(html).toContain('original');
+  expect(html).not.toContain('kv-list');
+});
