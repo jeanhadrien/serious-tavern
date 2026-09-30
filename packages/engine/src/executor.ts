@@ -152,7 +152,14 @@ export async function executeWorkflow(
   const onAbort = () => controller.abort(options.signal?.reason);
   options.signal?.addEventListener('abort', onAbort, { once: true });
   if (options.signal?.aborted) onAbort();
-  const emit = (event: EngineEvent) => options.onEvent?.(event);
+  const emit = (event: EngineEvent) => {
+    // Observers are best-effort notifications, never part of the workflow outcome.
+    try {
+      options.onEvent?.(event);
+    } catch {
+      // Observer exceptions must not disrupt execution or cancellation cleanup.
+    }
+  };
   const resolved = new Map<string, { output: Record<string, unknown>; skipped: boolean }>();
   const replies = new Map<string, ChatReply>();
   const ports = new Map(

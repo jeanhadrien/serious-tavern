@@ -573,4 +573,77 @@ describe('executor', () => {
       execution: { status: 'error', nodes: { output: { status: 'error' } } },
     });
   });
+  it.each(
+    (['success', 'failure'] as const).flatMap((outcome) =>
+      [false, true].map((terminalOnly) => ({ outcome, terminalOnly })),
+    ),
+  )(
+    'ignores throwing observers on the $outcome path (terminalOnly=$terminalOnly)',
+    async ({ outcome, terminalOnly }) => {
+      const eventTypes = new Set<string>();
+      const graph = workflow(
+        [node('input', 'chat-input'), node('output', 'chat-output'), node('unused', 'merge')],
+        [edge('input', 'message', 'output', 'value')],
+      );
+      if (outcome === 'failure') {
+        const definition = {
+          ...registry.get('chat-input')!,
+          inputs: [{ name: 'in', label: 'In', dataType: 'any' as const }],
+          outputs: [{ name: 'out', label: 'Out', dataType: 'any' as const }],
+        };
+        registry.set('fast-fail-test', {
+          ...definition,
+          type: 'fast-fail-test',
+          async execute() {
+            throw new Error('real failure');
+          },
+        });
+        registry.set('abort-test', {
+          ...definition,
+          type: 'abort-test',
+          async execute({ signal }) {
+            await new Promise<void>((resolve) => {
+              if (signal.aborted) resolve();
+              else signal.addEventListener('abort', () => resolve(), { once: true });
+            });
+            return { out: 'cancelled' };
+          },
+        });
+        graph.nodes.push(
+          node('fail', 'fast-fail-test'),
+          node('slow', 'abort-test'),
+          node('merge', 'merge'),
+          node('final', 'chat-output'),
+        );
+        graph.edges.push(
+          edge('output', 'reply', 'fail', 'in'),
+          edge('output', 'reply', 'slow', 'in'),
+          edge('fail', 'out', 'merge', 'a'),
+          edge('slow', 'out', 'merge', 'b'),
+          edge('merge', 'value', 'final', 'value'),
+        );
+      }
+      const result = await executeWorkflow(graph, {
+        ...options,
+        onEvent: (event) => {
+          eventTypes.add(event.type);
+          if (!terminalOnly || event.type === 'execution:complete') throw new Error(`Observer threw on ${event.type}`);
+        },
+      }).catch((error) => error);
+      expect(result.replies).toEqual([{ nodeId: 'output', content: 'hello' }]);
+      expect(result.execution).toMatchObject({
+        status: outcome === 'success' ? 'completed' : 'error',
+        nodes: { output: { status: 'completed' }, unused: { status: 'skipped' } },
+      });
+      expect(result.execution.finishedAt).toBeDefined();
+      expect([...eventTypes]).toEqual(
+        expect.arrayContaining(['node:start', 'node:complete', 'node:skipped', 'execution:complete']),
+      );
+      if (outcome === 'failure') {
+        expect(result.message).toBe('Node fail (fast-fail-test): real failure');
+        expect(result.execution.nodes.slow.status).toBe('cancelled');
+        expect([...eventTypes]).toEqual(expect.arrayContaining(['node:error', 'node:cancelled']));
+      }
+    },
+  );
 });
