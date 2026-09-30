@@ -16,6 +16,7 @@ export const updateSessionSchema = z.object({
   personaId: z.string().uuid().nullable().optional(),
 });
 export const sendMessageSchema = z.object({ content: z.string().trim().min(1) });
+const messageParamsSchema = idParamsSchema.extend({ messageId: z.string().uuid() });
 export const sendMessageResultSchema = z.object({
   userMessage: messageSchema,
   assistantMessages: z.array(messageSchema),
@@ -28,6 +29,8 @@ export const sessionEndpoints = {
   updateSession: endpoint(sessionSchema, updateSessionSchema, idParamsSchema),
   deleteSession: endpoint(noContentSchema, undefined, idParamsSchema),
   sendMessage: endpoint(sendMessageResultSchema, sendMessageSchema, idParamsSchema),
+  updateMessage: endpoint(messageSchema, sendMessageSchema, messageParamsSchema),
+  deleteMessage: endpoint(noContentSchema, undefined, messageParamsSchema),
   getExecution: endpoint(executionLogSchema, undefined, idParamsSchema),
 };
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;

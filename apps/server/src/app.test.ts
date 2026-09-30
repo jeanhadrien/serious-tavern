@@ -141,6 +141,15 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     expect(sessions[0]?.messageCount).toBe(2);
     await request('getSession', { method: 'GET', url: `/api/sessions/${session.id}` });
     await request('getExecution', { method: 'GET', url: `/api/executions/${message.execution.id}` });
+    await request('updateMessage', {
+      method: 'PATCH',
+      url: `/api/sessions/${session.id}/messages/${message.userMessage.id}`,
+      payload: { content: 'Edited reply' },
+    });
+    await request('deleteMessage', {
+      method: 'DELETE',
+      url: `/api/sessions/${session.id}/messages/${message.userMessage.id}`,
+    });
     await request('previewPreset', {
       method: 'POST',
       url: '/api/presets/preview',
