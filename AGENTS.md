@@ -31,7 +31,11 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - `api/`: typed clients per resource, built on `transport.ts` (ApiError, toasts, `{silent:true}`). Pages call these clients, never raw paths.
   - `alerts/`: toast store and `<Toaster/>`.
   - `connection.ts`: `isValidConnection`.
-  - `pages/<area>/`: components and hooks per page (chat, workflows, entities, presets). Keep files focused, roughly under 250 lines.
+  - `pages/<area>/`: components and hooks per page (chat, workflows, entities, presets). Keep files focused, roughly under 250 lines. Page components take explicit, minimal props interfaces (not a whole hook result); the page file is a thin composition.
+  - `components/`: shared UI pieces (e.g. `IconButton`). Page-specific styles live next to the page (e.g. `pages/chat/chat.css`), not in `style.css`.
+  - Icons: `lucide-react` only. Icon-only buttons need `aria-label` and `title`.
+  - Markdown: `react-markdown` + `remark-gfm` with `skipHtml`. Never render raw HTML from message content (no `rehype-raw`).
+  - Message edit/delete (`PATCH`/`DELETE /api/sessions/:id/messages/:messageId`) change stored content only and never re-run the workflow.
 
 ## Commands
 - `npm run dev`: server and web together.
