@@ -60,7 +60,19 @@ Frontend notifications live in `apps/web/src/alerts/`. Import `alerts` and call 
 
 `pages/entities/` shares list/detail/avatar/drop components and draft/CRUD/import state between the character and persona pages, with separate field editors and validation/import notifications.
 
-`pages/chat/` separates chat data/actions (`useChat.ts`) from rendering and execution details.
+`Chat.tsx` is a thin composition of focused components in `pages/chat/`: `ChatSidebar`, `ChatHeader` (including shared character/persona selectors), `MessageList`, `ChatMessageView`, `MessageContent`, `MessageActions`, `MessageEditor`, `Composer`, and `ExecutionDetails`. `useChat` owns session/loading/send state; `useMessageActions` owns persisted edits/deletions. `useStickToBottom` tracks proximity to the bottom and observes content resizing (including images and execution details). Chat-only styles live in `pages/chat/chat.css`; the reusable accessible `IconButton` and its styles live in `components/`.
+
+### Chat controls and rendering
+
+- The composer grows up to 200px before scrolling. **Enter** sends, **Shift+Enter** adds a newline, and IME composition never submits. Sending retains/restores composer focus. While sending or mutating a message, the composer is read-only and sends/actions/context changes/chat navigation are disabled; workflow execution shows animated pending dots (respecting reduced-motion preferences).
+- Both user and assistant bubbles render Markdown, including GFM tables, lists, blockquotes, inline code and fenced code. Links open in a new tab with `rel="noopener noreferrer"`. Raw HTML is skipped and unsafe link protocols are rejected by the Markdown renderer; no `rehype-raw` is enabled. Soft line breaks are kept visible with scoped `white-space: pre-line` on Markdown paragraphs/list items rather than another plugin dependency; code uses its own whitespace rules.
+- User bubbles use the selected session persona's name/avatar, falling back to “You” and a user icon. Assistant bubbles preserve each reply's speaker snapshot and character avatar, or show “Assistant” with a bot icon. Consecutive outputs remain separate bubbles with their own identities.
+- Opening a conversation scrolls to its bottom. New messages and content resizes stick only when the reader was within 96px of the bottom; scrolling back through history opts out until the reader returns near the bottom.
+- Hover or keyboard-focus a bubble to expose **Edit/Delete** icon buttons (always visible on touch devices). Editing is inline: **Ctrl/Cmd+Enter** saves, **Escape** cancels, and whitespace-only content cannot be saved. Deletion requires a small inline confirmation. Both actions work on either role and never re-run a workflow or alter message attribution/execution metadata. Changes affect history used by subsequent turns, not saved execution logs.
+
+Web-only dependencies: **`lucide-react`** supplies tree-shakable SVG icons without runtime CSS; **`react-markdown`** renders Markdown safely as React elements; **`remark-gfm`** adds tables, strikethrough, task lists and autolinks. No HTML-processing or syntax-highlighting plugin is added.
+
+The scrollable history region intentionally has `tabIndex={0}` for keyboard scrolling (a narrowly documented Biome suppression); icon-only buttons have accessible labels and titles.
 
 To add a node type: (1) create `packages/engine/src/nodes/<type>/index.ts` exporting a `NodeDefinition` with Zod config, typed ports (`dataType`, optional `description`), defaults and `execute(ctx)`; (2) optionally add `resolvePorts(config, resources)` for instance-specific ports (resources provide read-only access to presets and character cards without importing server code), and declare `templateFields` for config fields accepting `{{...}}`; (3) register the definition in `packages/engine/src/registry.ts`; (4) optionally add a custom config panel. `/api/node-types/:type/ports` resolves dynamic ports for the editor; validation and execution use the same resolver. Resource lookups are cached for each execution so validation and execution use the same cards/presets.
 
@@ -79,6 +91,13 @@ The **LLM** has an optional `character` input in addition to preset inputs. A co
 ### Message API and partial failures
 
 `POST /api/sessions/:id/messages` accepts `{ content }` and returns `{ userMessage, assistantMessages: [...], execution }`. The array may be empty. Assistant messages may have `name` and `characterId`; the name is snapshotted when the message is created, so renaming a card does not rename old messages. Older stored sessions without these fields still work. Both user and assistant messages reference their execution, allowing the UI to display warnings/errors even when no output ran.
+
+| Method and path | Request | Success |
+| --- | --- | --- |
+| `PATCH /api/sessions/:id/messages/:messageId` | JSON `{ content: string }`, trimmed, minimum 1 character | `200` updated message: `{ id, role, content, createdAt, executionId?, name?, characterId? }` |
+| `DELETE /api/sessions/:id/messages/:messageId` | No body | `204` with no response body |
+
+Both parameters are UUIDs defined in the shared contract. Missing sessions or messages return `404` with `{ error: { code: 'NOT_FOUND', message: 'Session not found' | 'Message not found' } }`; invalid parameters or content return the standard validation `400` envelope. `services/messages.ts` mutates only the targeted message under the same `sessions.update` per-session lock as sending, updates the session's `updatedAt`, and retains all other messages and message fields. Concurrent API mutations wait for an in-flight workflow instead of racing its write; the UI also prevents these requests while busy.
 
 The engine returns `{ replies: Array<{ nodeId, content, name?, characterId? }>, execution }`. On failure it throws `ExecutionFailure` with `.execution` and ordered `.replies` containing only completed outputs. The server keeps those replies in the locked session before returning HTTP 500 with `{ error: { code: 'WORKFLOW_EXECUTION_FAILED', message, details: { userMessage, assistantMessages, execution } } }`.
 
