@@ -40,7 +40,15 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     return apiContract[key].response.parse(payload) as ApiResponse<K>;
   };
   try {
-    await request('listNodeTypes', { method: 'GET', url: '/api/node-types' });
+    const nodeTypes = await request('listNodeTypes', { method: 'GET', url: '/api/node-types' });
+    expect(
+      nodeTypes
+        .filter((descriptor) => descriptor.dynamicPorts)
+        .map((descriptor) => descriptor.type)
+        .sort(),
+    ).toEqual(['character', 'llm']);
+    for (const descriptor of nodeTypes)
+      expect(descriptor.dynamicPorts).toBe(!!registry.get(descriptor.type)?.resolvePorts);
     await request('listProviders', { method: 'GET', url: '/api/providers' });
     const workflow = await request('createWorkflow', {
       method: 'POST',

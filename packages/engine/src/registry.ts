@@ -16,11 +16,23 @@ export const registry = new Map<string, NodeDefinition>(
 );
 export function descriptors(): NodeTypeDescriptor[] {
   return [...registry.values()].map(
-    ({ type, label, description, category, inputs, outputs, configSchema, defaultConfig, templateFields }) => ({
+    ({
       type,
       label,
       description,
       category,
+      inputs,
+      outputs,
+      configSchema,
+      defaultConfig,
+      templateFields,
+      resolvePorts,
+    }) => ({
+      type,
+      label,
+      description,
+      category,
+      dynamicPorts: !!resolvePorts,
       inputs,
       outputs,
       templateFields,

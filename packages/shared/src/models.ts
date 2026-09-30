@@ -73,6 +73,7 @@ export const nodeTypeDescriptorSchema = z.object({
   label: z.string(),
   description: z.string(),
   category: z.string(),
+  dynamicPorts: z.boolean(),
   inputs: z.array(portSchema),
   outputs: z.array(portSchema),
   configSchema: z.record(z.string(), z.unknown()),

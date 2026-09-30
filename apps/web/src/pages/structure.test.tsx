@@ -93,6 +93,7 @@ it('renders output name/order controls and a character picker', () => {
     label: 'Chat Output',
     description: '',
     category: 'Chat',
+    dynamicPorts: false,
     inputs: [],
     outputs: [],
     defaultConfig: {},

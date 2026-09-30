@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   addEdge,
   applyNodeChanges,
@@ -10,16 +10,18 @@ import {
   type Edge,
   type ReactFlow,
 } from '@xyflow/react';
-import type { Workflow, NodeTypeDescriptor, NodeInstance, Preset } from '@st/shared';
-import { nodeTypesApi } from '../../api.js';
+import type { Workflow, NodeTypeDescriptor, NodeInstance, Preset, Character } from '@st/shared';
 import { alerts } from '../../alerts/index.js';
 import { checkConnection } from '../../connection.js';
 import { workflowToCanvas, type CanvasNode } from './model.js';
+import { useDynamicPorts } from './useDynamicPorts.js';
 
-export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]) {
+export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[], characters: Character[]) {
   const [nodes, setNodes] = useState<CanvasNode[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selected, setSelected] = useState<string>();
+  const [canvasVersion, setCanvasVersion] = useState(0);
+  useDynamicPorts(nodes, setNodes, types, presets, characters, canvasVersion);
   const canvasRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
   const visibleEdges = useMemo(
@@ -39,44 +41,8 @@ export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]
       }),
     [edges, nodes],
   );
-  const llmConfigs = JSON.stringify(
-    nodes.filter((node) => node.data.descriptor.type === 'llm').map((node) => [node.id, node.data.config.presetId]),
-  );
-  useEffect(() => {
-    let active = true;
-    void Promise.all(
-      nodes
-        .filter((node) => node.data.descriptor.type === 'llm')
-        .map(async (node) => {
-          if (!node.data.config.presetId) return undefined;
-          try {
-            return { id: node.id, ports: await nodeTypesApi.resolvePorts('llm', node.data.config) };
-          } catch {
-            return {
-              id: node.id,
-              ports: {
-                inputs: node.data.descriptor.inputs.filter((port) => port.name === 'character'),
-                outputs: node.data.descriptor.outputs,
-              },
-            };
-          }
-        }),
-    ).then((results) => {
-      if (!active) return;
-      setNodes((previous) =>
-        previous.map((node) => {
-          const result = results.find((item) => item?.id === node.id);
-          if (!result || JSON.stringify(node.data.descriptor.inputs) === JSON.stringify(result.ports.inputs))
-            return node;
-          return { ...node, data: { ...node.data, descriptor: { ...node.data.descriptor, ...result.ports } } };
-        }),
-      );
-    });
-    return () => {
-      active = false;
-    };
-  }, [llmConfigs, presets]);
   const load = (next: Workflow) => {
+    setCanvasVersion((version) => version + 1);
     const canvas = workflowToCanvas(next, types);
     setNodes(canvas.nodes);
     setEdges(canvas.edges);
@@ -85,6 +51,7 @@ export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]
       alerts.warning(`Unknown node types are preserved read-only: ${canvas.unknownTypes.join(', ')}`);
   };
   const clear = () => {
+    setCanvasVersion((version) => version + 1);
     setNodes([]);
     setEdges([]);
     setSelected(undefined);

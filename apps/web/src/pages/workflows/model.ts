@@ -42,6 +42,7 @@ export function workflowToCanvas(
           label: `Unknown node type: ${node.type}`,
           description: 'This node type is not currently available. Its configuration is preserved as read-only.',
           category: 'Unknown',
+          dynamicPorts: false,
           inputs: inputs.map((name) => ({ name, label: name, dataType: 'any' as const })),
           outputs: outputs.map((name) => ({ name, label: name, dataType: 'any' as const })),
           configSchema: {},

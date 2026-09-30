@@ -10,6 +10,7 @@ function descriptor(type: string, output: 'text' | 'messages', input: 'number' |
     category: '',
     configSchema: {},
     defaultConfig: {},
+    dynamicPorts: false,
     inputs: [{ name: 'in', label: 'In', dataType: input }],
     outputs: [{ name: 'out', label: 'Out', dataType: output }],
   };

@@ -13,7 +13,7 @@ export function useWorkflowEditor() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [providersList, setProvidersList] = useState<ApiResponse<'listProviders'>>([]);
   const [workflow, setWorkflow] = useState<Workflow>();
-  const canvas = useWorkflowCanvas(types, presets);
+  const canvas = useWorkflowCanvas(types, presets, characters);
   const refresh = () => workflowsApi.list().then(setWorkflows);
   useEffect(() => {
     void refresh().catch(() => {});
