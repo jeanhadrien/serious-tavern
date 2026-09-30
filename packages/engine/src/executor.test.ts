@@ -499,4 +499,78 @@ describe('executor', () => {
     expect(failedExecution).toEqual(snapshot);
     expect(failedExecution?.nodes.slow).not.toHaveProperty('request');
   });
+  it.each(['never', 'late'] as const)('bounds cleanup of a %s-settling sibling by its deadline', async (settlement) => {
+    let finish!: () => void;
+    const events: string[] = [];
+    registry.set('fast-fail-test', {
+      ...registry.get('chat-input')!,
+      type: 'fast-fail-test',
+      async execute() {
+        throw new Error('first failure');
+      },
+    });
+    registry.set('ignore-abort-test', {
+      ...registry.get('chat-input')!,
+      type: 'ignore-abort-test',
+      async execute({ recordRequest, emit }) {
+        await new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+        recordRequest({ late: true });
+        emit({ type: 'node:complete', nodeId: 'late-event' });
+        return { message: 'late', history: [] };
+      },
+    });
+    const graph = workflow(
+      [
+        node('input', 'chat-input'),
+        node('fail', 'fast-fail-test'),
+        node('slow', 'ignore-abort-test'),
+        node('merge', 'merge'),
+        node('output', 'chat-output'),
+      ],
+      [
+        edge('fail', 'message', 'merge', 'a'),
+        edge('slow', 'message', 'merge', 'b'),
+        edge('merge', 'value', 'output', 'value'),
+      ],
+    );
+    const failure = await Promise.race([
+      executeWorkflow(graph, { ...options, nodeTimeoutMs: 30, onEvent: (e) => events.push(e.type) }).catch(
+        (error) => error,
+      ),
+      new Promise((resolve) => setTimeout(() => resolve(new Error('Cleanup exceeded deadline')), 300)),
+    ]);
+    expect(failure).toMatchObject({
+      message: 'Node fail (fast-fail-test): first failure',
+      replies: [],
+      execution: { status: 'error', nodes: { slow: { status: 'cancelled' } } },
+    });
+    const snapshot = structuredClone(failure.execution);
+    const eventSnapshot = [...events];
+    if (settlement === 'late') finish();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(failure.execution).toEqual(snapshot);
+    expect(failure.replies).toEqual([]);
+    expect(events).toEqual(eventSnapshot);
+  });
+  it('reports per-node input setup errors instead of silently discarding rejected wave results', async () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    registry.set('typed-test', {
+      ...registry.get('chat-input')!,
+      type: 'typed-test',
+      outputs: [{ name: 'out', label: 'Out', dataType: 'object' }],
+      async execute() {
+        return { out: circular };
+      },
+    });
+    const graph = workflow(
+      [node('input', 'chat-input'), node('object', 'typed-test'), node('output', 'chat-output')],
+      [edge('object', 'out', 'output', 'value')],
+    );
+    await expect(executeWorkflow(graph, options)).rejects.toMatchObject({
+      execution: { status: 'error', nodes: { output: { status: 'error' } } },
+    });
+  });
 });
