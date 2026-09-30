@@ -57,8 +57,10 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 - **Secrets are write-only:** the API only returns masked hints. The OpenRouter key is the secret named `openrouter`. The master key comes from env `SECRETS_KEY` or `data/.master.key`.
 - **Seeded workflows** ("Default Assistant", "Parallel demo") must keep validating. There's a test for this.
 - **Session writes:** always go through the per-session lock and `update`, never `load → await → save`.
+  - The same applies to every mutation of an existing record (characters, personas, avatars): use `update` or the entity lock. Plain `save` is only for creation. Secrets use one store-wide lock.
+  - Locks (`storage/lock.ts`) are in-process and **not re-entrant**: never acquire the same key inside its own critical section, or it deadlocks.
   - Messages sent to one session are handled one after another; different sessions run concurrently.
-  - Repository writes are atomic: they write a temp file, then rename it.
+  - Repository writes are atomic: they write a temp file, then rename it. The rename retries transient Windows `EPERM`/`EACCES`/`EBUSY` errors.
 - **Execution semantics:**
   - A workflow has exactly one Chat Input and **one or more** Chat Outputs. Only nodes that some Chat Output depends on run; the rest are logged as `skipped`.
   - Each Chat Output that runs appends one assistant message. Message order is deterministic: dependency order first, then the output's `order` config, then node id. It never depends on which output finishes first.
@@ -66,7 +68,8 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - If no output runs, the turn has no reply and the execution records a warning. On failure, the replies already completed are kept and returned in the error details.
   - `character` is a port data type. The Character node outputs either the session's character or a specific card. A character connected to an LLM node replaces the session character for that node's `{{character.*}}` macros and aliases. The preset input key `character` is reserved.
   - A connected output port that a node doesn't return is an error, unless the port is marked `optional` (Condition branches are).
-  - On failure, the sibling nodes in the same wave are aborted and settled (status `cancelled`) before the error is thrown. After that, the execution log must never change.
+  - On failure, the sibling nodes in the same wave are aborted and settled (status `cancelled`) before the error is thrown. The wait for them is bounded by their original deadline; work that ignores the abort is left running detached and ignored. After that, the execution log must never change.
+  - `onEvent` observers can never change the outcome: their exceptions are swallowed.
 - **Editor:** never drop nodes. Unknown node types are kept as read-only placeholders and are saved unchanged.
 - **Presets:** fixed entries that render to empty text are dropped, so a template entry holding only one variable disappears when that variable is empty.
 - **Creating a session** requires a `workflowId`. Sessions also store `characterId` and `personaId`, which the server loads and passes to the executor.
