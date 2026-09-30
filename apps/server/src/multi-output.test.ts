@@ -1,12 +1,17 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
+import { registry } from '@st/engine';
 import { randomUUID } from 'node:crypto';
-import { rm } from 'node:fs/promises';
+import { readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { apiContract, errorEnvelopeSchema, sendMessageResultSchema, type ApiBody, type Workflow } from '@st/shared';
 import { createApp } from './app.js';
+import { createContext } from './context.js';
+import { characterFromCard } from './card.js';
+import { sendMessage } from './services/chat.js';
 
 const directories: string[] = [];
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
 const node = (id: string, type = 'chat-output', config: Record<string, unknown> = {}) => ({
@@ -64,8 +69,84 @@ async function setup(nodes: Workflow['nodes'], edges: Workflow['edges']) {
         })
       ).json(),
     );
-  return { app, workflow, session, send, load };
+  return { app, workflow, session, send, load, directory };
 }
+
+it('prepares each chat turn once, passing defaults to port resolution', async () => {
+  const definition = registry.get('chat-output')!;
+  const resolve = vi.fn(async (config: Record<string, unknown>) => {
+    expect(config).toEqual({ template: '', name: '', order: 0 });
+    return { inputs: definition.inputs, outputs: definition.outputs };
+  });
+  const original = definition.resolvePorts;
+  definition.resolvePorts = resolve;
+  const { app, send } = await setup([node('input', 'chat-input'), node('output')], [edge('input', 'output')]);
+  try {
+    expect((await send()).statusCode).toBe(200);
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect((await send()).statusCode).toBe(200);
+    expect(resolve).toHaveBeenCalledTimes(2);
+  } finally {
+    definition.resolvePorts = original;
+    await app.close();
+  }
+});
+
+it('rejects invalid disconnected nodes before persisting any message or execution', async () => {
+  const { app, send, load, directory } = await setup(
+    [node('input', 'chat-input'), node('output'), node('unknown', 'unknown-type')],
+    [edge('input', 'output')],
+  );
+  try {
+    const response = await send();
+    expect(response.statusCode).toBe(400);
+    expect(errorEnvelopeSchema.parse(response.json()).error).toMatchObject({ code: 'WORKFLOW_INVALID' });
+    expect((await load()).messages).toEqual([]);
+    expect(await readdir(join(directory, 'executions')).catch(() => [])).toEqual([]);
+  } finally {
+    await app.close();
+  }
+});
+
+it('shares the prepared card snapshot with session character context and execution', async () => {
+  const directory = join(process.cwd(), '.test-data', `snapshot-${randomUUID()}`);
+  directories.push(directory);
+  const context = await createContext(directory, { seed: false });
+  const card = characterFromCard(JSON.stringify({ name: 'Original' }), randomUUID(), '', false);
+  const get = vi
+    .spyOn(context.characters, 'get')
+    .mockResolvedValueOnce(card)
+    .mockResolvedValue({
+      ...card,
+      name: 'Changed',
+    });
+  const workflow: Workflow = {
+    id: randomUUID(),
+    name: 'Snapshot',
+    createdAt: '',
+    updatedAt: '',
+    nodes: [
+      node('input', 'chat-input'),
+      node('card', 'character', { source: 'card', characterId: card.id }),
+      node('output', 'chat-output', { template: '{{character.name}}' }),
+    ],
+    edges: [edge('input', 'output'), edge('card', 'output', 'character', 'character')],
+  };
+  await context.workflows.save(workflow);
+  const id = randomUUID();
+  await context.sessions.save({
+    id,
+    title: 'Snapshot',
+    workflowId: workflow.id,
+    characterId: card.id,
+    messages: [],
+    createdAt: '',
+    updatedAt: '',
+  });
+  const result = await sendMessage(context, id, 'hello');
+  expect(result.assistantMessages).toMatchObject([{ name: 'Original', content: 'Original', characterId: card.id }]);
+  expect(get).toHaveBeenCalledTimes(1);
+});
 
 it('persists multiple named assistant messages and forwards history names to preview', async () => {
   const { app, send, load, session } = await setup(
@@ -117,16 +198,17 @@ it('persists completed messages on partial failure and returns them in the error
     [
       node('input', 'chat-input'),
       node('foo', 'chat-output', { name: 'foo' }),
-      node('fail', 'http-request', { url: 'not-a-url' }),
+      node('fail with spaces', 'http-request', { url: 'not-a-url' }),
       node('bar'),
     ],
-    [edge('input', 'foo'), edge('foo', 'fail', 'reply', 'input'), edge('fail', 'bar', 'body')],
+    [edge('input', 'foo'), edge('foo', 'fail with spaces', 'reply', 'input'), edge('fail with spaces', 'bar', 'body')],
   );
   try {
     const response = await send();
     expect(response.statusCode).toBe(500);
     const error = errorEnvelopeSchema.parse(response.json()).error;
     expect(error.code).toBe('WORKFLOW_EXECUTION_FAILED');
+    expect(error.message).toMatch(/^HTTP Request \(fail with spaces\):/);
     const details = sendMessageResultSchema.parse(error.details);
     expect(details.assistantMessages).toMatchObject([{ name: 'foo', content: 'hello' }]);
     expect(details.execution.status).toBe('error');

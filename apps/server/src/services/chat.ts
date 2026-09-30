@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { ApiResponse, ChatMessage } from '@st/shared';
-import { executeWorkflow, ExecutionFailure, registry, validateWorkflow } from '@st/engine';
+import { executeWorkflow, ExecutionFailure, registry, prepareWorkflow } from '@st/engine';
 import type { ChatReply } from '@st/engine';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
@@ -15,10 +15,10 @@ export async function sendMessage(
   // Hold the repository's session lock until execution and both writes settle.
   const session = await sessions.update(id, async (current) => {
     const workflow = await requireEntity(workflows, current.workflowId, 'Workflow');
-    const errors = await validateWorkflow(workflow, { presets, characters });
-    if (errors.length) throw new HttpError(400, 'WORKFLOW_INVALID', 'Invalid workflow', errors);
+    const { errors, prepared } = await prepareWorkflow(workflow, { presets, characters });
+    if (!prepared) throw new HttpError(400, 'WORKFLOW_INVALID', 'Invalid workflow', errors);
     const history = [...current.messages];
-    const character = current.characterId ? await characters.get(current.characterId) : undefined;
+    const character = current.characterId ? await prepared.resources.characters?.get(current.characterId) : undefined;
     const persona = current.personaId ? await personas.get(current.personaId) : undefined;
     const userMessage: ChatMessage = { id: randomUUID(), role: 'user', content, createdAt: now() };
     current.messages.push(userMessage);
@@ -40,12 +40,11 @@ export async function sendMessage(
       return messages;
     };
     try {
-      const { replies, execution } = await executeWorkflow(workflow, {
+      const { replies, execution } = await executeWorkflow(prepared, {
         message: content,
         sessionId: id,
         history,
         secrets,
-        resources: { presets, characters },
         character,
         persona,
       });
@@ -56,9 +55,8 @@ export async function sendMessage(
       if (error instanceof ExecutionFailure) {
         const assistantMessages = keepReplies(error.replies, error.execution.id);
         await executions.save(error.execution);
-        const failedId = /^Node ([^ ]+) \(/.exec(error.message)?.[1];
-        const failedNode = workflow.nodes.find((node) => node.id === failedId);
-        const label = failedNode && registry.get(failedNode.type)?.label;
+        const failedId = error.nodeId;
+        const label = error.nodeType && registry.get(error.nodeType)?.label;
         const message =
           label && failedId
             ? `${label} (${failedId}): ${error.execution.nodes[failedId]?.error ?? error.message}`

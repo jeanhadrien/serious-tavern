@@ -1,10 +1,12 @@
 import type { Workflow } from '@st/shared';
 import type { ChatReply } from './types.js';
 
-export function orderReplies(workflow: Workflow, replies: Map<string, ChatReply>): ChatReply[] {
+export function orderReplies(
+  workflow: Workflow,
+  replies: Map<string, ChatReply>,
+  upstream: Map<string, string[]>,
+): ChatReply[] {
   const outputs = workflow.nodes.filter((node) => node.type === 'chat-output' && replies.has(node.id));
-  const upstream = new Map(workflow.nodes.map((node) => [node.id, [] as string[]]));
-  for (const edge of workflow.edges) upstream.get(edge.target)?.push(edge.source);
   const ancestors = new Map<string, Set<string>>();
   for (const output of outputs) {
     const seen = new Set<string>();
