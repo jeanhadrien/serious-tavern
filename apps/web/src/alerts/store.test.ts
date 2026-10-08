@@ -39,6 +39,16 @@ describe('alert store', () => {
     expect(store.warning('Same warning')).not.toBe(id);
     expect(store.getSnapshot()).toHaveLength(2);
   });
+  it('keeps alerts with different action targets separate', () => {
+    const first = store.error('Invalid workflow', {
+      action: { label: 'Open workflow', to: '/workflows?workflow=one' },
+    });
+    const second = store.error('Invalid workflow', {
+      action: { label: 'Open workflow', to: '/workflows?workflow=two' },
+    });
+    expect(first).not.toBe(second);
+    expect(store.getSnapshot()).toHaveLength(2);
+  });
   it('auto-dismisses timed alerts and pauses while hovered', () => {
     const id = store.success('Saved');
     vi.advanceTimersByTime(1000);

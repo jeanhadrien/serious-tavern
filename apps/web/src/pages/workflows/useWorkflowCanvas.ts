@@ -10,7 +10,14 @@ import {
   type Edge,
   type ReactFlow,
 } from '@xyflow/react';
-import type { Workflow, NodeTypeDescriptor, NodeInstance, Preset, Character } from '@st/shared';
+import {
+  nodeDisplayName,
+  type Workflow,
+  type NodeTypeDescriptor,
+  type NodeInstance,
+  type Preset,
+  type Character,
+} from '@st/shared';
 import { alerts } from '../../alerts/index.js';
 import { checkConnection } from '../../connection.js';
 import { workflowToCanvas, type CanvasNode } from './model.js';
@@ -20,26 +27,31 @@ export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]
   const [nodes, setNodes] = useState<CanvasNode[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selected, setSelected] = useState<string>();
+  const [highlightedEdge, setHighlightedEdge] = useState<string>();
   const [canvasVersion, setCanvasVersion] = useState(0);
-  useDynamicPorts(nodes, setNodes, types, presets, characters, canvasVersion);
+  useDynamicPorts(nodes, setNodes, edges, setEdges, types, presets, characters, canvasVersion);
   const canvasRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
   const visibleEdges = useMemo(
     () =>
       edges.map((edge) => {
         const result = checkConnection(edge, nodes);
+        const highlighted = edge.id === highlightedEdge;
         return {
           ...edge,
           label: !result.ok ? 'incompatible' : result.coerce ? '→text' : undefined,
-          labelStyle: { fill: result.ok ? '#efcf9b' : '#ff8b93', fontSize: 11 },
-          style: !result.ok
-            ? { stroke: '#ef8186', strokeWidth: 2 }
-            : result.coerce
-              ? { stroke: '#e6bb77', strokeWidth: 2, strokeDasharray: '6 4' }
-              : undefined,
+          labelStyle: { fill: highlighted || !result.ok ? '#ff8b93' : '#efcf9b', fontSize: 11 },
+          animated: highlighted || undefined,
+          style: highlighted
+            ? { stroke: '#ef8186', strokeWidth: 3 }
+            : !result.ok
+              ? { stroke: '#ef8186', strokeWidth: 2 }
+              : result.coerce
+                ? { stroke: '#e6bb77', strokeWidth: 2, strokeDasharray: '6 4' }
+                : undefined,
         };
       }),
-    [edges, nodes],
+    [edges, nodes, highlightedEdge],
   );
   const load = (next: Workflow) => {
     setCanvasVersion((version) => version + 1);
@@ -47,6 +59,7 @@ export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]
     setNodes(canvas.nodes);
     setEdges(canvas.edges);
     setSelected(undefined);
+    setHighlightedEdge(undefined);
     if (canvas.unknownTypes.length)
       alerts.warning(`Unknown node types are preserved read-only: ${canvas.unknownTypes.join(', ')}`);
   };
@@ -55,6 +68,7 @@ export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]
     setNodes([]);
     setEdges([]);
     setSelected(undefined);
+    setHighlightedEdge(undefined);
   };
   const onNodesChange: OnNodesChange<CanvasNode> = useCallback((changes) => {
     setNodes((prev) => applyNodeChanges(changes, prev));
@@ -100,15 +114,20 @@ export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]
     if (!result.ok) alerts.info(result.reason);
   };
   const addNode = (descriptor: NodeTypeDescriptor, position: { x: number; y: number }) => {
-    setNodes((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        type: 'workflow',
-        position,
-        data: { descriptor, config: { ...descriptor.defaultConfig } },
-      },
-    ]);
+    setNodes((prev) => {
+      const next: CanvasNode[] = [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          type: 'workflow',
+          position,
+          data: { descriptor, config: { ...descriptor.defaultConfig }, name: descriptor.label },
+        },
+      ];
+      const labelOf = (type: string) => types.find((item) => item.type === type)?.label ?? type;
+      const list = next.map((node) => ({ id: node.id, type: node.data.descriptor.type }));
+      return next.map((node) => ({ ...node, data: { ...node.data, name: nodeDisplayName(list, labelOf, node.id) } }));
+    });
   };
   const addAtCenter = (descriptor: NodeTypeDescriptor) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -133,6 +152,8 @@ export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]
     current,
     canvasRef,
     setSelected,
+    highlightedEdge,
+    setHighlightedEdge,
     load,
     clear,
     onNodesChange,

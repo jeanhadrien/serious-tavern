@@ -27,7 +27,7 @@ export function WorkflowNode({ id, data, selected }: NodeProps<CanvasNode>) {
     `${port.label} (${port.dataType})${port.description ? ` — ${port.description}` : ''}`;
   return (
     <div className={`flow-node ${selected ? 'selected' : ''} ${data.unknown ? 'unknown-node' : ''}`}>
-      <strong>{descriptor.label}</strong>
+      <strong>{data.name}</strong>
       <small>{descriptor.category}</small>
       {descriptor.inputs.map((port) => (
         <div className="port input-port" key={port.name} title={tooltip(port)}>

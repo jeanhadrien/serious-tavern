@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ApiResponse } from '@st/shared';
-import { canvasToWorkflow, type CanvasNode } from './model.js';
+import type { CanvasNode } from './model.js';
 import { checkConnection } from '../../connection.js';
 import { applyResolvedPorts, portRequests, portsEqual, resolvePortRequests } from './dynamicPorts.js';
 
@@ -26,6 +26,7 @@ function node(type = 'plugin', dynamicPorts = true): CanvasNode {
         defaultConfig: {},
       },
       config: { mode: 'first' },
+      name: `${type} #1 (${type})`,
     },
   };
 }
@@ -54,13 +55,13 @@ describe('dynamic ports', () => {
     const current = node();
     const staticNode = node('static', false);
     const request = portRequests([current])[0]!;
-    const result = applyResolvedPorts([current, staticNode], request, { ...base, outputs: [] });
-    expect(result[0]?.data.descriptor.outputs).toEqual([]);
-    expect(result[0]?.position).toBe(current.position);
-    expect(result[0]?.selected).toBe(true);
-    expect(result[0]?.data.config).toBe(current.data.config);
-    expect(result[1]).toBe(staticNode);
-    expect(applyResolvedPorts([current], request, base)[0]).toBe(current);
+    const result = applyResolvedPorts([current, staticNode], [], request, { ...base, outputs: [] });
+    expect(result.nodes[0]?.data.descriptor.outputs).toEqual([]);
+    expect(result.nodes[0]?.position).toBe(current.position);
+    expect(result.nodes[0]?.selected).toBe(true);
+    expect(result.nodes[0]?.data.config).toBe(current.data.config);
+    expect(result.nodes[1]).toBe(staticNode);
+    expect(applyResolvedPorts([current], [], request, base).nodes[0]).toBe(current);
   });
 
   it('rejects results for changed configs, changed types, removed nodes and unknown placeholders', () => {
@@ -73,23 +74,27 @@ describe('dynamic ports', () => {
       data: { ...current.data, descriptor: { ...current.data.descriptor, type: 'other' } },
     };
     for (const stale of [changed, unknown, changedType])
-      expect(applyResolvedPorts([stale], request, { inputs: [], outputs: [] })[0]).toBe(stale);
-    expect(applyResolvedPorts([], request, base)).toEqual([]);
+      expect(applyResolvedPorts([stale], [], request, { inputs: [], outputs: [] }).nodes[0]).toBe(stale);
+    expect(applyResolvedPorts([], [], request, base).nodes).toEqual([]);
   });
 
-  it('keeps edges attached to disappearing output ports unchanged when saving', () => {
+  it('prunes edges whose handle disappears when the resolved node keeps its config', () => {
     const nodes = [node(), node('target', false)];
-    const workflow = {
-      id: 'workflow',
-      name: 'Edges',
-      createdAt: '',
-      updatedAt: '',
-      nodes: [],
-      edges: [{ id: 'edge', source: 'plugin', sourceHandle: 'output', target: 'target', targetHandle: 'input' }],
-    };
-    const updated = applyResolvedPorts(nodes, portRequests(nodes)[0]!, { ...base, outputs: [] });
-    expect(checkConnection(workflow.edges[0]!, updated).ok).toBe(false);
-    expect(canvasToWorkflow(workflow, updated, workflow.edges).edges).toEqual(workflow.edges);
+    const edges = [{ id: 'edge', source: 'plugin', sourceHandle: 'output', target: 'target', targetHandle: 'input' }];
+    const pruned = applyResolvedPorts(nodes, edges, portRequests(nodes)[0]!, { ...base, outputs: [] });
+    expect(pruned.edges).toEqual([]);
+    expect(checkConnection(edges[0]!, pruned.nodes).ok).toBe(false);
+    const kept = applyResolvedPorts(nodes, edges, portRequests(nodes)[0]!, base);
+    expect(kept.edges).toEqual(edges);
+  });
+
+  it('leaves edges untouched when a stale result is ignored', () => {
+    const current = node();
+    const changed = { ...current, data: { ...current.data, config: { mode: 'new' } } };
+    const edges = [{ id: 'edge', source: 'plugin', sourceHandle: 'output', target: 'target', targetHandle: 'input' }];
+    const result = applyResolvedPorts([changed], edges, portRequests([current])[0]!, { inputs: [], outputs: [] });
+    expect(result.nodes[0]).toBe(changed);
+    expect(result.edges).toBe(edges);
   });
 
   it('ignores a slower cancelled batch, even if a newer canvas has the same node id and config', async () => {
@@ -101,7 +106,7 @@ describe('dynamic ports', () => {
     let oldActive = true;
     let nodes = [node()];
     const accept = (request: (typeof requests)[number], ports: ApiResponse<'resolvePorts'>) => {
-      nodes = applyResolvedPorts(nodes, request, ports);
+      nodes = applyResolvedPorts(nodes, [], request, ports).nodes;
     };
     const oldBatch = resolvePortRequests(
       requests,

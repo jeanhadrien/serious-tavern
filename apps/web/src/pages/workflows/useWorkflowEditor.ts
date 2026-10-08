@@ -1,11 +1,20 @@
-import { useEffect, useState } from 'react';
-import type { Character, Workflow, NodeTypeDescriptor, Preset, ApiResponse } from '@st/shared';
-import { charactersApi, workflowsApi, nodeTypesApi, presetsApi, providersApi } from '../../api.js';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import {
+  workflowInvalidDetailsSchema,
+  type Character,
+  type Workflow,
+  type NodeTypeDescriptor,
+  type Preset,
+  type ApiResponse,
+} from '@st/shared';
+import { ApiError, charactersApi, workflowsApi, nodeTypesApi, presetsApi, providersApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
 import { canvasToWorkflow } from './model.js';
 import { useWorkflowCanvas } from './useWorkflowCanvas.js';
 
 export function useWorkflowEditor() {
+  const [searchParams] = useSearchParams();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [types, setTypes] = useState<NodeTypeDescriptor[]>([]);
   const [typesReady, setTypesReady] = useState(false);
@@ -53,6 +62,30 @@ export function useWorkflowEditor() {
     setWorkflow(next);
     canvas.load(next);
   };
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  const requestedWorkflowId = searchParams.get('workflow');
+  const requestedEdgeId = searchParams.get('edge');
+  const deepLinkRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!requestedWorkflowId || deepLinkRef.current === requestedWorkflowId) return;
+    deepLinkRef.current = requestedWorkflowId;
+    let active = true;
+    void workflowsApi
+      .get(requestedWorkflowId)
+      .then((loaded) => {
+        if (!active) return;
+        loadRef.current(loaded);
+        if (requestedEdgeId) canvas.setHighlightedEdge(requestedEdgeId);
+      })
+      .catch(() => {
+        deepLinkRef.current = undefined;
+      });
+    return () => {
+      active = false;
+      if (deepLinkRef.current === requestedWorkflowId) deepLinkRef.current = undefined;
+    };
+  }, [requestedWorkflowId, requestedEdgeId, canvas.setHighlightedEdge]);
   const create = async () => {
     if (!typesReady) return;
     const name = window.prompt('Workflow name');
@@ -83,8 +116,14 @@ export function useWorkflowEditor() {
     try {
       if (!(await save(false))) return;
       await workflowsApi.validate(workflow.id);
+      canvas.setHighlightedEdge(undefined);
       alerts.success('Workflow is valid');
-    } catch {
+    } catch (error) {
+      const invalid = error instanceof ApiError ? workflowInvalidDetailsSchema.safeParse(error.details) : undefined;
+      if (invalid?.success) {
+        const edgeId = invalid.data.issues.find((issue) => issue.edgeId)?.edgeId;
+        canvas.setHighlightedEdge(edgeId);
+      }
       /* API errors are toasted. */
     }
   };

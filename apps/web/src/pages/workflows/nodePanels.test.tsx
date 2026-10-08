@@ -38,7 +38,7 @@ it('renders the registered LLM panel with the same controls, preset summary and 
   const html = renderToStaticMarkup(
     <MemoryRouter>
       <WorkflowConfigPanel
-        current={{ id: 'llm', position: { x: 0, y: 0 }, data: { descriptor, config } }}
+        current={{ id: 'llm', position: { x: 0, y: 0 }, data: { descriptor, config, name: 'LLM #1 (llm)' } }}
         presets={[preset]}
         characters={[]}
         providersList={[{ id: 'openrouter', label: 'OpenRouter', secretName: 'openrouter' }]}

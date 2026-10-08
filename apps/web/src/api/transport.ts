@@ -1,4 +1,4 @@
-import type { ExecutionLog, ErrorEnvelope } from '@st/shared';
+import { workflowInvalidDetailsSchema, type ExecutionLog, type ErrorEnvelope } from '@st/shared';
 import { alerts } from '../alerts/store.js';
 type ApiOptions = RequestInit & { silent?: boolean };
 export type RequestOptions = Omit<ApiOptions, 'method' | 'body'>;
@@ -19,6 +19,8 @@ function detailText(details: unknown): string | undefined {
   if (Array.isArray(details) && details.every((item) => typeof item === 'string')) return details.join('\n');
   if (Array.isArray(details) && details.every((item) => item && typeof item === 'object' && 'message' in item))
     return details.map((item) => `${item.path ? `${item.path}: ` : ''}${item.message}`).join('\n');
+  const invalid = workflowInvalidDetailsSchema.safeParse(details);
+  if (invalid.success) return invalid.data.issues.map((issue) => issue.message).join('\n');
   if (typeof details === 'object' && 'execution' in details) {
     const execution = (details as { execution: ExecutionLog }).execution;
     return (
@@ -31,11 +33,26 @@ function detailText(details: unknown): string | undefined {
   return JSON.stringify(details, null, 2);
 }
 function notify(error: ApiError, silent: boolean) {
-  if (!silent)
-    alerts.error(error.message, {
-      title: error.code === 'WORKFLOW_EXECUTION_FAILED' ? 'Workflow failed' : 'Request failed',
-      details: detailText(error.details),
-    });
+  if (silent) return;
+  if (error.code === 'WORKFLOW_INVALID') {
+    const invalid = workflowInvalidDetailsSchema.safeParse(error.details);
+    if (invalid.success) {
+      const edgeId = invalid.data.issues.find((issue) => issue.edgeId)?.edgeId;
+      alerts.error(error.message, {
+        title: 'Workflow is invalid',
+        details: detailText(error.details),
+        action: {
+          label: 'Open workflow',
+          to: `/workflows?workflow=${invalid.data.workflowId}${edgeId ? `&edge=${edgeId}` : ''}`,
+        },
+      });
+      return;
+    }
+  }
+  alerts.error(error.message, {
+    title: error.code === 'WORKFLOW_EXECUTION_FAILED' ? 'Workflow failed' : 'Request failed',
+    details: detailText(error.details),
+  });
 }
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { silent = false, ...requestOptions } = options;

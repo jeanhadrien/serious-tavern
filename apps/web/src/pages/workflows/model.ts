@@ -1,9 +1,10 @@
 import type { Edge as FlowEdge, Node as FlowNode } from '@xyflow/react';
-import type { Edge, NodeInstance, NodeTypeDescriptor, Workflow } from '@st/shared';
+import { nodeDisplayName, type Edge, type NodeInstance, type NodeTypeDescriptor, type Workflow } from '@st/shared';
 
 export type CanvasNode = FlowNode<{
   descriptor: NodeTypeDescriptor;
   config: NodeInstance['config'];
+  name: string;
   unknown?: boolean;
 }>;
 
@@ -15,14 +16,16 @@ export function workflowToCanvas(
   edges: FlowEdge[];
   unknownTypes: string[];
 } {
+  const labelOf = (type: string) => types.find((item) => item.type === type)?.label ?? type;
   const nodes = workflow.nodes.map((node) => {
     const descriptor = types.find((type) => type.type === node.type);
+    const name = nodeDisplayName(workflow.nodes, labelOf, node.id);
     if (descriptor)
       return {
         id: node.id,
         type: 'workflow',
         position: node.position,
-        data: { descriptor, config: node.config },
+        data: { descriptor, config: node.config, name },
       } satisfies CanvasNode;
     const inputs = [
       ...new Set(workflow.edges.filter((edge) => edge.target === node.id).map((edge) => edge.targetHandle)),
@@ -37,6 +40,7 @@ export function workflowToCanvas(
       data: {
         unknown: true,
         config: node.config,
+        name,
         descriptor: {
           type: node.type,
           label: `Unknown node type: ${node.type}`,

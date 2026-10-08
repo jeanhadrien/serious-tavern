@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useAlerts } from './index.js';
 
 export function Toaster() {
@@ -25,6 +26,11 @@ export function Toaster() {
             </button>
           </div>
           <p>{item.message}</p>
+          {item.action && (
+            <Link className="toast-action" to={item.action.to} onClick={() => alerts.dismiss(item.id)}>
+              {item.action.label}
+            </Link>
+          )}
           {item.details && (
             <details>
               <summary>Details</summary>

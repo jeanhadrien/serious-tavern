@@ -22,7 +22,7 @@ export function WorkflowConfigPanel({
   return (
     <aside className="config-panel">
       <div className="toolbar">
-        <h3>{currentDescriptor.label}</h3>
+        <h3>{current.data.name}</h3>
         <button onClick={onClose}>×</button>
       </div>
       <p className="hint">{currentDescriptor.description}</p>

@@ -394,6 +394,16 @@ pre {
   margin: 6px 0 0;
   font-size: 0.92rem;
 }
+.toast-action {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #aab4ff;
+}
+.toast-action:hover {
+  text-decoration: underline;
+}
 .toast details {
   font-size: 0.82rem;
   margin-top: 8px;

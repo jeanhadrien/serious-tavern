@@ -1,4 +1,5 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+import type { Edge } from '@xyflow/react';
 import type { Character, NodeTypeDescriptor, Preset } from '@st/shared';
 import { nodeTypesApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
@@ -8,6 +9,8 @@ import { applyResolvedPorts, portRequests, resolvePortRequests } from './dynamic
 export function useDynamicPorts(
   nodes: CanvasNode[],
   setNodes: Dispatch<SetStateAction<CanvasNode[]>>,
+  edges: Edge[],
+  setEdges: Dispatch<SetStateAction<Edge[]>>,
   types: NodeTypeDescriptor[],
   presets: Preset[],
   characters: Character[],
@@ -17,6 +20,10 @@ export function useDynamicPorts(
   const requestKey = JSON.stringify(requests);
   const requestsRef = useRef(requests);
   requestsRef.current = requests;
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+  const edgesRef = useRef(edges);
+  edgesRef.current = edges;
   useEffect(() => {
     let active = true;
     void resolvePortRequests(
@@ -26,15 +33,21 @@ export function useDynamicPorts(
           return await nodeTypesApi.resolvePorts(request.type, request.config, { silent: true });
         } catch (error) {
           if (active) alerts.error(error instanceof Error ? error.message : 'Could not resolve node ports');
-          const descriptor = types.find((type) => type.type === request.type)!;
-          return { inputs: descriptor.inputs, outputs: descriptor.outputs };
+          return undefined;
         }
       },
-      (request, ports) => setNodes((previous) => (active ? applyResolvedPorts(previous, request, ports) : previous)),
+      (request, ports) => {
+        if (!active) return;
+        const result = applyResolvedPorts(nodesRef.current, edgesRef.current, request, ports);
+        nodesRef.current = result.nodes;
+        edgesRef.current = result.edges;
+        setNodes(result.nodes);
+        setEdges(result.edges);
+      },
       () => active,
     );
     return () => {
       active = false;
     };
-  }, [requestKey, types, presets, characters, canvasVersion, setNodes]);
+  }, [requestKey, types, presets, characters, canvasVersion, setNodes, setEdges]);
 }

@@ -5,11 +5,17 @@ export type Alert = {
   title?: string;
   message: string;
   details?: string;
+  action?: { label: string; to: string };
   createdAt: number;
   timeoutMs: number;
   count: number;
 };
-export type AlertOptions = { title?: string; details?: string; timeoutMs?: number };
+export type AlertOptions = {
+  title?: string;
+  details?: string;
+  timeoutMs?: number;
+  action?: { label: string; to: string };
+};
 
 const defaults: Record<AlertLevel, number> = { error: 0, success: 4000, info: 4000, warning: 4000 };
 
@@ -31,8 +37,8 @@ export class AlertStore {
   private notify() {
     for (const listener of this.listeners) listener();
   }
-  private key(alert: Pick<Alert, 'level' | 'title' | 'message' | 'details'>) {
-    return JSON.stringify([alert.level, alert.title, alert.message, alert.details]);
+  private key(alert: Pick<Alert, 'level' | 'title' | 'message' | 'details' | 'action'>) {
+    return JSON.stringify([alert.level, alert.title, alert.message, alert.details, alert.action]);
   }
   private cancel(id: string) {
     const timer = this.timers.get(id);
@@ -54,7 +60,7 @@ export class AlertStore {
   }
   add(level: AlertLevel, message: string, options: AlertOptions = {}): string {
     const now = Date.now();
-    const candidate = { level, title: options.title, message, details: options.details };
+    const candidate = { level, title: options.title, message, details: options.details, action: options.action };
     const key = this.key(candidate);
     const duplicate = this.items.find(
       (item) => this.key(item) === key && now - (this.lastSeen.get(item.id) ?? 0) < 2000,
