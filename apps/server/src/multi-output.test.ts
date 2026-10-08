@@ -82,6 +82,8 @@ it('prepares each chat turn once, passing defaults to port resolution', async ()
   definition.resolvePorts = resolve;
   const { app, send } = await setup([node('input', 'chat-input'), node('output')], [edge('input', 'output')]);
   try {
+    // Saving the workflow resolves ports once for pruning; the turn counter starts after that.
+    resolve.mockClear();
     expect((await send()).statusCode).toBe(200);
     expect(resolve).toHaveBeenCalledTimes(1);
     expect((await send()).statusCode).toBe(200);
@@ -284,7 +286,13 @@ it('resolves selected cards for validation, output attribution and immutable spe
     const invalid = await app.inject({ method: 'POST', url: `/api/workflows/${workflow.id}/validate` });
     expect(invalid.statusCode).toBe(422);
     expect(errorEnvelopeSchema.parse(invalid.json()).error.details).toEqual(
-      expect.arrayContaining([`Node character: Character ${card.id} not found`]),
+      expect.objectContaining({
+        issues: expect.arrayContaining([
+          expect.objectContaining({
+            message: expect.stringContaining(`could not resolve its ports: Character ${card.id} not found`),
+          }),
+        ]),
+      }),
     );
   } finally {
     await app.close();

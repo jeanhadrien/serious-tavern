@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { ApiResponse, ChatMessage } from '@st/shared';
+import type { ApiResponse, ChatMessage, WorkflowInvalidDetails } from '@st/shared';
 import { executeWorkflow, ExecutionFailure, registry, prepareWorkflow } from '@st/engine';
 import type { ChatReply } from '@st/engine';
 import { now, type AppContext } from '../context.js';
@@ -16,7 +16,12 @@ export async function sendMessage(
   const session = await sessions.update(id, async (current) => {
     const workflow = await requireEntity(workflows, current.workflowId, 'Workflow');
     const { errors, prepared } = await prepareWorkflow(workflow, { presets, characters });
-    if (!prepared) throw new HttpError(400, 'WORKFLOW_INVALID', 'Invalid workflow', errors);
+    if (!prepared)
+      throw new HttpError(400, 'WORKFLOW_INVALID', `Workflow "${workflow.name}" is invalid`, {
+        workflowId: workflow.id,
+        workflowName: workflow.name,
+        issues: errors,
+      } satisfies WorkflowInvalidDetails);
     const history = [...current.messages];
     const character = current.characterId ? await prepared.resources.characters?.get(current.characterId) : undefined;
     const persona = current.personaId ? await personas.get(current.personaId) : undefined;

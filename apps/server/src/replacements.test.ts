@@ -93,10 +93,14 @@ it.each(
     });
     if (order === 'put-first') {
       const get = repository.get.bind(repository);
+      // Workflows read once for requireEntity (prune input) and once inside update; presets read only inside update.
+      const pauseAt = resource === 'workflows' ? 2 : 1;
+      let calls = 0;
       let paused = false;
       vi.spyOn(repository, 'get').mockImplementation(async (key) => {
         const current = await get(key);
-        if (key === id && !paused) {
+        calls++;
+        if (key === id && calls === pauseAt && !paused) {
           paused = true;
           started.resolve();
           await release.promise;

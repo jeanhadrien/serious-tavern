@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { apiContract, presetSchema } from '@st/shared';
+import { pruneInvalidEdges } from '@st/engine';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
 import { previewPreset } from '../services/preset-preview.js';
 import type { ApiRoute } from './types.js';
 
 export function registerPresets(app: FastifyInstance, context: AppContext) {
-  const { presets, workflows } = context;
+  const { presets, workflows, characters } = context;
   app.get<ApiRoute<'listPresets'>>('/api/presets', async () => presets.list());
   app.post<ApiRoute<'previewPreset'>>('/api/presets/preview', async (request) =>
     previewPreset(context, apiContract.previewPreset.body.parse(request.body)),
@@ -29,6 +30,13 @@ export function registerPresets(app: FastifyInstance, context: AppContext) {
       presetSchema.parse({ ...body, id, createdAt: old.createdAt, updatedAt: now() }),
     );
     if (!preset) throw notFound('Preset');
+    // Drop connections into preset inputs that no longer exist on dependent LLM nodes.
+    for (const workflow of await workflows.list()) {
+      if (!workflow.nodes.some((node) => node.type === 'llm' && node.config.presetId === id)) continue;
+      const pruned = await pruneInvalidEdges(workflow, { presets, characters });
+      if (pruned.edges.length !== workflow.edges.length)
+        await workflows.update(workflow.id, (old) => ({ ...old, edges: pruned.edges, updatedAt: now() }));
+    }
     return preset;
   });
   app.delete<ApiRoute<'deletePreset'>>('/api/presets/:id', async (request, reply) => {

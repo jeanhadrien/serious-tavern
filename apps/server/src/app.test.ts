@@ -288,7 +288,12 @@ it('supports workflow CRUD, secrets masking, and a chat execution through inject
     expect(invalidValidation.statusCode).toBe(422);
     expect(invalidValidation.json().error).toMatchObject({
       code: 'WORKFLOW_INVALID',
-      details: expect.arrayContaining([expect.stringContaining('chat-output')]),
+      message: 'Workflow "Empty" is invalid',
+      details: {
+        workflowId: workflow.id,
+        workflowName: 'Empty',
+        issues: expect.arrayContaining([expect.objectContaining({ message: expect.stringContaining('chat-output') })]),
+      },
     });
     const invalidGraph = await app.inject({
       method: 'POST',
@@ -298,7 +303,12 @@ it('supports workflow CRUD, secrets masking, and a chat execution through inject
     expect(invalidGraph.statusCode).toBe(400);
     expect(invalidGraph.json().error).toMatchObject({
       code: 'WORKFLOW_INVALID',
-      details: expect.arrayContaining([expect.stringContaining('chat-input')]),
+      message: 'Workflow "Empty" is invalid',
+      details: {
+        workflowId: workflow.id,
+        workflowName: 'Empty',
+        issues: expect.arrayContaining([expect.objectContaining({ message: expect.stringContaining('chat-input') })]),
+      },
     });
     const preset = (
       await app.inject({
@@ -354,6 +364,66 @@ it('supports workflow CRUD, secrets masking, and a chat execution through inject
     expect((await app.inject({ method: 'DELETE', url: `/api/workflows/${workflow.id}` })).statusCode).toBe(409);
     expect((await app.inject({ method: 'DELETE', url: `/api/sessions/${created.id}` })).statusCode).toBe(204);
     expect((await app.inject({ method: 'DELETE', url: `/api/workflows/${workflow.id}` })).statusCode).toBe(204);
+  } finally {
+    await app.close();
+  }
+});
+it('prunes orphaned preset-input edges when a preset is updated', async () => {
+  const directory = join(process.cwd(), '.test-data', `test-${randomUUID()}`);
+  directories.push(directory);
+  const app = await createApp(directory, { seed: false });
+  try {
+    const preset = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/presets',
+        payload: {
+          name: 'Dynamic',
+          inputs: [
+            { id: 'message-input', key: 'message', label: 'Message', dataType: 'text' },
+            { id: 'extra-input', key: 'extra', label: 'Extra', dataType: 'text' },
+          ],
+          entries: [
+            { id: 'message-slot', name: 'Message', enabled: true, kind: 'slot', inputKey: 'message' },
+            { id: 'extra-slot', name: 'Extra', enabled: true, kind: 'slot', inputKey: 'extra' },
+          ],
+        },
+      })
+    ).json();
+    const workflow = (
+      await app.inject({ method: 'POST', url: '/api/workflows', payload: { name: 'Preset workflow' } })
+    ).json();
+    const put = await app.inject({
+      method: 'PUT',
+      url: `/api/workflows/${workflow.id}`,
+      payload: {
+        name: 'Preset workflow',
+        nodes: [
+          { id: 'input', type: 'chat-input', config: {}, position: { x: 0, y: 0 } },
+          { id: 'llm', type: 'llm', config: { presetId: preset.id }, position: { x: 100, y: 0 } },
+          { id: 'output', type: 'chat-output', config: {}, position: { x: 200, y: 0 } },
+        ],
+        edges: [
+          { id: 'prompt', source: 'input', sourceHandle: 'message', target: 'llm', targetHandle: 'message' },
+          { id: 'extra', source: 'input', sourceHandle: 'message', target: 'llm', targetHandle: 'extra' },
+          { id: 'reply', source: 'llm', sourceHandle: 'text', target: 'output', targetHandle: 'value' },
+        ],
+      },
+    });
+    expect(put.statusCode).toBe(200);
+    expect(put.json().edges.map((edge: { id: string }) => edge.id)).toEqual(['prompt', 'extra', 'reply']);
+    const updated = await app.inject({
+      method: 'PUT',
+      url: `/api/presets/${preset.id}`,
+      payload: {
+        name: 'Dynamic',
+        inputs: [{ id: 'message-input', key: 'message', label: 'Message', dataType: 'text' }],
+        entries: [{ id: 'message-slot', name: 'Message', enabled: true, kind: 'slot', inputKey: 'message' }],
+      },
+    });
+    expect(updated.statusCode).toBe(200);
+    const after = (await app.inject({ method: 'GET', url: `/api/workflows/${workflow.id}` })).json();
+    expect(after.edges.map((edge: { id: string }) => edge.id)).toEqual(['prompt', 'reply']);
   } finally {
     await app.close();
   }
@@ -670,8 +740,14 @@ it('supports presets CRUD, preview with a session, dynamic ports, and deletion c
         .inputs.map((port: { name: string }) => port.name),
     ).toEqual(['character', 'history']);
     const staleInputValidation = await app.inject({ method: 'POST', url: `/api/workflows/${workflow.id}/validate` });
-    expect(staleInputValidation.statusCode).toBe(422);
-    expect(staleInputValidation.json().error.details.join(' ')).toContain('invalid input port message');
+    expect(staleInputValidation.statusCode).toBe(200);
+    expect(staleInputValidation.json()).toEqual({ valid: true, errors: [] });
+    // Removing the preset input pruned the orphaned edge into it.
+    expect(
+      (await app.inject({ method: 'GET', url: `/api/workflows/${workflow.id}` }))
+        .json()
+        .edges.map((edge: { id: string }) => edge.id),
+    ).toEqual(['reply']);
     const inUse = await app.inject({ method: 'DELETE', url: `/api/presets/${preset.id}` });
     expect(inUse.statusCode).toBe(409);
     expect(inUse.json().error).toEqual({

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { apiContract, type ApiResponse } from '@st/shared';
-import { validateWorkflow } from '@st/engine';
+import { apiContract, type ApiResponse, type WorkflowInvalidDetails } from '@st/shared';
+import { pruneInvalidEdges, validateWorkflow } from '@st/engine';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
 import type { ApiRoute } from './types.js';
@@ -28,7 +28,9 @@ export function registerWorkflows(app: FastifyInstance, { workflows, sessions, p
   app.put<ApiRoute<'updateWorkflow'>>('/api/workflows/:id', async (request) => {
     const { id } = apiContract.updateWorkflow.params.parse(request.params);
     const body = apiContract.updateWorkflow.body.parse(request.body);
-    const workflow = await workflows.update(id, (old) => ({ ...old, ...body, updatedAt: now() }));
+    const existing = await requireEntity(workflows, id, 'Workflow');
+    const pruned = await pruneInvalidEdges({ ...existing, ...body }, { presets, characters });
+    const workflow = await workflows.update(id, (old) => ({ ...old, ...body, edges: pruned.edges, updatedAt: now() }));
     if (!workflow) throw notFound('Workflow');
     return workflow;
   });
@@ -43,7 +45,12 @@ export function registerWorkflows(app: FastifyInstance, { workflows, sessions, p
     const { id } = apiContract.validateWorkflow.params.parse(request.params);
     const workflow = await requireEntity(workflows, id, 'Workflow');
     const errors = await validateWorkflow(workflow, { presets, characters });
-    if (errors.length) throw new HttpError(422, 'WORKFLOW_INVALID', 'Invalid workflow', errors);
+    if (errors.length)
+      throw new HttpError(422, 'WORKFLOW_INVALID', `Workflow "${workflow.name}" is invalid`, {
+        workflowId: workflow.id,
+        workflowName: workflow.name,
+        issues: errors,
+      } satisfies WorkflowInvalidDetails);
     return { valid: true, errors: [] };
   });
 }

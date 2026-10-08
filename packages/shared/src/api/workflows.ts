@@ -1,6 +1,13 @@
 import { z } from 'zod';
-import { workflowSchema } from '../models.js';
+import { validationIssueSchema, workflowSchema } from '../models.js';
 import { endpoint, idParamsSchema, noContentSchema } from './common.js';
+
+export const workflowInvalidDetailsSchema = z.object({
+  workflowId: z.string(),
+  workflowName: z.string(),
+  issues: z.array(validationIssueSchema),
+});
+export type WorkflowInvalidDetails = z.infer<typeof workflowInvalidDetailsSchema>;
 
 export const workflowEndpoints = {
   listWorkflows: endpoint(z.array(workflowSchema)),
@@ -13,7 +20,7 @@ export const workflowEndpoints = {
   ),
   deleteWorkflow: endpoint(noContentSchema, undefined, idParamsSchema),
   validateWorkflow: endpoint(
-    z.object({ valid: z.literal(true), errors: z.array(z.string()) }),
+    z.object({ valid: z.literal(true), errors: z.array(validationIssueSchema) }),
     undefined,
     idParamsSchema,
   ),

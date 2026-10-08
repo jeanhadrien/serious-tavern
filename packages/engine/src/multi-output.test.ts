@@ -71,8 +71,8 @@ afterEach(() => {
 
 describe('multiple chat outputs', () => {
   it('requires one input and at least one output, but allows multiple outputs', async () => {
-    expect(await validateWorkflow(graph([node('input', 'chat-input')], []))).toContain(
-      'Expected at least one chat-output node',
+    expect(await validateWorkflow(graph([node('input', 'chat-input')], []))).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('chat-output node') }),
     );
     expect(
       await validateWorkflow(
@@ -328,9 +328,13 @@ describe('character nodes and history', () => {
       ],
       [edge('input', 'output'), edge('character', 'output', 'character', 'character')],
     );
-    expect(await validateWorkflow(workflow)).toContain('Node character: Character missing not found');
+    expect(await validateWorkflow(workflow)).toContainEqual(
+      expect.objectContaining({ message: expect.stringContaining('Character missing not found') }),
+    );
     workflow.nodes[1]!.config.characterId = '';
-    expect((await validateWorkflow(workflow)).join(' ')).toContain('Select a character card');
+    expect((await validateWorkflow(workflow)).map((issue) => issue.message).join(' ')).toContain(
+      'Select a character card',
+    );
   });
   it.each([false, true])('renders all character macros from the LLM render context (override=%s)', async (override) => {
     const chat = vi.fn(async () => ({ text: 'reply', raw: {} }));

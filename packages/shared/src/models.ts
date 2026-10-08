@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import { portDataTypes } from './ports.js';
+export const validationIssueSchema = z.object({
+  message: z.string(),
+  edgeId: z.string().optional(),
+  nodeIds: z.array(z.string()).optional(),
+});
 export const nodeSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
@@ -81,6 +86,7 @@ export const nodeTypeDescriptorSchema = z.object({
   templateFields: z.array(z.string()).optional(),
 });
 export type Workflow = z.infer<typeof workflowSchema>;
+export type ValidationIssue = z.infer<typeof validationIssueSchema>;
 export type NodeInstance = z.infer<typeof nodeSchema>;
 export type Edge = z.infer<typeof edgeSchema>;
 export type ChatMessage = z.infer<typeof messageSchema>;

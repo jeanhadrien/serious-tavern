@@ -46,7 +46,8 @@ export async function executeWorkflow(
 ): Promise<{ replies: ChatReply[]; execution: ExecutionLog }> {
   const preparation =
     'workflow' in input ? { errors: [], prepared: input } : await prepareWorkflow(input, options.resources);
-  if (!preparation.prepared) throw new Error(`Invalid workflow: ${preparation.errors.join('; ')}`);
+  if (!preparation.prepared)
+    throw new Error(`Invalid workflow: ${preparation.errors.map((issue) => issue.message).join('; ')}`);
   const { workflow, resources, definitions, ports, incoming, upstream, reachable } = preparation.prepared;
   const execution: ExecutionLog = {
     id: randomUUID(),

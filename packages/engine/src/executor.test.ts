@@ -157,8 +157,8 @@ describe('executor', () => {
       ],
     );
     graph.nodes[1]!.config = { template: 123 };
-    expect((await validateWorkflow(graph)).join(' ')).toMatch(
-      /invalid config.*invalid output port.*multiple connections.*invalid input port.*cycle/i,
+    expect((await validateWorkflow(graph)).map((issue) => issue.message).join(' ')).toMatch(
+      /invalid config.*no output called.*more than one connection.*no input called.*connections coming into.*loop/i,
     );
   });
   it('renders paths without evaluating expressions', () => {
@@ -253,7 +253,9 @@ describe('executor', () => {
     expect(await validateWorkflow(graph, resources)).toEqual([]);
     preset.inputs.splice(1, 1);
     preset.entries.splice(1, 1);
-    expect((await validateWorkflow(graph, resources)).join(' ')).toContain('invalid input port extra');
+    expect((await validateWorkflow(graph, resources)).map((issue) => issue.message).join(' ')).toContain(
+      'no input called "extra"',
+    );
   });
   it('rejects incompatible edges with node, port and type names after port resolution', async () => {
     registry.set('typed-test', {
@@ -273,8 +275,8 @@ describe('executor', () => {
       [node('input', 'chat-input'), node('convert', 'typed-test'), node('output', 'chat-output')],
       [edge('input', 'message', 'convert', 'count'), edge('convert', 'text', 'output', 'value')],
     );
-    expect((await validateWorkflow(graph)).join(' ')).toMatch(
-      /input \(chat-input\)\.message \[text\].*convert \(typed-test\)\.count \[number\]/,
+    expect((await validateWorkflow(graph)).map((issue) => issue.message).join(' ')).toMatch(
+      /Chat Input #1 \(chat-input\).*Typed #1 \(typed-test\).*Cannot connect text to number/,
     );
   });
   it('converts messages to a transcript and objects to pretty JSON on text edges', async () => {
