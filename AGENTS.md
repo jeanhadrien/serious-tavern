@@ -20,6 +20,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 - `packages/engine`: graph validation, wave-based parallel executor, templating (`{{input.x}}`, `{{trigger.message}}`, `{{history}}`, no code eval). Node types live in `src/nodes/<type>/index.ts` and are registered in `registry.ts`.
   - `prepareWorkflow` (in `prepare.ts`) parses configs, resolves ports and snapshots resources **once**. `validateWorkflow` wraps it, and `executeWorkflow` accepts its result. Prepare again for each turn, and load node resources through the resolvers.
   - Execution failures carry `nodeId`/`nodeType` as data. Never parse error messages.
+  - Validation returns structured `ValidationIssue`s (`{ message, edgeId?, nodeIds? }`), not bare strings. Messages are plain language and name nodes via `nodeDisplayName` (`Label #k (type)`); ids travel only in `edgeId`/`nodeIds`, never in the text. The `WORKFLOW_INVALID` error details are `{ workflowId, workflowName, issues }` (see `workflowInvalidDetailsSchema`); the web transport links the toast to the workflow and highlights the offending edge.
 - `packages/node-ui`: config forms generated from JSON Schema, custom panels (`src/panels/`), template-variable hints.
   - Panels get catalogs (presets, characters, providers) and `renderLink` through a typed `context` prop. node-ui never imports react-router or the web API clients.
   - Array fields in any shape other than `{key,value}[]` are shown as read-only JSON.
@@ -101,7 +102,8 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 4. The UI picks it up automatically through `/api/node-types`. Add a custom panel in `node-ui` only if the generated form isn't enough.
    - If the definition has `resolvePorts`, its descriptor gets `dynamicPorts: true`, and the editor resolves inputs and outputs for it. Never add per-type branches in the web app.
    - After handles change, refresh React Flow's node internals.
-   - Edges to ports that disappear are kept and shown as invalid until the port comes back.
+   - Edges to ports that disappear are **pruned** (the connection is dropped) once the node's ports resolve without them. Pruning only happens when the ports resolved successfully: unknown types and failing resolvers keep their edges.
+   - The same prune rule lives in the engine (`pruneInvalidEdges`) and runs on preset update and workflow save; the editor applies it when a dynamic node's ports re-resolve. Prune the handle, never the node.
 
 ## Gotchas
 - **POC stage, no data migrations:** the data in `apps/server/data` is disposable. On schema changes, don't write migrations; the data can be reset. The exception is `secrets.enc.json` and `.master.key`, which hold the user's API key and must be kept.
