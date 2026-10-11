@@ -142,6 +142,8 @@ export function Presets() {
                 change({ ...draft, entries: draft.entries.map((item) => (item.id === next.id ? next : item)) })
               }
             />
+          </div>
+          <div className="preset-preview-column">
             <PresetPreview preset={draft} />
           </div>
         </>

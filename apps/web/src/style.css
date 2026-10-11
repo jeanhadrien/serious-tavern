@@ -569,7 +569,17 @@ pre {
 }
 .preset-detail-column {
   flex: 1;
-  min-width: 340px;
+  min-width: 280px;
+  padding: 16px;
+  overflow: auto;
+  border-right: 1px solid #343844;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+.preset-preview-column {
+  flex: 1.25;
+  min-width: 320px;
   padding: 16px;
   overflow: auto;
   display: grid;
@@ -845,6 +855,9 @@ pre {
     min-width: 320px;
   }
   .preset-detail-column {
-    min-width: 330px;
+    min-width: 280px;
+  }
+  .preset-preview-column {
+    min-width: 300px;
   }
 }
