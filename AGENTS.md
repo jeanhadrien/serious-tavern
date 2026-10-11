@@ -116,6 +116,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Killing the npm/npx parent leaves node child processes running.
   - `&&` only chains native commands.
 - **Tooling:** pnpm isn't installed; use npm. No browser or Playwright is set up yet, so UI changes need a manual check by the user.
+- **Line endings:** the repo has no `.gitattributes`, so on Windows with `core.autocrlf=true` checkouts land as CRLF and repo-wide `biome check` fails on files nobody touched. Don't reformat unrelated files to fix it; normalize line endings only in files your own commit touches.
 - **Verification:** for server changes, a quick live check is to start the server with `npx tsx src/index.ts` in `apps/server` and `curl.exe` the endpoints.
 
 <!-- CODEGRAPH_START -->
