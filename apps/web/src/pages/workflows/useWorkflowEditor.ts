@@ -24,6 +24,16 @@ export function useWorkflowEditor() {
   const [workflow, setWorkflow] = useState<Workflow>();
   const canvas = useWorkflowCanvas(types, presets, characters);
   const refresh = () => workflowsApi.list().then(setWorkflows);
+  const refreshResources = () => {
+    void charactersApi
+      .list()
+      .then(setCharacters)
+      .catch(() => {});
+    void presetsApi
+      .list()
+      .then(setPresets)
+      .catch(() => {});
+  };
   useEffect(() => {
     void refresh().catch(() => {});
     void charactersApi
@@ -45,18 +55,8 @@ export function useWorkflowEditor() {
       .catch(() => {});
   }, []);
   useEffect(() => {
-    const update = () => {
-      void charactersApi
-        .list()
-        .then(setCharacters)
-        .catch(() => {});
-      void presetsApi
-        .list()
-        .then(setPresets)
-        .catch(() => {});
-    };
-    window.addEventListener('focus', update);
-    return () => window.removeEventListener('focus', update);
+    window.addEventListener('focus', refreshResources);
+    return () => window.removeEventListener('focus', refreshResources);
   }, []);
   const load = (next: Workflow) => {
     setWorkflow(next);
@@ -64,26 +64,40 @@ export function useWorkflowEditor() {
   };
   const loadRef = useRef(load);
   loadRef.current = load;
+  const workflowRef = useRef(workflow);
+  workflowRef.current = workflow;
   const requestedWorkflowId = searchParams.get('workflow');
   const requestedEdgeId = searchParams.get('edge');
   const deepLinkRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!requestedWorkflowId || deepLinkRef.current === requestedWorkflowId) return;
-    deepLinkRef.current = requestedWorkflowId;
+    // Tabs stay mounted, so a validation link must also work when the editor
+    // already has a workflow open. The guard resets once the link target is left.
+    if (!requestedWorkflowId) {
+      deepLinkRef.current = undefined;
+      return;
+    }
+    const linkKey = `${requestedWorkflowId}|${requestedEdgeId ?? ''}`;
+    if (deepLinkRef.current === linkKey) return;
+    deepLinkRef.current = linkKey;
+    if (workflowRef.current?.id === requestedWorkflowId) {
+      // Already open: only move the highlight and keep unsaved canvas edits.
+      canvas.setHighlightedEdge(requestedEdgeId ?? undefined);
+      return;
+    }
     let active = true;
     void workflowsApi
       .get(requestedWorkflowId)
       .then((loaded) => {
         if (!active) return;
         loadRef.current(loaded);
-        if (requestedEdgeId) canvas.setHighlightedEdge(requestedEdgeId);
+        canvas.setHighlightedEdge(requestedEdgeId ?? undefined);
       })
       .catch(() => {
         deepLinkRef.current = undefined;
       });
     return () => {
       active = false;
-      if (deepLinkRef.current === requestedWorkflowId) deepLinkRef.current = undefined;
+      if (deepLinkRef.current === linkKey) deepLinkRef.current = undefined;
     };
   }, [requestedWorkflowId, requestedEdgeId, canvas.setHighlightedEdge]);
   const create = async () => {
@@ -155,5 +169,6 @@ export function useWorkflowEditor() {
     save,
     validate,
     remove,
+    refreshResources,
   };
 }

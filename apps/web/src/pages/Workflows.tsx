@@ -1,5 +1,6 @@
 import { ReactFlowProvider } from '@xyflow/react';
 import { useWorkflowEditor } from './workflows/useWorkflowEditor.js';
+import { useRefreshOnTabActive } from '../useTabActivation.js';
 import { WorkflowToolbar } from './workflows/WorkflowToolbar.js';
 import { NodePalette } from './workflows/NodePalette.js';
 import { WorkflowCanvas } from './workflows/WorkflowCanvas.js';
@@ -29,7 +30,9 @@ function WorkflowEditor() {
     save,
     validate,
     remove,
+    refreshResources,
   } = useWorkflowEditor();
+  useRefreshOnTabActive('/workflows', () => refreshResources());
   return (
     <div className="workflow-layout">
       <aside className="sidebar">

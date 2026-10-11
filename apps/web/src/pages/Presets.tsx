@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { presetSchema, type Preset } from '@st/shared';
 import { presetsApi } from '../api.js';
+import { useRefreshOnTabActive } from '../useTabActivation.js';
 import { alerts } from '../alerts/index.js';
 import { PresetList } from './presets/PresetList.js';
 import { PresetEditor } from './presets/PresetEditor.js';
@@ -12,6 +13,8 @@ const id = () => crypto.randomUUID();
 
 export function Presets() {
   const [params] = useSearchParams();
+  const requestedId = params.get('id');
+  const requestedPresetRef = useRef<string | null>(null);
   const [list, setList] = useState<Preset[]>([]);
   const [draft, setDraft] = useState<Preset>();
   const [saved, setSaved] = useState('');
@@ -23,9 +26,15 @@ export function Presets() {
     void refresh().catch(() => {});
   }, []);
   useEffect(() => {
-    const preset = list.find((item) => item.id === params.get('id'));
-    if (preset && !draft) choose(preset);
-  }, [list, params, draft]);
+    // Tabs stay mounted: a preset link must open even when another draft is showing.
+    if (!requestedId || requestedPresetRef.current === requestedId) return;
+    const preset = list.find((item) => item.id === requestedId);
+    if (preset) {
+      requestedPresetRef.current = requestedId;
+      choose(preset);
+    }
+  }, [list, requestedId]);
+  useRefreshOnTabActive('/presets', () => void refresh());
 
   const choose = (preset: Preset) => {
     setDraft(structuredClone(preset));

@@ -20,7 +20,7 @@ export function useChat() {
   const refresh = () =>
     sessionsApi.list().then((list) => setSessions(list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))));
   const messageActions = useMessageActions(session, setSession, refresh, () => busyRef.current);
-  useEffect(() => {
+  const refreshAll = () => {
     void workflowsApi
       .list()
       .then(setWorkflows)
@@ -34,6 +34,9 @@ export function useChat() {
       .then(setPersonas)
       .catch(() => {});
     void refresh().catch(() => {});
+  };
+  useEffect(() => {
+    refreshAll();
   }, []);
   const open = async (id: string) => {
     if (busyRef.current || messageActions.isPending()) return;
@@ -145,6 +148,7 @@ export function useChat() {
     update,
     remove,
     send,
+    refreshAll,
     mutating: messageActions.mutating,
     editMessage: messageActions.editMessage,
     deleteMessage: messageActions.deleteMessage,

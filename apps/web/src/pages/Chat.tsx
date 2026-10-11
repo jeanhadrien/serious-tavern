@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react';
 import { useChat } from './chat/useChat.js';
+import { useRefreshOnTabActive } from '../useTabActivation.js';
 import { ChatSidebar } from './chat/ChatSidebar.js';
 import { ChatHeader } from './chat/ChatHeader.js';
 import { MessageList } from './chat/MessageList.js';
@@ -8,6 +9,7 @@ import './chat/chat.css';
 
 export function Chat() {
   const chat = useChat();
+  useRefreshOnTabActive('/', () => chat.refreshAll());
   const session = chat.session;
   const locked = chat.busy || chat.mutating;
   return (
