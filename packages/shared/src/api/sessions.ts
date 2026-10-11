@@ -22,6 +22,11 @@ export const sendMessageResultSchema = z.object({
   assistantMessages: z.array(messageSchema),
   execution: executionLogSchema,
 });
+// `details` of a failed or stopped turn (`WORKFLOW_EXECUTION_FAILED`, `TURN_STOPPED`): what was saved before it ended.
+export const turnFailureDetailsSchema = sendMessageResultSchema.extend({
+  aborted: z.enum(['user', 'disconnect']).optional(),
+});
+export type TurnFailureDetails = z.infer<typeof turnFailureDetailsSchema>;
 // One Server-Sent Event per item of `streamTurn`; the event name is the `type` field.
 // `turn.error` reuses the standard error envelope, whose details use the same shape as a failed send.
 export const turnEventSchema = z.discriminatedUnion('type', [
