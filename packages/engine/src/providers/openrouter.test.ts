@@ -138,7 +138,10 @@ describe('OpenRouter streaming', () => {
     await expect(
       openrouter.stream!(request, { ...options(controller.signal), onToken, onReasoning: () => {} }),
     ).rejects.toThrow('client left');
-    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(onToken).toHaveBeenCalledTimes(1);
   });
 });

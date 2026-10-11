@@ -160,6 +160,23 @@ describe('multiple chat outputs', () => {
       { nodeId: 'bar', content: 'bar(hello)', name: 'bar' },
     ]);
   });
+  it('orders outputs fed by a shared upstream node by dependency, not by order config', async () => {
+    const chat = vi.fn(async (request) => ({ text: `second(${request.messages[0].content})`, raw: {} }));
+    providers.set('reply-test', { id: 'reply-test', label: 'Test', secretName: 'test', chat });
+    const result = await executeWorkflow(
+      graph(
+        [
+          node('input', 'chat-input'),
+          node('first', 'chat-output', { order: 10, name: 'first' }),
+          node('llm', 'llm', { presetId: preset.id, provider: 'reply-test' }),
+          node('second', 'chat-output', { order: -10, name: 'second' }),
+        ],
+        [edge('input', 'first'), edge('input', 'llm', 'message', 'prompt'), edge('llm', 'second', 'text')],
+      ),
+      { ...options, resources: { presets: { get: async () => preset } } },
+    );
+    expect(result.replies.map((reply) => reply.name)).toEqual(['first', 'second']);
+  });
   it('omits skipped condition outputs', async () => {
     const result = await executeWorkflow(
       graph(

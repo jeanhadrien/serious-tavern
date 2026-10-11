@@ -17,7 +17,12 @@ export const chatOutput: NodeDefinition = {
   configSchema: z.object({
     template: z.string().default(''),
     name: z.string().default(''),
-    order: z.number().default(0),
+    order: z
+      .number()
+      .default(0)
+      .describe(
+        'Tie-break between independent outputs (lower first); outputs that depend on others always come after them',
+      ),
   }),
   defaultConfig: { template: '', name: '', order: 0 },
   async execute(ctx) {

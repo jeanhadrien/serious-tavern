@@ -158,4 +158,24 @@ describe('replyRanks', () => {
       ['late', 1],
     ]);
   });
+
+  it('ranks outputs fed by a shared upstream after the outputs with a smaller upstream', async () => {
+    const prepared = await preparedFor(
+      [
+        llm('first'),
+        node('out1', 'chat-output', { order: 10 }),
+        chainedLlm('second'),
+        node('out2', 'chat-output', { order: -10 }),
+      ],
+      [
+        edge('first', 'text', 'out1', 'value'),
+        edge('first', 'text', 'second', 'draft'),
+        edge('second', 'text', 'out2', 'value'),
+      ],
+    );
+    expect([...replyRanks(prepared)]).toEqual([
+      ['out1', 0],
+      ['out2', 1],
+    ]);
+  });
 });

@@ -1,4 +1,4 @@
-import type { PreparedWorkflow } from '@st/engine';
+import { orderOutputs, type PreparedWorkflow } from '@st/engine';
 
 /**
  * Chat Outputs whose reply is exactly one LLM's text: no template, and the only edge into `value`
@@ -19,37 +19,11 @@ export function passthroughSources(prepared: PreparedWorkflow): Map<string, stri
 }
 
 /**
- * Reservation order for the reachable Chat Outputs: dependency order first, then the `order`
- * config, then node id. This is the same rule the engine applies to replies. Streamed rows use it
- * to pick their array position while the turn runs; the settled turn uses the engine's order.
+ * Array position of each reachable Chat Output. Uses the engine's ordering, so streamed rows land
+ * exactly where the settled turn will put them.
  */
 export function replyRanks(prepared: PreparedWorkflow): Map<string, number> {
   const { workflow, upstream, reachable } = prepared;
-  const outputs = workflow.nodes.filter((node) => node.type === 'chat-output' && reachable.has(node.id));
-  const ancestors = new Map(outputs.map((output) => [output.id, ancestorsOf(upstream, output.id)]));
-  const remaining = new Set(outputs.map((output) => output.id));
-  const ranks = new Map<string, number>();
-  while (remaining.size) {
-    const next = outputs
-      .filter((output) => remaining.has(output.id) && ![...remaining].some((id) => ancestors.get(output.id)!.has(id)))
-      .sort(
-        (a, b) => Number(a.config.order ?? 0) - Number(b.config.order ?? 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-      )[0];
-    if (!next) break;
-    ranks.set(next.id, ranks.size);
-    remaining.delete(next.id);
-  }
-  return ranks;
-}
-
-function ancestorsOf(upstream: Map<string, string[]>, id: string): Set<string> {
-  const seen = new Set<string>();
-  const visit = [...(upstream.get(id) ?? [])];
-  while (visit.length) {
-    const next = visit.pop()!;
-    if (seen.has(next)) continue;
-    seen.add(next);
-    visit.push(...(upstream.get(next) ?? []));
-  }
-  return seen;
+  const order = orderOutputs(workflow, upstream, reachable);
+  return new Map(order.map((id, rank) => [id, rank]));
 }
