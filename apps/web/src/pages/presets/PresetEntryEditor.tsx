@@ -43,14 +43,6 @@ export function PresetEntryEditor(props: { preset: Preset; entry?: PresetEntry; 
       <label>
         Name <input value={entry.name} onChange={(event) => update({ name: event.target.value })} />
       </label>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={entry.enabled}
-          onChange={(event) => update({ enabled: event.target.checked })}
-        />
-        Enabled
-      </label>
       {entry.kind === 'slot' ? (
         <>
           <label>
