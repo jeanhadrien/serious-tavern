@@ -3,6 +3,7 @@ import type { Character, Persona, Preset, Workflow, Session, ExecutionLog } from
 import { JsonRepository, type Repository } from './storage/repository.js';
 import { SecretStore } from './secrets/store.js';
 import { seed } from './seed.js';
+import { TurnRegistry } from './services/turns.js';
 
 export interface AppContext {
   workflows: Repository<Workflow>;
@@ -14,6 +15,7 @@ export interface AppContext {
   characterAvatars: string;
   personaAvatars: string;
   secrets: SecretStore;
+  turns: TurnRegistry;
 }
 
 export async function createContext(dataDir: string, options: { seed?: boolean }): Promise<AppContext> {
@@ -32,6 +34,7 @@ export async function createContext(dataDir: string, options: { seed?: boolean }
     characterAvatars: join(dataDir, 'avatars', 'characters'),
     personaAvatars: join(dataDir, 'avatars', 'personas'),
     secrets,
+    turns: new TurnRegistry(),
   };
 }
 

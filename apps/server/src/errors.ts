@@ -12,6 +12,18 @@ export class HttpError extends Error {
 export const notFound = (resource: string) => new HttpError(404, 'NOT_FOUND', `${resource} not found`);
 export const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
+/** The error envelope for a failure reported inside an open stream (`turn.error`). */
+export function errorBody(error: unknown): ErrorEnvelope['error'] {
+  if (error instanceof HttpError)
+    return {
+      code: error.code,
+      message: error.message,
+      ...(error.details === undefined ? {} : { details: error.details }),
+    };
+  console.error('Unexpected stream error:', error);
+  return { code: 'INTERNAL_ERROR', message: 'Internal server error' };
+}
+
 export async function requireEntity<T extends { id: string }>(repository: Repository<T>, id: string, resource: string) {
   const item = await repository.get(id);
   if (!item) throw notFound(resource);

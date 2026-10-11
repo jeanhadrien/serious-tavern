@@ -15,6 +15,7 @@ import {
 } from '@st/shared';
 import type { InjectOptions } from 'fastify';
 import { registry } from '@st/engine';
+import { parseEventStream } from './test-support/event-stream.js';
 
 const directories: string[] = [];
 afterEach(async () => {
@@ -149,6 +150,23 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     expect(sessions[0]?.messageCount).toBe(2);
     await request('getSession', { method: 'GET', url: `/api/sessions/${session.id}` });
     await request('getExecution', { method: 'GET', url: `/api/executions/${message.execution.id}` });
+    const streamed = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${session.id}/messages/stream`,
+      payload: { content: 'Contract stream' },
+    });
+    expect(streamed.statusCode).toBe(200);
+    expect(streamed.headers['content-type']).toContain('text/event-stream');
+    const turnEvents = parseEventStream(streamed.body).map(({ event, data }) => {
+      expect(event).toBe(data.type);
+      return apiContract.streamTurn.response.parse(data);
+    });
+    covered.add('streamTurn');
+    expect(turnEvents.at(-1)).toMatchObject({
+      type: 'turn.complete',
+      assistantMessages: [{ content: 'Contract stream' }],
+    });
+    await request('stopTurn', { method: 'POST', url: `/api/sessions/${session.id}/stop` });
     await request('updateMessage', {
       method: 'PATCH',
       url: `/api/sessions/${session.id}/messages/${message.userMessage.id}`,
@@ -562,18 +580,18 @@ it('serializes same-session message exchanges and merges concurrent session patc
       payload: { content: 'patch-race' },
     });
     await patchExecutionStarted;
-    let patchFinished = false;
-    const inFlightPatch = app
-      .inject({ method: 'PATCH', url: `/api/sessions/${session.id}`, payload: { title: 'Patched during execution' } })
-      .then((response) => {
-        patchFinished = true;
-        return response;
-      });
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(patchFinished).toBe(false);
+    // The engine runs outside the session lock, so a patch during execution is not held back by it.
+    const inFlightPatch = await app.inject({
+      method: 'PATCH',
+      url: `/api/sessions/${session.id}`,
+      payload: { title: 'Patched during execution' },
+    });
+    expect(inFlightPatch.statusCode).toBe(200);
     releasePatchExecution();
     expect((await inFlightMessage).statusCode).toBe(200);
-    expect((await inFlightPatch).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json()).toMatchObject({
+      title: 'Patched during execution',
+    });
 
     const [titlePatch, characterPatch] = await Promise.all([
       app.inject({ method: 'PATCH', url: `/api/sessions/${session.id}`, payload: { title: 'Updated title' } }),
