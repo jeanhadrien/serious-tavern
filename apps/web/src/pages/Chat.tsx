@@ -54,8 +54,10 @@ export function Chat() {
               key={`composer-${session.id}`}
               content={chat.content}
               onChange={chat.setContent}
-              busy={locked}
+              busy={chat.busy}
+              locked={locked}
               onSend={chat.send}
+              onStop={chat.stop}
             />
           </>
         ) : (

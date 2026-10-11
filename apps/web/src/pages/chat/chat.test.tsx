@@ -92,11 +92,13 @@ it('renders Markdown for both roles and a persona avatar/name with accessible di
 });
 
 it('renders a busy multiline composer, an empty edit guard and an accessible pending indicator', () => {
-  const composer = renderToStaticMarkup(<Composer content="" busy onChange={() => {}} onSend={async () => {}} />);
+  const composer = renderToStaticMarkup(
+    <Composer content="" busy locked onChange={() => {}} onSend={async () => {}} onStop={() => {}} />,
+  );
   expect(composer).toContain('<textarea');
   expect(composer).toContain('readOnly=""');
   expect(composer).toContain('aria-busy="true"');
-  expect(composer).toContain('aria-label="Workflow running"');
+  expect(composer).toContain('aria-label="Stop generation"');
   expect(composer).toContain('Shift+Enter');
   const editor = renderToStaticMarkup(
     <MessageEditor content=" " disabled={false} onSave={async () => true} onCancel={() => {}} />,
@@ -118,4 +120,31 @@ it('renders a busy multiline composer, an empty edit guard and an accessible pen
   expect(list).toContain('role="status"');
   expect(list).toContain('typing-dots');
   expect(list).not.toContain('Running workflow…');
+});
+
+it('shows reasoning, a stopped note, and no pending indicator once a reply row is streaming', () => {
+  const base = { id: 'a', role: 'assistant' as const, createdAt: '' };
+  const thinking = renderToStaticMarkup(
+    <ChatMessageView message={{ ...base, content: '', reasoning: 'Plan', status: 'streaming' }} />,
+  );
+  expect(thinking).toContain('message-reasoning');
+  expect(thinking).toContain('open=""');
+  const stopped = renderToStaticMarkup(
+    <ChatMessageView message={{ ...base, content: 'Half', reasoning: 'Plan', status: 'partial' }} />,
+  );
+  expect(stopped).not.toContain('open=""');
+  expect(stopped).toContain('Stopped before it finished');
+  const list = renderToStaticMarkup(
+    <MessageList
+      sessionId="s"
+      messages={[{ ...base, content: 'Hel', status: 'streaming' }]}
+      characters={[]}
+      logs={{}}
+      busy
+      disabled
+      onEdit={async () => true}
+      onDelete={async () => true}
+    />,
+  );
+  expect(list).not.toContain('typing-dots');
 });

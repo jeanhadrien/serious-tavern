@@ -26,6 +26,8 @@ export function MessageList({
   onDelete,
 }: MessageListProps) {
   const { viewport, content, onScroll } = useStickToBottom(sessionId, messages);
+  // Once a reply row is streaming the text itself is the progress indicator.
+  const waiting = busy && !messages.some((message) => message.status === 'streaming');
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: A scrollable history region must be reachable for keyboard scrolling.
     <section ref={viewport} className="thread" onScroll={onScroll} aria-label="Message history" tabIndex={0}>
@@ -42,7 +44,7 @@ export function MessageList({
             onDelete={onDelete}
           />
         ))}
-        {busy && (
+        {waiting && (
           <div className="typing-indicator" role="status" aria-label="Workflow running">
             <span aria-hidden="true" className="typing-dots">
               <i />

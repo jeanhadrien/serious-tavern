@@ -36,6 +36,7 @@ export function ChatMessageView({
     }
   }, [editing, disabled]);
   const user = message.role === 'user';
+  const streaming = message.status === 'streaming';
   const name = user ? persona?.name || 'You' : message.name || 'Assistant';
   const avatar = user
     ? typeof persona?.avatar === 'string'
@@ -51,7 +52,7 @@ export function ChatMessageView({
   return (
     <article
       ref={bubble}
-      className={`message ${message.role}${editing ? ' editing' : ''}`}
+      className={`message ${message.role}${editing ? ' editing' : ''}${streaming ? ' streaming' : ''}`}
       aria-label={`${name} message`}
     >
       <div className="message-top">
@@ -84,7 +85,17 @@ export function ChatMessageView({
           }}
         />
       ) : (
-        <MessageContent content={message.content} />
+        <>
+          {message.reasoning && (
+            // Open while the model is still thinking (no answer text yet) so the stream is visible.
+            <details className="message-reasoning" open={streaming && !message.content ? true : undefined}>
+              <summary>Reasoning</summary>
+              <pre>{message.reasoning}</pre>
+            </details>
+          )}
+          <MessageContent content={message.content} />
+          {message.status === 'partial' && <small className="message-stopped">Stopped before it finished</small>}
+        </>
       )}
       {message.executionId && <ExecutionDetails id={message.executionId} cached={execution} />}
     </article>

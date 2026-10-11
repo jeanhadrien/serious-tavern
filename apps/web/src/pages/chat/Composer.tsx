@@ -1,16 +1,18 @@
 import { useLayoutEffect, useRef } from 'react';
-import { LoaderCircle, Send } from 'lucide-react';
+import { Send, Square } from 'lucide-react';
 import { IconButton } from '../../components/IconButton.js';
 import { composerShouldSend } from './keyboard.js';
 
 interface ComposerProps {
   content: string;
   busy: boolean;
+  locked: boolean;
   onChange: (content: string) => void;
   onSend: () => Promise<void>;
+  onStop: () => void;
 }
 
-export function Composer({ content, busy, onChange, onSend }: ComposerProps) {
+export function Composer({ content, busy, locked, onChange, onSend, onStop }: ComposerProps) {
   const input = useRef<HTMLTextAreaElement>(null);
   const composing = useRef(false);
   const restoreFocus = useRef(false);
@@ -27,14 +29,14 @@ export function Composer({ content, busy, onChange, onSend }: ComposerProps) {
     }
   }, [busy]);
   const send = () => {
-    if (busy || composing.current || !content.trim()) return;
+    if (locked || composing.current || !content.trim()) return;
     restoreFocus.current = true;
     input.current?.focus();
     void onSend();
   };
   return (
     <form
-      className={`composer${busy ? ' is-busy' : ''}`}
+      className={`composer${locked ? ' is-busy' : ''}`}
       aria-busy={busy}
       onSubmit={(event) => {
         event.preventDefault();
@@ -45,9 +47,9 @@ export function Composer({ content, busy, onChange, onSend }: ComposerProps) {
         ref={input}
         rows={1}
         aria-label="Message"
-        aria-disabled={busy}
-        readOnly={busy}
-        placeholder={busy ? 'Waiting for the workflow…' : 'Write a message…'}
+        aria-disabled={locked}
+        readOnly={locked}
+        placeholder={busy ? 'Generating… Esc to stop' : 'Write a message…'}
         value={content}
         onChange={(event) => onChange(event.target.value)}
         onCompositionStart={() => {
@@ -57,6 +59,10 @@ export function Composer({ content, busy, onChange, onSend }: ComposerProps) {
           composing.current = false;
         }}
         onKeyDown={(event) => {
+          if (busy && event.key === 'Escape') {
+            onStop();
+            return;
+          }
           if (
             composerShouldSend({
               ...event,
@@ -70,11 +76,11 @@ export function Composer({ content, busy, onChange, onSend }: ComposerProps) {
         }}
       />
       <IconButton
-        icon={busy ? LoaderCircle : Send}
-        label={busy ? 'Workflow running' : 'Send message'}
-        className={`primary${busy ? ' spinning' : ''}`}
-        disabled={busy || !content.trim()}
-        onClick={send}
+        icon={busy ? Square : Send}
+        label={busy ? 'Stop generation' : 'Send message'}
+        className={`primary${busy ? ' stop-generation' : ''}`}
+        disabled={!busy && (locked || !content.trim())}
+        onClick={busy ? onStop : send}
       />
       <small className="composer-hint">Enter to send · Shift+Enter for a new line</small>
     </form>

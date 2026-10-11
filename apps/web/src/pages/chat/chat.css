@@ -192,6 +192,40 @@
 .message-content img {
   max-width: 100%;
 }
+.message-reasoning {
+  margin: 10px 0;
+  border: 1px solid #414652;
+  border-radius: 7px;
+  overflow: hidden;
+}
+.message-reasoning summary {
+  background: #303440;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.message-reasoning pre {
+  background: #17191f;
+  padding: 12px;
+  margin: 0;
+  max-height: 300px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+}
+.message-stopped {
+  display: block;
+  margin-top: 8px;
+  color: #a0a6b4;
+  font-style: italic;
+}
+button.stop-generation {
+  background: #a33a3a;
+  border-color: #a33a3a;
+}
+button.stop-generation:hover {
+  background: #bd4747;
+}
 .message-editor {
   margin: 12px 0;
 }

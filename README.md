@@ -1,6 +1,6 @@
 # Serious Tavern
 
-A single-user chat app where each conversation runs a visual, reusable workflow. TypeScript/ESM throughout; no account system or streaming in this MVP.
+A single-user chat app where each conversation runs a visual, reusable workflow. TypeScript/ESM throughout; no account system in this MVP.
 
 See [Plan & Vision](PLAN.md) for the product vision and planned next steps.
 
@@ -69,6 +69,16 @@ Frontend notifications live in `apps/web/src/alerts/`. Import `alerts` and call 
 - User bubbles use the selected session persona's name/avatar, falling back to “You” and a user icon. Assistant bubbles preserve each reply's speaker snapshot and character avatar, or show “Assistant” with a bot icon. Consecutive outputs remain separate bubbles with their own identities.
 - Opening a conversation scrolls to its bottom. New messages and content resizes stick only when the reader was within 96px of the bottom; scrolling back through history opts out until the reader returns near the bottom.
 - Hover or keyboard-focus a bubble to expose **Edit/Delete** icon buttons (always visible on touch devices). Editing is inline: **Ctrl/Cmd+Enter** saves, **Escape** cancels, and whitespace-only content cannot be saved. Deletion requires a small inline confirmation. Both actions work on either role and never re-run a workflow or alter message attribution/execution metadata. Changes affect history used by subsequent turns, not saved execution logs.
+
+### Streaming
+
+Sending a message posts to `POST /api/sessions/:id/messages/stream`, which answers with server-sent events (`turn.start`, `node.delta`, `turn.complete`, `turn.error`; see `turnEventSchema`). The web client reads them in `api/turnStream.ts` and `useChat` applies them with the pure helpers in `pages/chat/turnMessages.ts`:
+- The composer shows the user row immediately and appends one assistant row per streaming Chat Output as `node.delta` events arrive. The "Preparing a reply" indicator only shows until the first row exists.
+- A collapsible **Reasoning** block appears above a message when the model emits reasoning content; it is open while no answer text has arrived yet.
+- `turn.complete` replaces the local rows with the persisted messages and execution.
+- **Stop** (button, or Escape in the composer) only calls `POST /api/sessions/:id/stop` and keeps reading the stream. The server cancels the LLM call and ends the stream with `turn.error` `TURN_STOPPED`, whose `details` (`turnFailureDetailsSchema`) carry the saved user message and the replies so far as `partial` rows (shown with a "Stopped" note). The same details come with `WORKFLOW_EXECUTION_FAILED`, so a failed turn keeps its partial replies without a refetch. Aborting the connection is only a fallback when the stop request fails, and a dropped connection resyncs the session from the server.
+- While a turn runs the chat is locked: no switching, creating or deleting chats, and no message edits.
+- Streaming can be disabled per LLM node in its config (default enabled); the reply then arrives in one piece.
 
 Web-only dependencies: **`lucide-react`** supplies tree-shakable SVG icons without runtime CSS; **`react-markdown`** renders Markdown safely as React elements; **`remark-gfm`** adds tables, strikethrough, task lists and autolinks. No HTML-processing or syntax-highlighting plugin is added.
 
@@ -184,7 +194,7 @@ Chat history and message inputs carry an optional string `name`. Chat Input, Mem
 
 Seeding uses stable IDs so concurrent initializers do not create duplicate Default presets or demo workflows. Seeds are added only when the corresponding store is empty.
 
-To add a provider, implement `LlmProvider` in `packages/engine/src/providers/` with `id`, `label`, `secretName` and `chat(request, { apiKey, signal })`, returning `{ text, raw, usage? }`. Register the provider in the provider registry and import its module during startup (the existing OpenRouter implementation is an example). The request is provider-neutral; translate sampler names into your provider's API format. The provider picker is served by `/api/providers`, and the engine looks up the configured secret by `secretName`. Streaming can be added as a separate method in a future release.
+To add a provider, implement `LlmProvider` in `packages/engine/src/providers/` with `id`, `label`, `secretName` and `chat(request, { apiKey, signal })`, returning `{ text, raw, usage? }`. Register the provider in the provider registry and import its module during startup (the existing OpenRouter implementation is an example). The request is provider-neutral; translate sampler names into your provider's API format. The provider picker is served by `/api/providers`, and the engine looks up the configured secret by `secretName`. Providers may also implement the optional `stream(request, { apiKey, signal, onToken, onReasoning })`; the LLM node uses it unless its `streaming` option is off.
 
 ## Ports & types
 
@@ -218,4 +228,4 @@ Workflow and preset PUT replacements use `repository.update`, sharing the per-re
 
 Executions report node status, timing, outputs, errors and a `warnings` list (older logs default to an empty list). Nodes in a failed execution wave are aborted and allowed to settle **only until their original node deadline** before the failure is returned (`definition.timeoutMs`, otherwise `nodeTimeoutMs`, otherwise 30 seconds). An abort-ignoring sibling that has not settled by its deadline is still recorded as `cancelled`, distinct from an unselected condition branch (`skipped`). Its detached work may continue; the engine does not claim to have stopped it, but ignores its results, request-recording callbacks and events. Completed Chat Output replies are retained even if another node later fails; cancelled and skipped outputs produce no messages. After cancellation cleanup returns, logs and replies no longer change. Per-node setup errors are recorded as execution failures rather than silently discarded wave rejections. A required output port with outgoing edges must be returned by its node; an output declared `optional` may be omitted (Condition's mutually exclusive branch outputs are optional).
 
-Engine events are available for a future streaming transport. The `onEvent` observer is a best-effort synchronous notification: exceptions from it are swallowed and never change workflow success/failure, kept replies, execution details or cancellation cleanup, including for the terminal `execution:complete` event. Message requests for one session are serialized through all completed replies or failure, so each prompt sees the prior exchange; different sessions can still execute concurrently. Workflow edits affect subsequent messages in all sessions bound to that workflow.
+Engine events feed the streaming transport (`TurnStream` on the server) and are also available to other observers. The `onEvent` observer is a best-effort synchronous notification: exceptions from it are swallowed and never change workflow success/failure, kept replies, execution details or cancellation cleanup, including for the terminal `execution:complete` event. Message requests for one session are serialized through all completed replies or failure, so each prompt sees the prior exchange; different sessions can still execute concurrently. Workflow edits affect subsequent messages in all sessions bound to that workflow.

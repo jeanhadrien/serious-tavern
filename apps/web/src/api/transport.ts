@@ -32,8 +32,8 @@ function detailText(details: unknown): string | undefined {
   }
   return JSON.stringify(details, null, 2);
 }
-function notify(error: ApiError, silent: boolean) {
-  if (silent) return;
+/** Toasts an API failure the way `api()` does; used by callers that handle their own request, e.g. the turn stream. */
+export function notifyError(error: ApiError) {
   if (error.code === 'WORKFLOW_INVALID') {
     const invalid = workflowInvalidDetailsSchema.safeParse(error.details);
     if (invalid.success) {
@@ -54,6 +54,24 @@ function notify(error: ApiError, silent: boolean) {
     details: detailText(error.details),
   });
 }
+/** Builds an ApiError from a non-2xx status and its (possibly missing) JSON error envelope. */
+export function apiErrorFrom(status: number, statusText: string, body: unknown): ApiError {
+  const data = body as Partial<ErrorEnvelope> | undefined;
+  return new ApiError(
+    status,
+    data?.error?.code ?? 'HTTP_ERROR',
+    data?.error?.message || statusText || `HTTP ${status}`,
+    data?.error?.details,
+  );
+}
+export function networkError(cause: unknown): ApiError {
+  return new ApiError(
+    0,
+    'NETWORK_ERROR',
+    'Could not reach the server',
+    cause instanceof Error ? cause.message : String(cause),
+  );
+}
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { silent = false, ...requestOptions } = options;
   const headers = new Headers(requestOptions.headers);
@@ -63,26 +81,15 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   try {
     response = await fetch(`/api${path}`, { ...requestOptions, headers });
   } catch (cause) {
-    const error = new ApiError(
-      0,
-      'NETWORK_ERROR',
-      'Could not reach the server',
-      cause instanceof Error ? cause.message : String(cause),
-    );
-    notify(error, silent);
+    const error = networkError(cause);
+    if (!silent) notifyError(error);
     throw error;
   }
   if (response.status === 204) return undefined as T;
   const body: unknown = await response.json().catch(() => undefined);
   if (!response.ok) {
-    const data = body as Partial<ErrorEnvelope> | undefined;
-    const error = new ApiError(
-      response.status,
-      data?.error?.code ?? 'HTTP_ERROR',
-      data?.error?.message || response.statusText || `HTTP ${response.status}`,
-      data?.error?.details,
-    );
-    notify(error, silent);
+    const error = apiErrorFrom(response.status, response.statusText, body);
+    if (!silent) notifyError(error);
     throw error;
   }
   return body as T;

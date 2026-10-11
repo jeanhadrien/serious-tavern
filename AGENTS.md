@@ -77,6 +77,10 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - A connected output port that a node doesn't return is an error, unless the port is marked `optional` (Condition branches are).
   - On failure, the sibling nodes in the same wave are aborted and settled (status `cancelled`) before the error is thrown. The wait for them is bounded by their original deadline; work that ignores the abort is left running detached and ignored. After that, the execution log must never change.
   - `onEvent` observers can never change the outcome: their exceptions are swallowed.
+- **Streaming turns:** the web client sends messages through `POST /api/sessions/:id/messages/stream` (SSE, `turnEventSchema`); the plain `POST .../messages` stays for non-streaming callers.
+  - Stop is `POST .../stop` only: the stream stays open and ends with `turn.error` `TURN_STOPPED`. Failed and stopped turns carry `turnFailureDetailsSchema` in `details` (saved user message, replies so far as `partial` rows, execution), so the client settles from the payload and never guesses with a refetch. Aborting the fetch is a fallback only; it is seen by the server as a `disconnect`.
+  - `streamMessage` (`apps/web/src/api/turnStream.ts`) never toasts; `useChat` decides, via `notifyError`.
+  - Local row bookkeeping lives in the pure helpers of `pages/chat/turnMessages.ts`. Rows with `status: 'streaming'` are local until the turn settles.
 - **Editor:** never drop nodes. Unknown node types are kept as read-only placeholders and are saved unchanged.
 - **Presets:** fixed entries that render to empty text are dropped, so a template entry holding only one variable disappears when that variable is empty.
 - **Creating a session** requires a `workflowId`. Sessions also store `characterId` and `personaId`, which the server loads and passes to the executor.

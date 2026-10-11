@@ -1,10 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Workflow, Session, ExecutionLog, SessionSummary, ApiBody, Character, Persona } from '@st/shared';
-import { sendMessageResultSchema } from '@st/shared';
-import { sessionsApi, workflowsApi, charactersApi, personasApi } from '../../api.js';
-import { ApiError } from '../../api/transport.js';
+import {
+  turnFailureDetailsSchema,
+  type TurnFailureDetails,
+  type Workflow,
+  type Session,
+  type ExecutionLog,
+  type SessionSummary,
+  type ApiBody,
+  type Character,
+  type Persona,
+  type ChatMessage,
+} from '@st/shared';
+import { sessionsApi, workflowsApi, charactersApi, personasApi, streamMessage } from '../../api.js';
+import { ApiError, notifyError } from '../../api/transport.js';
+import type { TurnResult } from '../../api/turnStream.js';
 import { alerts } from '../../alerts/index.js';
 import { compareRecent } from '../recentOrder.js';
+import { applyDelta, settleTurn } from './turnMessages.js';
 import { useMessageActions } from './useMessageActions.js';
 
 export function useChat() {
@@ -17,6 +29,7 @@ export function useChat() {
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const opening = useRef(0);
+  const streamControllerRef = useRef<AbortController | undefined>(undefined);
   const [logs, setLogs] = useState<Record<string, ExecutionLog>>({});
   const refresh = () =>
     sessionsApi.list().then((list) => setSessions(list.sort((a, b) => compareRecent(a, b, (item) => item.title))));
@@ -38,6 +51,11 @@ export function useChat() {
   };
   useEffect(() => {
     refreshAll();
+  }, []);
+  useEffect(() => {
+    return () => {
+      streamControllerRef.current?.abort();
+    };
   }, []);
   const open = async (id: string) => {
     if (busyRef.current || messageActions.isPending()) return;
@@ -94,44 +112,70 @@ export function useChat() {
       /* API errors are toasted. */
     }
   };
+  // Asks the server to stop; the open stream then ends with the partial rows, which `send` settles.
+  // Aborting the connection is only the fallback, for when the stop request itself cannot get through.
+  const stop = () => {
+    if (!busyRef.current || !session) return;
+    sessionsApi.stopTurn(session.id, { silent: true }).catch(() => streamControllerRef.current?.abort());
+  };
   const send = async () => {
     if (!session || !content.trim() || busyRef.current || messageActions.isPending()) return;
-    ++opening.current;
     busyRef.current = true;
+    const sessionId = session.id;
     const text = content.trim();
     setContent('');
     setBusy(true);
-    try {
-      const result = await sessionsApi.sendMessage(session.id, { content: text });
-      setSession((prev) =>
-        prev?.id === session.id
-          ? { ...prev, messages: [...prev.messages, result.userMessage, ...result.assistantMessages] }
-          : prev,
-      );
+
+    const optimisticUser: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: text,
+      createdAt: new Date().toISOString(),
+    };
+    const patchMessages = (change: (messages: ChatMessage[]) => ChatMessage[]) =>
+      setSession((prev) => (prev?.id === sessionId ? { ...prev, messages: change(prev.messages) } : prev));
+    const settle = (result: TurnResult | TurnFailureDetails) => {
+      patchMessages((messages) => settleTurn(messages, optimisticUser.id, result));
       setLogs((prev) => ({ ...prev, [result.execution.id]: result.execution }));
-      await refresh().catch(() => {});
+    };
+    const resync = () =>
+      sessionsApi
+        .get(sessionId, { silent: true })
+        .then((current) => setSession((prev) => (prev?.id === current.id ? current : prev)))
+        .catch(() => {});
+    patchMessages((messages) => [...messages, optimisticUser]);
+
+    const controller = new AbortController();
+    streamControllerRef.current = controller;
+    try {
+      await streamMessage(
+        sessionId,
+        text,
+        {
+          onDelta: (nodeId, textDelta, reasoningDelta) =>
+            patchMessages((messages) => applyDelta(messages, nodeId, textDelta, reasoningDelta)),
+          onComplete: settle,
+        },
+        { signal: controller.signal },
+      );
     } catch (error) {
-      const details = sendMessageResultSchema.safeParse(error instanceof ApiError ? error.details : undefined);
-      if (details.success) {
-        const result = details.data;
-        setSession((prev) =>
-          prev?.id === session.id
-            ? { ...prev, messages: [...prev.messages, result.userMessage, ...result.assistantMessages] }
-            : prev,
-        );
-        setLogs((prev) => ({ ...prev, [result.execution.id]: result.execution }));
-        await refresh().catch(() => {});
+      const failure = error instanceof ApiError ? turnFailureDetailsSchema.safeParse(error.details) : undefined;
+      if (failure?.success) {
+        // The server saved the user message and any partial replies before ending the turn.
+        settle(failure.data);
+        if (error instanceof ApiError && error.code === 'TURN_STOPPED') alerts.info('Generation stopped');
+        else if (error instanceof ApiError) notifyError(error);
       } else {
-        await sessionsApi
-          .get(session.id)
-          .then((current) => {
-            setSession((previous) => (previous?.id === current.id ? current : previous));
-          })
-          .catch(() => {});
+        if (error instanceof ApiError) notifyError(error);
+        else if (!(error instanceof Error && error.name === 'AbortError')) alerts.error(String(error));
+        // Whatever the server kept (the user message, partial rows) is the truth; drop local rows.
+        await resync();
       }
     } finally {
+      streamControllerRef.current = undefined;
       busyRef.current = false;
       setBusy(false);
+      refresh().catch(() => {});
     }
   };
   return {
@@ -149,6 +193,7 @@ export function useChat() {
     update,
     remove,
     send,
+    stop,
     refreshAll,
     mutating: messageActions.mutating,
     editMessage: messageActions.editMessage,

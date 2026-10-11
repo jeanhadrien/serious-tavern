@@ -16,7 +16,10 @@ export const sessionsApi = {
     api<ApiResponse<'updateMessage'>>(`/sessions/${id}/messages/${messageId}`, { ...json('PATCH', body), ...options }),
   deleteMessage: (id: string, messageId: string, options?: RequestOptions) =>
     api<ApiResponse<'deleteMessage'>>(`/sessions/${id}/messages/${messageId}`, { ...json('DELETE'), ...options }),
+  stopTurn: (id: string, options?: RequestOptions) =>
+    api<ApiResponse<'stopTurn'>>(`/sessions/${id}/stop`, { ...json('POST'), ...options }),
 };
+
 export const executionsApi = {
   get: (id: string, options?: RequestOptions) => api<ApiResponse<'getExecution'>>(`/executions/${id}`, options),
 };
