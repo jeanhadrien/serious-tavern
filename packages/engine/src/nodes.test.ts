@@ -170,9 +170,13 @@ describe('integration nodes', () => {
     expect(Object.hasOwn(body.messages[1], 'name')).toBe(false);
   });
 
-  it('defaults system-message merging to false in the schema and node defaults', () => {
+  it('defaults system-message merging and streaming to true in the schema and node defaults', () => {
     expect(llm.defaultConfig.mergeSystemMessages).toBe(false);
-    expect(llm.configSchema.parse({ presetId: preset.id })).toMatchObject({ mergeSystemMessages: false });
+    expect(llm.defaultConfig.streaming).toBe(true);
+    expect(llm.configSchema.parse({ presetId: preset.id })).toMatchObject({
+      mergeSystemMessages: false,
+      streaming: true,
+    });
   });
 
   it('merges only consecutive unnamed system messages without mutating the source', () => {
@@ -288,6 +292,21 @@ describe('integration nodes', () => {
     });
     expect(result).toEqual({ text: 'whole', raw: { whole: true } });
     expect(chat).toHaveBeenCalledTimes(1);
+    expect(emit).not.toHaveBeenCalled();
+  });
+
+  it('uses chat without deltas when streaming is disabled, even if the provider supports it', async () => {
+    const chat = vi.fn().mockResolvedValue({ text: 'whole', raw: { whole: true } });
+    const stream = vi.fn();
+    providers.set('fake', { id: 'fake', label: 'Fake', secretName: 'fake-key', chat, stream });
+    const emit = vi.fn();
+    const result = await llm.execute({
+      ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', streaming: false }),
+      emit,
+    });
+    expect(result).toEqual({ text: 'whole', raw: { whole: true } });
+    expect(chat).toHaveBeenCalledTimes(1);
+    expect(stream).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalled();
   });
 

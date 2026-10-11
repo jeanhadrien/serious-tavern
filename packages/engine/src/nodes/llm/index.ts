@@ -49,6 +49,10 @@ export const llm: NodeDefinition = {
       .boolean()
       .default(false)
       .describe('Merge consecutive unnamed system messages with blank lines'),
+    streaming: z
+      .boolean()
+      .default(true)
+      .describe('Stream tokens and reasoning as they are generated; disable to wait for the full response'),
   }),
   defaultConfig: {
     provider: 'openrouter',
@@ -58,6 +62,7 @@ export const llm: NodeDefinition = {
     maxTokens: 1024,
     reasoningEffort: 'off',
     mergeSystemMessages: false,
+    streaming: true,
   },
   async resolvePorts(config, resources) {
     const preset = await resources.presets.get(String(config.presetId ?? ''));
@@ -107,8 +112,10 @@ export const llm: NodeDefinition = {
     ctx.recordRequest({ provider: provider.id, ...request });
     const options = { apiKey: key, signal: ctx.signal };
     // Deltas are notifications only; the outcome is the accumulated response returned below.
-    const response = provider.stream
-      ? await provider.stream(request, {
+    const stream = provider.stream;
+    const useStream = ctx.config.streaming !== false && stream != null;
+    const response = useStream
+      ? await stream(request, {
           ...options,
           onToken: (textDelta) => ctx.emit({ type: 'node:delta', nodeId: ctx.nodeId, detail: { textDelta } }),
           onReasoning: (reasoningDelta) =>
