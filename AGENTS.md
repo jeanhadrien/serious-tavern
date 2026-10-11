@@ -119,6 +119,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - `&&` only chains native commands.
 - **Tooling:** pnpm isn't installed; use npm. No browser or Playwright is set up yet, so UI changes need a manual check by the user.
 - **Line endings:** the repo has no `.gitattributes`, so on Windows with `core.autocrlf=true` checkouts land as CRLF and repo-wide `biome check` fails on files nobody touched. Don't reformat unrelated files to fix it; normalize line endings only in files your own commit touches.
+- **Server integration tests that build a workflow by hand** must include exactly one `chat-input` node, even when its outputs are not wired to anything. `prepareWorkflow` rejects workflows with zero or multiple chat-input nodes before execution begins.
 - **Verification:** for server changes, a quick live check is to start the server with `npx tsx src/index.ts` in `apps/server` and `curl.exe` the endpoints.
 
 <!-- CODEGRAPH_START -->
