@@ -4,6 +4,7 @@ import { sendMessageResultSchema } from '@st/shared';
 import { sessionsApi, workflowsApi, charactersApi, personasApi } from '../../api.js';
 import { ApiError } from '../../api/transport.js';
 import { alerts } from '../../alerts/index.js';
+import { compareRecent } from '../recentOrder.js';
 import { useMessageActions } from './useMessageActions.js';
 
 export function useChat() {
@@ -18,7 +19,7 @@ export function useChat() {
   const opening = useRef(0);
   const [logs, setLogs] = useState<Record<string, ExecutionLog>>({});
   const refresh = () =>
-    sessionsApi.list().then((list) => setSessions(list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))));
+    sessionsApi.list().then((list) => setSessions(list.sort((a, b) => compareRecent(a, b, (item) => item.title))));
   const messageActions = useMessageActions(session, setSession, refresh, () => busyRef.current);
   const refreshAll = () => {
     void workflowsApi

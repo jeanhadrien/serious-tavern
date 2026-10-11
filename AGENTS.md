@@ -66,6 +66,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Locks (`storage/lock.ts`) are in-process and **not re-entrant**: never acquire the same key inside its own critical section, or it deadlocks.
   - Messages sent to one session are handled one after another; different sessions run concurrently.
   - Repository writes are atomic: they write a temp file, then rename it. The rename retries transient Windows `EPERM`/`EACCES`/`EBUSY` errors.
+- **Recency ordering:** the preset, workflow and chat lists are ordered most-recent-first with the shared `compareRecent` comparator (`apps/web/src/pages/recentOrder.ts`: `updatedAt` desc, then `createdAt` desc, then name). Session `updatedAt` means last message activity: only sending a message advances it; message edit/delete and session metadata patches leave it unchanged.
 - **Execution semantics:**
   - A workflow has exactly one Chat Input and **one or more** Chat Outputs. Only nodes that some Chat Output depends on run; the rest are logged as `skipped`.
   - Each Chat Output that runs appends one assistant message. Message order is deterministic: dependency order first, then the output's `order` config, then node id. It never depends on which output finishes first.

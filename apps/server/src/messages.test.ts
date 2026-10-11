@@ -60,7 +60,7 @@ it('edits either role without changing metadata or executing, then deletes only 
     }
     const edited = (await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json();
     expect(edited.messages).toHaveLength(2);
-    expect(edited.updatedAt > before.updatedAt).toBe(true);
+    expect(edited.updatedAt).toBe(before.updatedAt);
     const response = await app.inject({
       method: 'DELETE',
       url: `/api/sessions/${session.id}/messages/${result.userMessage.id}`,
@@ -69,9 +69,51 @@ it('edits either role without changing metadata or executing, then deletes only 
     expect(response.body).toBe('');
     const remaining = (await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json();
     expect(remaining.messages).toEqual([edited.messages[1]]);
-    expect(remaining.updatedAt >= edited.updatedAt).toBe(true);
+    expect(remaining.updatedAt).toBe(edited.updatedAt);
     const execution = await app.inject({ method: 'GET', url: `/api/executions/${result.execution.id}` });
     expect(execution.json()).toEqual(result.execution);
+  } finally {
+    await app.close();
+  }
+});
+
+it('only advances session updatedAt on message send, not on edits, deletes or metadata patches', async () => {
+  const { app, session, result } = await fixture();
+  try {
+    const before = (await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json();
+    const edited = await app.inject({
+      method: 'PATCH',
+      url: `/api/sessions/${session.id}/messages/${result.userMessage.id}`,
+      payload: { content: 'Edited' },
+    });
+    expect(edited.statusCode).toBe(200);
+    const afterEdit = (await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json();
+    expect(afterEdit.updatedAt).toBe(before.updatedAt);
+    const deleted = await app.inject({
+      method: 'DELETE',
+      url: `/api/sessions/${session.id}/messages/${result.assistantMessages[0]!.id}`,
+    });
+    expect(deleted.statusCode).toBe(204);
+    const afterDelete = (await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json();
+    expect(afterDelete.updatedAt).toBe(before.updatedAt);
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/api/sessions/${session.id}`,
+      payload: { title: 'Renamed' },
+    });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json().title).toBe('Renamed');
+    const afterPatch = (await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json();
+    expect(afterPatch.updatedAt).toBe(before.updatedAt);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const sent = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${session.id}/messages`,
+      payload: { content: 'Another turn' },
+    });
+    expect(sent.statusCode).toBe(200);
+    const afterSend = (await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json();
+    expect(afterSend.updatedAt > before.updatedAt).toBe(true);
   } finally {
     await app.close();
   }

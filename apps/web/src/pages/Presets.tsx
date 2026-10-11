@@ -4,6 +4,7 @@ import { presetSchema, type Preset } from '@st/shared';
 import { presetsApi } from '../api.js';
 import { useRefreshOnTabActive } from '../useTabActivation.js';
 import { alerts } from '../alerts/index.js';
+import { compareRecent } from './recentOrder.js';
 import { PresetList } from './presets/PresetList.js';
 import { PresetEditor } from './presets/PresetEditor.js';
 import { PresetEntryEditor } from './presets/PresetEntryEditor.js';
@@ -20,7 +21,8 @@ export function Presets() {
   const [saved, setSaved] = useState('');
   const [selectedEntryId, setSelectedEntryId] = useState('');
   const dirty = !!draft && JSON.stringify(draft) !== saved;
-  const refresh = async () => setList(await presetsApi.list());
+  const refresh = async () =>
+    setList((await presetsApi.list()).sort((a, b) => compareRecent(a, b, (preset) => preset.name)));
 
   useEffect(() => {
     void refresh().catch(() => {});

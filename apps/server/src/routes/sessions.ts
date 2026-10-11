@@ -40,9 +40,7 @@ export function registerSessions(app: FastifyInstance, { workflows, characters, 
       if (body.personaId) await requireEntity(personas, body.personaId, 'Persona');
       if (body.characterId === null) delete current.characterId;
       if (body.personaId === null) delete current.personaId;
-      Object.assign(current, Object.fromEntries(Object.entries(body).filter(([, value]) => value !== null)), {
-        updatedAt: now(),
-      });
+      Object.assign(current, Object.fromEntries(Object.entries(body).filter(([, value]) => value !== null)));
       return current;
     });
     if (!session) throw notFound('Session');

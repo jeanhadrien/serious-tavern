@@ -10,6 +10,7 @@ import {
 } from '@st/shared';
 import { ApiError, charactersApi, workflowsApi, nodeTypesApi, presetsApi, providersApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
+import { compareRecent } from '../recentOrder.js';
 import { canvasToWorkflow } from './model.js';
 import { useWorkflowCanvas } from './useWorkflowCanvas.js';
 
@@ -23,7 +24,8 @@ export function useWorkflowEditor() {
   const [providersList, setProvidersList] = useState<ApiResponse<'listProviders'>>([]);
   const [workflow, setWorkflow] = useState<Workflow>();
   const canvas = useWorkflowCanvas(types, presets, characters);
-  const refresh = () => workflowsApi.list().then(setWorkflows);
+  const refresh = () =>
+    workflowsApi.list().then((list) => setWorkflows(list.sort((a, b) => compareRecent(a, b, (item) => item.name))));
   const refreshResources = () => {
     void charactersApi
       .list()
