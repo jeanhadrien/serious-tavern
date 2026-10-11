@@ -17,11 +17,19 @@ function requestBody(request: ChatRequest, stream: boolean) {
     ...(request.frequencyPenalty === undefined ? {} : { frequency_penalty: request.frequencyPenalty }),
     ...(request.presencePenalty === undefined ? {} : { presence_penalty: request.presencePenalty }),
     ...(request.stop === undefined ? {} : { stop: request.stop }),
-    // 'off' sends nothing, leaving the model's own default reasoning behaviour in place.
-    ...(request.reasoningEffort === undefined || request.reasoningEffort === 'off'
-      ? {}
-      : { reasoning: { effort: request.reasoningEffort } }),
+    ...reasoningParams(request),
   };
+}
+
+/** Builds OpenRouter's unified `reasoning` object; nothing is sent when no option is set. */
+function reasoningParams(request: ChatRequest) {
+  const reasoning = {
+    // 'off' sends nothing, leaving the model's own default reasoning behaviour in place.
+    ...(request.reasoningEffort && request.reasoningEffort !== 'off' ? { effort: request.reasoningEffort } : {}),
+    ...(request.reasoningMaxTokens === undefined ? {} : { max_tokens: request.reasoningMaxTokens }),
+    ...(request.reasoningExclude ? { exclude: true } : {}),
+  };
+  return Object.keys(reasoning).length ? { reasoning } : {};
 }
 
 async function postCompletion(request: ChatRequest, stream: boolean, options: { apiKey: string; signal: AbortSignal }) {

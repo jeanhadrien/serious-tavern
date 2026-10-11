@@ -1,7 +1,4 @@
-import type { PromptMessage } from '@st/shared';
-
-export const reasoningEfforts = ['off', 'low', 'medium', 'high'] as const;
-export type ReasoningEffort = (typeof reasoningEfforts)[number];
+import type { PromptMessage, ReasoningEffort } from '@st/shared';
 
 export type ChatRequest = {
   messages: PromptMessage[];
@@ -13,6 +10,10 @@ export type ChatRequest = {
   presencePenalty?: number;
   stop?: string[];
   reasoningEffort?: ReasoningEffort;
+  // Explicit reasoning budget in tokens; independent of `reasoningEffort`.
+  reasoningMaxTokens?: number;
+  // Keep reasoning internal: the model still thinks (and bills for it) but returns no trace.
+  reasoningExclude?: boolean;
 };
 export type ChatResponse = { text: string; raw: unknown; usage?: unknown };
 export type ChatOptions = { apiKey: string; signal: AbortSignal };

@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { characterSchema, presetInputLabel, type PromptMessage } from '@st/shared';
+import { characterSchema, presetInputLabel, reasoningEfforts, type PromptMessage } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { renderPreset } from '../../preset.js';
-import { providers, reasoningEfforts } from '../../providers/index.js';
+import { providers } from '../../providers/index.js';
 import '../../providers/openrouter.js';
 
 export function mergeSystemMessages(messages: readonly PromptMessage[]): PromptMessage[] {
@@ -45,6 +45,16 @@ export const llm: NodeDefinition = {
       .enum(reasoningEfforts)
       .default('off')
       .describe('Ask the model to reason before answering; reasoning streams separately from the reply'),
+    reasoningMaxTokens: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Reasoning token budget, for models that support it; counts against max tokens'),
+    reasoningExclude: z
+      .boolean()
+      .default(false)
+      .describe('Let the model reason but do not return the reasoning (still billed)'),
     mergeSystemMessages: z
       .boolean()
       .default(false)
@@ -61,6 +71,7 @@ export const llm: NodeDefinition = {
     temperature: 0.7,
     maxTokens: 1024,
     reasoningEffort: 'off',
+    reasoningExclude: false,
     mergeSystemMessages: false,
     streaming: true,
   },
@@ -104,7 +115,15 @@ export const llm: NodeDefinition = {
       temperature: Number(ctx.config.temperature),
       maxTokens: Number(ctx.config.maxTokens),
       ...Object.fromEntries(
-        ['topP', 'frequencyPenalty', 'presencePenalty', 'stop', 'reasoningEffort']
+        [
+          'topP',
+          'frequencyPenalty',
+          'presencePenalty',
+          'stop',
+          'reasoningEffort',
+          'reasoningMaxTokens',
+          'reasoningExclude',
+        ]
           .filter((field) => ctx.config[field] !== undefined)
           .map((field) => [field, ctx.config[field]]),
       ),

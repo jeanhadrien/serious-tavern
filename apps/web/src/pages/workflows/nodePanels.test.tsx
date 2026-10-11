@@ -55,7 +55,10 @@ it('renders the registered LLM panel with the same controls, preset summary and 
   expect(html).toContain('Edit preset ↗');
   expect(html).toContain('Merge consecutive system messages');
   expect(html).toContain('checked=""');
-  expect(html.match(/type="number"/g)).toHaveLength(5);
+  expect(html.match(/type="number"/g)).toHaveLength(6);
+  expect(html).toContain('Reasoning effort');
+  expect(html).toContain('Reasoning max tokens');
+  expect(html).toContain('Stream the response');
   expect(html).toContain('step="1" value="1024"');
   expect(html).toContain('END\nSTOP');
   expect(html).not.toContain('kv-list');

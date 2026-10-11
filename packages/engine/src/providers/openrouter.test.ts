@@ -72,12 +72,29 @@ describe('OpenRouter streaming', () => {
     ['low', { effort: 'low' }],
     ['medium', { effort: 'medium' }],
     ['high', { effort: 'high' }],
+    ['minimal', { effort: 'minimal' }],
+    ['xhigh', { effort: 'xhigh' }],
   ] as const)('maps reasoningEffort %s to %j, leaving "off" to the provider default', async (effort, reasoning) => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(streamResponse([`${event({ choices: [{ delta: { content: 'ok' } }] })}data: [DONE]\n\n`]));
     await openrouter.stream!({ ...request, reasoningEffort: effort }, { ...options(), ...callbacks() });
     expect(sentBody(fetchMock).reasoning).toEqual(reasoning);
+  });
+
+  it('sends the reasoning budget and exclude flag independently of effort', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      streamResponse([
+        `${event({ choices: [{ delta: { content: 'ok' } }] })}data: [DONE]
+
+`,
+      ]),
+    );
+    await openrouter.stream!(
+      { ...request, reasoningMaxTokens: 2000, reasoningExclude: true },
+      { ...options(), ...callbacks() },
+    );
+    expect(sentBody(fetchMock).reasoning).toEqual({ max_tokens: 2000, exclude: true });
   });
 
   it('fails the stream on an error frame after partial output', async () => {

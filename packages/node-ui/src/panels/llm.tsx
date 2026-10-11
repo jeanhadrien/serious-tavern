@@ -1,3 +1,4 @@
+import { reasoningEfforts } from '@st/shared';
 import type { NodeConfigPanelProps } from './types.js';
 import { parseStopSequences, updateNumericOption } from './llmConfig.js';
 
@@ -75,6 +76,49 @@ export function LlmPanel({ config, onChange, context }: NodeConfigPanelProps) {
           />
         </label>
       ))}
+      <label>
+        Reasoning effort
+        <select
+          value={String(config.reasoningEffort ?? 'off')}
+          onChange={(e) => onChange({ ...config, reasoningEffort: e.target.value })}
+        >
+          {reasoningEfforts.map((effort) => (
+            <option key={effort} value={effort}>
+              {effort}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Reasoning max tokens
+        <input
+          type="number"
+          step={1}
+          min={1}
+          value={String(config.reasoningMaxTokens ?? '')}
+          onChange={(e) => onChange(updateNumericOption(config, 'reasoningMaxTokens', e.target.value))}
+        />
+      </label>
+      <p className="hint">
+        Effort is "off" by default, which leaves the model's own behaviour. Reasoning tokens count against max tokens,
+        so keep that comfortably higher.
+      </p>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={config.reasoningExclude === true}
+          onChange={(e) => onChange({ ...config, reasoningExclude: e.target.checked })}
+        />
+        Hide reasoning from the response
+      </label>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={config.streaming !== false}
+          onChange={(e) => onChange({ ...config, streaming: e.target.checked })}
+        />
+        Stream the response
+      </label>
       <label>
         Stop sequences (one per line)
         <textarea
