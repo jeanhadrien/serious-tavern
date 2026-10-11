@@ -37,32 +37,44 @@ it('uses the registry for hints and warns on unknown macros only in enabled mess
         name: 'Active',
         role: 'system',
         content:
-          '{{unknown}} {{char.name}} {{user.description}} {{random::a::b}} {{CHARACTER.Name}} {{INPUT.MESSAGE}} {{inputs.HISTORY}}',
+          '{{unknown}} {{char.name}} {{user.description}} {{random::a::b}} {{CHARACTER.Name}} {{input.message}} {{inputs.history}}',
       },
       { id: 'disabled', kind: 'message', enabled: false, name: 'Disabled', role: 'system', content: '{{disabled}}' },
     ],
   });
   expect(presetWarnings(parsed)).toEqual(
-    ['{{unknown}}', '{{char.name}}', '{{user.description}}', '{{random::a::b}}'].map((expression) => ({
-      path: ['entries', 0, 'content'],
-      message: `Unknown macro: ${expression}`,
-    })),
+    ['{{unknown}}', '{{char.name}}', '{{user.description}}', '{{random::a::b}}', '{{CHARACTER.Name}}'].map(
+      (expression) => ({
+        path: ['entries', 0, 'content'],
+        message: `Unknown macro: ${expression}`,
+      }),
+    ),
   );
   const hints = macroHints(parsed.inputs);
   expect(hints).toContainEqual(expect.objectContaining({ expression: '{{input.message}}', type: 'text' }));
   expect(hints).toContainEqual(expect.objectContaining({ expression: '{{character.creator_notes}}' }));
-  expect(hints.every((hint) => findMacro(hint.expression.slice(2, -2)) !== undefined)).toBe(true);
+  expect(hints).toContainEqual(
+    expect.objectContaining({ expression: '{{#each input.history}}{{/each}}', type: 'messages' }),
+  );
+  const variables = hints.filter((hint) => !hint.expression.startsWith('{{#') && !hint.expression.startsWith('{{!'));
+  expect(variables.every((hint) => findMacro(hint.expression.slice(2, -2)) !== undefined)).toBe(true);
   expect(hints.some((hint) => hint.expression.startsWith('{{char.') || hint.expression.startsWith('{{user.'))).toBe(
     false,
   );
 });
 
-it('validates input macros case-insensitively and rejects ambiguous input keys', () => {
+it('validates input references case-sensitively and rejects ambiguous input keys', () => {
   const message = { id: 'm', kind: 'message', enabled: true, name: 'M', role: 'system' };
+  expect(presetSchema.safeParse({ ...base(), entries: [{ ...message, content: '{{input.message}}' }] }).success).toBe(
+    true,
+  );
+  expect(presetSchema.safeParse({ ...base(), entries: [{ ...message, content: '{{input.Missing}}' }] }).success).toBe(
+    false,
+  );
   expect(presetSchema.safeParse({ ...base(), entries: [{ ...message, content: '{{INPUT.MESSAGE}}' }] }).success).toBe(
     true,
   );
-  expect(presetSchema.safeParse({ ...base(), entries: [{ ...message, content: '{{INPUT.Missing}}' }] }).success).toBe(
+  expect(presetSchema.safeParse({ ...base(), entries: [{ ...message, content: '{{input.MESSAGE}}' }] }).success).toBe(
     false,
   );
   expect(
@@ -200,4 +212,82 @@ it('warns when an input is unused by enabled slots or message templates', () => 
   expect(presetWarnings(parsed)).toEqual([
     { path: ['inputs', 0], message: 'Input "history" is not used by an enabled entry.' },
   ]);
+});
+
+describe('block templates', () => {
+  const message = (content: string) => ({
+    id: 'm',
+    kind: 'message' as const,
+    enabled: true,
+    name: 'M',
+    role: 'system' as const,
+    content,
+  });
+  const historySlot = {
+    id: 'history-slot',
+    kind: 'slot' as const,
+    enabled: true,
+    name: 'History',
+    inputKey: 'history',
+  };
+  const messageSlot = {
+    id: 'message-slot',
+    kind: 'slot' as const,
+    enabled: true,
+    name: 'Message',
+    inputKey: 'message',
+  };
+  const withContent = (content: string) => presetSchema.safeParse({ ...base(), entries: [message(content)] });
+
+  it('reports unknown input references inside blocks and subexpressions as errors', () => {
+    for (const content of [
+      '{{#if input.missing}}x{{/if}}',
+      '{{#if (eq input.missing "a")}}x{{/if}}',
+      '{{#each input.history}}{{input.missing}}{{/each}}',
+    ])
+      expect(withContent(content).success, content).toBe(false);
+    expect(
+      withContent('{{#if (eq input.message "a")}}{{#each input.history}}{{this.role}}{{/each}}{{/if}}').success,
+    ).toBe(true);
+  });
+
+  it('warns on unknown paths, relative paths are not checked, and helper names are never flagged', () => {
+    const parsed = presetSchema.parse({
+      ...base(),
+      entries: [
+        message(
+          '{{#if (eq character.name "aeaze")}}{{#each input.history}}{{this.role}} {{content}} {{../unknown}}{{/each}}{{/if}}',
+        ),
+        historySlot,
+        messageSlot,
+      ],
+    });
+    expect(presetWarnings(parsed)).toEqual([
+      { path: ['entries', 0, 'content'], message: 'Unknown macro: {{../unknown}}' },
+    ]);
+  });
+
+  it('warns instead of failing on syntax errors and unsupported constructs', () => {
+    const parsed = presetSchema.parse({
+      ...base(),
+      entries: [
+        message('{{#if input.message}}open'),
+        { ...message('{{format input.message}}'), id: 'helper' },
+        messageSlot,
+        historySlot,
+      ],
+    });
+    expect(presetWarnings(parsed)).toEqual([
+      { path: ['entries', 0, 'content'], message: expect.stringMatching(/^Template syntax error: /) },
+      { path: ['entries', 1, 'content'], message: 'Unknown helper: format' },
+    ]);
+  });
+
+  it('counts an input used only inside a block as used', () => {
+    const parsed = presetSchema.parse({
+      ...base(),
+      entries: [message('{{#if input.message}}{{/if}}'), historySlot],
+    });
+    expect(presetWarnings(parsed)).toEqual([]);
+  });
 });

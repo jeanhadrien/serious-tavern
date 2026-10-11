@@ -94,7 +94,7 @@ describe('renderPreset', () => {
       [input('history', 'messages'), input('message', 'text'), input('empty', 'text')],
       [
         message('empty-message', ' \t '),
-        message('filled', '{{INPUT.HISTORY}}\n{{TRIGGER.MESSAGE}} {{trigger.sessionId}} {{input.MESSAGE}}'),
+        message('filled', '{{input.history}}\n{{trigger.message}} {{trigger.sessionId}} {{input.message}}'),
         slot('empty-slot', 'empty'),
         message('disabled', '{{input.message}}', { mode: 'ordered' }, false),
       ],

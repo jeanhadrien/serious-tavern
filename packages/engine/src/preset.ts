@@ -1,39 +1,13 @@
 import {
-  canConnect,
-  caseInsensitiveValue,
-  findMacro,
   presetSchema,
   type Character,
   type Persona,
-  type PortDataType,
   type Preset,
   type PresetEntry,
   type PromptMessage,
 } from '@st/shared';
 import { renderContextTemplate } from './template.js';
-import { coerceValue } from './text.js';
-
-function sourceType(value: unknown): PortDataType {
-  if (
-    Array.isArray(value) &&
-    value.every(
-      (item) => item && typeof item === 'object' && typeof item.role === 'string' && typeof item.content === 'string',
-    )
-  )
-    return 'messages';
-  if (value === null || value === undefined) return 'text';
-  if (typeof value === 'object') return Array.isArray(value) ? 'array' : 'object';
-  if (typeof value === 'boolean') return 'boolean';
-  if (typeof value === 'number') return 'number';
-  return 'text';
-}
-
-function toText(value: unknown): string {
-  if (value == null) return '';
-  const compatibility = canConnect(sourceType(value), 'text');
-  if (!compatibility.ok) throw new Error(compatibility.reason);
-  return coerceValue(value, compatibility.coerce ?? 'to-text');
-}
+import { toText } from './text.js';
 
 function renderMessagesSlot(value: unknown, slot: Extract<PresetEntry, { kind: 'slot' }>): PromptMessage[] {
   if (value != null && !Array.isArray(value)) throw new Error(`Input ${slot.inputKey} requires messages`);
@@ -73,13 +47,7 @@ export function renderPreset(
         character: options.templateContext.character,
         persona: options.templateContext.persona,
       },
-      (path) => {
-        const macro = findMacro(path);
-        if (macro?.source === 'inputs')
-          return toText(path.split('.').slice(1).reduce<unknown>(caseInsensitiveValue, options.inputs));
-        if (macro?.source === 'history' && !macro.pattern) return toText(options.templateContext.history);
-        return undefined;
-      },
+      'preset',
     );
     if (content.trim()) renderedMessages.set(entry.id, { role: entry.role, content });
   }

@@ -4,4 +4,5 @@ export * from './ports.js';
 export * from './preset.js';
 export * from './character.js';
 export * from './macros.js';
+export * from './template-analysis.js';
 export * from './api/index.js';

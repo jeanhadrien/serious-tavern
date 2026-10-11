@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { macroInputKey, templateMacros } from './macros.js';
+import { findMacro, macroInputKey, templateMacros } from './macros.js';
+import { analyzeTemplate } from './template-analysis.js';
 
 export const presetRoleSchema = z.enum(['system', 'user', 'assistant']);
 export const presetInputKeySchema = z
@@ -67,9 +68,9 @@ export const presetFieldsSchema = z
           message: `Unknown input: ${entry.inputKey}`,
         });
       if (entry.kind === 'message') {
-        for (const macro of templateMacros(entry.content)) {
-          const key = macroInputKey(macro.name);
-          if (key !== undefined && !inputKeys.has(key))
+        for (const reference of analyzeTemplate(entry.content).references) {
+          const key = macroInputKey(reference.name);
+          if (key !== undefined && !inputByKey.has(key))
             ctx.addIssue({ code: 'custom', path: ['entries', index, 'content'], message: `Unknown input: ${key}` });
         }
       }
@@ -120,16 +121,18 @@ export function presetWarnings(preset: Preset): PresetWarning[] {
       (entry) =>
         entry.kind === 'message' &&
         entry.enabled &&
-        templateMacros(entry.content).some((macro) => macroInputKey(macro.name) === input.key.toLowerCase()),
+        templateMacros(entry.content).some((macro) => macroInputKey(macro.name) === input.key),
     );
     if (!usedBySlot && !usedByTemplate)
       warnings.push({ path: ['inputs', index], message: `Input "${input.key}" is not used by an enabled entry.` });
   });
   preset.entries.forEach((entry, index) => {
     if (entry.kind !== 'message' || !entry.enabled) return;
-    for (const macro of templateMacros(entry.content)) {
-      if (!macro.definition)
-        warnings.push({ path: ['entries', index, 'content'], message: `Unknown macro: ${macro.expression}` });
+    const { references, problems } = analyzeTemplate(entry.content);
+    for (const problem of problems) warnings.push({ path: ['entries', index, 'content'], message: problem });
+    for (const reference of references) {
+      if (reference.root && !findMacro(reference.name))
+        warnings.push({ path: ['entries', index, 'content'], message: `Unknown macro: ${reference.expression}` });
     }
   });
   return warnings;

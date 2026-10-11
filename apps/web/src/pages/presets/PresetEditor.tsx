@@ -45,7 +45,7 @@ function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void })
     const oldKey = lastValidKeys.current.get(input.id) ?? input.key;
     const isValidKey = /^[a-z][a-zA-Z0-9_]*$/.test(key);
     const escapedKey = oldKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const reference = new RegExp(`(\\{\\{\\s*inputs?\\.)${escapedKey}(?=[.\\s}]|$)`, 'gi');
+    const reference = new RegExp(`(\\{\\{\\s*inputs?\\.)${escapedKey}(?=[.\\s}]|$)`, 'g');
     const entries =
       isValidKey && oldKey !== key
         ? props.preset.entries.map((entry) => {
@@ -70,7 +70,7 @@ function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void })
       (entry) =>
         (entry.kind === 'slot' && entry.inputKey === input.key) ||
         (entry.kind === 'message' &&
-          templateMacros(entry.content).some((macro) => macroInputKey(macro.name) === input.key.toLowerCase())),
+          templateMacros(entry.content).some((macro) => macroInputKey(macro.name) === input.key)),
     );
   const warnings = parsed.success ? presetWarnings(parsed.data) : [];
   return (

@@ -162,13 +162,12 @@ describe('executor', () => {
     );
   });
   it('renders paths without evaluating expressions', () => {
-    expect(
-      renderTemplate('A {{input.foo}} B {{trigger.message}} C {{history}} D {{input.foo.constructor()}}', {
-        inputs: { foo: 3 },
-        trigger: { message: 'hi', sessionId: 's' },
-        history: [],
-      }),
-    ).toBe('A 3 B hi C [] D {{input.foo.constructor()}}');
+    const ctx = { inputs: { foo: 3 }, trigger: { message: 'hi', sessionId: 's' }, history: [] };
+    expect(renderTemplate('A {{input.foo}} B {{trigger.message}} C {{history}}', ctx)).toBe('A 3 B hi C []');
+    // Code-like expressions are syntax errors, so the whole template renders unchanged.
+    expect(renderTemplate('A {{input.foo}} D {{input.foo.constructor()}}', ctx)).toBe(
+      'A {{input.foo}} D {{input.foo.constructor()}}',
+    );
   });
   it('renders character and persona variables in node templates', () => {
     expect(

@@ -17,7 +17,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 
 ## Layout (npm workspaces, TypeScript strict, ESM, packages consumed as TS source)
 - `packages/shared`: zod schemas and types (workflow, ports, `canConnect` compatibility and coercion rules). This is the single source of truth for both front and back.
-- `packages/engine`: graph validation, wave-based parallel executor, templating (`{{input.x}}`, `{{trigger.message}}`, `{{history}}`, no code eval). Node types live in `src/nodes/<type>/index.ts` and are registered in `registry.ts`.
+- `packages/engine`: graph validation, wave-based parallel executor, templating (Handlebars runtime over the turn context: `{{input.x}}`, `{{trigger.message}}`, `{{history}}`, `{{#if}}`/`{{#each}}` blocks, `(eq …)` comparisons, no code eval). Node types live in `src/nodes/<type>/index.ts` and are registered in `registry.ts`.
   - `prepareWorkflow` (in `prepare.ts`) parses configs, resolves ports and snapshots resources **once**. `validateWorkflow` wraps it, and `executeWorkflow` accepts its result. Prepare again for each turn, and load node resources through the resolvers.
   - Execution failures carry `nodeId`/`nodeType` as data. Never parse error messages.
   - Validation returns structured `ValidationIssue`s (`{ message, edgeId?, nodeIds? }`), not bare strings. Messages are plain language and name nodes via `nodeDisplayName` (`Label #k (type)`); ids travel only in `edgeId`/`nodeIds`, never in the text. The `WORKFLOW_INVALID` error details are `{ workflowId, workflowName, issues }` (see `workflowInvalidDetailsSchema`); the web transport links the toast to the workflow and highlights the offending edge.
@@ -82,12 +82,13 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Card parsing and writing (PNG `tEXt` chunks `ccv3`, which takes precedence, then `chara`; V1/V2/V3 JSON) lives in `apps/server/src/card.ts` and runs on the server.
   - Export writes both `chara` (V2) and `ccv3` (V3), like SillyTavern.
   - Unknown card fields are kept in `extensions` so export round-trips.
-- **Macros:** the macro registry in `packages/shared/src/macros.ts` is the single source of truth. The engine resolves macros through it, and the editor hints and preset warnings come from it. Never hand-write hint lists.
+- **Templates are Handlebars:** preset content and template-taking node configs are rendered with the `handlebars` runtime (`noEscape: true`) over a data object built from the turn context. Blocks (`{{#if}}`, `{{#each}}`), `{{else}}`, subexpression comparisons (`{{#if (eq character.name "x")}}`), and `{{! comments}}` are supported; the exact syntax and helper list are documented in the README.
+  - The macro registry in `packages/shared/src/macros.ts` still defines every available path, and the helper list lives next to it. Preset validation walks the parsed AST, so editor hints and warnings stay in sync with what renders. Never hand-write hint lists.
   - Macro names are namespaced by source: `{{character.<field>}}`, `{{persona.name|description}}`, `{{input.<key>}}`, `{{trigger.*}}`.
   - Short aliases: `{{char}}`, `{{user}}` (defaults to "User"), `{{description}}`, `{{personality}}`, `{{scenario}}`, and `{{persona}}` (the persona description).
   - `{{char.*}}`/`{{user.*}}` were removed on purpose. Don't add legacy `<BOT>`/`<USER>` or SillyTavern's extra macros unless asked.
-  - Matching ignores case.
-  - Unknown macros are **left as-is** and produce a preset warning.
+  - Templates are **case-sensitive** (stock Handlebars resolution).
+  - Unknown macros render as **empty text** (stock Handlebars). Unknown paths in enabled entries still produce a preset warning.
   - A known macro with no value renders as empty text.
   - Macros also resolve inside character and persona fields, with protection against cycles.
   - Unknown `{{input.x}}` is a preset validation **error**.

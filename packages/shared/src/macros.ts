@@ -1,4 +1,5 @@
 import type { PortDataType } from './ports.js';
+import { analyzeTemplate } from './template-analysis.js';
 
 export type MacroDefinition = {
   name: string;
@@ -77,10 +78,10 @@ export const macroRegistry: readonly MacroDefinition[] = [
   },
   {
     name: 'input.<key>',
-    description: 'Input value (keys are case-insensitive)',
+    description: 'Input value',
     category: 'input',
     source: 'inputs',
-    pattern: /^input\.[\w]+(?:\.[\w]+)*$/i,
+    pattern: /^input\.[\w]+(?:\.[\w]+)*$/,
     dataType: 'any',
   },
   {
@@ -88,7 +89,7 @@ export const macroRegistry: readonly MacroDefinition[] = [
     description: 'Node input value or nested path',
     category: 'input',
     source: 'inputs',
-    pattern: /^inputs\.[\w]+(?:\.[\w]+)*$/i,
+    pattern: /^inputs\.[\w]+(?:\.[\w]+)*$/,
     dataType: 'any',
   },
   { name: 'input', description: 'All input values', category: 'input', source: 'inputs', dataType: 'object' },
@@ -115,7 +116,7 @@ export const macroRegistry: readonly MacroDefinition[] = [
     description: 'Trigger context path',
     category: 'trigger',
     source: 'trigger',
-    pattern: /^trigger\.[\w]+(?:\.[\w]+)*$/i,
+    pattern: /^trigger\.[\w]+(?:\.[\w]+)*$/,
     dataType: 'any',
   },
   {
@@ -130,31 +131,46 @@ export const macroRegistry: readonly MacroDefinition[] = [
     description: 'Conversation history path',
     category: 'history',
     source: 'history',
-    pattern: /^history\.[\w]+(?:\.[\w]+)*$/i,
+    pattern: /^history\.[\w]+(?:\.[\w]+)*$/,
     dataType: 'any',
   },
 ];
 
+// Names are case-sensitive, matching Handlebars path resolution.
 export function findMacro(name: string): MacroDefinition | undefined {
-  const normalized = name.toLowerCase();
-  return macroRegistry.find((macro) =>
-    macro.pattern ? macro.pattern.test(name) : macro.name.toLowerCase() === normalized,
-  );
+  return macroRegistry.find((macro) => (macro.pattern ? macro.pattern.test(name) : macro.name === name));
 }
 
-export function templateMacros(template: string): { expression: string; name: string; definition?: MacroDefinition }[] {
-  return [...template.matchAll(/\{\{([^{}]*?)\}\}/g)].map((match) => {
-    const name = match[1]!.trim();
-    return { expression: match[0], name, definition: findMacro(name) };
-  });
+export function templateMacros(
+  template: string,
+): { expression: string; name: string; root: boolean; definition?: MacroDefinition }[] {
+  return analyzeTemplate(template).references.map((reference) => ({
+    ...reference,
+    definition: findMacro(reference.name),
+  }));
 }
 
 export function macroInputKey(name: string): string | undefined {
-  return findMacro(name)?.source === 'inputs' && name.includes('.') ? name.split('.')[1]!.toLowerCase() : undefined;
+  return findMacro(name)?.source === 'inputs' && name.includes('.') ? name.split('.')[1] : undefined;
 }
 
+// Block and comment snippets for the editor; the helper names they use are listed in templateHelperNames.
+const templateSnippets: { expression: string; description: string; type: PortDataType }[] = [
+  {
+    expression: '{{#if character.name}}{{/if}}',
+    description: 'Renders the block when the value is truthy; add {{else}} for the other case',
+    type: 'any',
+  },
+  {
+    expression: '{{#if (eq character.name "")}}{{/if}}',
+    description: 'Renders the block when eq, ne, lt, lte, gt, gte, and, or or not holds',
+    type: 'any',
+  },
+  { expression: '{{! Comment}}', description: 'Comment, removed from the output', type: 'any' },
+];
+
 export function macroHints(inputs: readonly { key: string; dataType: PortDataType }[]) {
-  return macroRegistry.flatMap((macro) => {
+  const hints = macroRegistry.flatMap((macro) => {
     if (macro.pattern) {
       if (macro.source !== 'inputs') return [];
       return inputs.map((input) => ({
@@ -165,10 +181,12 @@ export function macroHints(inputs: readonly { key: string; dataType: PortDataTyp
     }
     return [{ expression: `{{${macro.name}}}`, description: macro.description, type: macro.dataType }];
   });
-}
-
-export function caseInsensitiveValue(value: unknown, key: string): unknown {
-  if (!value || typeof value !== 'object') return undefined;
-  const actual = Object.keys(value).find((candidate) => candidate.toLowerCase() === key.toLowerCase());
-  return actual === undefined ? undefined : (value as Record<string, unknown>)[actual];
+  const loops = inputs
+    .filter((input) => input.dataType === 'messages')
+    .map((input) => ({
+      expression: `{{#each input.${input.key}}}{{/each}}`,
+      description: 'Repeats for each message of the input (this.role, this.content, this.name)',
+      type: input.dataType,
+    }));
+  return [...hints, ...loops, ...templateSnippets];
 }
