@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import {
   macroInputKey,
+  presetInputLabel,
   templateMacros,
   presetSchema,
   presetWarnings,
@@ -14,7 +15,7 @@ const newInput = (inputs: PresetInput[]): PresetInput => {
   let key = 'context';
   let suffix = 2;
   while (inputs.some((input) => input.key.toLowerCase() === key.toLowerCase())) key = `context${suffix++}`;
-  return { id: newId(), key, label: 'Context', dataType: 'text' };
+  return { id: newId(), key, dataType: 'text' };
 };
 const newMessage = (): PresetEntry => ({
   id: newId(),
@@ -115,32 +116,6 @@ function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void })
               <option value="messages">messages</option>
               <option value="text">text</option>
             </select>
-            <input
-              aria-label={`Input label ${index + 1}`}
-              placeholder={input.key}
-              value={input.label ?? ''}
-              onChange={(event) =>
-                props.onChange({
-                  ...props.preset,
-                  inputs: props.preset.inputs.map((item, itemIndex) =>
-                    itemIndex === index ? { ...item, label: event.target.value || undefined } : item,
-                  ),
-                })
-              }
-            />
-            <input
-              aria-label={`Input description ${index + 1}`}
-              placeholder="Description"
-              value={input.description ?? ''}
-              onChange={(event) =>
-                props.onChange({
-                  ...props.preset,
-                  inputs: props.preset.inputs.map((item, itemIndex) =>
-                    itemIndex === index ? { ...item, description: event.target.value || undefined } : item,
-                  ),
-                })
-              }
-            />
             <button
               title={isUsed(input) ? 'Remove entries using this input first' : 'Remove input'}
               disabled={isUsed(input)}
@@ -189,7 +164,7 @@ function EntryList(props: {
     if (!input) return;
     const entry: PresetEntry = {
       id: newId(),
-      name: input.label ?? input.key,
+      name: presetInputLabel(input.key),
       kind: 'slot',
       enabled: true,
       inputKey: input.key,

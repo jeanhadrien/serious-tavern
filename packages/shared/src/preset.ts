@@ -9,10 +9,20 @@ export const presetInputKeySchema = z
 export const presetInputSchema = z.object({
   id: z.string().min(1),
   key: presetInputKeySchema,
-  label: z.string().optional(),
   dataType: z.enum(['messages', 'text']),
-  description: z.string().optional(),
 });
+
+// Display names for preset inputs are derived from the key, never stored:
+// `chat_history` reads as "Chat history".
+export function presetInputLabel(key: string): string {
+  const words = key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .split(/[\s_-]+/)
+    .filter((word) => word.length > 0)
+    .map((word) => word.toLowerCase());
+  if (words.length === 0) return key;
+  return words.join(' ').replace(/^\S/, (first) => first.toUpperCase());
+}
 
 const depthPlacementSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('ordered') }),

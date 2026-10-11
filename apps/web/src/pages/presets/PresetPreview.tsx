@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  presetInputLabel,
   presetSchema,
   presetWarnings,
   type Preset,
@@ -69,7 +70,7 @@ export function PresetPreview(props: { preset: Preset }) {
         .filter((input) => input.dataType === 'text')
         .map((input) => (
           <label key={input.id}>
-            Sample · {input.label ?? input.key} ({input.key})
+            Sample · {presetInputLabel(input.key)} ({input.key})
             <textarea
               rows={2}
               placeholder={`<${input.key}>`}

@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { macroHints, presetSchema, type Preset, type PresetEntry } from '@st/shared';
+import { macroHints, presetInputLabel, presetSchema, type Preset, type PresetEntry } from '@st/shared';
 
 export function PresetEntryEditor(props: { preset: Preset; entry?: PresetEntry; onChange(entry: PresetEntry): void }) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -61,7 +61,7 @@ export function PresetEntryEditor(props: { preset: Preset; entry?: PresetEntry; 
             >
               {preset.inputs.map((input) => (
                 <option value={input.key} key={input.id}>
-                  {input.label ?? input.key} ({input.key}) · {input.dataType}
+                  {presetInputLabel(input.key)} ({input.key}) · {input.dataType}
                 </option>
               ))}
               {!preset.inputs.some((input) => input.key === entry.inputKey) && (

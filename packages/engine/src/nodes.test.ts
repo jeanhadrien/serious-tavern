@@ -12,7 +12,7 @@ const preset: Preset = {
   name: 'Test',
   createdAt: '',
   updatedAt: '',
-  inputs: [{ id: 'prompt-input', label: 'Prompt', key: 'prompt', dataType: 'text' }],
+  inputs: [{ id: 'prompt-input', key: 'prompt', dataType: 'text' }],
   entries: [
     {
       kind: 'message',

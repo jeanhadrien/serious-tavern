@@ -40,8 +40,8 @@ export function defaultPreset(): Preset {
     id: '5d6c72c7-5185-4963-8227-527f12ef9eea',
     name: 'Default',
     inputs: [
-      { id: 'default-history', key: 'history', label: 'Chat history', dataType: 'messages' },
-      { id: 'default-message', key: 'message', label: 'User message', dataType: 'text' },
+      { id: 'default-history', key: 'history', dataType: 'messages' },
+      { id: 'default-message', key: 'message', dataType: 'text' },
     ],
     entries: [
       {

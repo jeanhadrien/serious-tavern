@@ -7,7 +7,7 @@ const preset: Preset = {
   name: 'Dynamic',
   createdAt: '',
   updatedAt: '',
-  inputs: [{ id: 'prompt-input', label: 'Prompt', key: 'prompt', dataType: 'text' }],
+  inputs: [{ id: 'prompt-input', key: 'prompt', dataType: 'text' }],
   entries: [{ id: 'one', name: 'Prompt', kind: 'slot', enabled: true, inputKey: 'prompt', role: 'user' }],
 };
 const resources = { presets: { get: async (id: string) => (id === preset.id ? preset : undefined) } };

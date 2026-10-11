@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { presetSchema, presetWarnings } from './preset.js';
+import { presetInputLabel, presetSchema, presetWarnings } from './preset.js';
 import { findMacro, macroHints } from './macros.js';
 
 const base = () => ({
@@ -8,8 +8,8 @@ const base = () => ({
   createdAt: '',
   updatedAt: '',
   inputs: [
-    { id: 'history-input', key: 'history', label: 'Chat history', dataType: 'messages' as const },
-    { id: 'message-input', key: 'message', label: 'User message', dataType: 'text' as const },
+    { id: 'history-input', key: 'history', dataType: 'messages' as const },
+    { id: 'message-input', key: 'message', dataType: 'text' as const },
   ],
   entries: [
     { id: 'history-slot', kind: 'slot' as const, enabled: true, name: 'History', inputKey: 'history' },
@@ -24,6 +24,12 @@ const base = () => ({
     },
     { id: 'message-slot', kind: 'slot' as const, enabled: true, name: 'Message', inputKey: 'message' },
   ],
+});
+
+it('derives input display labels from keys', () => {
+  expect(presetInputLabel('history')).toBe('History');
+  expect(presetInputLabel('chat_history')).toBe('Chat history');
+  expect(presetInputLabel('userMessage')).toBe('User message');
 });
 
 it('uses the registry for hints and warns on unknown macros only in enabled messages', () => {

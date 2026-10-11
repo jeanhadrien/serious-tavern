@@ -229,7 +229,7 @@ describe('executor', () => {
       createdAt: '',
       updatedAt: '',
       inputs: [
-        { id: 'prompt-input', label: 'Prompt', key: 'prompt', dataType: 'text' },
+        { id: 'prompt-input', key: 'prompt', dataType: 'text' },
         { id: 'extra-input', key: 'extra', dataType: 'text' },
       ],
       entries: [
@@ -242,7 +242,7 @@ describe('executor', () => {
       inputs: [
         { name: 'character', label: 'Character', dataType: 'character' },
         { name: 'prompt', label: 'Prompt', dataType: 'text' },
-        { name: 'extra', label: 'extra', dataType: 'text' },
+        { name: 'extra', label: 'Extra', dataType: 'text' },
       ],
     });
     const graph = workflow(

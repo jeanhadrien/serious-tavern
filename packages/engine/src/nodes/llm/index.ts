@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { characterSchema, type PromptMessage } from '@st/shared';
+import { characterSchema, presetInputLabel, type PromptMessage } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { renderPreset } from '../../preset.js';
 import { providers } from '../../providers/index.js';
@@ -64,9 +64,8 @@ export const llm: NodeDefinition = {
         ...llm.inputs,
         ...preset.inputs.map((input) => ({
           name: input.key,
-          label: input.label ?? input.key,
+          label: presetInputLabel(input.key),
           dataType: input.dataType,
-          description: input.description,
         })),
       ],
       outputs: llm.outputs,
