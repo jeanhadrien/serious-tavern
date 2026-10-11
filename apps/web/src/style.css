@@ -286,6 +286,17 @@ pre {
 .flow-node > small {
   display: block;
 }
+.flow-node > .flow-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.flow-node > .flow-header > small {
+  margin-top: 0;
+  flex-shrink: 0;
+  text-align: right;
+}
 .flow-node > small {
   margin-top: 4px;
 }
@@ -325,6 +336,15 @@ pre {
 .react-flow__handle.invalid-handle {
   opacity: 0.45;
   border: 2px solid #ef8186;
+}
+.flow-node .react-flow__handle-left {
+  left: -14px;
+}
+.flow-node .react-flow__handle-right {
+  right: -14px;
+}
+.port.invalid-port {
+  opacity: 0.45;
 }
 .port-legend {
   margin-top: 20px;

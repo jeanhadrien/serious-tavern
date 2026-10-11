@@ -27,34 +27,42 @@ export function WorkflowNode({ id, data, selected }: NodeProps<CanvasNode>) {
     `${port.label} (${port.dataType})${port.description ? ` — ${port.description}` : ''}`;
   return (
     <div className={`flow-node ${selected ? 'selected' : ''} ${data.unknown ? 'unknown-node' : ''}`}>
-      <strong>{data.name}</strong>
-      <small>{descriptor.category}</small>
-      {descriptor.inputs.map((port) => (
-        <div className="port input-port" key={port.name} title={tooltip(port)}>
-          <Handle
-            type="target"
-            id={port.name}
-            position={Position.Left}
-            className={incompatible(port, 'target') ? 'invalid-handle' : ''}
-            style={{ top: '50%', background: incompatible(port, 'target') ? '#ef8186' : portColors[port.dataType] }}
-          />
-          {port.label}
-          <span className="port-type">{port.dataType}</span>
-        </div>
-      ))}
-      {descriptor.outputs.map((port) => (
-        <div className="port output-port" key={port.name} title={tooltip(port)}>
-          <span className="port-type">{port.dataType}</span>
-          {port.label}
-          <Handle
-            type="source"
-            id={port.name}
-            position={Position.Right}
-            className={incompatible(port, 'source') ? 'invalid-handle' : ''}
-            style={{ top: '50%', background: incompatible(port, 'source') ? '#ef8186' : portColors[port.dataType] }}
-          />
-        </div>
-      ))}
+      <div className="flow-header">
+        <strong>{data.name}</strong>
+        <small>{descriptor.category}</small>
+      </div>
+      {descriptor.inputs.map((port) => {
+        const invalid = incompatible(port, 'target');
+        return (
+          <div className={`port input-port${invalid ? ' invalid-port' : ''}`} key={port.name} title={tooltip(port)}>
+            <Handle
+              type="target"
+              id={port.name}
+              position={Position.Left}
+              className={invalid ? 'invalid-handle' : ''}
+              style={{ top: '50%', background: invalid ? '#ef8186' : portColors[port.dataType] }}
+            />
+            {port.label}
+            <span className="port-type">{port.dataType}</span>
+          </div>
+        );
+      })}
+      {descriptor.outputs.map((port) => {
+        const invalid = incompatible(port, 'source');
+        return (
+          <div className={`port output-port${invalid ? ' invalid-port' : ''}`} key={port.name} title={tooltip(port)}>
+            <span className="port-type">{port.dataType}</span>
+            {port.label}
+            <Handle
+              type="source"
+              id={port.name}
+              position={Position.Right}
+              className={invalid ? 'invalid-handle' : ''}
+              style={{ top: '50%', background: invalid ? '#ef8186' : portColors[port.dataType] }}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
