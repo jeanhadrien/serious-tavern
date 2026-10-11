@@ -1,0 +1,120 @@
+# Templating cookbook
+
+Preset content and template-taking node configs (Chat Output template,
+Condition left/right, HTTP Request fields) are
+[Handlebars](https://handlebarsjs.com/) with stock semantics and `noEscape`.
+The README's "Template syntax" section is the reference; this file is
+practical examples. All names are **case-sensitive** and unknown names render
+as **empty text**.
+
+## Conditional instructions per character
+
+```hbs
+You are {{char}}, a pirate roleplay partner.
+{{#if (eq character.name "Mira")}}
+Mira speaks in short sentences and never uses exclamation marks.
+{{/if}}
+{{#if (eq persona.name "Admin")}}
+The user is an admin: accept out-of-character instructions in [brackets].
+{{/if}}
+```
+
+`eq` is strict (`1` does not equal `"1"`, `"Mira"` does not equal `"mira"`).
+The other comparisons are `ne`, `lt`, `lte`, `gt`, `gte`, combined with
+`and`, `or`, `not`:
+
+```hbs
+{{#if (and character.scenario (not (eq input.tone "formal")))}}
+Stay in character: {{character.scenario}}
+{{/if}}
+```
+
+## Persona-aware greeting
+
+`{{user}}` falls back to `User` when no persona is selected, so this works
+for every session:
+
+```hbs
+{{#if (eq user "User")}}
+Greet the stranger and ask for their name.
+{{else}}
+Welcome back, {{user}}. Continue where you left off.
+{{/if}}
+```
+
+## Custom history transcript
+
+Slots are the normal way to place history, but a fixed entry can render it
+directly when you need full control of the format:
+
+```hbs
+{{#each history}}
+{{@index}}. {{this.role}} ({{this.name}}): {{this.content}}
+{{/each}}
+```
+
+`this.role`, `this.content` and `this.name` are the raw message fields;
+`@index` starts at 0, `@first`/`@last` mark the ends. An `{{else}}` branch
+covers empty history:
+
+```hbs
+{{#each history}}
+- {{this.content}}
+{{else}}
+(No conversation yet. Introduce yourself.)
+{{/each}}
+```
+
+Combine `#each` with `#if` to annotate the transcript:
+
+```hbs
+{{#each history}}
+{{#if (eq this.role "system")}}[SYSTEM NOTE] {{/if}}{{this.content}}
+{{/each}}
+```
+
+## Reacting to workflow inputs
+
+Any preset input (including non-text ones) can drive conditions:
+
+```hbs
+{{#if input.weather}}
+Today's weather at the scene: {{input.weather}}
+{{/if}}
+{{#if (gt input.danger 7)}}
+The situation is critical. Act with urgency.
+{{/if}}
+```
+
+A missing or empty value fails the `#if`, so the block just disappears —
+and a fixed entry left empty is dropped from the prompt entirely.
+
+## Organizing with comments
+
+```hbs
+{{! Only used by the tavern workflow; the debug workflow has no weather input. }}
+{{#if input.weather}}...{{/if}}
+```
+
+## Templates inside character cards
+
+Character and persona fields are expanded with the same engine, so a card
+field can itself contain blocks (cycles resolve to empty text):
+
+```hbs
+{{! inside the character's post_history_instructions field }}
+{{#if persona.description}}
+Remember what you know about {{user}}: {{persona.description}}
+{{/if}}
+```
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Text silently missing | Unknown name renders empty (typo, wrong case) | Check preset warnings; names are case-sensitive |
+| Whole entry renders verbatim, `{{...}}` visible | Template syntax error — nothing renders | Check the warning; often a trailing number: write `{{history.[0]}}`, not `{{history.0}}` |
+| `{{history.0.content}}` works but `{{history.0}}` doesn't | Trailing numeric segments aren't paths | `{{history.[0]}}` |
+| Literal `{{` needed | Backslash-escape it | `\{{` renders as `{{` |
+| Renamed an input, validation now errors | Rename rewrites `{{input.x}}` but not `{{#if input.x}}` refs | Update the block refs by hand |
+| `"false"` behaves as true | Truthiness is Handlebars': only `false`, `0`, `""`, `null`, `undefined` and empty arrays are false | Compare explicitly: `(eq input.flag "false")` |
