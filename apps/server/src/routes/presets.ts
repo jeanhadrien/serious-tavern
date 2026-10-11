@@ -26,8 +26,9 @@ export function registerPresets(app: FastifyInstance, context: AppContext) {
   app.put<ApiRoute<'updatePreset'>>('/api/presets/:id', async (request) => {
     const { id } = apiContract.updatePreset.params.parse(request.params);
     const body = apiContract.updatePreset.body.parse({ ...(request.body as object) });
+    // Spread old first so unknown fields from newer versions survive (migrate-on-write).
     const preset = await presets.update(id, (old) =>
-      presetSchema.parse({ ...body, id, createdAt: old.createdAt, updatedAt: now() }),
+      presetSchema.parse({ ...old, ...body, id, createdAt: old.createdAt, updatedAt: now() }),
     );
     if (!preset) throw notFound('Preset');
     // Drop connections into preset inputs that no longer exist on dependent LLM nodes.

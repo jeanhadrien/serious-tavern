@@ -39,17 +39,29 @@ export class JsonRepository<T extends { id: string }> implements Repository<T> {
     if (!/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error('Invalid id');
     return join(this.directory, `${id}.json`);
   }
+  // Reads never delete or rewrite user data. Corrupt files are reported with their
+  // path and skipped (list) or thrown (get) so they can be fixed by hand.
   async list(): Promise<T[]> {
     await mkdir(this.directory, { recursive: true });
     const files = (await readdir(this.directory)).filter((name) => name.endsWith('.json'));
-    return Promise.all(files.map(async (name) => JSON.parse(await readFile(join(this.directory, name), 'utf8')) as T));
+    const items: T[] = [];
+    for (const name of files) {
+      const path = join(this.directory, name);
+      try {
+        items.push(JSON.parse(await readFile(path, 'utf8')) as T);
+      } catch (error) {
+        console.warn(`Skipping unreadable record ${path}: ${(error as Error).message}`);
+      }
+    }
+    return items;
   }
   async get(id: string): Promise<T | undefined> {
+    const path = this.path(id);
     try {
-      return JSON.parse(await readFile(this.path(id), 'utf8')) as T;
+      return JSON.parse(await readFile(path, 'utf8')) as T;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-      throw error;
+      throw new Error(`Failed to read record ${path}: ${(error as Error).message}`, { cause: error });
     }
   }
   async save(item: T): Promise<void> {

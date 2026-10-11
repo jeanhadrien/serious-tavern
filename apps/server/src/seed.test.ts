@@ -127,6 +127,54 @@ it('seeds two valid workflows only once', async () => {
   expect(items.size).toBe(2);
   expect(presets.size).toBe(1);
 });
+it('never overwrites user-modified seed records', async () => {
+  const workflows = new Map<string, Workflow>();
+  const presets = new Map<string, Preset>();
+  const workflowRepository: Repository<Workflow> = {
+    list: async () => [...workflows.values()],
+    get: async (key) => workflows.get(key),
+    save: async (workflow) => {
+      workflows.set(workflow.id, workflow);
+    },
+    update: async (key, mutator) => {
+      const current = workflows.get(key);
+      if (!current) return undefined;
+      const updated = await mutator(current);
+      workflows.set(key, updated);
+      return updated;
+    },
+    delete: async (key) => {
+      workflows.delete(key);
+    },
+  };
+  const presetRepository: Repository<Preset> = {
+    list: async () => [...presets.values()],
+    get: async (key) => presets.get(key),
+    save: async (preset) => {
+      presets.set(preset.id, preset);
+    },
+    update: async (key, mutator) => {
+      const current = presets.get(key);
+      if (!current) return undefined;
+      const updated = await mutator(current);
+      presets.set(key, updated);
+      return updated;
+    },
+    delete: async (key) => {
+      presets.delete(key);
+    },
+  };
+  await seed(workflowRepository, presetRepository);
+  const presetId = [...presets.keys()][0]!;
+  const workflowId = [...workflows.keys()][0]!;
+  await presetRepository.update(presetId, (current) => ({ ...current, name: 'My preset' }));
+  await workflowRepository.update(workflowId, (current) => ({ ...current, name: 'My workflow' }));
+  await seed(workflowRepository, presetRepository);
+  expect(presets.get(presetId)?.name).toBe('My preset');
+  expect(workflows.get(workflowId)?.name).toBe('My workflow');
+  expect(presets.size).toBe(1);
+  expect(workflows.size).toBe(2);
+});
 it('uses stable seed IDs when two initializers observe empty stores concurrently', async () => {
   const workflows = new Map<string, Workflow>();
   const presets = new Map<string, Preset>();

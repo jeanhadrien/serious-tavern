@@ -6,11 +6,15 @@ export const presetRoleSchema = z.enum(['system', 'user', 'assistant']);
 export const presetInputKeySchema = z
   .string()
   .regex(/^[a-z][a-zA-Z0-9_]*$/, 'Input key must match /^[a-z][a-zA-Z0-9_]*$/');
-export const presetInputSchema = z.object({
-  id: z.string().min(1),
-  key: presetInputKeySchema,
-  dataType: z.enum(['messages', 'text']),
-});
+// Stored preset records preserve unknown fields so newer versions never lose data on
+// round-trips; new optional fields must use .default()/.optional() so old files still parse.
+export const presetInputSchema = z
+  .object({
+    id: z.string().min(1),
+    key: presetInputKeySchema,
+    dataType: z.enum(['messages', 'text']),
+  })
+  .passthrough();
 
 // Display names for preset inputs are derived from the key, never stored:
 // `chat_history` reads as "Chat history".
@@ -25,28 +29,34 @@ export function presetInputLabel(key: string): string {
 }
 
 const depthPlacementSchema = z.discriminatedUnion('mode', [
-  z.object({ mode: z.literal('ordered') }),
-  z.object({ mode: z.literal('depth'), entryId: z.string().min(1), depth: z.number().int().nonnegative() }),
+  z.object({ mode: z.literal('ordered') }).passthrough(),
+  z
+    .object({ mode: z.literal('depth'), entryId: z.string().min(1), depth: z.number().int().nonnegative() })
+    .passthrough(),
 ]);
 
 export const presetEntrySchema = z.discriminatedUnion('kind', [
-  z.object({
-    id: z.string().min(1),
-    name: z.string().trim().min(1),
-    enabled: z.boolean(),
-    kind: z.literal('message'),
-    role: presetRoleSchema,
-    content: z.string(),
-    placement: depthPlacementSchema.default({ mode: 'ordered' }),
-  }),
-  z.object({
-    id: z.string().min(1),
-    name: z.string().trim().min(1),
-    enabled: z.boolean(),
-    kind: z.literal('slot'),
-    inputKey: presetInputKeySchema,
-    role: presetRoleSchema.default('user'),
-  }),
+  z
+    .object({
+      id: z.string().min(1),
+      name: z.string().trim().min(1),
+      enabled: z.boolean(),
+      kind: z.literal('message'),
+      role: presetRoleSchema,
+      content: z.string(),
+      placement: depthPlacementSchema.default({ mode: 'ordered' }),
+    })
+    .passthrough(),
+  z
+    .object({
+      id: z.string().min(1),
+      name: z.string().trim().min(1),
+      enabled: z.boolean(),
+      kind: z.literal('slot'),
+      inputKey: presetInputKeySchema,
+      role: presetRoleSchema.default('user'),
+    })
+    .passthrough(),
 ]);
 
 export const presetFieldsSchema = z
@@ -56,6 +66,7 @@ export const presetFieldsSchema = z
     inputs: z.array(presetInputSchema),
     entries: z.array(presetEntrySchema),
   })
+  .passthrough()
   .superRefine((preset, ctx) => {
     const inputByKey = new Map(preset.inputs.map((input) => [input.key, input]));
     const inputKeys = new Set<string>();
@@ -100,11 +111,13 @@ export const presetFieldsSchema = z
     });
   });
 
-export const presetSchema = presetFieldsSchema.safeExtend({
-  id: z.string().uuid(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
+export const presetSchema = presetFieldsSchema
+  .safeExtend({
+    id: z.string().uuid(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .passthrough();
 
 export type Preset = z.infer<typeof presetSchema>;
 export type PresetInput = z.infer<typeof presetInputSchema>;

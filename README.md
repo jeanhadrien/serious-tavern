@@ -204,7 +204,13 @@ Memory's `history` output is `any` because its `format` setting can emit either 
 
 ## Data and secrets
 
-`data/` is gitignored. Workflows, presets, sessions and execution logs are separate JSON files written via temporary-file-and-rename. Persistence is behind a `Repository<T>` interface for a future database. Secrets are AES-256-GCM encrypted in `data/secrets.enc.json`; a 32-byte key comes from `SECRETS_KEY` (64 hex characters), or is generated in `data/.master.key` on first start. **Back up both encrypted secrets and the master key.** The secrets API returns only names and masked hints; key values can only be set or deleted. For a production deployment, provide `SECRETS_KEY`, restrict access to the server and data directory, and put authentication in front of the API.
+`data/` is gitignored and holds user data that must be preserved across upgrades: workflows, presets, sessions, execution logs, characters, personas and avatars live as separate JSON files written via temporary-file-and-rename. Never reset or delete `data/`. Persistence is behind a `Repository<T>` interface for a future database.
+
+Schema changes stay additive and backward compatible: stored records keep unknown fields (zod `passthrough`), new optional fields use `.default()`/`.optional()` so old files still parse, and writes migrate-on-write (normalize with `safeParse` + defaults, keep unknown fields, no destructive rewrites). If a breaking change is unavoidable, ship an explicit migration script plus a backup step. Seeds only create missing records and never overwrite user-modified ones. Corrupt JSON files are never auto-deleted: `list()` skips them with a warning, `get()` throws with the file path.
+
+Back up the whole `data/` directory (at minimum `secrets.enc.json`, `.master.key` and the JSON files). Stop the server first, then copy the directory to a timestamped zip. `data/` stays gitignored.
+
+Secrets are AES-256-GCM encrypted in `data/secrets.enc.json`; a 32-byte key comes from `SECRETS_KEY` (64 hex characters), or is generated in `data/.master.key` on first start. **Back up both encrypted secrets and the master key.** The secrets API returns only names and masked hints; key values can only be set or deleted. For a production deployment, provide `SECRETS_KEY`, restrict access to the server and data directory, and put authentication in front of the API.
 
 Secret `set` and `delete` operations serialize their entire encrypted-file read/modify/atomic-write sequence through one store-wide lock, shared across secret names. The reusable `storage/lock.ts` keyed lock also backs repository mutations. Locks are in-process and scoped to their owning store/repository instance; they do not coordinate multiple server processes writing the same directory.
 

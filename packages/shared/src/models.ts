@@ -5,65 +5,81 @@ export const validationIssueSchema = z.object({
   edgeId: z.string().optional(),
   nodeIds: z.array(z.string()).optional(),
 });
-export const nodeSchema = z.object({
-  id: z.string().min(1),
-  type: z.string().min(1),
-  config: z.record(z.string(), z.unknown()),
-  position: z.object({ x: z.number(), y: z.number() }),
-});
-export const edgeSchema = z.object({
-  id: z.string().min(1),
-  source: z.string().min(1),
-  sourceHandle: z.string().min(1),
-  target: z.string().min(1),
-  targetHandle: z.string().min(1),
-});
-export const workflowSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  nodes: z.array(nodeSchema),
-  edges: z.array(edgeSchema),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
-export const messageSchema = z.object({
-  id: z.string(),
-  role: z.enum(['user', 'assistant']),
-  content: z.string(),
-  createdAt: z.string(),
-  executionId: z.string().optional(),
-  name: z.string().optional(),
-  characterId: z.string().optional(),
-});
-export const sessionSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  workflowId: z.string(),
-  messages: z.array(messageSchema),
-  characterId: z.string().optional(),
-  personaId: z.string().optional(),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
-export const nodeExecutionSchema = z.object({
-  status: z.enum(['running', 'completed', 'skipped', 'cancelled', 'error']),
-  startedAt: z.string().optional(),
-  finishedAt: z.string().optional(),
-  durationMs: z.number().optional(),
-  output: z.unknown().optional(),
-  error: z.string().optional(),
-  request: z.unknown().optional(),
-});
-export const executionLogSchema = z.object({
-  id: z.string(),
-  workflowId: z.string(),
-  sessionId: z.string(),
-  status: z.enum(['running', 'completed', 'error']),
-  startedAt: z.string(),
-  finishedAt: z.string().optional(),
-  nodes: z.record(z.string(), nodeExecutionSchema),
-  warnings: z.array(z.string()).default([]),
-});
+// Stored records preserve unknown fields (passthrough) so forward-compatible reads
+// never drop data added by newer versions; writes migrate-on-write via these schemas.
+export const nodeSchema = z
+  .object({
+    id: z.string().min(1),
+    type: z.string().min(1),
+    config: z.record(z.string(), z.unknown()),
+    position: z.object({ x: z.number(), y: z.number() }),
+  })
+  .passthrough();
+export const edgeSchema = z
+  .object({
+    id: z.string().min(1),
+    source: z.string().min(1),
+    sourceHandle: z.string().min(1),
+    target: z.string().min(1),
+    targetHandle: z.string().min(1),
+  })
+  .passthrough();
+export const workflowSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    nodes: z.array(nodeSchema),
+    edges: z.array(edgeSchema),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .passthrough();
+export const messageSchema = z
+  .object({
+    id: z.string(),
+    role: z.enum(['user', 'assistant']),
+    content: z.string(),
+    createdAt: z.string(),
+    executionId: z.string().optional(),
+    name: z.string().optional(),
+    characterId: z.string().optional(),
+  })
+  .passthrough();
+export const sessionSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    workflowId: z.string(),
+    messages: z.array(messageSchema),
+    characterId: z.string().optional(),
+    personaId: z.string().optional(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .passthrough();
+export const nodeExecutionSchema = z
+  .object({
+    status: z.enum(['running', 'completed', 'skipped', 'cancelled', 'error']),
+    startedAt: z.string().optional(),
+    finishedAt: z.string().optional(),
+    durationMs: z.number().optional(),
+    output: z.unknown().optional(),
+    error: z.string().optional(),
+    request: z.unknown().optional(),
+  })
+  .passthrough();
+export const executionLogSchema = z
+  .object({
+    id: z.string(),
+    workflowId: z.string(),
+    sessionId: z.string(),
+    status: z.enum(['running', 'completed', 'error']),
+    startedAt: z.string(),
+    finishedAt: z.string().optional(),
+    nodes: z.record(z.string(), nodeExecutionSchema),
+    warnings: z.array(z.string()).default([]),
+  })
+  .passthrough();
 export const dataTypeSchema = z.enum(portDataTypes);
 export const portSchema = z.object({
   name: z.string(),

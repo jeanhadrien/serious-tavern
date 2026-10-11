@@ -61,6 +61,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Add new types or rules there, together with their table-driven tests.
 - **Secrets are write-only:** the API only returns masked hints. The OpenRouter key is the secret named `openrouter`. The master key comes from env `SECRETS_KEY` or `data/.master.key`.
 - **Seeded workflows** ("Default Assistant", "Parallel demo") must keep validating. There's a test for this.
+- **Data compatibility (alpha):** user data under `data/` is preserved across upgrades. Schema changes are additive and backward compatible: unknown fields survive via `passthrough`, new optional fields use `.default()`/`.optional()`/`.catch()`, writes migrate-on-write (normalize with `safeParse` + defaults, keep unknown fields, no destructive rewrites). If a breaking change is unavoidable, ship an explicit migration script plus a backup step. Seeds only create missing records and never overwrite user-modified ones. See README Data and secrets.
 - **Session writes:** always go through the per-session lock and `update`, never `load → await → save`.
   - The same applies to every mutation of an existing record (characters, personas, avatars): use `update` or the entity lock. Plain `save` is only for creation. Secrets use one store-wide lock.
   - Locks (`storage/lock.ts`) are in-process and **not re-entrant**: never acquire the same key inside its own critical section, or it deadlocks.
@@ -108,9 +109,9 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
    - The same prune rule lives in the engine (`pruneInvalidEdges`) and runs on preset update and workflow save; the editor applies it when a dynamic node's ports re-resolve. Prune the handle, never the node.
 
 ## Gotchas
-- **POC stage, no data migrations:** the data in `apps/server/data` is disposable. On schema changes, don't write migrations; the data can be reset. The exception is `secrets.enc.json` and `.master.key`, which hold the user's API key and must be kept.
+- **Alpha stage, user data is preserved:** never reset or delete `data/`; schema changes must be additive + backward compatible (see Key contracts). Corrupt JSON files are never auto-deleted (`list()` skips with a warning, `get()` throws with the file path).
 - **Never run tests or scripts against `apps/server/data`.** Tests use temp dirs. For live checks, run the server from a temp cwd or against a copy of the data.
-- **Seeds must be idempotent:** they only create what's missing, so restarts never duplicate anything.
+- **Seeds must be idempotent and non-destructive:** they only create what's missing, so restarts never duplicate anything and never overwrite user-modified records.
 - **React Flow editor:** keep nodes and edges as **controlled state**. Don't rebuild them from workflow data on every render; that breaks dragging and selection. This was a past bug.
 - **Environment:** Windows/PowerShell.
   - Stop processes only by PID. Find them with `Get-NetTCPConnection -LocalPort 3001,5173 -State Listen`.

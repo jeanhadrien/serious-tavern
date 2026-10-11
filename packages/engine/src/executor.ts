@@ -44,8 +44,13 @@ export async function executeWorkflow(
     nodeTimeoutMs?: number;
   },
 ): Promise<{ replies: ChatReply[]; execution: ExecutionLog }> {
-  const preparation =
-    'workflow' in input ? { errors: [], prepared: input } : await prepareWorkflow(input, options.resources);
+  // NB: Workflow is a passthrough (loose) object for forward compatibility, so `in`
+  // narrowing does not discriminate it from PreparedWorkflow; check the prepared marker instead.
+  const isPrepared = (value: Workflow | PreparedWorkflow): value is PreparedWorkflow =>
+    (value as PreparedWorkflow).definitions instanceof Map;
+  const preparation = isPrepared(input)
+    ? { errors: [], prepared: input }
+    : await prepareWorkflow(input, options.resources);
   if (!preparation.prepared)
     throw new Error(`Invalid workflow: ${preparation.errors.map((issue) => issue.message).join('; ')}`);
   const { workflow, resources, definitions, ports, incoming, upstream, reachable } = preparation.prepared;
