@@ -1,5 +1,4 @@
 import { useState, type DragEvent } from 'react';
-import { GripVertical } from 'lucide-react';
 import { presetInputLabel, type Preset, type PresetEntry } from '@st/shared';
 
 export const newId = () => crypto.randomUUID();
@@ -87,14 +86,7 @@ export function EntryList(props: {
     );
     return target?.inputKey ?? 'slot';
   };
-  const move = (index: number, delta: number) => {
-    const next = index + delta;
-    if (next < 0 || next >= props.preset.entries.length) return;
-    const entries = [...props.preset.entries];
-    [entries[index], entries[next]] = [entries[next]!, entries[index]!];
-    updateEntries(entries);
-  };
-  const startDrag = (event: DragEvent<HTMLSpanElement>, id: string) => {
+  const startDrag = (event: DragEvent<HTMLDivElement>, id: string) => {
     event.dataTransfer.setData('text/plain', id);
     event.dataTransfer.effectAllowed = 'move';
     setDraggedId(id);
@@ -147,24 +139,18 @@ export function EntryList(props: {
         </div>
       </div>
       <div className="entry-list-scroll" onDragOver={(event) => event.preventDefault()} onDrop={dropAtEnd}>
-        {props.preset.entries.map((entry, index) => (
+        {props.preset.entries.map((entry) => (
           <div
             className={rowClass(entry)}
             key={entry.id}
+            title="Drag to reorder"
+            draggable
+            onDragStart={(event) => startDrag(event, entry.id)}
+            onDragEnd={clearDrag}
             onDragOver={(event) => hoverRow(event, entry)}
             onDragLeave={() => setDropTarget((prev) => (prev && prev.id === entry.id ? null : prev))}
             onDrop={(event) => dropOnRow(event, entry)}
           >
-            <span
-              className="drag-handle"
-              title="Drag to reorder"
-              aria-hidden={true}
-              draggable
-              onDragStart={(event) => startDrag(event, entry.id)}
-              onDragEnd={clearDrag}
-            >
-              <GripVertical size={14} />
-            </span>
             <button className="preset-entry-select" onClick={() => props.onSelect(entry.id)}>
               <span>
                 {entryIcon(entry, props.preset)} {entry.name}
@@ -189,17 +175,6 @@ export function EntryList(props: {
                 }
               />
             </label>
-            <button title="Move up" aria-label="Move up" disabled={index === 0} onClick={() => move(index, -1)}>
-              ↑
-            </button>
-            <button
-              title="Move down"
-              aria-label="Move down"
-              disabled={index === props.preset.entries.length - 1}
-              onClick={() => move(index, 1)}
-            >
-              ↓
-            </button>
             <button title="Duplicate entry" aria-label="Duplicate entry" onClick={() => duplicate(entry)}>
               ⧉
             </button>
