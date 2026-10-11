@@ -2,8 +2,16 @@ import type { Character, ChatMessage, Persona, PortDef, Preset } from '@st/share
 import type { z } from 'zod';
 
 export type EngineEvent = {
-  type: 'node:start' | 'node:complete' | 'node:skipped' | 'node:cancelled' | 'node:error' | 'execution:complete';
+  type:
+    | 'node:start'
+    | 'node:delta'
+    | 'node:complete'
+    | 'node:skipped'
+    | 'node:cancelled'
+    | 'node:error'
+    | 'execution:complete';
   nodeId?: string;
+  // `node:delta` carries `{ textDelta?, reasoningDelta? }`.
   detail?: unknown;
 };
 export type NodeResources = {
@@ -12,6 +20,7 @@ export type NodeResources = {
 };
 export type ChatReply = { nodeId: string; content: string; name?: string; characterId?: string };
 export type ExecutionContext = {
+  nodeId: string;
   inputs: Record<string, unknown>;
   config: Record<string, unknown>;
   trigger: { message: string; sessionId: string };

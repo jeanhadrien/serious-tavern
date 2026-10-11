@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { characterSchema, presetInputLabel, type PromptMessage } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { renderPreset } from '../../preset.js';
-import { providers } from '../../providers/index.js';
+import { providers, reasoningEfforts } from '../../providers/index.js';
 import '../../providers/openrouter.js';
 
 export function mergeSystemMessages(messages: readonly PromptMessage[]): PromptMessage[] {
@@ -41,6 +41,10 @@ export const llm: NodeDefinition = {
     frequencyPenalty: z.number().min(-2).max(2).optional(),
     presencePenalty: z.number().min(-2).max(2).optional(),
     stop: z.array(z.string()).optional(),
+    reasoningEffort: z
+      .enum(reasoningEfforts)
+      .default('off')
+      .describe('Ask the model to reason before answering; reasoning streams separately from the reply'),
     mergeSystemMessages: z
       .boolean()
       .default(false)
@@ -52,6 +56,7 @@ export const llm: NodeDefinition = {
     presetId: '',
     temperature: 0.7,
     maxTokens: 1024,
+    reasoningEffort: 'off',
     mergeSystemMessages: false,
   },
   async resolvePorts(config, resources) {
@@ -94,13 +99,22 @@ export const llm: NodeDefinition = {
       temperature: Number(ctx.config.temperature),
       maxTokens: Number(ctx.config.maxTokens),
       ...Object.fromEntries(
-        ['topP', 'frequencyPenalty', 'presencePenalty', 'stop']
+        ['topP', 'frequencyPenalty', 'presencePenalty', 'stop', 'reasoningEffort']
           .filter((field) => ctx.config[field] !== undefined)
           .map((field) => [field, ctx.config[field]]),
       ),
     };
     ctx.recordRequest({ provider: provider.id, ...request });
-    const response = await provider.chat(request, { apiKey: key, signal: ctx.signal });
+    const options = { apiKey: key, signal: ctx.signal };
+    // Deltas are notifications only; the outcome is the accumulated response returned below.
+    const response = provider.stream
+      ? await provider.stream(request, {
+          ...options,
+          onToken: (textDelta) => ctx.emit({ type: 'node:delta', nodeId: ctx.nodeId, detail: { textDelta } }),
+          onReasoning: (reasoningDelta) =>
+            ctx.emit({ type: 'node:delta', nodeId: ctx.nodeId, detail: { reasoningDelta } }),
+        })
+      : await provider.chat(request, options);
     return { text: response.text, raw: response.raw };
   },
 };

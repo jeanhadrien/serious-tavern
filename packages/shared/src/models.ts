@@ -43,6 +43,11 @@ export const messageSchema = z
     executionId: z.string().optional(),
     name: z.string().optional(),
     characterId: z.string().optional(),
+    // `streaming` while a turn runs; `partial` when stopped early; `final` once complete.
+    status: z.enum(['final', 'streaming', 'partial']).optional(),
+    // Stored for display only; reasoning never enters prompt content.
+    reasoning: z.string().optional(),
+    nodeId: z.string().optional(),
   })
   .passthrough();
 export const sessionSchema = z

@@ -4,6 +4,8 @@ import type { Workflow, Edge, ChatMessage, Preset } from '@st/shared';
 import { executeWorkflow, validateWorkflow } from './executor.js';
 import { renderTemplate } from './template.js';
 import { registry } from './registry.js';
+import { providers } from './providers/index.js';
+import type { EngineEvent } from './types.js';
 
 const node = (id: string, type: string, config: Record<string, unknown> = {}) => ({
   id,
@@ -647,4 +649,113 @@ describe('executor', () => {
       }
     },
   );
+});
+
+describe('execution id', () => {
+  const echo = () =>
+    workflow(
+      [node('input', 'chat-input'), node('output', 'chat-output')],
+      [edge('input', 'message', 'output', 'value')],
+    );
+
+  it('uses the caller-provided id on success and on failure', async () => {
+    const result = await executeWorkflow(echo(), { ...options, executionId: 'turn-execution' });
+    expect(result.execution.id).toBe('turn-execution');
+    registry.set('fail-id-test', {
+      type: 'fail-id-test',
+      label: 'Failure',
+      description: '',
+      category: '',
+      inputs: [{ name: 'in', label: 'In', dataType: 'any' }],
+      outputs: [{ name: 'out', label: 'Out', dataType: 'any' }],
+      configSchema: z.object({}),
+      defaultConfig: {},
+      async execute() {
+        throw new Error('boom');
+      },
+    });
+    try {
+      await expect(
+        executeWorkflow(
+          workflow(
+            [node('input', 'chat-input'), node('broken', 'fail-id-test'), node('output', 'chat-output')],
+            [edge('input', 'message', 'broken', 'in'), edge('broken', 'out', 'output', 'value')],
+          ),
+          { ...options, executionId: 'failed-execution' },
+        ),
+      ).rejects.toMatchObject({ execution: { id: 'failed-execution', status: 'error' } });
+    } finally {
+      registry.delete('fail-id-test');
+    }
+  });
+
+  it('generates a random id when none is provided', async () => {
+    const first = await executeWorkflow(echo(), options);
+    const second = await executeWorkflow(echo(), options);
+    expect(first.execution.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(second.execution.id).not.toBe(first.execution.id);
+  });
+});
+
+describe('streaming events', () => {
+  it('forwards provider deltas with the LLM node id and keeps the outcome when observers throw', async () => {
+    const preset: Preset = {
+      id: '2b041793-416b-4c94-a541-99ab866230b7',
+      name: 'Streamed',
+      createdAt: '',
+      updatedAt: '',
+      inputs: [],
+      entries: [
+        {
+          id: 'system',
+          name: 'System',
+          kind: 'message',
+          enabled: true,
+          role: 'system',
+          content: 'Be brief',
+          placement: { mode: 'ordered' },
+        },
+      ],
+    };
+    const stream = vi.fn(async (_request, { onToken, onReasoning }) => {
+      onReasoning('Plan');
+      onToken('Hi');
+      return { text: 'Hi', raw: {} };
+    });
+    providers.set('executor-stream', {
+      id: 'executor-stream',
+      label: 'Stream',
+      secretName: 'stream-key',
+      chat: vi.fn(),
+      stream,
+    });
+    const graph = workflow(
+      [
+        node('input', 'chat-input'),
+        node('llm', 'llm', { presetId: preset.id, provider: 'executor-stream' }),
+        node('output', 'chat-output'),
+      ],
+      [edge('llm', 'text', 'output', 'value')],
+    );
+    const events: EngineEvent[] = [];
+    try {
+      const result = await executeWorkflow(graph, {
+        ...options,
+        secrets: { get: async () => 'key' },
+        resources: { presets: { get: async () => preset } },
+        onEvent: (event) => {
+          events.push(event);
+          throw new Error('observer failure');
+        },
+      });
+      expect(result.execution.status).toBe('completed');
+      expect(result.replies).toEqual([{ nodeId: 'output', content: 'Hi' }]);
+      expect(events.filter((event) => event.type === 'node:delta')).toEqual([
+        { type: 'node:delta', nodeId: 'llm', detail: { reasoningDelta: 'Plan' } },
+        { type: 'node:delta', nodeId: 'llm', detail: { textDelta: 'Hi' } },
+      ]);
+    } finally {
+      providers.delete('executor-stream');
+    }
+  });
 });

@@ -226,4 +226,34 @@ describe('renderPreset', () => {
     ]);
     expect(renderPreset(definition, options({})).map((item) => item.content)).toEqual([' |  |  |  |  | User | ']);
   });
+
+  it('keeps assistant reasoning out of every prompt path while the stored history keeps it', () => {
+    const reasoningHistory = [
+      { id: '1', role: 'user', content: 'Question', createdAt: '' },
+      { id: '2', role: 'assistant', content: 'Answer', createdAt: '', reasoning: 'SECRET THOUGHT' },
+    ];
+    const definition = preset(
+      [input('history', 'messages'), input('extra', 'messages')],
+      [
+        message(
+          'dump',
+          'Dump: {{history}} | {{#each history}}[{{this.content}}:{{this.reasoning}}]{{/each}} | {{input}} | {{#each input.extra}}{{this.reasoning}}{{/each}}',
+        ),
+        slot('history', 'history', true, 'assistant'),
+        slot('extra', 'extra'),
+      ],
+    );
+    const rendered = renderPreset(definition, {
+      inputs: { history: reasoningHistory, extra: reasoningHistory },
+      templateContext: { trigger: { message: 'Hi', sessionId: 'session-1' }, history: reasoningHistory },
+    });
+    expect(JSON.stringify(rendered)).not.toContain('SECRET THOUGHT');
+    expect(rendered.slice(1)).toEqual([
+      { role: 'user', content: 'Question' },
+      { role: 'assistant', content: 'Answer' },
+      { role: 'user', content: 'Question' },
+      { role: 'assistant', content: 'Answer' },
+    ]);
+    expect(reasoningHistory[1]?.reasoning).toBe('SECRET THOUGHT');
+  });
 });

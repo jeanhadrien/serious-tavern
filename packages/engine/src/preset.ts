@@ -21,6 +21,12 @@ function renderMessagesSlot(value: unknown, slot: Extract<PresetEntry, { kind: '
   });
 }
 
+// Assistant reasoning is stored for display only, so it is dropped before any message reaches a template.
+function withoutReasoning(message: unknown): unknown {
+  if (!message || typeof message !== 'object' || !Object.hasOwn(message, 'reasoning')) return message;
+  return Object.fromEntries(Object.entries(message).filter(([key]) => key !== 'reasoning'));
+}
+
 export function renderPreset(
   preset: Preset,
   options: {
@@ -35,15 +41,22 @@ export function renderPreset(
 ): PromptMessage[] {
   const valid = presetSchema.parse(preset);
   const inputByKey = new Map(valid.inputs.map((input) => [input.key, input]));
+  const inputs = Object.fromEntries(
+    Object.entries(options.inputs).map(([key, value]) => [
+      key,
+      inputByKey.get(key)?.dataType === 'messages' && Array.isArray(value) ? value.map(withoutReasoning) : value,
+    ]),
+  );
+  const history = options.templateContext.history?.map(withoutReasoning);
   const renderedMessages = new Map<string, PromptMessage>();
   for (const entry of valid.entries) {
     if (entry.kind !== 'message' || !entry.enabled) continue;
     const content = renderContextTemplate(
       entry.content,
       {
-        inputs: options.inputs,
+        inputs,
         trigger: options.templateContext.trigger,
-        history: options.templateContext.history,
+        history,
         character: options.templateContext.character,
         persona: options.templateContext.persona,
       },
@@ -64,7 +77,7 @@ export function renderPreset(
     }
 
     const input = inputByKey.get(entry.inputKey)!;
-    const value = options.inputs[input.key];
+    const value = inputs[input.key];
     if (input.dataType === 'text') {
       const content = toText(value);
       if (content.trim()) result.push({ role: entry.role, content });

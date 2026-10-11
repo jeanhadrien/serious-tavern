@@ -384,6 +384,7 @@ describe('character nodes and history', () => {
     ];
     const context = {
       ...options,
+      nodeId: 'memory',
       history,
       config: { lastN: 10, format: 'messages' },
       inputs: {},

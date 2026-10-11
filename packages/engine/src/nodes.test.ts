@@ -5,7 +5,7 @@ import { character } from './nodes/character/index.js';
 import { llm, mergeSystemMessages } from './nodes/llm/index.js';
 import { providers } from './providers/index.js';
 import { openrouter } from './providers/openrouter.js';
-import type { ExecutionContext } from './types.js';
+import type { EngineEvent, ExecutionContext } from './types.js';
 
 const preset: Preset = {
   id: '8f1fe1a9-3480-4e52-834c-f25d90684d71',
@@ -27,6 +27,7 @@ const preset: Preset = {
   ],
 };
 const ctx = (config: Record<string, unknown>): ExecutionContext => ({
+  nodeId: 'node',
   config,
   inputs: { input: 'hi', prompt: 'What is up?' },
   trigger: { message: 'hello', sessionId: 's' },
@@ -117,7 +118,7 @@ describe('integration nodes', () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(
-        new Response(JSON.stringify({ choices: [{ message: { content: 'reply' } }] }), { status: 200 }),
+        new Response('data: {"choices":[{"delta":{"content":"reply"}}]}\n\ndata: [DONE]\n\n', { status: 200 }),
       );
     const config = { ...llm.defaultConfig, presetId: preset.id, topP: 0.9 };
     expect((await llm.execute(ctx(config))).text).toBe('reply');
@@ -251,5 +252,63 @@ describe('integration nodes', () => {
     expect(chat.mock.calls[0]?.[0].messages).toEqual(expected);
     expect(recordRequest.mock.calls[0]?.[0]).toEqual({ provider: 'fake', ...chat.mock.calls[0]?.[0] });
     expect(history[0]?.content).toBe('History system');
+  });
+
+  it('emits a delta per streamed chunk, then returns the accumulated reply unchanged', async () => {
+    const chat = vi.fn();
+    const stream = vi.fn(async (_request, { onToken, onReasoning }) => {
+      onReasoning('Plan.');
+      onToken('Hel');
+      onToken('lo');
+      return { text: 'Hello', raw: { streamed: true } };
+    });
+    providers.set('fake', { id: 'fake', label: 'Fake', secretName: 'fake-key', chat, stream });
+    const events: EngineEvent[] = [];
+    const result = await llm.execute({
+      ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake' }),
+      nodeId: 'llm-node',
+      emit: (event) => events.push(event),
+    });
+    expect(result).toEqual({ text: 'Hello', raw: { streamed: true } });
+    expect(chat).not.toHaveBeenCalled();
+    expect(events).toEqual([
+      { type: 'node:delta', nodeId: 'llm-node', detail: { reasoningDelta: 'Plan.' } },
+      { type: 'node:delta', nodeId: 'llm-node', detail: { textDelta: 'Hel' } },
+      { type: 'node:delta', nodeId: 'llm-node', detail: { textDelta: 'lo' } },
+    ]);
+  });
+
+  it('falls back to chat without deltas when the provider cannot stream', async () => {
+    const chat = vi.fn().mockResolvedValue({ text: 'whole', raw: { whole: true } });
+    providers.set('fake', { id: 'fake', label: 'Fake', secretName: 'fake-key', chat });
+    const emit = vi.fn();
+    const result = await llm.execute({
+      ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake' }),
+      emit,
+    });
+    expect(result).toEqual({ text: 'whole', raw: { whole: true } });
+    expect(chat).toHaveBeenCalledTimes(1);
+    expect(emit).not.toHaveBeenCalled();
+  });
+
+  it.each(['off', 'low', 'medium', 'high'] as const)(
+    'passes reasoningEffort %s to the provider request',
+    async (reasoningEffort) => {
+      const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
+      providers.set('fake', { id: 'fake', label: 'Fake', secretName: 'fake-key', chat });
+      const recordRequest = vi.fn();
+      await llm.execute({
+        ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', reasoningEffort }),
+        recordRequest,
+      });
+      expect(chat.mock.calls[0]?.[0]).toMatchObject({ reasoningEffort });
+      expect(recordRequest).toHaveBeenCalledWith(expect.objectContaining({ reasoningEffort }));
+    },
+  );
+
+  it('defaults reasoningEffort to off and rejects unknown levels', () => {
+    expect(llm.defaultConfig.reasoningEffort).toBe('off');
+    expect(llm.configSchema.parse({ presetId: preset.id })).toMatchObject({ reasoningEffort: 'off' });
+    expect(llm.configSchema.safeParse({ presetId: preset.id, reasoningEffort: 'max' }).success).toBe(false);
   });
 });

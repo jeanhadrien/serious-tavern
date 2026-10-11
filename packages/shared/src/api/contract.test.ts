@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { messageSchema } from '../models.js';
 import { apiContract, errorEnvelopeSchema } from './index.js';
 
 it('preserves existing entity defaults, including defaults on partial updates', () => {
@@ -48,4 +49,41 @@ it('defines message mutation bodies, both UUID params, and a bodyless delete res
     expect(contract.params.safeParse({ ...params, messageId: '../message' }).success).toBe(false);
   }
   expect(apiContract.deleteMessage.response.parse(undefined)).toBeUndefined();
+});
+
+it('describes streamed turn events, the stop endpoint and optional streaming message fields', () => {
+  const executionFailure = {
+    userMessage: { id: 'user', role: 'user', content: 'hi', createdAt: '' },
+    assistantMessages: [],
+    execution: { id: 'exec', workflowId: 'wf', sessionId: 's', status: 'error', startedAt: '', nodes: {} },
+  };
+  const events = [
+    { type: 'turn.start', executionId: 'exec' },
+    { type: 'node.start', nodeId: 'llm' },
+    { type: 'node.delta', nodeId: 'llm', textDelta: 'Hel' },
+    { type: 'node.delta', nodeId: 'llm', reasoningDelta: 'Plan' },
+    { type: 'node.complete', nodeId: 'llm' },
+    { type: 'turn.complete', ...executionFailure },
+    {
+      type: 'turn.error',
+      error: { code: 'WORKFLOW_EXECUTION_FAILED', message: 'Failed', details: executionFailure },
+    },
+  ];
+  for (const event of events) expect(apiContract.streamTurn.response.parse(event)).toMatchObject(event);
+  expect(apiContract.streamTurn.response.safeParse({ type: 'node.delta', nodeId: 'llm', textDelta: 1 }).success).toBe(
+    false,
+  );
+  expect(apiContract.streamTurn.response.safeParse({ type: 'unknown' }).success).toBe(false);
+  expect(apiContract.streamTurn.body.parse({ content: ' hi ' })).toEqual({ content: 'hi' });
+  expect(apiContract.stopTurn.response.parse(undefined)).toBeUndefined();
+  expect(apiContract.stopTurn.params.safeParse({ id: 'not-a-uuid' }).success).toBe(false);
+
+  const message = { id: 'm', role: 'assistant', content: '', createdAt: '' };
+  expect(messageSchema.parse({ ...message, status: 'streaming', reasoning: 'Plan', nodeId: 'llm' })).toMatchObject({
+    status: 'streaming',
+    reasoning: 'Plan',
+    nodeId: 'llm',
+  });
+  expect(messageSchema.parse(message)).toEqual(message);
+  expect(messageSchema.safeParse({ ...message, status: 'pending' }).success).toBe(false);
 });

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { sessionSchema, messageSchema, executionLogSchema } from '../models.js';
-import { endpoint, idParamsSchema, noContentSchema } from './common.js';
+import { endpoint, errorEnvelopeSchema, idParamsSchema, noContentSchema } from './common.js';
 
 export const sessionSummarySchema = sessionSchema.omit({ messages: true }).extend({ messageCount: z.number() });
 export const createSessionSchema = z.object({
@@ -22,6 +22,21 @@ export const sendMessageResultSchema = z.object({
   assistantMessages: z.array(messageSchema),
   execution: executionLogSchema,
 });
+// One Server-Sent Event per item of `streamTurn`; the event name is the `type` field.
+// `turn.error` reuses the standard error envelope, whose details use the same shape as a failed send.
+export const turnEventSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('turn.start'), executionId: z.string() }),
+  z.object({ type: z.literal('node.start'), nodeId: z.string() }),
+  z.object({
+    type: z.literal('node.delta'),
+    nodeId: z.string(),
+    textDelta: z.string().optional(),
+    reasoningDelta: z.string().optional(),
+  }),
+  z.object({ type: z.literal('node.complete'), nodeId: z.string() }),
+  sendMessageResultSchema.extend({ type: z.literal('turn.complete') }),
+  errorEnvelopeSchema.extend({ type: z.literal('turn.error') }),
+]);
 export const sessionEndpoints = {
   listSessions: endpoint(z.array(sessionSummarySchema)),
   createSession: endpoint(sessionSchema, createSessionSchema),
@@ -29,6 +44,8 @@ export const sessionEndpoints = {
   updateSession: endpoint(sessionSchema, updateSessionSchema, idParamsSchema),
   deleteSession: endpoint(noContentSchema, undefined, idParamsSchema),
   sendMessage: endpoint(sendMessageResultSchema, sendMessageSchema, idParamsSchema),
+  streamTurn: endpoint(turnEventSchema, sendMessageSchema, idParamsSchema),
+  stopTurn: endpoint(noContentSchema, undefined, idParamsSchema),
   updateMessage: endpoint(messageSchema, sendMessageSchema, messageParamsSchema),
   deleteMessage: endpoint(noContentSchema, undefined, messageParamsSchema),
   getExecution: endpoint(executionLogSchema, undefined, idParamsSchema),

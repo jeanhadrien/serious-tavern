@@ -42,6 +42,8 @@ export async function executeWorkflow(
     resources?: NodeResources;
     onEvent?: (event: EngineEvent) => void;
     nodeTimeoutMs?: number;
+    // Lets the caller know the execution id before the run starts (streaming announces it up front).
+    executionId?: string;
   },
 ): Promise<{ replies: ChatReply[]; execution: ExecutionLog }> {
   // NB: Workflow is a passthrough (loose) object for forward compatibility, so `in`
@@ -55,7 +57,7 @@ export async function executeWorkflow(
     throw new Error(`Invalid workflow: ${preparation.errors.map((issue) => issue.message).join('; ')}`);
   const { workflow, resources, definitions, ports, incoming, upstream, reachable } = preparation.prepared;
   const execution: ExecutionLog = {
-    id: randomUUID(),
+    id: options.executionId ?? randomUUID(),
     workflowId: workflow.id,
     sessionId: options.sessionId,
     status: 'running',
@@ -141,6 +143,7 @@ export async function executeWorkflow(
             signal = nodeSignal;
             task = Promise.resolve().then(() =>
               definition.execute({
+                nodeId: node.id,
                 inputs,
                 config: node.config,
                 trigger: { message: options.message, sessionId: options.sessionId },
