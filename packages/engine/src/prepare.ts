@@ -14,7 +14,7 @@ export type PreparedWorkflow = {
   reachable: Set<string>;
 };
 
-const labelOf = (type: string) => registry.get(type)?.label ?? type;
+export const labelOf = (type: string) => registry.get(type)?.label ?? type;
 
 /** Lists port names for a validation message, or "none" when there are none. */
 const availablePorts = (ports: ReadonlyArray<PortDef> | undefined) =>

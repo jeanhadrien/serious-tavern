@@ -26,7 +26,7 @@ function detailText(details: unknown): string | undefined {
     return (
       Object.entries(execution.nodes)
         .filter(([, node]) => node.status === 'error')
-        .map(([nodeId, node]) => `${nodeId}: ${node.error ?? 'Failed'}`)
+        .map(([nodeId, node]) => `${node.name ?? nodeId}: ${node.error ?? 'Failed'}`)
         .join('\n') || undefined
     );
   }

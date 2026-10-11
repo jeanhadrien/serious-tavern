@@ -64,6 +64,8 @@ export const sessionSchema = z
   .passthrough();
 export const nodeExecutionSchema = z
   .object({
+    /** Display name (`Label #k (type)`) stamped at run time; absent in older logs. */
+    name: z.string().optional(),
     status: z.enum(['running', 'completed', 'skipped', 'cancelled', 'error']),
     startedAt: z.string().optional(),
     finishedAt: z.string().optional(),

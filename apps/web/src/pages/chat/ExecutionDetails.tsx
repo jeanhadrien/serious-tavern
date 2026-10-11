@@ -26,7 +26,7 @@ export function ExecutionDetails({ id, cached }: { id: string; cached?: Executio
           ))}
           {Object.entries(execution.nodes).map(([nodeId, node]) => (
             <div className="execution-node" key={nodeId}>
-              <strong>{nodeId}</strong> · {node.status} · {node.durationMs ?? 0}ms
+              <strong>{node.name ?? nodeId}</strong> · {node.status} · {node.durationMs ?? 0}ms
               {node.error && <p className="error">{node.error}</p>}
               {node.request !== undefined && (
                 <details>

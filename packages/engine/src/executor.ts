@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { canConnect } from '@st/shared/ports';
+import { nodeDisplayName } from '@st/shared';
 import type { Character, Workflow, ChatMessage, ExecutionLog, Edge, Persona } from '@st/shared';
-import { prepareWorkflow, type PreparedWorkflow } from './prepare.js';
+import { labelOf, prepareWorkflow, type PreparedWorkflow } from './prepare.js';
 export { validateWorkflow } from './prepare.js';
 import type { ChatReply, EngineEvent, ExecutionContext, NodeResources } from './types.js';
 import { stringify, coerceValue } from './text.js';
@@ -286,6 +287,8 @@ export async function executeWorkflow(
     );
   } finally {
     if (!replies.size) execution.warnings.push('No Chat Output nodes ran; this turn produced no assistant messages.');
+    for (const [nodeId, node] of Object.entries(execution.nodes))
+      node.name = nodeDisplayName(workflow.nodes, labelOf, nodeId);
     execution.finishedAt = new Date().toISOString();
     emit({ type: 'execution:complete', detail: execution.status });
     options.signal?.removeEventListener('abort', onAbort);
