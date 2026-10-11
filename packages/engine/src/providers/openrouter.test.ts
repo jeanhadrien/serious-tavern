@@ -120,7 +120,7 @@ describe('OpenRouter streaming', () => {
     );
   });
 
-  it('rejects when the request is aborted mid-stream and passes the signal to fetch', async () => {
+  it('rejects when the request is aborted mid-stream and gives fetch an abortable signal', async () => {
     const controller = new AbortController();
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
       const signal = init?.signal as AbortSignal;
@@ -138,7 +138,54 @@ describe('OpenRouter streaming', () => {
     await expect(
       openrouter.stream!(request, { ...options(controller.signal), onToken, onReasoning: () => {} }),
     ).rejects.toThrow('client left');
-    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ signal: controller.signal }));
+    expect(fetchMock).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(onToken).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('OpenRouter idle timeout', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // A response whose body the test feeds manually and which errors when the request is aborted.
+  const controlledStream = (fetchMock: ReturnType<typeof vi.spyOn>) => {
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    fetchMock.mockImplementation(async (_url: unknown, init?: RequestInit) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(c) {
+          controller = c;
+          init?.signal?.addEventListener('abort', () => c.error(init.signal?.reason), { once: true });
+        },
+      });
+      return new Response(body, { status: 200 });
+    });
+    const push = (text: string) => controller.enqueue(new TextEncoder().encode(text));
+    return { push, close: () => controller.close() };
+  };
+
+  it('fails a stream that goes silent for the idle window', async () => {
+    vi.useFakeTimers();
+    controlledStream(vi.spyOn(globalThis, 'fetch'));
+    const result = openrouter.stream!(request, { ...options(), ...callbacks() });
+    const failed = expect(result).rejects.toThrow('timed out after 120s');
+    await vi.advanceTimersByTimeAsync(120_000);
+    await failed;
+  });
+
+  it('keeps a stream alive for longer than the idle window while data keeps arriving', async () => {
+    vi.useFakeTimers();
+    const feed = controlledStream(vi.spyOn(globalThis, 'fetch'));
+    const result = openrouter.stream!(request, { ...options(), ...callbacks() });
+    await vi.advanceTimersByTimeAsync(0);
+    for (let i = 0; i < 4; i++) {
+      await vi.advanceTimersByTimeAsync(100_000);
+      feed.push(event({ choices: [{ delta: { content: 'x' } }] }));
+    }
+    feed.push(`${event({ choices: [{ delta: {}, finish_reason: 'stop' }] })}data: [DONE]
+
+`);
+    feed.close();
+    await expect(result).resolves.toMatchObject({ text: 'xxxx' });
   });
 });

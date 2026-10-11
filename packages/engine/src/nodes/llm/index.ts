@@ -26,6 +26,8 @@ export const llm: NodeDefinition = {
   label: 'LLM',
   description: 'Generate a completion using a preset and provider',
   category: 'AI',
+  // Backstop only: the provider enforces its own idle timeout, so a live stream is not cut at the default 30s.
+  timeoutMs: 600_000,
   inputs: [{ name: 'character', label: 'Character', dataType: 'character' }],
   outputs: [
     { name: 'text', label: 'Text', dataType: 'text' },

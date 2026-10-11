@@ -6,6 +6,8 @@ export const httpRequest: NodeDefinition = {
   label: 'HTTP Request',
   description: 'Fetch a remote endpoint',
   category: 'Integration',
+  // Backstop only: the node enforces its own `timeoutMs` config.
+  timeoutMs: 600_000,
   inputs: [{ name: 'input', label: 'Input', dataType: 'any' }],
   outputs: [
     { name: 'body', label: 'Body', dataType: 'any' },
