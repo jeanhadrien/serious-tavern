@@ -1,40 +1,13 @@
 import { useRef } from 'react';
-import {
-  macroInputKey,
-  presetInputLabel,
-  templateMacros,
-  presetSchema,
-  presetWarnings,
-  type Preset,
-  type PresetEntry,
-  type PresetInput,
-} from '@st/shared';
+import { macroInputKey, templateMacros, presetSchema, presetWarnings, type Preset, type PresetInput } from '@st/shared';
+import { EntryList, newId } from './PresetEntryList.js';
 
-const newId = () => crypto.randomUUID();
 const newInput = (inputs: PresetInput[]): PresetInput => {
   let key = 'context';
   let suffix = 2;
   while (inputs.some((input) => input.key.toLowerCase() === key.toLowerCase())) key = `context${suffix++}`;
   return { id: newId(), key, dataType: 'text' };
 };
-const newMessage = (): PresetEntry => ({
-  id: newId(),
-  name: 'New message',
-  kind: 'message',
-  enabled: true,
-  role: 'system',
-  content: '',
-  placement: { mode: 'ordered' },
-});
-
-export function entryPreview(entry: PresetEntry): string {
-  return entry.kind === 'slot' ? `→ {{input.${entry.inputKey}}}` : entry.content.replace(/\s+/g, ' ').slice(0, 70);
-}
-
-export function entryIcon(entry: PresetEntry, preset: Preset): string {
-  if (entry.kind === 'message') return { system: '⚙️', user: '👤', assistant: '🤖' }[entry.role];
-  return preset.inputs.find((input) => input.key === entry.inputKey)?.dataType === 'messages' ? '📜' : '🔤';
-}
 
 function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void }) {
   const lastValidKeys = useRef(new Map(props.preset.inputs.map((input) => [input.id, input.key])));
@@ -143,122 +116,6 @@ function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void })
       {props.preset.inputs.some(isUsed) && (
         <small className="hint">To remove an input, first remove its slots and template references.</small>
       )}
-    </section>
-  );
-}
-
-function EntryList(props: {
-  preset: Preset;
-  selectedId: string;
-  onChange(preset: Preset): void;
-  onSelect(id: string): void;
-}) {
-  const updateEntries = (entries: PresetEntry[]) => props.onChange({ ...props.preset, entries });
-  const addMessage = () => {
-    const entry = newMessage();
-    updateEntries([...props.preset.entries, entry]);
-    props.onSelect(entry.id);
-  };
-  const addSlot = () => {
-    const input = props.preset.inputs[0];
-    if (!input) return;
-    const entry: PresetEntry = {
-      id: newId(),
-      name: presetInputLabel(input.key),
-      kind: 'slot',
-      enabled: true,
-      inputKey: input.key,
-      role: 'user',
-    };
-    updateEntries([...props.preset.entries, entry]);
-    props.onSelect(entry.id);
-  };
-  const duplicate = (entry: PresetEntry) => {
-    const copy = { ...entry, id: newId(), name: `${entry.name} copy` } as PresetEntry;
-    updateEntries([...props.preset.entries, copy]);
-    props.onSelect(copy.id);
-  };
-  const getDepthLabel = (entry: PresetEntry) => {
-    if (entry.kind !== 'message' || entry.placement.mode !== 'depth') return undefined;
-    const entryId = entry.placement.entryId;
-    const target = props.preset.entries.find(
-      (item): item is Extract<PresetEntry, { kind: 'slot' }> => item.id === entryId && item.kind === 'slot',
-    );
-    return target?.inputKey ?? 'slot';
-  };
-  const move = (index: number, delta: number) => {
-    const next = index + delta;
-    if (next < 0 || next >= props.preset.entries.length) return;
-    const entries = [...props.preset.entries];
-    [entries[index], entries[next]] = [entries[next]!, entries[index]!];
-    updateEntries(entries);
-  };
-  return (
-    <section className="preset-entry-list">
-      <div className="toolbar">
-        <h3>Entries</h3>
-        <div>
-          <button onClick={addMessage}>+ Message</button>
-          <button onClick={addSlot} disabled={!props.preset.inputs.length}>
-            + Slot
-          </button>
-        </div>
-      </div>
-      <div className="entry-list-scroll">
-        {props.preset.entries.map((entry, index) => (
-          <div
-            className={`preset-entry-row ${props.selectedId === entry.id ? 'selected' : ''} ${entry.enabled ? '' : 'disabled'}`}
-            key={entry.id}
-          >
-            <button className="preset-entry-select" onClick={() => props.onSelect(entry.id)}>
-              <span>
-                {entryIcon(entry, props.preset)} {entry.name}
-              </span>
-              <small>{entryPreview(entry) || 'Empty message'}</small>
-            </button>
-            {entry.kind === 'message' && entry.placement.mode === 'depth' && (
-              <small className="depth-badge">
-                @{entry.placement.depth} in {getDepthLabel(entry)}
-              </small>
-            )}
-            <label className="check" title="Enabled">
-              <input
-                type="checkbox"
-                checked={entry.enabled}
-                onChange={(event) =>
-                  updateEntries(
-                    props.preset.entries.map((item) =>
-                      item.id === entry.id ? { ...item, enabled: event.target.checked } : item,
-                    ),
-                  )
-                }
-              />
-            </label>
-            <button title="Move up" disabled={index === 0} onClick={() => move(index, -1)}>
-              ↑
-            </button>
-            <button
-              title="Move down"
-              disabled={index === props.preset.entries.length - 1}
-              onClick={() => move(index, 1)}
-            >
-              ↓
-            </button>
-            <button title="Duplicate entry" onClick={() => duplicate(entry)}>
-              ⧉
-            </button>
-            <button
-              title="Delete entry"
-              onClick={() => {
-                updateEntries(props.preset.entries.filter((item) => item.id !== entry.id));
-                if (props.selectedId === entry.id) props.onSelect('');
-              }}
-            >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
     </section>
   );
 }
