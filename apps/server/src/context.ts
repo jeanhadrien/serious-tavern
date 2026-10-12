@@ -2,6 +2,8 @@ import { join } from 'node:path';
 import type { Character, Persona, Preset, Workflow, Session, ExecutionLog, ImportSource } from '@st/shared';
 import { JsonRepository, type Repository } from './storage/repository.js';
 import { KeyedLock } from './storage/lock.js';
+import { PresetRepository } from './storage/preset-repository.js';
+import { migrateJsonPresets } from './storage/preset-migration.js';
 import { SecretStore } from './secrets/store.js';
 import { seed } from './seed.js';
 import { TurnRegistry } from './services/turns.js';
@@ -24,7 +26,8 @@ export interface AppContext {
 
 export async function createContext(dataDir: string, options: { seed?: boolean }): Promise<AppContext> {
   const workflows = new JsonRepository<Workflow>(join(dataDir, 'workflows'));
-  const presets = new JsonRepository<Preset>(join(dataDir, 'presets'));
+  const presets = new PresetRepository(join(dataDir, 'presets'));
+  await migrateJsonPresets(join(dataDir, 'presets'), presets);
   const secrets = new SecretStore(dataDir);
   await secrets.init();
   if (options.seed !== false) await seed(workflows, presets);

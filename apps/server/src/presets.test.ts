@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -42,7 +42,10 @@ async function setup(withSource: boolean) {
 
 it('refuses updates to imported presets with PRESET_READ_ONLY and leaves the record unchanged', async () => {
   const { app, dataDir, id } = await setup(true);
-  const before = await readFile(join(dataDir, 'presets', `${id}.json`), 'utf8');
+  // The legacy JSON is migrated to YAML at startup; the YAML is the record from here on.
+  const directory = join(dataDir, 'presets');
+  const file = join(directory, (await readdir(directory)).find((name) => name.endsWith('.yaml'))!);
+  const before = await readFile(file, 'utf8');
   const response = await app.inject({
     method: 'PUT',
     url: `/api/presets/${id}`,
@@ -50,7 +53,7 @@ it('refuses updates to imported presets with PRESET_READ_ONLY and leaves the rec
   });
   expect(response.statusCode).toBe(409);
   expect(response.json().error.code).toBe('PRESET_READ_ONLY');
-  expect(await readFile(join(dataDir, 'presets', `${id}.json`), 'utf8')).toBe(before);
+  expect(await readFile(file, 'utf8')).toBe(before);
 });
 
 it('still allows deleting imported presets', async () => {
