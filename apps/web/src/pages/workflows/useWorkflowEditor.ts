@@ -8,6 +8,7 @@ import {
   type Preset,
   type ApiResponse,
 } from '@st/shared';
+import { subscribeToChanges } from '../../api/events.js';
 import { ApiError, charactersApi, workflowsApi, nodeTypesApi, presetsApi, providersApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
 import { compareRecent } from '../recentOrder.js';
@@ -60,6 +61,19 @@ export function useWorkflowEditor() {
     window.addEventListener('focus', refreshResources);
     return () => window.removeEventListener('focus', refreshResources);
   }, []);
+  useEffect(
+    // Preset files edited on disk: refetch so LLM nodes re-resolve their ports. An unchanged catalog keeps
+    // its identity, so our own saves do not trigger port resolution.
+    () =>
+      subscribeToChanges((event) => {
+        if (event.type !== 'presets.changed') return;
+        void presetsApi
+          .list({ silent: true })
+          .then((next) => setPresets((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next)))
+          .catch(() => {});
+      }),
+    [],
+  );
   const load = (next: Workflow) => {
     setWorkflow(next);
     canvas.load(next);

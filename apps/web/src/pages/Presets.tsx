@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { presetSchema, type Preset } from '@st/shared';
 import { presetsApi } from '../api.js';
+import type { RequestOptions } from '../api/transport.js';
 import { useRefreshOnTabActive } from '../useTabActivation.js';
 import { alerts } from '../alerts/index.js';
 import { compareRecent } from './recentOrder.js';
@@ -10,6 +11,8 @@ import { PresetEditor } from './presets/PresetEditor.js';
 import { PresetEntryEditor } from './presets/PresetEntryEditor.js';
 import { PresetPreview } from './presets/PresetPreview.js';
 import { copyPresetBody, isImportedPreset } from './presets/presetImport.js';
+import { sameList } from './presets/liveSync.js';
+import { usePresetLiveSync } from './presets/usePresetLiveSync.js';
 import './presets/presets.css';
 
 export function Presets() {
@@ -22,8 +25,12 @@ export function Presets() {
   const [selectedEntryId, setSelectedEntryId] = useState('');
   const dirty = !!draft && JSON.stringify(draft) !== saved;
   const readOnly = draft !== undefined && isImportedPreset(draft);
-  const refresh = async () =>
-    setList((await presetsApi.list()).sort((a, b) => compareRecent(a, b, (preset) => preset.name)));
+  // Fetches the catalog, newest first. An unchanged list keeps its identity, so nothing re-renders.
+  const refresh = async (options?: RequestOptions) => {
+    const fresh = (await presetsApi.list(options)).sort((a, b) => compareRecent(a, b, (preset) => preset.name));
+    setList((current) => (sameList(current, fresh) ? current : fresh));
+    return fresh;
+  };
 
   useEffect(() => {
     void refresh().catch(() => {});
@@ -39,11 +46,23 @@ export function Presets() {
   }, [list, requestedId]);
   useRefreshOnTabActive('/presets', () => void refresh());
 
-  const choose = (preset: Preset) => {
+  const openPreset = (preset: Preset, entryId: string) => {
     setDraft(structuredClone(preset));
     setSaved(JSON.stringify(preset));
-    setSelectedEntryId(preset.entries[0]?.id ?? '');
+    setSelectedEntryId(entryId);
   };
+  const choose = (preset: Preset) => openPreset(preset, preset.entries[0]?.id ?? '');
+  const closeEditor = () => {
+    setDraft(undefined);
+    setSaved('');
+    setSelectedEntryId('');
+  };
+  usePresetLiveSync({
+    editor: { draft, saved, selectedEntryId },
+    refresh: () => refresh({ silent: true }),
+    onReload: openPreset,
+    onClose: closeEditor,
+  });
   // Imported presets never change in the editor, so no edit can make them dirty.
   const change = (next: Preset) => {
     if (!readOnly) setDraft(next);
@@ -90,11 +109,7 @@ export function Presets() {
     if (!window.confirm(`Delete ${preset.name}?`)) return;
     try {
       await presetsApi.delete(preset.id);
-      if (draft?.id === preset.id) {
-        setDraft(undefined);
-        setSaved('');
-        setSelectedEntryId('');
-      }
+      if (draft?.id === preset.id) closeEditor();
       await refresh();
     } catch {
       /* In-use errors are toasted automatically. */
