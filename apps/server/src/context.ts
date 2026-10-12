@@ -1,6 +1,7 @@
 import { join } from 'node:path';
-import type { Character, Persona, Preset, Workflow, Session, ExecutionLog } from '@st/shared';
+import type { Character, Persona, Preset, Workflow, Session, ExecutionLog, ImportSource } from '@st/shared';
 import { JsonRepository, type Repository } from './storage/repository.js';
+import { KeyedLock } from './storage/lock.js';
 import { SecretStore } from './secrets/store.js';
 import { seed } from './seed.js';
 import { TurnRegistry } from './services/turns.js';
@@ -12,6 +13,9 @@ export interface AppContext {
   executions: Repository<ExecutionLog>;
   characters: Repository<Character>;
   personas: Repository<Persona>;
+  importSources: Repository<ImportSource>;
+  /** Serializes import syncs per connector, so overlapping syncs cannot create duplicate presets. */
+  importLock: KeyedLock;
   characterAvatars: string;
   personaAvatars: string;
   secrets: SecretStore;
@@ -31,6 +35,8 @@ export async function createContext(dataDir: string, options: { seed?: boolean }
     executions: new JsonRepository<ExecutionLog>(join(dataDir, 'executions')),
     characters: new JsonRepository<Character>(join(dataDir, 'characters')),
     personas: new JsonRepository<Persona>(join(dataDir, 'personas')),
+    importSources: new JsonRepository<ImportSource>(join(dataDir, 'import-sources')),
+    importLock: new KeyedLock(),
     characterAvatars: join(dataDir, 'avatars', 'characters'),
     personaAvatars: join(dataDir, 'avatars', 'personas'),
     secrets,

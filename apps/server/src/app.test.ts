@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { join } from 'node:path';
-import { rm } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { createApp } from './app.js';
@@ -189,6 +189,23 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     await request('deletePreset', { method: 'DELETE', url: `/api/presets/${preset.id}` });
     await request('deleteCharacter', { method: 'DELETE', url: `/api/characters/${character.id}` });
     await request('deletePersona', { method: 'DELETE', url: `/api/personas/${persona.id}` });
+    const install = join(process.cwd(), '.test-data', `install-${randomUUID()}`);
+    directories.push(install);
+    await mkdir(join(install, 'data', 'default-user', 'OpenAI Settings'), { recursive: true });
+    await writeFile(
+      join(install, 'data', 'default-user', 'OpenAI Settings', 'Contract.json'),
+      JSON.stringify({
+        prompts: [{ identifier: 'main', name: 'Main', role: 'system', content: 'Hi' }],
+        prompt_order: [{ character_id: 100001, order: [{ identifier: 'main', enabled: true }] }],
+      }),
+    );
+    await request('listImportSources', { method: 'GET', url: '/api/import-sources' });
+    await request('setImportSource', {
+      method: 'PUT',
+      url: '/api/import-sources/sillytavern',
+      payload: { path: install },
+    });
+    await request('syncImportSource', { method: 'POST', url: '/api/import-sources/sillytavern/sync' });
     expect([...covered].sort()).toEqual(Object.keys(apiContract).sort());
     for (const options of [
       { method: 'GET', url: `/api/sessions/${randomUUID()}` },

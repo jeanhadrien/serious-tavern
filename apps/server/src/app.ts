@@ -12,6 +12,7 @@ import { registerMessages } from './routes/messages.js';
 import { registerExecutions } from './routes/executions.js';
 import { registerSecrets } from './routes/secrets.js';
 import { registerNodeTypes } from './routes/node-types.js';
+import { registerImports } from './routes/imports.js';
 
 export async function createApp(dataDir = join(process.cwd(), 'data'), options: { seed?: boolean } = {}) {
   const app = Fastify({ logger: false, bodyLimit: MAX_UPLOAD_BYTES + 256 * 1024 });
@@ -35,6 +36,7 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
   registerMessages(app, context);
   registerExecutions(app, context);
   registerSecrets(app, context);
+  registerImports(app, context);
   registerErrors(app);
   return app;
 }

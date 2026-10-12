@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, expect, it } from 'vitest';
-import type { Preset } from '@st/shared';
+import type { Preset, PresetSource } from '@st/shared';
 import { createApp } from './app.js';
 
 const directories: string[] = [];
@@ -11,7 +11,7 @@ afterEach(async () => {
   await Promise.all(directories.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
-const source = {
+const source: PresetSource = {
   app: 'sillytavern',
   installPath: 'C:/SillyTavern',
   user: 'default-user',
