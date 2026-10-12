@@ -1,21 +1,21 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { apiContract, presetSchema } from '@st/shared';
-import { pruneInvalidEdges } from '@st/engine';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
 import { previewPreset } from '../services/preset-preview.js';
+import { pruneWorkflowsUsingPreset, withoutSource } from '../services/presets.js';
 import type { ApiRoute } from './types.js';
 
 export function registerPresets(app: FastifyInstance, context: AppContext) {
-  const { presets, workflows, characters } = context;
+  const { presets, workflows } = context;
   app.get<ApiRoute<'listPresets'>>('/api/presets', async () => presets.list());
   app.post<ApiRoute<'previewPreset'>>('/api/presets/preview', async (request) =>
     previewPreset(context, apiContract.previewPreset.body.parse(request.body)),
   );
   app.post<ApiRoute<'createPreset'>>('/api/presets', async (request, reply) => {
     const date = now();
-    const body = apiContract.createPreset.body.parse({ ...(request.body as object) });
+    const body = withoutSource(apiContract.createPreset.body.parse({ ...(request.body as object) }));
     const preset = presetSchema.parse({ ...body, id: randomUUID(), createdAt: date, updatedAt: date });
     await presets.save(preset);
     return reply.code(201).send(preset);
@@ -25,19 +25,21 @@ export function registerPresets(app: FastifyInstance, context: AppContext) {
   );
   app.put<ApiRoute<'updatePreset'>>('/api/presets/:id', async (request) => {
     const { id } = apiContract.updatePreset.params.parse(request.params);
-    const body = apiContract.updatePreset.body.parse({ ...(request.body as object) });
+    const body = withoutSource(apiContract.updatePreset.body.parse({ ...(request.body as object) }));
     // Spread old first so unknown fields from newer versions survive (migrate-on-write).
-    const preset = await presets.update(id, (old) =>
-      presetSchema.parse({ ...old, ...body, id, createdAt: old.createdAt, updatedAt: now() }),
-    );
+    // Imported presets are read-only; `source` is kept from the stored record.
+    const preset = await presets.update(id, (old) => {
+      if (old.source)
+        throw new HttpError(
+          409,
+          'PRESET_READ_ONLY',
+          'Imported presets are read-only. Duplicate the preset to edit it.',
+        );
+      return presetSchema.parse({ ...old, ...body, id, createdAt: old.createdAt, updatedAt: now() });
+    });
     if (!preset) throw notFound('Preset');
     // Drop connections into preset inputs that no longer exist on dependent LLM nodes.
-    for (const workflow of await workflows.list()) {
-      if (!workflow.nodes.some((node) => node.type === 'llm' && node.config.presetId === id)) continue;
-      const pruned = await pruneInvalidEdges(workflow, { presets, characters });
-      if (pruned.edges.length !== workflow.edges.length)
-        await workflows.update(workflow.id, (old) => ({ ...old, edges: pruned.edges, updatedAt: now() }));
-    }
+    await pruneWorkflowsUsingPreset(context, id);
     return preset;
   });
   app.delete<ApiRoute<'deletePreset'>>('/api/presets/:id', async (request, reply) => {
