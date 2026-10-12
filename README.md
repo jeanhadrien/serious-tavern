@@ -51,7 +51,7 @@ git config blame.ignoreRevsFile .git-blame-ignore-revs
 - `packages/shared`: entity models plus the endpoint contract in `src/api/` (body, params, query, response schemas and inferred `ApiBody`, `ApiParams`, `ApiQuery`, `ApiResponse` types). The contract covers sessions/messages/executions, workflows/validation, presets/preview, characters/personas/import/export/avatars, node types/dynamic ports/providers, secrets and the common error envelope. Binary upload/download schemas describe bytes, not JSON; card extension values and error details intentionally remain `unknown`.
 - `packages/engine`: validated DAG executor, event callback, template helper, preset renderer, provider registry, node registry, and individual node implementations in `src/nodes/<type>/index.ts`. Internal `text.ts` centralizes compact node/template serialization and pretty JSON/transcript coercion shared by execution and presets; their distinct formatting remains intentional. Nodes backward-reachable from **any** Chat Output execute (the union of their dependencies); other nodes are logged as skipped. Independent ready nodes execute concurrently; condition branches skip and merges ignore skipped inputs.
 - `packages/node-ui`: JSON-Schema-driven config form and optional custom panels.
-- `apps/server`: `app.ts` assembles Fastify parsers, errors and resource routes; `context.ts` wires repositories, secrets and seed initialization. `routes/` parses shared contract schemas and types Fastify replies with `ApiResponse`; `services/` owns locked chat execution, preset preview, character/persona imports/exports and connector imports (`services/import/`). `errors.ts` centralizes HTTP errors and missing-entity checks. `storage/` and `secrets/` retain atomic JSON writes, per-session locking and encryption. `card.ts` and `uploads.ts` handle card/image transport. The server owns all data and secrets.
+- `apps/server`: `app.ts` assembles Fastify parsers, errors and resource routes; `context.ts` wires repositories, secrets and seed initialization. `routes/` parses shared contract schemas and types Fastify replies with `ApiResponse`; `services/` owns locked chat execution, preset preview, character/persona imports/exports and connector imports (`services/import/`). `errors.ts` centralizes HTTP errors and missing-entity checks. `storage/` and `secrets/` retain atomic JSON writes (presets use YAML via `PresetRepository`), per-session locking and encryption. `card.ts` and `uploads.ts` handle card/image transport. The server owns all data and secrets.
 - `apps/web`: React/Vite chat, React Flow workflow editor, Presets, Characters, Personas, and Settings. Every tab stays mounted and inactive tabs are only hidden, so each tab keeps its open item, drafts and scroll position; pages refresh their shared catalogs when their tab becomes active again. `api/transport.ts` owns fetch, `ApiError`, JSON headers and automatic/silent toasts. Per-resource clients in `api/` use the shared request/response types; pages call methods such as `sessionsApi.sendMessage(id, body)` rather than declaring payloads or constructing route strings. The UI does not execute workflows.
 
 Frontend notifications live in `apps/web/src/alerts/`. Import `alerts` and call `alerts.error(message)`, `.success`, `.info`, or `.warning` from any module; React components can use `useAlerts()`. API failures toast automatically unless a request uses `{ silent: true }` to handle an error inline.
@@ -250,11 +250,59 @@ Memory's `history` output is `any` because its `format` setting can emit either 
 
 ## Data and secrets
 
-`data/` is gitignored and holds user data that must be preserved across upgrades: workflows, presets, sessions, execution logs, characters, personas and avatars live as separate JSON files written via temporary-file-and-rename. Never reset or delete `data/`. Persistence is behind a `Repository<T>` interface for a future database.
+`data/` is gitignored and holds user data that must be preserved across upgrades: workflows, sessions, execution logs, characters, personas and avatars live as separate JSON files written via temporary-file-and-rename; presets are YAML files (see Preset files below). Never reset or delete `data/`. Persistence is behind a `Repository<T>` interface for a future database.
 
 Schema changes stay additive and backward compatible: stored records keep unknown fields (zod `passthrough`), new optional fields use `.default()`/`.optional()` so old files still parse, and writes migrate-on-write (normalize with `safeParse` + defaults, keep unknown fields, no destructive rewrites). If a breaking change is unavoidable, ship an explicit migration script plus a backup step. Seeds only create missing records and never overwrite user-modified ones. Corrupt JSON files are never auto-deleted: `list()` skips them with a warning, `get()` throws with the file path.
 
-Back up the whole `data/` directory (at minimum `secrets.enc.json`, `.master.key` and the JSON files). Stop the server first, then copy the directory to a timestamped zip. `data/` stays gitignored.
+### Preset files (YAML)
+
+Presets are the one record type stored as YAML instead of JSON: `data/presets/<slug-of-name>.yaml`, handled by `PresetRepository` (`storage/preset-repository.ts`; format in `preset-yaml.ts`, names in `preset-filenames.ts`). The HTTP API and contract are unchanged.
+
+```yaml
+name: My roleplay preset
+description: Optional
+inputs:
+  - key: history
+    dataType: messages
+  - key: message
+    dataType: text
+entries:
+  - name: Main prompt
+    kind: message
+    role: system
+    enabled: true
+    content: |
+      Write a natural, in-character reply.
+      {{character.system_prompt}}
+  - name: Author note
+    kind: message
+    role: system
+    enabled: true
+    placement:        # depth placement: points at a slot id
+      mode: depth
+      entryId: chat-history
+      depth: 1
+    content: "{{character.personality}}"
+  - id: chat-history  # slots targeted by a depth placement carry a readable id
+    name: Chat history
+    kind: slot
+    inputKey: history
+id: 5d6c72c7-5185-4963-8227-527f12ef9eea   # bookkeeping last
+createdAt: 2026-01-01T00:00:00.000Z
+updatedAt: 2026-01-01T00:00:00.000Z
+```
+
+- **Identity** is the `id` inside the file, never the file name, so files can be renamed or edited by hand. Nothing is cached: every operation re-reads the directory.
+- **File names** are the slugified preset name (letters and digits of any script, lowercase, hyphens, at most 80 characters; reserved Windows names such as `con` get a `-preset` suffix; an empty slug becomes `preset`). A collision (compared case-insensitively) adds `-2`, `-3`, ... Renaming a preset writes the new file, then removes the old one. A file whose preset name did not change keeps its name, even if you renamed it by hand. `.yml` is read too; files are always written as `.yaml`.
+- **Optional keys:** `id` on inputs and entries, `enabled` (defaults to `true`), `placement` (defaults to ordered), `inputs`/`entries` (default empty). Items without an `id` get `input-<n>`/`entry-<n>` from their position (1-based); this is deterministic but shifts if you reorder them by hand. Machine ids (UUIDs) are not written: they are replaced by these derived ids on the next save, and slots targeted by depth placements get a label derived from their name.
+- **Content** is lossless: multi-line strings are literal block scalars. Content that block scalars cannot carry (for example lines made only of whitespace, or CR characters) is written double-quoted instead. Unknown fields are preserved at every level.
+- **A new hand-written file** with no `id` is valid: the server stamps a fresh `id` (and `createdAt`/`updatedAt` if missing) into the file once, appending after your content, then treats it as a normal preset.
+- **Invalid files** (bad YAML, fail the preset schema) are skipped with a warning naming the file and the reason, and are never modified or deleted. If two files declare the same `id`, the first by file name wins and the other is skipped with a warning.
+- **Delete** removes only the preset's YAML file.
+- **Migration:** at startup, before seeding, each `data/presets/<id>.json` that parses as a valid preset is written as YAML, read back and compared with the original (only machine ids may differ), and then renamed to `<id>.json.migrated`. The JSON content is never changed or deleted, and the `.json` filter ignores it afterwards. A failed verification removes the new YAML and leaves the JSON in place with a warning; unreadable or invalid JSON is left untouched with a warning; if a YAML with the same id already exists the JSON is just renamed. Running it again does nothing. To roll back, delete the YAML and rename `.json.migrated` back to `.json` (an older server then reads it).
+- Edits made on disk are picked up by the next API call. There is no file watcher yet, so an open web page shows the old content until it reloads.
+
+Back up the whole `data/` directory (at minimum `secrets.enc.json`, `.master.key`, the JSON files and the preset YAML files). Stop the server first, then copy the directory to a timestamped zip. `data/` stays gitignored.
 
 Secrets are AES-256-GCM encrypted in `data/secrets.enc.json`; a 32-byte key comes from `SECRETS_KEY` (64 hex characters), or is generated in `data/.master.key` on first start. **Back up both encrypted secrets and the master key.** The secrets API returns only names and masked hints; key values can only be set or deleted. For a production deployment, provide `SECRETS_KEY`, restrict access to the server and data directory, and put authentication in front of the API.
 
