@@ -5,3 +5,4 @@ export { workflowsApi } from './api/workflows.js';
 export { presetsApi } from './api/presets.js';
 export { charactersApi, personasApi } from './api/entities.js';
 export { nodeTypesApi, providersApi, secretsApi } from './api/catalog.js';
+export { importsApi } from './api/imports.js';

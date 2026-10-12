@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { SecretSummary } from '@st/shared';
 import { secretsApi } from '../api.js';
 import { alerts } from '../alerts/index.js';
+import { ImportContent } from './settings/ImportContent.js';
 export function Settings() {
   const [secrets, setSecrets] = useState<SecretSummary[]>([]);
   const [name, setName] = useState('openrouter');
@@ -56,6 +57,7 @@ export function Settings() {
           Save secret
         </button>
       </div>
+      <ImportContent />
     </div>
   );
 }

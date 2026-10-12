@@ -1,6 +1,6 @@
 import { expectTypeOf, it } from 'vitest';
 import type { ApiBody, ApiResponse } from '@st/shared';
-import { sessionsApi, workflowsApi, presetsApi, charactersApi, personasApi, secretsApi } from '../api.js';
+import { sessionsApi, workflowsApi, presetsApi, charactersApi, personasApi, secretsApi, importsApi } from '../api.js';
 
 it('infers client requests and responses directly from shared schemas', () => {
   expectTypeOf(sessionsApi.sendMessage).parameter(1).toEqualTypeOf<ApiBody<'sendMessage'>>();
@@ -11,4 +11,6 @@ it('infers client requests and responses directly from shared schemas', () => {
   expectTypeOf(charactersApi.create).parameter(0).toEqualTypeOf<ApiBody<'createCharacter'>>();
   expectTypeOf(personasApi.update).parameter(1).toEqualTypeOf<ApiBody<'updatePersona'>>();
   expectTypeOf(secretsApi.list).returns.toEqualTypeOf<Promise<ApiResponse<'listSecrets'>>>();
+  expectTypeOf(importsApi.set).parameter(1).toEqualTypeOf<ApiBody<'setImportSource'>>();
+  expectTypeOf(importsApi.sync).returns.toEqualTypeOf<Promise<ApiResponse<'syncImportSource'>>>();
 });

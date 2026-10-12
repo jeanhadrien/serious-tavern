@@ -1,0 +1,20 @@
+.import-content {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+.import-connector {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #414757;
+  border-radius: 10px;
+  background: #222630;
+}
+.import-connector h3 {
+  margin: 0;
+}
+.import-actions {
+  display: flex;
+  gap: 8px;
+}
