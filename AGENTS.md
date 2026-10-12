@@ -84,6 +84,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Local row bookkeeping lives in the pure helpers of `pages/chat/turnMessages.ts`. Rows with `status: 'streaming'` are local until the turn settles.
 - **Editor:** never drop nodes. Unknown node types are kept as read-only placeholders and are saved unchanged.
 - **Presets:** fixed entries that render to empty text are dropped, so a template entry holding only one variable disappears when that variable is empty.
+  - **Imported presets** carry a server-owned `source`. Client writes never set it, `PUT` on a preset with one returns 409 `PRESET_READ_ONLY`, and only `services/import/sync.ts` writes it, under `context.importLock`. New connectors implement `ImportConnector` in `services/import/`.
 - **Creating a session** requires a `workflowId`. Sessions also store `characterId` and `personaId`, which the server loads and passes to the executor.
 - **Characters/personas:**
   - Card parsing and writing (PNG `tEXt` chunks `ccv3`, which takes precedence, then `chara`; V1/V2/V3 JSON) lives in `apps/server/src/card.ts` and runs on the server.
@@ -122,6 +123,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Stop processes only by PID. Find them with `Get-NetTCPConnection -LocalPort 3001,5173 -State Listen`.
   - Killing the npm/npx parent leaves node child processes running.
   - `&&` only chains native commands.
+- **Git worktrees:** `@st/*` resolves through `node_modules/@st` links. Without the worktree's own links, the packages resolve to the main checkout, so tests and typecheck silently use the wrong `shared`. Create junctions for `shared`, `engine` and `node-ui` inside the worktree's `node_modules/@st`.
 - **Tooling:** pnpm isn't installed; use npm. No browser or Playwright is set up yet, so UI changes need a manual check by the user.
 - **Line endings:** the repo has no `.gitattributes`, so on Windows with `core.autocrlf=true` checkouts land as CRLF and repo-wide `biome check` fails on files nobody touched. Don't reformat unrelated files to fix it; normalize line endings only in files your own commit touches.
 - **Server integration tests that build a workflow by hand** must include exactly one `chat-input` node, even when its outputs are not wired to anything. `prepareWorkflow` rejects workflows with zero or multiple chat-input nodes before execution begins.

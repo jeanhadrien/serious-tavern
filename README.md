@@ -51,7 +51,7 @@ git config blame.ignoreRevsFile .git-blame-ignore-revs
 - `packages/shared`: entity models plus the endpoint contract in `src/api/` (body, params, query, response schemas and inferred `ApiBody`, `ApiParams`, `ApiQuery`, `ApiResponse` types). The contract covers sessions/messages/executions, workflows/validation, presets/preview, characters/personas/import/export/avatars, node types/dynamic ports/providers, secrets and the common error envelope. Binary upload/download schemas describe bytes, not JSON; card extension values and error details intentionally remain `unknown`.
 - `packages/engine`: validated DAG executor, event callback, template helper, preset renderer, provider registry, node registry, and individual node implementations in `src/nodes/<type>/index.ts`. Internal `text.ts` centralizes compact node/template serialization and pretty JSON/transcript coercion shared by execution and presets; their distinct formatting remains intentional. Nodes backward-reachable from **any** Chat Output execute (the union of their dependencies); other nodes are logged as skipped. Independent ready nodes execute concurrently; condition branches skip and merges ignore skipped inputs.
 - `packages/node-ui`: JSON-Schema-driven config form and optional custom panels.
-- `apps/server`: `app.ts` assembles Fastify parsers, errors and resource routes; `context.ts` wires repositories, secrets and seed initialization. `routes/` parses shared contract schemas and types Fastify replies with `ApiResponse`; `services/` owns locked chat execution, preset preview and character/persona imports/exports. `errors.ts` centralizes HTTP errors and missing-entity checks. `storage/` and `secrets/` retain atomic JSON writes, per-session locking and encryption. `card.ts` and `uploads.ts` handle card/image transport. The server owns all data and secrets.
+- `apps/server`: `app.ts` assembles Fastify parsers, errors and resource routes; `context.ts` wires repositories, secrets and seed initialization. `routes/` parses shared contract schemas and types Fastify replies with `ApiResponse`; `services/` owns locked chat execution, preset preview, character/persona imports/exports and connector imports (`services/import/`). `errors.ts` centralizes HTTP errors and missing-entity checks. `storage/` and `secrets/` retain atomic JSON writes, per-session locking and encryption. `card.ts` and `uploads.ts` handle card/image transport. The server owns all data and secrets.
 - `apps/web`: React/Vite chat, React Flow workflow editor, Presets, Characters, Personas, and Settings. Every tab stays mounted and inactive tabs are only hidden, so each tab keeps its open item, drafts and scroll position; pages refresh their shared catalogs when their tab becomes active again. `api/transport.ts` owns fetch, `ApiError`, JSON headers and automatic/silent toasts. Per-resource clients in `api/` use the shared request/response types; pages call methods such as `sessionsApi.sendMessage(id, body)` rather than declaring payloads or constructing route strings. The UI does not execute workflows.
 
 Frontend notifications live in `apps/web/src/alerts/`. Import `alerts` and call `alerts.error(message)`, `.success`, `.info`, or `.warning` from any module; React components can use `useAlerts()`. API failures toast automatically unless a request uses `{ silent: true }` to handle an error inline.
@@ -134,6 +134,42 @@ An enabled **message** entry has a system/user/assistant role and templated cont
 Preview `inputs` accepts strings for text inputs and arrays of `{ role, content, name? }` for messages inputs. Explicit messages arrays are used unchanged by the preview, including an empty array; only an omitted messages input falls back to the selected session's history or the sample conversation. The current preview UI still selects session/sample history rather than editing messages arrays.
 
 The **Default** preset declares `history` (`messages`, label “Chat history”) and `message` (`text`, label “User message”). Its ordered system entries are Main prompt (a short instruction plus `{{character.system_prompt}}`), Character description, Personality, Scenario, Persona (`{{persona.description}}`), and Example dialogue; then the history slot; then Post-history instructions; then the user-message slot. Each character/persona field is a separate variable-only entry, so empty fields produce no blank prompt messages. The character's first greeting is not included. The Default Assistant workflow connects Chat Input `history` and `message` to those LLM ports.
+
+## Importing presets from other apps
+
+Connectors copy content from another app's install folder into local records. Each connector has one config record, keyed by its app id (`sillytavern` is the only one so far). Adapters live in `apps/server/src/services/import/` (`connector.ts` defines the shape: detect, scan, name, map). Sync, routes and the config are generic over that shape.
+
+| Method and path | Request | Success |
+| --- | --- | --- |
+| `GET /api/import-sources` | none | `ImportSource[]`: `{ id, app, path, lastSyncAt? }` |
+| `PUT /api/import-sources/:app` | JSON `{ path }` (trimmed, required) | `200` the stored record. The path is resolved to an absolute path and must hold a `data/` folder, or the response is `400 IMPORT_SOURCE_INVALID`. |
+| `POST /api/import-sources/:app/sync` | No body | `200` `{ created, updated, unchanged, missing }`. `409 IMPORT_SOURCE_NOT_SET` when no folder is configured; `400 IMPORT_SOURCE_INVALID` when the folder has gone. |
+
+SillyTavern presets are read from `<install>/data/<user>/OpenAI Settings/*.json` for every user folder, skipping folders whose name starts with `_`. Nothing else in the install is read: symlinks and nested folders are not followed, and files over 5 MB are skipped. A file's identity is (install path, user, file name). Its preset name is the file name without `.json`, plus ` (<user>)` unless the user is `default-user`.
+
+Each sync works like this:
+- A file with no record creates a preset.
+- A file whose sha256 changed overwrites its preset in place, keeping the preset id, so workflows stay linked. Edges into inputs that no longer exist are pruned, as preset `PUT` does.
+- An unchanged file is left alone, including its `updatedAt`.
+- A preset whose file is gone is kept and marked `source.missing: true`. The flag is cleared if the file returns. Its `updatedAt` does not change.
+- An unreadable, invalid or oversized file is skipped with a server warning. Its local copy stays, and it is not counted.
+- Syncs are serialized per connector (`context.importLock`). Presets from another install folder are never touched.
+
+Imported presets carry an optional `source` (`presetSourceSchema` in `@st/shared`): `{ app, installPath, user, file, hash, importedAt, missing? }`. The field belongs to the server:
+- `POST /api/presets` and `PUT /api/presets/:id` strip any client-sent `source`, so a duplicate is always an editable copy.
+- `PUT` on a preset with a `source` fails with `409 PRESET_READ_ONLY` and leaves the record unchanged. `DELETE` still works, and the next sync recreates the preset.
+
+### SillyTavern chat-completion mapping
+
+`apps/server/src/services/import/sillytavern-mapper.ts` is a pure function from parsed JSON to inputs and entries.
+- Order: the `prompt_order` entry with `character_id` 100001 is used, then 100000, then the first entry. Only the identifiers listed there are imported, in that order, with `enabled` taken from the order entry. Anything absent is ignored.
+- A normal prompt becomes a `message` entry. The role is `system` when it is missing or unknown. The content is kept verbatim, macros included, so unsupported macros show up as preset warnings. The name is the prompt name, falling back to its identifier.
+- `chatHistory` becomes a `messages` input named `history` plus a `slot` entry.
+- `charDescription`, `charPersonality`, `scenario` and `personaDescription` become system messages with `{{character.description}}`, `{{character.personality}}`, `{{character.scenario}}` and `{{persona.description}}`.
+- `dialogueExamples`, `worldInfoBefore`, `worldInfoAfter` and any other marker become disabled, empty `message` entries named after the marker.
+- Absolute injection (`injection_position: 1`) with an `injection_depth` becomes depth placement in the first enabled chat-history slot. Otherwise the prompt stays ordered. `injection_order`, sampler settings and other top-level fields are ignored.
+
+**Known gap:** an imported preset has no input for the message being sent. Chat history is captured before the new message is saved, and the mapper adds no `message` input, so the current user message does not reach the model. To fix it by hand, duplicate the preset (imports are read-only), add a `text` input and a slot at the end, and connect the workflow's `message` port to it. Changing the mapper to do this is a separate decision.
 
 ## Characters and Personas
 
