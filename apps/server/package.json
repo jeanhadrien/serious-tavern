@@ -6,9 +6,10 @@
     "dev": "tsx watch src/main.ts"
   },
   "dependencies": {
-    "@st/shared": "*",
     "@st/engine": "*",
+    "@st/shared": "*",
     "fastify": "^5.12.5",
+    "yaml": "^2.9.1",
     "zod": "^4.6.5"
   }
 }
