@@ -220,6 +220,19 @@ it('warns when an input is unused by enabled slots or message templates', () => 
   ]);
 });
 
+it('accepts a server-owned import source and rejects a malformed hash', () => {
+  const source = {
+    app: 'sillytavern',
+    installPath: 'C:/SillyTavern',
+    user: 'default-user',
+    file: 'Default.json',
+    hash: 'a'.repeat(64),
+    importedAt: '',
+  };
+  expect(presetSchema.parse({ ...base(), source }).source).toEqual(source);
+  expect(presetSchema.safeParse({ ...base(), source: { ...source, hash: 'short' } }).success).toBe(false);
+});
+
 describe('block templates', () => {
   const message = (content: string) => ({
     id: 'm',

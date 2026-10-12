@@ -1,8 +1,23 @@
 import { z } from 'zod';
 import { findMacro, macroInputKey, templateMacros } from './macros.js';
+import { importAppSchema } from './imports.js';
 import { analyzeTemplate } from './template-analysis.js';
 
 export const presetRoleSchema = z.enum(['system', 'user', 'assistant']);
+
+// Imported presets are read-only copies of one source file. Identity is (installPath, user, file).
+export const presetSourceSchema = z
+  .object({
+    app: importAppSchema,
+    installPath: z.string().min(1),
+    user: z.string().min(1),
+    file: z.string().min(1),
+    hash: z.string().regex(/^[a-f0-9]{64}$/, 'Hash must be a sha256 hex digest'),
+    importedAt: z.string(),
+    missing: z.boolean().optional(),
+  })
+  .passthrough();
+export type PresetSource = z.infer<typeof presetSourceSchema>;
 export const presetInputKeySchema = z
   .string()
   .regex(/^[a-z][a-zA-Z0-9_]*$/, 'Input key must match /^[a-z][a-zA-Z0-9_]*$/');
@@ -111,11 +126,13 @@ export const presetFieldsSchema = z
     });
   });
 
+// `source` is server-owned: it is set by imports and never accepted from client writes.
 export const presetSchema = presetFieldsSchema
   .safeExtend({
     id: z.string().uuid(),
     createdAt: z.string(),
     updatedAt: z.string(),
+    source: presetSourceSchema.optional(),
   })
   .passthrough();
 
