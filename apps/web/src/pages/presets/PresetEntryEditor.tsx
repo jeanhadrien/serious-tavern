@@ -1,7 +1,13 @@
 import { useRef } from 'react';
 import { macroHints, presetInputLabel, presetSchema, type Preset, type PresetEntry } from '@st/shared';
 
-export function PresetEntryEditor(props: { preset: Preset; entry?: PresetEntry; onChange(entry: PresetEntry): void }) {
+// A read-only editor disables its whole field block through one disabled fieldset.
+export function PresetEntryEditor(props: {
+  preset: Preset;
+  entry?: PresetEntry;
+  readOnly: boolean;
+  onChange(entry: PresetEntry): void;
+}) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const { entry, preset } = props;
   if (!entry)
@@ -40,29 +46,45 @@ export function PresetEntryEditor(props: { preset: Preset; entry?: PresetEntry; 
   return (
     <section className="preset-entry-detail">
       <h3>Edit entry</h3>
-      <label>
-        Name <input value={entry.name} onChange={(event) => update({ name: event.target.value })} />
-      </label>
-      {entry.kind === 'slot' ? (
-        <>
-          <label>
-            Input{' '}
-            <select
-              value={entry.inputKey}
-              onChange={(event) => update({ inputKey: event.target.value } as Partial<PresetEntry>)}
-            >
-              {preset.inputs.map((input) => (
-                <option value={input.key} key={input.id}>
-                  {presetInputLabel(input.key)} ({input.key}) · {input.dataType}
-                </option>
-              ))}
-              {!preset.inputs.some((input) => input.key === entry.inputKey) && (
-                <option value={entry.inputKey}>{entry.inputKey} · missing</option>
-              )}
-            </select>
-          </label>
-          <p className="hint">This slot places the selected input at this position in the final message list.</p>
-          {preset.inputs.find((input) => input.key === entry.inputKey)?.dataType === 'text' && (
+      <fieldset disabled={props.readOnly} className="preset-entry-fields">
+        <label>
+          Name <input value={entry.name} onChange={(event) => update({ name: event.target.value })} />
+        </label>
+        {entry.kind === 'slot' ? (
+          <>
+            <label>
+              Input{' '}
+              <select
+                value={entry.inputKey}
+                onChange={(event) => update({ inputKey: event.target.value } as Partial<PresetEntry>)}
+              >
+                {preset.inputs.map((input) => (
+                  <option value={input.key} key={input.id}>
+                    {presetInputLabel(input.key)} ({input.key}) · {input.dataType}
+                  </option>
+                ))}
+                {!preset.inputs.some((input) => input.key === entry.inputKey) && (
+                  <option value={entry.inputKey}>{entry.inputKey} · missing</option>
+                )}
+              </select>
+            </label>
+            <p className="hint">This slot places the selected input at this position in the final message list.</p>
+            {preset.inputs.find((input) => input.key === entry.inputKey)?.dataType === 'text' && (
+              <label>
+                Role{' '}
+                <select
+                  value={entry.role}
+                  onChange={(event) => update({ role: event.target.value as 'system' | 'user' | 'assistant' })}
+                >
+                  {['system', 'user', 'assistant'].map((role) => (
+                    <option key={role}>{role}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </>
+        ) : (
+          <>
             <label>
               Role{' '}
               <select
@@ -74,96 +96,82 @@ export function PresetEntryEditor(props: { preset: Preset; entry?: PresetEntry; 
                 ))}
               </select>
             </label>
-          )}
-        </>
-      ) : (
-        <>
-          <label>
-            Role{' '}
-            <select
-              value={entry.role}
-              onChange={(event) => update({ role: event.target.value as 'system' | 'user' | 'assistant' })}
-            >
-              {['system', 'user', 'assistant'].map((role) => (
-                <option key={role}>{role}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Content{' '}
-            <textarea
-              ref={textareaRef}
-              rows={12}
-              value={entry.content}
-              onChange={(event) => update({ content: event.target.value })}
-            />
-          </label>
-          <div className="template-hints">
-            <small>Insert variable at cursor</small>
-            {macroHints(preset.inputs).map((variable) => (
-              <button
-                type="button"
-                key={variable.expression}
-                title={variable.description}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => insert(variable.expression)}
-              >
-                {variable.expression}
-              </button>
-            ))}
-          </div>
-          <label>
-            Placement{' '}
-            <select
-              value={placement?.mode ?? 'ordered'}
-              onChange={(event) => {
-                update({
-                  placement:
-                    event.target.value === 'ordered'
-                      ? { mode: 'ordered' }
-                      : { mode: 'depth', entryId: slots[0]?.id ?? '', depth: 0 },
-                });
-              }}
-            >
-              <option value="ordered">Ordered</option>
-              <option value="depth">Inside a messages slot</option>
-            </select>
-          </label>
-          {placement?.mode === 'depth' && (
-            <>
-              <label>
-                Messages slot{' '}
-                <select
-                  value={placement.entryId}
-                  onChange={(event) => update({ placement: { ...placement, entryId: event.target.value } })}
+            <label>
+              Content{' '}
+              <textarea
+                ref={textareaRef}
+                rows={12}
+                value={entry.content}
+                onChange={(event) => update({ content: event.target.value })}
+              />
+            </label>
+            <div className="template-hints">
+              <small>Insert variable at cursor</small>
+              {macroHints(preset.inputs).map((variable) => (
+                <button
+                  type="button"
+                  key={variable.expression}
+                  title={variable.description}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => insert(variable.expression)}
                 >
-                  {slots.map((slot) => (
-                    <option value={slot.id} key={slot.id}>
-                      {slot.name} · {slot.inputKey}
-                    </option>
-                  ))}
-                  {!slots.some((slot) => slot.id === placement.entryId) && (
-                    <option value={placement.entryId}>{placement.entryId || 'Choose a slot'}</option>
-                  )}
-                </select>
-              </label>
-              <label>
-                Depth from end{' '}
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={placement.depth}
-                  onChange={(event) => update({ placement: { ...placement, depth: Number(event.target.value) } })}
-                />
-              </label>
-              {slots.length === 0 && (
-                <p className="preset-warning">Add an enabled slot for a messages input to use depth placement.</p>
-              )}
-            </>
-          )}
-        </>
-      )}
+                  {variable.expression}
+                </button>
+              ))}
+            </div>
+            <label>
+              Placement{' '}
+              <select
+                value={placement?.mode ?? 'ordered'}
+                onChange={(event) => {
+                  update({
+                    placement:
+                      event.target.value === 'ordered'
+                        ? { mode: 'ordered' }
+                        : { mode: 'depth', entryId: slots[0]?.id ?? '', depth: 0 },
+                  });
+                }}
+              >
+                <option value="ordered">Ordered</option>
+                <option value="depth">Inside a messages slot</option>
+              </select>
+            </label>
+            {placement?.mode === 'depth' && (
+              <>
+                <label>
+                  Messages slot{' '}
+                  <select
+                    value={placement.entryId}
+                    onChange={(event) => update({ placement: { ...placement, entryId: event.target.value } })}
+                  >
+                    {slots.map((slot) => (
+                      <option value={slot.id} key={slot.id}>
+                        {slot.name} · {slot.inputKey}
+                      </option>
+                    ))}
+                    {!slots.some((slot) => slot.id === placement.entryId) && (
+                      <option value={placement.entryId}>{placement.entryId || 'Choose a slot'}</option>
+                    )}
+                  </select>
+                </label>
+                <label>
+                  Depth from end{' '}
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={placement.depth}
+                    onChange={(event) => update({ placement: { ...placement, depth: Number(event.target.value) } })}
+                  />
+                </label>
+                {slots.length === 0 && (
+                  <p className="preset-warning">Add an enabled slot for a messages input to use depth placement.</p>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </fieldset>
       {issues.length > 0 && (
         <div className="preset-warnings" role="alert">
           {issues.map((issue, issueIndex) => (

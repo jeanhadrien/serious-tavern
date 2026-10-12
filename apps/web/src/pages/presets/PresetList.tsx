@@ -21,6 +21,14 @@ export function PresetList(props: {
         <div className={`session-row ${props.selectedId === preset.id ? 'selected' : ''}`} key={preset.id}>
           <button className="session-link" onClick={() => props.onSelect(preset)}>
             {preset.name}
+            {preset.source && (
+              <span
+                className={`source-badge${preset.source.missing ? ' missing' : ''}`}
+                title={preset.source.missing ? 'The source file is gone from the install' : 'Read-only imported preset'}
+              >
+                {preset.source.missing ? 'source missing' : 'imported'}
+              </span>
+            )}
             {props.dirtyId === preset.id && (
               <span className="dirty-dot" title="Unsaved changes">
                 {' '}

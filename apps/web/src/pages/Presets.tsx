@@ -9,8 +9,8 @@ import { PresetList } from './presets/PresetList.js';
 import { PresetEditor } from './presets/PresetEditor.js';
 import { PresetEntryEditor } from './presets/PresetEntryEditor.js';
 import { PresetPreview } from './presets/PresetPreview.js';
-
-const id = () => crypto.randomUUID();
+import { copyPresetBody, isImportedPreset } from './presets/presetImport.js';
+import './presets/presets.css';
 
 export function Presets() {
   const [params] = useSearchParams();
@@ -21,6 +21,7 @@ export function Presets() {
   const [saved, setSaved] = useState('');
   const [selectedEntryId, setSelectedEntryId] = useState('');
   const dirty = !!draft && JSON.stringify(draft) !== saved;
+  const readOnly = draft !== undefined && isImportedPreset(draft);
   const refresh = async () =>
     setList((await presetsApi.list()).sort((a, b) => compareRecent(a, b, (preset) => preset.name)));
 
@@ -43,7 +44,10 @@ export function Presets() {
     setSaved(JSON.stringify(preset));
     setSelectedEntryId(preset.entries[0]?.id ?? '');
   };
-  const change = (next: Preset) => setDraft(next);
+  // Imported presets never change in the editor, so no edit can make them dirty.
+  const change = (next: Preset) => {
+    if (!readOnly) setDraft(next);
+  };
   const create = async () => {
     try {
       const created = await presetsApi.create({ name: 'New preset', inputs: [], entries: [] });
@@ -54,7 +58,7 @@ export function Presets() {
     }
   };
   const save = async () => {
-    if (!draft) return;
+    if (!draft || readOnly) return;
     const parsed = presetSchema.safeParse(draft);
     if (!parsed.success) {
       alerts.error('Fix the preset validation errors before saving', {
@@ -74,24 +78,7 @@ export function Presets() {
   };
   const duplicate = async (preset: Preset) => {
     try {
-      const entryIds = new Map(preset.entries.map((item) => [item.id, id()]));
-      const copy = await presetsApi.create({
-        ...preset,
-        name: `${preset.name} copy`,
-        inputs: preset.inputs.map((input) => ({ ...input, id: id() })),
-        entries: preset.entries.map((item) =>
-          item.kind === 'message' && item.placement.mode === 'depth'
-            ? {
-                ...item,
-                id: entryIds.get(item.id)!,
-                placement: {
-                  ...item.placement,
-                  entryId: entryIds.get(item.placement.entryId) ?? item.placement.entryId,
-                },
-              }
-            : { ...item, id: entryIds.get(item.id)! },
-        ),
-      });
+      const copy = await presetsApi.create(copyPresetBody(preset));
       await refresh();
       choose(copy);
       alerts.success('Preset duplicated');
@@ -131,8 +118,10 @@ export function Presets() {
           <PresetEditor
             preset={draft}
             dirty={dirty}
+            readOnly={readOnly}
             onChange={change}
             onSave={() => void save()}
+            onDuplicate={() => void duplicate(draft)}
             selectedEntryId={selectedEntryId}
             onSelectEntry={setSelectedEntryId}
           />
@@ -140,6 +129,7 @@ export function Presets() {
             <PresetEntryEditor
               preset={draft}
               entry={selectedEntry}
+              readOnly={readOnly}
               onChange={(next) =>
                 change({ ...draft, entries: draft.entries.map((item) => (item.id === next.id ? next : item)) })
               }

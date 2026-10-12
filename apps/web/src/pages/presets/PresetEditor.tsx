@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { macroInputKey, templateMacros, presetSchema, presetWarnings, type Preset, type PresetInput } from '@st/shared';
 import { EntryList, newId } from './PresetEntryList.js';
+import { ImportedBanner } from './ImportedBanner.js';
 
 const newInput = (inputs: PresetInput[]): PresetInput => {
   let key = 'context';
@@ -9,7 +10,7 @@ const newInput = (inputs: PresetInput[]): PresetInput => {
   return { id: newId(), key, dataType: 'text' };
 };
 
-function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void }) {
+function PresetInputs(props: { preset: Preset; readOnly: boolean; onChange(preset: Preset): void }) {
   const lastValidKeys = useRef(new Map(props.preset.inputs.map((input) => [input.id, input.key])));
   const parsed = presetSchema.safeParse(props.preset);
   const issues = parsed.success ? [] : parsed.error.issues;
@@ -52,6 +53,7 @@ function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void })
       <div className="toolbar">
         <h3>Inputs</h3>
         <button
+          disabled={props.readOnly}
           onClick={() =>
             props.onChange({
               ...props.preset,
@@ -69,6 +71,7 @@ function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void })
           <div className="preset-input-row" key={input.id}>
             <input
               aria-label={`Input key ${index + 1}`}
+              disabled={props.readOnly}
               value={input.key}
               onChange={(event) => {
                 updateKey(index, event.target.value);
@@ -76,6 +79,7 @@ function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void })
             />
             <select
               aria-label={`Input type ${index + 1}`}
+              disabled={props.readOnly}
               value={input.dataType}
               onChange={(event) =>
                 props.onChange({
@@ -91,7 +95,7 @@ function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void })
             </select>
             <button
               title={isUsed(input) ? 'Remove entries using this input first' : 'Remove input'}
-              disabled={isUsed(input)}
+              disabled={props.readOnly || isUsed(input)}
               onClick={() =>
                 props.onChange({ ...props.preset, inputs: props.preset.inputs.filter((item) => item.id !== input.id) })
               }
@@ -123,34 +127,40 @@ function PresetInputs(props: { preset: Preset; onChange(preset: Preset): void })
 export function PresetEditor(props: {
   preset: Preset;
   dirty: boolean;
+  readOnly: boolean;
   onChange(preset: Preset): void;
   onSave(): void;
+  onDuplicate(): void;
   selectedEntryId: string;
   onSelectEntry(id: string): void;
 }) {
   return (
     <section className="preset-editor-column">
+      {props.preset.source && <ImportedBanner source={props.preset.source} onDuplicate={props.onDuplicate} />}
       <div className="editor-toolbar preset-toolbar">
         <input
           aria-label="Preset name"
+          disabled={props.readOnly}
           value={props.preset.name}
           onChange={(event) => props.onChange({ ...props.preset, name: event.target.value })}
         />
         {props.dirty && <small>Unsaved changes</small>}
-        <button className="primary" onClick={props.onSave}>
+        <button className="primary" disabled={props.readOnly} onClick={props.onSave}>
           Save
         </button>
       </div>
       <label>
         Description{' '}
         <input
+          disabled={props.readOnly}
           value={props.preset.description ?? ''}
           onChange={(event) => props.onChange({ ...props.preset, description: event.target.value || undefined })}
         />
       </label>
-      <PresetInputs preset={props.preset} onChange={props.onChange} />
+      <PresetInputs preset={props.preset} readOnly={props.readOnly} onChange={props.onChange} />
       <EntryList
         preset={props.preset}
+        readOnly={props.readOnly}
         selectedId={props.selectedEntryId}
         onChange={props.onChange}
         onSelect={props.onSelectEntry}

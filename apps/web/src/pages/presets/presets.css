@@ -1,0 +1,37 @@
+.source-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #414757;
+  color: #c5cdff;
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+.source-badge.missing {
+  background: #5a4630;
+  color: #f2d39b;
+}
+.preset-banner {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #5b6fb0;
+  border-radius: 7px;
+  background: #242a40;
+  font-size: 0.85rem;
+}
+.preset-banner p {
+  margin: 0;
+}
+.preset-banner.missing {
+  border-color: #8b6d3f;
+  background: #392f22;
+}
+.preset-entry-fields {
+  display: grid;
+  gap: 11px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}

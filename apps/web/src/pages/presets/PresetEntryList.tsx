@@ -41,8 +41,10 @@ export function reorderEntries(
   return [...rest.slice(0, at), moving, ...rest.slice(at)];
 }
 
+// Read-only lists still allow selecting entries, so they can be browsed; every change control is disabled.
 export function EntryList(props: {
   preset: Preset;
+  readOnly: boolean;
   selectedId: string;
   onChange(preset: Preset): void;
   onSelect(id: string): void;
@@ -132,8 +134,10 @@ export function EntryList(props: {
       <div className="toolbar">
         <h3>Entries</h3>
         <div>
-          <button onClick={addMessage}>+ Message</button>
-          <button onClick={addSlot} disabled={!props.preset.inputs.length}>
+          <button onClick={addMessage} disabled={props.readOnly}>
+            + Message
+          </button>
+          <button onClick={addSlot} disabled={props.readOnly || !props.preset.inputs.length}>
             + Slot
           </button>
         </div>
@@ -143,8 +147,8 @@ export function EntryList(props: {
           <div
             className={rowClass(entry)}
             key={entry.id}
-            title="Drag to reorder"
-            draggable
+            title={props.readOnly ? undefined : 'Drag to reorder'}
+            draggable={!props.readOnly}
             onDragStart={(event) => startDrag(event, entry.id)}
             onDragEnd={clearDrag}
             onDragOver={(event) => hoverRow(event, entry)}
@@ -165,6 +169,7 @@ export function EntryList(props: {
             <label className="check" title="Enabled">
               <input
                 type="checkbox"
+                disabled={props.readOnly}
                 checked={entry.enabled}
                 onChange={(event) =>
                   updateEntries(
@@ -175,12 +180,18 @@ export function EntryList(props: {
                 }
               />
             </label>
-            <button title="Duplicate entry" aria-label="Duplicate entry" onClick={() => duplicate(entry)}>
+            <button
+              title="Duplicate entry"
+              aria-label="Duplicate entry"
+              disabled={props.readOnly}
+              onClick={() => duplicate(entry)}
+            >
               ⧉
             </button>
             <button
               title="Delete entry"
               aria-label="Delete entry"
+              disabled={props.readOnly}
               onClick={() => {
                 updateEntries(props.preset.entries.filter((item) => item.id !== entry.id));
                 if (props.selectedId === entry.id) props.onSelect('');
