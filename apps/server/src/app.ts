@@ -13,8 +13,13 @@ import { registerExecutions } from './routes/executions.js';
 import { registerSecrets } from './routes/secrets.js';
 import { registerNodeTypes } from './routes/node-types.js';
 import { registerImports } from './routes/imports.js';
+import { registerEvents } from './routes/events.js';
+import { watchPresetFiles } from './services/change-events.js';
 
-export async function createApp(dataDir = join(process.cwd(), 'data'), options: { seed?: boolean } = {}) {
+export async function createApp(
+  dataDir = join(process.cwd(), 'data'),
+  options: { seed?: boolean; watch?: boolean } = {},
+) {
   const app = Fastify({ logger: false, bodyLimit: MAX_UPLOAD_BYTES + 256 * 1024 });
   const parseJson = app.getDefaultJsonParser('error', 'error');
   app.removeContentTypeParser('application/json');
@@ -37,6 +42,12 @@ export async function createApp(dataDir = join(process.cwd(), 'data'), options: 
   registerExecutions(app, context);
   registerSecrets(app, context);
   registerImports(app, context);
+  registerEvents(app, context);
   registerErrors(app);
+  // Watching is opt-in (the server entry point enables it) so ordinary tests do not spawn watchers.
+  if (options.watch) {
+    const watcher = await watchPresetFiles(context);
+    app.addHook('onClose', async () => watcher.close());
+  }
   return app;
 }

@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import type { Character, Persona, Preset, Workflow, Session, ExecutionLog, ImportSource } from '@st/shared';
+import type { Character, Persona, Workflow, Session, ExecutionLog, ImportSource } from '@st/shared';
 import { JsonRepository, type Repository } from './storage/repository.js';
 import { KeyedLock } from './storage/lock.js';
 import { PresetRepository } from './storage/preset-repository.js';
@@ -7,10 +7,11 @@ import { migrateJsonPresets } from './storage/preset-migration.js';
 import { SecretStore } from './secrets/store.js';
 import { seed } from './seed.js';
 import { TurnRegistry } from './services/turns.js';
+import { ChangeHub } from './services/change-events.js';
 
 export interface AppContext {
   workflows: Repository<Workflow>;
-  presets: Repository<Preset>;
+  presets: PresetRepository;
   sessions: Repository<Session>;
   executions: Repository<ExecutionLog>;
   characters: Repository<Character>;
@@ -22,6 +23,8 @@ export interface AppContext {
   personaAvatars: string;
   secrets: SecretStore;
   turns: TurnRegistry;
+  /** Fan-out of resource change events (preset files edited on disk) to the open event streams. */
+  changes: ChangeHub;
 }
 
 export async function createContext(dataDir: string, options: { seed?: boolean }): Promise<AppContext> {
@@ -44,6 +47,7 @@ export async function createContext(dataDir: string, options: { seed?: boolean }
     personaAvatars: join(dataDir, 'avatars', 'personas'),
     secrets,
     turns: new TurnRegistry(),
+    changes: new ChangeHub(),
   };
 }
 

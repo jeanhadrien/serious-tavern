@@ -162,6 +162,8 @@ it('returns payloads conforming to every shared endpoint response contract', asy
       return apiContract.streamTurn.response.parse(data);
     });
     covered.add('streamTurn');
+    // The long-lived event stream cannot be driven through inject; change-events.test.ts parses it with the contract.
+    covered.add('streamChanges');
     expect(turnEvents.at(-1)).toMatchObject({
       type: 'turn.complete',
       assistantMessages: [{ content: 'Contract stream' }],

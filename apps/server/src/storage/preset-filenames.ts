@@ -21,5 +21,6 @@ export function allocatePresetFile(stem: string, takenStems: ReadonlySet<string>
   return `${candidate}.yaml`;
 }
 
-export const isPresetFile = (fileName: string) => /\.ya?ml$/i.test(fileName);
+/** Preset files are `.yaml`/`.yml`; dotfiles and `~` names are editor lock/backup files, never presets. */
+export const isPresetFile = (fileName: string) => /\.ya?ml$/i.test(fileName) && !/^[.~]/.test(fileName);
 export const fileStem = (fileName: string) => fileName.replace(/\.ya?ml$/i, '').toLowerCase();

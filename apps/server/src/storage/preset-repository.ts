@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isMap, parseDocument } from 'yaml';
-import type { Preset } from '@st/shared';
+import type { InvalidPresetFile, Preset } from '@st/shared';
 import { KeyedLock } from './lock.js';
 import { atomicWrite, type Repository } from './repository.js';
 import { allocatePresetFile, fileStem, isPresetFile, presetFileStem } from './preset-filenames.js';
@@ -23,14 +23,19 @@ export class PresetRepository implements Repository<Preset> {
   // that order, and never re-entrantly.
   private readonly locks = new KeyedLock();
   private readonly warned = new Map<string, string>();
-  constructor(private readonly directory: string) {}
+  constructor(readonly directory: string) {}
 
   async list(): Promise<Preset[]> {
-    return (await this.scan()).map((entry) => entry.preset);
+    return (await this.scan()).files.map((entry) => entry.preset);
+  }
+
+  /** The files the last directory scan skipped (bad YAML, schema errors, duplicate ids) and why. */
+  async listInvalid(): Promise<InvalidPresetFile[]> {
+    return (await this.scan()).invalid;
   }
 
   async get(id: string): Promise<Preset | undefined> {
-    return (await this.scan()).find((entry) => entry.preset.id === id)?.preset;
+    return (await this.scan()).files.find((entry) => entry.preset.id === id)?.preset;
   }
 
   async save(item: Preset): Promise<void> {
@@ -49,7 +54,7 @@ export class PresetRepository implements Repository<Preset> {
 
   async delete(id: string, beforeDelete?: (current: Preset | undefined) => void | Promise<void>): Promise<void> {
     await this.locks.run(`id:${id}`, async () => {
-      const found = (await this.scan()).find((entry) => entry.preset.id === id);
+      const found = (await this.scan()).files.find((entry) => entry.preset.id === id);
       if (beforeDelete) await beforeDelete(found?.preset);
       if (found) await rm(join(this.directory, found.file), { force: true });
     });
@@ -62,46 +67,56 @@ export class PresetRepository implements Repository<Preset> {
     console.warn(`Skipping preset file ${join(this.directory, file)}: ${reason}`);
   }
 
-  private async scan(): Promise<PresetFile[]> {
+  // One pass over the directory: the loadable presets and the files skipped with their reasons.
+  private async scan(): Promise<{ files: PresetFile[]; invalid: InvalidPresetFile[] }> {
     await mkdir(this.directory, { recursive: true });
-    const files = (await readdir(this.directory)).filter(isPresetFile).sort();
-    const found: PresetFile[] = [];
+    const names = (await readdir(this.directory)).filter(isPresetFile).sort();
+    const files: PresetFile[] = [];
+    const invalid: InvalidPresetFile[] = [];
     const ids = new Map<string, string>();
-    for (const file of files) {
-      const preset = await this.load(file);
-      if (!preset) continue;
+    const skip = (file: string, reason: string) => {
+      this.warn(file, reason);
+      invalid.push({ file, reason });
+    };
+    for (const file of names) {
+      const loaded = await this.load(file);
+      // A file that vanished mid-scan is neither a preset nor invalid.
+      if (!loaded) continue;
+      if ('reason' in loaded) {
+        skip(file, loaded.reason);
+        continue;
+      }
+      const { preset } = loaded;
       const owner = ids.get(preset.id);
       if (owner) {
-        this.warn(file, `duplicate preset id ${preset.id}, already used by ${owner}`);
+        skip(file, `duplicate preset id ${preset.id}, already used by ${owner}`);
         continue;
       }
       ids.set(preset.id, file);
       this.warned.delete(file);
-      found.push({ file, preset });
+      files.push({ file, preset });
     }
-    return found;
+    return { files, invalid };
   }
 
-  private async load(file: string): Promise<Preset | undefined> {
+  private async load(file: string): Promise<{ preset: Preset } | { reason: string } | undefined> {
     let text: string;
     try {
       text = await readFile(join(this.directory, file), 'utf8');
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') this.warn(file, (error as Error).message);
-      return undefined;
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+      return { reason: (error as Error).message };
     }
     let result = parsePresetYaml(text);
     if (!result.ok && result.needsStamp) {
       try {
         result = parsePresetYaml(await this.stamp(file));
       } catch (error) {
-        this.warn(file, `could not stamp id: ${(error as Error).message}`);
-        return undefined;
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+        return { reason: `could not stamp id: ${(error as Error).message}` };
       }
     }
-    if (result.ok) return result.preset;
-    this.warn(file, result.reason);
-    return undefined;
+    return result.ok ? { preset: result.preset } : { reason: result.reason };
   }
 
   // Adds a missing id and timestamps to a file that is otherwise a valid preset, keeping the user's
@@ -137,7 +152,7 @@ export class PresetRepository implements Repository<Preset> {
     const reread = parsePresetYaml(text);
     if (!reread.ok) throw new Error(`Preset ${preset.id} cannot be stored: ${reread.reason}`);
     await this.locks.run('names', async () => {
-      const existing = (await this.scan()).find((entry) => entry.preset.id === preset.id);
+      const existing = (await this.scan()).files.find((entry) => entry.preset.id === preset.id);
       const stem = presetFileStem(preset.name);
       let file = existing?.file;
       if (!existing || presetFileStem(existing.preset.name) !== stem) {

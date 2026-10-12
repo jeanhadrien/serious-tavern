@@ -273,6 +273,25 @@ it('skips invalid YAML and invalid presets without touching them', async () => {
   expect(warn.mock.calls.length).toBe(count);
 });
 
+it('reports skipped files with their reasons, ignores editor files, and drops entries once fixed', async () => {
+  const id = randomUUID();
+  const body = (name: string) =>
+    `name: ${name}\nid: ${id}\ncreatedAt: ${date}\nupdatedAt: ${date}\ninputs: []\nentries: []\n`;
+  await writeFile(join(directory, 'broken.yaml'), 'name: [unclosed\n');
+  await writeFile(join(directory, 'a.yaml'), body('First'));
+  await writeFile(join(directory, 'b.yaml'), body('Dup'));
+  await writeFile(join(directory, '.a.yaml.swp'), 'junk');
+  await writeFile(join(directory, '.#a.yaml'), 'junk');
+  await writeFile(join(directory, 'a.yaml.1234.tmp'), 'junk');
+  const repository = new PresetRepository(directory);
+  const invalid = await repository.listInvalid();
+  expect(invalid.map((item) => item.file)).toEqual(['b.yaml', 'broken.yaml']);
+  expect(invalid.every((item) => item.reason.length > 0)).toBe(true);
+  expect(invalid[0]?.reason).toContain('duplicate preset id');
+  await writeFile(join(directory, 'broken.yaml'), body('Fixed').replace(id, randomUUID()));
+  expect((await repository.listInvalid()).map((item) => item.file)).toEqual(['b.yaml']);
+});
+
 it('keeps the first file by name when two files declare the same id', async () => {
   const id = randomUUID();
   const body = (name: string) =>

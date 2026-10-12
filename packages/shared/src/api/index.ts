@@ -5,6 +5,7 @@ import { presetEndpoints } from './presets.js';
 import { entityEndpoints } from './entities.js';
 import { catalogEndpoints } from './catalog.js';
 import { importEndpoints } from './imports.js';
+import { eventEndpoints } from './events.js';
 
 export * from './common.js';
 export * from './sessions.js';
@@ -13,6 +14,7 @@ export * from './presets.js';
 export * from './entities.js';
 export * from './catalog.js';
 export * from './imports.js';
+export * from './events.js';
 
 export const apiContract = {
   ...sessionEndpoints,
@@ -21,6 +23,7 @@ export const apiContract = {
   ...entityEndpoints,
   ...catalogEndpoints,
   ...importEndpoints,
+  ...eventEndpoints,
 };
 export type ApiEndpoint = keyof typeof apiContract;
 export type ApiBody<K extends ApiEndpoint> = z.input<(typeof apiContract)[K]['body']>;

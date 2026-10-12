@@ -85,3 +85,33 @@ it('never lets a client set or change source through an update of a normal prese
   const stored = await app.inject({ method: 'GET', url: `/api/presets/${id}` });
   expect(stored.json()).not.toHaveProperty('source');
 });
+
+it('answers a create with the stored form, so ids match later reads', async () => {
+  const { app } = await setup(false);
+  const response = await app.inject({
+    method: 'POST',
+    url: '/api/presets',
+    payload: {
+      name: 'Stored form',
+      inputs: [{ id: randomUUID(), key: 'history', dataType: 'messages' }],
+      entries: [
+        {
+          id: randomUUID(),
+          name: 'Rules',
+          kind: 'message',
+          enabled: true,
+          role: 'system',
+          content: 'Be nice',
+          placement: { mode: 'ordered' },
+        },
+        { id: randomUUID(), name: 'History', kind: 'slot', enabled: true, inputKey: 'history', role: 'user' },
+      ],
+    },
+  });
+  expect(response.statusCode).toBe(201);
+  const created = response.json();
+  expect(created.entries.map((entry: { id: string }) => entry.id)).toEqual(['entry-1', 'entry-2']);
+  expect(created.inputs[0].id).toBe('input-1');
+  const fetched = await app.inject({ method: 'GET', url: `/api/presets/${created.id}` });
+  expect(fetched.json()).toEqual(created);
+});

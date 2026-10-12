@@ -18,7 +18,8 @@ export function registerPresets(app: FastifyInstance, context: AppContext) {
     const body = withoutSource(apiContract.createPreset.body.parse({ ...(request.body as object) }));
     const preset = presetSchema.parse({ ...body, id: randomUUID(), createdAt: date, updatedAt: date });
     await presets.save(preset);
-    return reply.code(201).send(preset);
+    // Answer with the stored form (ids are re-derived from the file), like PUT and later GETs.
+    return reply.code(201).send(await requireEntity(presets, preset.id, 'Preset'));
   });
   app.get<ApiRoute<'getPreset'>>('/api/presets/:id', async (request) =>
     requireEntity(presets, apiContract.getPreset.params.parse(request.params).id, 'Preset'),

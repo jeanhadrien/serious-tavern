@@ -110,6 +110,51 @@ it('rejects invalid disconnected nodes before persisting any message or executio
   }
 });
 
+it('fails a turn with a normal error naming the preset when its file was removed on disk', async () => {
+  const directory = join(process.cwd(), '.test-data', `missing-preset-${randomUUID()}`);
+  directories.push(directory);
+  const app = await createApp(directory, { seed: false });
+  try {
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/presets',
+      payload: { name: 'Doomed', inputs: [], entries: [] },
+    });
+    const presetId = created.json().id as string;
+    const workflow = apiContract.createWorkflow.response.parse(
+      (await app.inject({ method: 'POST', url: '/api/workflows', payload: { name: 'Uses preset' } })).json(),
+    );
+    const saved = await app.inject({
+      method: 'PUT',
+      url: `/api/workflows/${workflow.id}`,
+      payload: {
+        name: workflow.name,
+        nodes: [node('input', 'chat-input'), node('llm', 'llm', { presetId }), node('output')],
+        edges: [edge('input', 'llm', 'message', 'unused'), edge('llm', 'output', 'text', 'value')],
+      },
+    });
+    expect(saved.statusCode).toBe(200);
+    const session = apiContract.createSession.response.parse(
+      (await app.inject({ method: 'POST', url: '/api/sessions', payload: { workflowId: workflow.id } })).json(),
+    );
+    // Deleting the file by hand bypasses the PRESET_IN_USE guard.
+    await rm(join(directory, 'presets', (await readdir(join(directory, 'presets')))[0]!));
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${session.id}/messages`,
+      payload: { content: 'hello' },
+    });
+    expect(response.statusCode).toBe(400);
+    const error = errorEnvelopeSchema.parse(response.json()).error;
+    expect(error.code).toBe('WORKFLOW_INVALID');
+    expect(JSON.stringify(error.details)).toContain(`Preset ${presetId} not found`);
+    const loaded = await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` });
+    expect(loaded.json().messages).toEqual([]);
+  } finally {
+    await app.close();
+  }
+});
+
 it('shares the prepared card snapshot with session character context and execution', async () => {
   const directory = join(process.cwd(), '.test-data', `snapshot-${randomUUID()}`);
   directories.push(directory);

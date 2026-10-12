@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { messageSchema } from '../models.js';
-import { apiContract, errorEnvelopeSchema } from './index.js';
+import { apiContract, changeEventTypes, errorEnvelopeSchema } from './index.js';
 
 it('preserves existing entity defaults, including defaults on partial updates', () => {
   expect(apiContract.createCharacter.body.parse({ name: '  Alice  ' })).toMatchObject({
@@ -86,4 +86,11 @@ it('describes streamed turn events, the stop endpoint and optional streaming mes
   });
   expect(messageSchema.parse(message)).toEqual(message);
   expect(messageSchema.safeParse({ ...message, status: 'pending' }).success).toBe(false);
+});
+
+it('describes the change event stream, one event per resource type', () => {
+  const event = { type: 'presets.changed', invalidFiles: [{ file: 'broken.yaml', reason: 'bad YAML' }] };
+  expect(apiContract.streamChanges.response.parse(event)).toEqual(event);
+  expect(apiContract.streamChanges.response.safeParse({ type: 'presets.changed' }).success).toBe(false);
+  expect(changeEventTypes).toEqual(['presets.changed']);
 });
