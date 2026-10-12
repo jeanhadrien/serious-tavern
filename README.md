@@ -159,6 +159,8 @@ Imported presets carry an optional `source` (`presetSourceSchema` in `@st/shared
 - `POST /api/presets` and `PUT /api/presets/:id` strip any client-sent `source`, so a duplicate is always an editable copy.
 - `PUT` on a preset with a `source` fails with `409 PRESET_READ_ONLY` and leaves the record unchanged. `DELETE` still works, and the next sync recreates the preset.
 
+In the web app, Settings → **Import content** saves the SillyTavern install folder (the one containing `data/`) and runs **Sync**. Sync stays disabled until a folder is saved; the counts appear in a toast and the last sync time is shown under the folder. On the Presets page, imported presets carry an *imported* badge (or *source missing* when `source.missing` is set). Opening one shows a banner with its origin and a *Duplicate to edit* action. Name, description, inputs, entries and Save are all disabled, and entries can still be selected and previewed. The read-only state is one `readOnly` prop threaded from `pages/Presets.tsx`, and `change`/`save` also ignore edits for imported presets. Duplicating (from the list or the banner) builds the create body without `source`, so the copy is editable.
+
 ### SillyTavern chat-completion mapping
 
 `apps/server/src/services/import/sillytavern-mapper.ts` is a pure function from parsed JSON to inputs and entries.
