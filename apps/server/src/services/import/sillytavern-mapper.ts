@@ -16,6 +16,7 @@ const MARKER_MACROS = new Map([
   ['charDescription', '{{character.description}}'],
   ['charPersonality', '{{character.personality}}'],
   ['scenario', '{{character.scenario}}'],
+  ['dialogueExamples', '{{character.mes_example}}'],
   ['personaDescription', '{{persona.description}}'],
 ]);
 
@@ -43,6 +44,8 @@ export function mapSillyTavernPreset(file: unknown, newId: () => string = random
   // Depth placement targets the first enabled chat-history slot; without one, prompts stay ordered.
   const historyIndex = ordered.findIndex((item) => item.enabled && item.identifier === CHAT_HISTORY);
   const depthTarget = historyIndex === -1 ? undefined : ids[historyIndex];
+  // Depth 0 prompts sit after the new user message, so they are moved after the Current message slot.
+  const afterCurrent = new Set<string>();
   const hasHistory = ordered.some((item) => item.identifier === CHAT_HISTORY);
   const inputs: PresetInput[] = hasHistory
     ? [
@@ -57,7 +60,14 @@ export function mapSillyTavernPreset(file: unknown, newId: () => string = random
     if (item.identifier === CHAT_HISTORY)
       return { id, name, enabled: item.enabled, kind: 'slot', inputKey: 'history', role: 'user' };
 
-    const placement = depthPlacement(item.prompt, depthTarget);
+    // ST counts depth from the end of the chat including the new user message. Our history slot excludes
+    // it, so ST depth N becomes N-1 here; ST depth 0 cannot be a history depth and is moved instead.
+    const depth = injectionDepth(item.prompt);
+    if (depth === 0 && depthTarget !== undefined) afterCurrent.add(id);
+    const placement: Placement =
+      depth !== undefined && depth > 0 && depthTarget !== undefined
+        ? { mode: 'depth', entryId: depthTarget, depth: depth - 1 }
+        : { mode: 'ordered' };
     if (item.prompt.marker !== true)
       return {
         id,
@@ -79,14 +89,17 @@ export function mapSillyTavernPreset(file: unknown, newId: () => string = random
       placement,
     };
   });
-  return { inputs, entries: withCurrentMessage(entries, newId) };
+  return { inputs, entries: withCurrentMessage(entries, newId, afterCurrent) };
 }
 
 // A turn's history is captured before the new user message is saved, so ST's single chat-history
 // block needs a second slot right after it for the message being sent (like the Default preset).
-function withCurrentMessage(entries: PresetEntry[], newId: () => string): PresetEntry[] {
-  const at = entries.findIndex((entry) => entry.kind === 'slot' && entry.inputKey === 'history');
-  const history = entries[at];
+// Entries in `afterCurrent` are moved to just after that slot, keeping their relative order.
+function withCurrentMessage(entries: PresetEntry[], newId: () => string, afterCurrent: Set<string>): PresetEntry[] {
+  const moved = entries.filter((entry) => afterCurrent.has(entry.id));
+  const rest = entries.filter((entry) => !afterCurrent.has(entry.id));
+  const at = rest.findIndex((entry) => entry.kind === 'slot' && entry.inputKey === 'history');
+  const history = rest[at];
   if (!history) return entries;
   const current: PresetEntry = {
     id: newId(),
@@ -96,7 +109,7 @@ function withCurrentMessage(entries: PresetEntry[], newId: () => string): Preset
     inputKey: 'message',
     role: 'user',
   };
-  return [...entries.slice(0, at + 1), current, ...entries.slice(at + 1)];
+  return [...rest.slice(0, at + 1), current, ...moved, ...rest.slice(at + 1)];
 }
 
 function listedPrompts(root: Record_): { identifier: string; enabled: boolean }[] {
@@ -109,11 +122,12 @@ function listedPrompts(root: Record_): { identifier: string; enabled: boolean }[
   );
 }
 
-function depthPlacement(prompt: Record_, depthTarget: string | undefined): Placement {
+// The ST injection depth of an absolute prompt, clamped to a non-negative integer. Undefined for relative prompts.
+function injectionDepth(prompt: Record_): number | undefined {
   const depth = prompt.injection_depth;
-  if (prompt.injection_position !== ABSOLUTE_INJECTION || depthTarget === undefined) return { mode: 'ordered' };
-  if (typeof depth !== 'number' || !Number.isFinite(depth)) return { mode: 'ordered' };
-  return { mode: 'depth', entryId: depthTarget, depth: Math.max(0, Math.trunc(depth)) };
+  if (prompt.injection_position !== ABSOLUTE_INJECTION) return undefined;
+  if (typeof depth !== 'number' || !Number.isFinite(depth)) return undefined;
+  return Math.max(0, Math.trunc(depth));
 }
 
 // Entry names must be non-empty, so they fall back to the identifier, then to a generic label.

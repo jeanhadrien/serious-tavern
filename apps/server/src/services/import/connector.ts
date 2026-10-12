@@ -13,6 +13,8 @@ export interface SourceFile {
  */
 export interface ImportConnector {
   readonly app: ImportApp;
+  /** Bump when `mapContent` changes its output for the same input, so Sync re-imports unchanged files. */
+  readonly mapperVersion: number;
   /** Throws an HttpError when `installPath` is not a usable install of this app. */
   detect(installPath: string): Promise<void>;
   /** Lists only the files this connector imports. Nothing else in the install is read. */

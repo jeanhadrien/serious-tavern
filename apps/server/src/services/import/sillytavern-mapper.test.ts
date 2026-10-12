@@ -127,24 +127,24 @@ describe('markers', () => {
     ],
   });
 
-  it('maps the four marker kinds with a macro equivalent to system messages', () => {
+  it('maps the five marker kinds with a macro equivalent to system messages', () => {
     expect(
-      result.entries.slice(0, 4).map((entry) => (entry.kind === 'message' ? [entry.enabled, entry.content] : [])),
+      result.entries.slice(0, 5).map((entry) => (entry.kind === 'message' ? [entry.enabled, entry.content] : [])),
     ).toEqual([
       [true, '{{character.description}}'],
       [true, '{{character.personality}}'],
       [true, '{{character.scenario}}'],
       [true, '{{persona.description}}'],
+      [true, '{{character.mes_example}}'],
     ]);
   });
 
-  it('imports markers without an equivalent as disabled, empty entries named after the marker', () => {
-    expect(result.entries.slice(4).map((entry) => [entry.name, entry.enabled, entry.kind])).toEqual([
-      ['dialogueExamples', false, 'message'],
+  it('imports world info markers as disabled, empty entries named after the marker', () => {
+    expect(result.entries.slice(5).map((entry) => [entry.name, entry.enabled, entry.kind])).toEqual([
       ['worldInfoBefore', false, 'message'],
       ['worldInfoAfter', false, 'message'],
     ]);
-    expect(result.entries.slice(4).every((entry) => entry.kind === 'message' && entry.content === '')).toBe(true);
+    expect(result.entries.slice(5).every((entry) => entry.kind === 'message' && entry.content === '')).toBe(true);
   });
 
   it('maps chatHistory to a messages input and slot, followed by a current-message slot', () => {
@@ -173,39 +173,80 @@ describe('markers', () => {
 });
 
 describe('depth injection', () => {
+  // Listed as main, note, chatHistory, tail. The note sits before the history, so depth 0 has to move it.
   const file = (injection: Record<string, unknown>, historyEnabled = true) => ({
     prompts: [
       prompt('main'),
-      prompt('chatHistory', { marker: true, content: null }),
       prompt('note', { role: 'system', content: 'Remember', ...injection }),
+      prompt('chatHistory', { marker: true, content: null }),
+      prompt('tail'),
     ],
     prompt_order: [
       order(100001, [
         ['main', true],
-        ['chatHistory', historyEnabled],
         ['note', true],
+        ['chatHistory', historyEnabled],
+        ['tail', true],
       ]),
     ],
   });
+  const names = (result: ReturnType<typeof map>) => result.entries.map((entry) => entry.name);
+  const find = (result: ReturnType<typeof map>, name: string) => result.entries.find((entry) => entry.name === name);
+  const historyId = (result: ReturnType<typeof map>) =>
+    result.entries.find((entry) => entry.kind === 'slot' && entry.inputKey === 'history')?.id;
+  const injected = (depth: number, historyEnabled = true) =>
+    file({ injection_position: 1, injection_depth: depth }, historyEnabled);
+  // The result must pass the same schema the server stores presets with, including the depth target check.
+  const isValid = (result: ReturnType<typeof map>) =>
+    presetSchema.safeParse({
+      id: '00000000-0000-4000-8000-000000000001',
+      name: 'P',
+      createdAt: '',
+      updatedAt: '',
+      ...result,
+    }).success;
 
-  it('places an absolute prompt at its depth inside the enabled chat-history slot', () => {
-    const result = map(file({ injection_position: 1, injection_depth: 2 }));
-    const note = result.entries[3];
-    expect(note).toMatchObject({ placement: { mode: 'depth', entryId: 'id-2', depth: 2 } });
-    expect(result.entries[1]).toMatchObject({ id: 'id-2', kind: 'slot' });
+  it('maps ST depth N to depth N-1 inside the enabled chat-history slot', () => {
+    const result = map(injected(3));
+    expect(find(result, 'note')).toMatchObject({
+      placement: { mode: 'depth', entryId: historyId(result), depth: 2 },
+    });
+    expect(isValid(result)).toBe(true);
+  });
+
+  it('maps ST depth 1, the message just before the new user message, to depth 0 in the history slot', () => {
+    const result = map(injected(1));
+    expect(find(result, 'note')).toMatchObject({
+      placement: { mode: 'depth', entryId: historyId(result), depth: 0 },
+    });
+    expect(names(result)).toEqual(['main', 'note', 'chatHistory', 'Current message', 'tail']);
+    expect(isValid(result)).toBe(true);
+  });
+
+  it('moves an ST depth 0 prompt, which follows the new user message, right after the Current message slot', () => {
+    const result = map(injected(0));
+    expect(find(result, 'note')).toMatchObject({ placement: { mode: 'ordered' } });
+    expect(names(result)).toEqual(['main', 'chatHistory', 'Current message', 'note', 'tail']);
+    expect(isValid(result)).toBe(true);
+  });
+
+  it('keeps depth 0 prompts in their listed position without an enabled chat-history slot', () => {
+    const result = map(injected(0, false));
+    expect(find(result, 'note')).toMatchObject({ placement: { mode: 'ordered' } });
+    expect(names(result)).toEqual(['main', 'note', 'chatHistory', 'Current message', 'tail']);
   });
 
   it('falls back to ordered placement without an enabled chat-history slot', () => {
-    expect(map(file({ injection_position: 1, injection_depth: 2 }, false)).entries[3]).toMatchObject({
+    expect(find(map(file({ injection_position: 1, injection_depth: 2 }, false)), 'note')).toMatchObject({
       placement: { mode: 'ordered' },
     });
   });
 
   it('ignores depth for relative prompts and for depths that are not numbers', () => {
-    expect(map(file({ injection_position: 0, injection_depth: 2 })).entries[3]).toMatchObject({
+    expect(find(map(file({ injection_position: 0, injection_depth: 2 })), 'note')).toMatchObject({
       placement: { mode: 'ordered' },
     });
-    expect(map(file({ injection_position: 1, injection_depth: null })).entries[3]).toMatchObject({
+    expect(find(map(file({ injection_position: 1, injection_depth: null })), 'note')).toMatchObject({
       placement: { mode: 'ordered' },
     });
   });

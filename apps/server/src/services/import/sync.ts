@@ -64,7 +64,7 @@ async function importFile(
   } catch (error) {
     return skip(file.path, error);
   }
-  const hash = createHash('sha256').update(data).digest('hex');
+  const hash = sourceHash(connector.mapperVersion, data);
   if (existing?.source?.hash === hash) {
     if (existing.source.missing) await setMissing(context, existing.id, false);
     return 'unchanged';
@@ -104,6 +104,11 @@ async function setMissing(context: AppContext, id: string, missing: boolean): Pr
   await context.presets.update(id, (old) =>
     old.source ? presetSchema.parse({ ...old, source: { ...old.source, missing } }) : old,
   );
+}
+
+// Covers the mapper version as well as the bytes, so a mapper change makes Sync re-import unchanged files.
+function sourceHash(mapperVersion: number, data: Buffer): string {
+  return createHash('sha256').update(`mapper ${mapperVersion}\n`).update(data).digest('hex');
 }
 
 async function readSourceFile(path: string): Promise<Buffer> {

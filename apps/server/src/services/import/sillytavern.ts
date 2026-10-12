@@ -12,6 +12,8 @@ const DEFAULT_USER = 'default-user';
 /** Imports chat-completion presets from `<install>/data/<user>/OpenAI Settings/*.json`. */
 export const sillyTavernConnector: ImportConnector = {
   app: 'sillytavern',
+  // 1: original mapping, hashed on file bytes only. 2: dialogue examples mapped, depth off-by-one fixed.
+  mapperVersion: 2,
   async detect(installPath) {
     const dataDir = join(installPath, 'data');
     if (!(await isDirectory(dataDir)))

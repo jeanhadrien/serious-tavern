@@ -114,6 +114,25 @@ describe('import sync', () => {
     expect((await allPresets(context))[0]).toEqual(before);
   });
 
+  it('re-imports an unchanged file in place when the connector mapper version changes', async () => {
+    const { context, install } = await setup();
+    await writeSettings(install, 'default-user', 'Alpha.json', chatCompletion('same'));
+    await connect(context, install);
+    await sync(context);
+    const [before] = await allPresets(context);
+    await pause();
+
+    const bumped = { ...sillyTavernConnector, mapperVersion: sillyTavernConnector.mapperVersion + 1 };
+    expect(await syncImportSource(context, bumped)).toEqual({ created: 0, updated: 1, unchanged: 0, missing: 0 });
+    const [after] = await allPresets(context);
+    expect(after?.id).toBe(before?.id);
+    expect(after?.source?.hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(after?.source?.hash).not.toBe(before?.source?.hash);
+    expect(after?.updatedAt).not.toBe(before?.updatedAt);
+
+    expect(await syncImportSource(context, bumped)).toEqual({ created: 0, updated: 0, unchanged: 1, missing: 0 });
+  });
+
   it('keeps presets whose file disappeared, marks them missing, and clears the flag when the file returns', async () => {
     const { context, install } = await setup();
     await writeSettings(install, 'default-user', 'Alpha.json', chatCompletion('kept'));

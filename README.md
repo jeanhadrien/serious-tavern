@@ -149,7 +149,7 @@ SillyTavern presets are read from `<install>/data/<user>/OpenAI Settings/*.json`
 
 Each sync works like this:
 - A file with no record creates a preset.
-- A file whose sha256 changed overwrites its preset in place, keeping the preset id, so workflows stay linked. Edges into inputs that no longer exist are pruned, as preset `PUT` does.
+- A file whose hash changed overwrites its preset in place, keeping the preset id, so workflows stay linked. Edges into inputs that no longer exist are pruned, as preset `PUT` does. The hash is the sha256 of `mapper <version>\n` followed by the file bytes. Each connector sets `mapperVersion`; bumping it re-imports every file on the next Sync, so mapping fixes reach existing presets. The SillyTavern connector is at version 2.
 - An unchanged file is left alone, including its `updatedAt`.
 - A preset whose file is gone is kept and marked `source.missing: true`. The flag is cleared if the file returns. Its `updatedAt` does not change.
 - An unreadable, invalid or oversized file is skipped with a server warning. Its local copy stays, and it is not counted.
@@ -167,9 +167,9 @@ In the web app, Settings → **Import content** saves the SillyTavern install fo
 - Order: the `prompt_order` entry with `character_id` 100001 is used, then 100000, then the first entry. Only the identifiers listed there are imported, in that order, with `enabled` taken from the order entry. Anything absent is ignored.
 - A normal prompt becomes a `message` entry. The role is `system` when it is missing or unknown. The content is kept verbatim, macros included, so unsupported macros show up as preset warnings. The name is the prompt name, falling back to its identifier.
 - `chatHistory` becomes a `messages` input named `history` plus a `slot` entry. A `message` text input and a `Current message` slot follow it (enabled together), because a turn's history is captured before the new user message is saved.
-- `charDescription`, `charPersonality`, `scenario` and `personaDescription` become system messages with `{{character.description}}`, `{{character.personality}}`, `{{character.scenario}}` and `{{persona.description}}`.
-- `dialogueExamples`, `worldInfoBefore`, `worldInfoAfter` and any other marker become disabled, empty `message` entries named after the marker.
-- Absolute injection (`injection_position: 1`) with an `injection_depth` becomes depth placement in the first enabled chat-history slot. Otherwise the prompt stays ordered. `injection_order`, sampler settings and other top-level fields are ignored.
+- `charDescription`, `charPersonality`, `scenario`, `dialogueExamples` and `personaDescription` become system messages with `{{character.description}}`, `{{character.personality}}`, `{{character.scenario}}`, `{{character.mes_example}}` and `{{persona.description}}`.
+- `worldInfoBefore`, `worldInfoAfter` and any other marker become disabled, empty `message` entries named after the marker.
+- Absolute injection (`injection_position: 1`) with an `injection_depth` N is counted like ST, from the end of the chat including the new user message. Our history slot excludes that message, so for N >= 1 the entry gets depth N-1 in the first enabled chat-history slot. Depth 0 cannot be expressed as history depth, so it stays ordered and is moved to sit right after the `Current message` slot. Without an enabled chat-history slot, every prompt stays ordered where the prompt order lists it. `injection_order`, sampler settings and other top-level fields are ignored.
 
 ## Characters and Personas
 
