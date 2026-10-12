@@ -300,7 +300,25 @@ updatedAt: 2026-01-01T00:00:00.000Z
 - **Invalid files** (bad YAML, fail the preset schema) are skipped with a warning naming the file and the reason, and are never modified or deleted. If two files declare the same `id`, the first by file name wins and the other is skipped with a warning.
 - **Delete** removes only the preset's YAML file.
 - **Migration:** at startup, before seeding, each `data/presets/<id>.json` that parses as a valid preset is written as YAML, read back and compared with the original (only machine ids may differ), and then renamed to `<id>.json.migrated`. The JSON content is never changed or deleted, and the `.json` filter ignores it afterwards. A failed verification removes the new YAML and leaves the JSON in place with a warning; unreadable or invalid JSON is left untouched with a warning; if a YAML with the same id already exists the JSON is just renamed. Running it again does nothing. To roll back, delete the YAML and rename `.json.migrated` back to `.json` (an older server then reads it).
-- Edits made on disk are picked up by the next API call. There is no file watcher yet, so an open web page shows the old content until it reloads.
+- Edits made on disk are picked up by the next API call, and the open web app updates live (see Live reload below).
+
+#### Live reload
+
+The server watches `data/presets/` (`fs.watch`, non-recursive; temp files of our own atomic writes, editor swap/lock files such as `.x.yaml.swp` or `.#x.yaml`, and non-YAML files are ignored). Bursts, including editors that save through temp file + rename, are debounced into one notification, followed by a rescan. The watcher is only started by the server entry point (`createApp(dir, { watch: true })`), re-arms itself after errors, and is closed with the app. It watches the directory by its resolved long path, because libuv aborts the whole process when Windows reports long names for a directory given by its 8.3 short name.
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /api/events` | Server-Sent Events (`changeEventSchema`, event name = `type`). One event today: `presets.changed` with `invalidFiles: { file, reason }[]` (empty when every file loads). |
+
+The server sends the current state right after a client connects, so a client that reconnected resyncs, plus a `: keepalive` comment every 15 seconds. Events only say that something changed; clients re-fetch. Writes made through the API trigger the event too, which is harmless.
+
+In the web app, one shared `EventSource` (`api/events.ts`) serves every listener. On `presets.changed`, the Presets page:
+- refreshes the list, and leaves the list and editor untouched when the data is identical (a UI save followed by its own event is a no-op);
+- reloads the open preset when its editor has no unsaved changes, keeping the selected entry by **position** (entry ids are re-derived on every read); if the preset no longer exists, closes the editor with an info toast;
+- never touches a dirty draft: it shows one warning that the file changed on disk. Saving that draft **overwrites the disk edits (last write wins)**; if the file was deleted, saving fails with `NOT_FOUND`, so duplicate the preset to keep the edits;
+- shows one persistent warning per invalid file, with the file name and the reason (bad YAML, schema errors, duplicate ids). It is shown once per (file, reason) and dismissed when the file is fixed or removed. Invalid files are skipped, never modified.
+
+The workflow editor's preset catalog (LLM node ports) refetches on the same event. A workflow whose LLM node points at a preset that was deleted or broken on disk is not guarded by `PRESET_IN_USE`; running it fails with `400 WORKFLOW_INVALID` whose issue names the node and the missing preset id.
 
 Back up the whole `data/` directory (at minimum `secrets.enc.json`, `.master.key`, the JSON files and the preset YAML files). Stop the server first, then copy the directory to a timestamped zip. `data/` stays gitignored.
 
