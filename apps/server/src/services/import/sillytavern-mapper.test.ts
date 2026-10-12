@@ -147,16 +147,28 @@ describe('markers', () => {
     expect(result.entries.slice(4).every((entry) => entry.kind === 'message' && entry.content === '')).toBe(true);
   });
 
-  it('maps chatHistory to one messages input and one slot entry named after the marker', () => {
+  it('maps chatHistory to a messages input and slot, followed by a current-message slot', () => {
     const history = map({
       prompts: [prompt('chatHistory', { marker: true, content: null })],
       prompt_order: [order(100001, [['chatHistory', true]])],
     });
-    // Entry ids are generated first, then the input's.
-    expect(history.inputs).toEqual([{ id: 'id-2', key: 'history', dataType: 'messages' }]);
+    // Entry ids are generated first, then the inputs', then the current-message slot's.
+    expect(history.inputs).toEqual([
+      { id: 'id-2', key: 'history', dataType: 'messages' },
+      { id: 'id-3', key: 'message', dataType: 'text' },
+    ]);
     expect(history.entries).toEqual([
       { id: 'id-1', name: 'chatHistory', enabled: true, kind: 'slot', inputKey: 'history', role: 'user' },
+      { id: 'id-4', name: 'Current message', enabled: true, kind: 'slot', inputKey: 'message', role: 'user' },
     ]);
+  });
+
+  it('disables the current-message slot together with a disabled chat history', () => {
+    const history = map({
+      prompts: [prompt('chatHistory', { marker: true, content: null })],
+      prompt_order: [order(100001, [['chatHistory', false]])],
+    });
+    expect(history.entries.map((entry) => entry.enabled)).toEqual([false, false]);
   });
 });
 
@@ -178,22 +190,22 @@ describe('depth injection', () => {
 
   it('places an absolute prompt at its depth inside the enabled chat-history slot', () => {
     const result = map(file({ injection_position: 1, injection_depth: 2 }));
-    const note = result.entries[2];
+    const note = result.entries[3];
     expect(note).toMatchObject({ placement: { mode: 'depth', entryId: 'id-2', depth: 2 } });
     expect(result.entries[1]).toMatchObject({ id: 'id-2', kind: 'slot' });
   });
 
   it('falls back to ordered placement without an enabled chat-history slot', () => {
-    expect(map(file({ injection_position: 1, injection_depth: 2 }, false)).entries[2]).toMatchObject({
+    expect(map(file({ injection_position: 1, injection_depth: 2 }, false)).entries[3]).toMatchObject({
       placement: { mode: 'ordered' },
     });
   });
 
   it('ignores depth for relative prompts and for depths that are not numbers', () => {
-    expect(map(file({ injection_position: 0, injection_depth: 2 })).entries[2]).toMatchObject({
+    expect(map(file({ injection_position: 0, injection_depth: 2 })).entries[3]).toMatchObject({
       placement: { mode: 'ordered' },
     });
-    expect(map(file({ injection_position: 1, injection_depth: null })).entries[2]).toMatchObject({
+    expect(map(file({ injection_position: 1, injection_depth: null })).entries[3]).toMatchObject({
       placement: { mode: 'ordered' },
     });
   });

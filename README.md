@@ -164,12 +164,10 @@ Imported presets carry an optional `source` (`presetSourceSchema` in `@st/shared
 `apps/server/src/services/import/sillytavern-mapper.ts` is a pure function from parsed JSON to inputs and entries.
 - Order: the `prompt_order` entry with `character_id` 100001 is used, then 100000, then the first entry. Only the identifiers listed there are imported, in that order, with `enabled` taken from the order entry. Anything absent is ignored.
 - A normal prompt becomes a `message` entry. The role is `system` when it is missing or unknown. The content is kept verbatim, macros included, so unsupported macros show up as preset warnings. The name is the prompt name, falling back to its identifier.
-- `chatHistory` becomes a `messages` input named `history` plus a `slot` entry.
+- `chatHistory` becomes a `messages` input named `history` plus a `slot` entry. A `message` text input and a `Current message` slot follow it (enabled together), because a turn's history is captured before the new user message is saved.
 - `charDescription`, `charPersonality`, `scenario` and `personaDescription` become system messages with `{{character.description}}`, `{{character.personality}}`, `{{character.scenario}}` and `{{persona.description}}`.
 - `dialogueExamples`, `worldInfoBefore`, `worldInfoAfter` and any other marker become disabled, empty `message` entries named after the marker.
 - Absolute injection (`injection_position: 1`) with an `injection_depth` becomes depth placement in the first enabled chat-history slot. Otherwise the prompt stays ordered. `injection_order`, sampler settings and other top-level fields are ignored.
-
-**Known gap:** an imported preset has no input for the message being sent. Chat history is captured before the new message is saved, and the mapper adds no `message` input, so the current user message does not reach the model. To fix it by hand, duplicate the preset (imports are read-only), add a `text` input and a slot at the end, and connect the workflow's `message` port to it. Changing the mapper to do this is a separate decision.
 
 ## Characters and Personas
 

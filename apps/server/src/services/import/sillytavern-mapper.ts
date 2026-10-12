@@ -43,8 +43,12 @@ export function mapSillyTavernPreset(file: unknown, newId: () => string = random
   // Depth placement targets the first enabled chat-history slot; without one, prompts stay ordered.
   const historyIndex = ordered.findIndex((item) => item.enabled && item.identifier === CHAT_HISTORY);
   const depthTarget = historyIndex === -1 ? undefined : ids[historyIndex];
-  const inputs: PresetInput[] = ordered.some((item) => item.identifier === CHAT_HISTORY)
-    ? [{ id: newId(), key: 'history', dataType: 'messages' }]
+  const hasHistory = ordered.some((item) => item.identifier === CHAT_HISTORY);
+  const inputs: PresetInput[] = hasHistory
+    ? [
+        { id: newId(), key: 'history', dataType: 'messages' },
+        { id: newId(), key: 'message', dataType: 'text' },
+      ]
     : [];
 
   const entries = ordered.map((item, index): PresetEntry => {
@@ -75,7 +79,24 @@ export function mapSillyTavernPreset(file: unknown, newId: () => string = random
       placement,
     };
   });
-  return { inputs, entries };
+  return { inputs, entries: withCurrentMessage(entries, newId) };
+}
+
+// A turn's history is captured before the new user message is saved, so ST's single chat-history
+// block needs a second slot right after it for the message being sent (like the Default preset).
+function withCurrentMessage(entries: PresetEntry[], newId: () => string): PresetEntry[] {
+  const at = entries.findIndex((entry) => entry.kind === 'slot' && entry.inputKey === 'history');
+  const history = entries[at];
+  if (!history) return entries;
+  const current: PresetEntry = {
+    id: newId(),
+    name: 'Current message',
+    enabled: history.enabled,
+    kind: 'slot',
+    inputKey: 'message',
+    role: 'user',
+  };
+  return [...entries.slice(0, at + 1), current, ...entries.slice(at + 1)];
 }
 
 function listedPrompts(root: Record_): { identifier: string; enabled: boolean }[] {
