@@ -95,6 +95,11 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - **Live reload:** a debounced `fs.watch` on the presets directory feeds `GET /api/events` (SSE, `changeEventSchema` in the shared contract). Event `presets.changed` carries the currently invalid files. The watcher is started only from `main.ts` (`createApp(dir, { watch: true })`), never from `createContext`.
     - The web editor never overwrites a dirty draft and keeps the selected entry by position, because entry ids are re-derived on read.
     - New SSE routes that must not block `app.close()` end their streams in the Fastify `preClose` hook, not `onClose`.
+- **Change events (`GET /api/events`):** besides `presets.changed`, the server emits `workflows|characters|personas|sessions.changed` (`{ type, id? }`).
+  - They come from `NotifyingRepository` (`services/change-events.ts`), which wraps those repositories in `context.ts` and announces every successful save, update and delete. New write paths are covered automatically. A new record resource gets wrapped there too.
+  - `repo.silent` is the raw repository. Chat turns write through it and publish one `sessions.changed` when the turn settles, never per token.
+  - Tests that spy on a repository's `get` to pause inside `update` must spy on `.silent`.
+  - On connect, every event type is sent once (id-less for records) so clients resync.
 - **Creating a session** requires a `workflowId`. Sessions also store `characterId` and `personaId`, which the server loads and passes to the executor.
 - **Characters/personas:**
   - Card parsing and writing (PNG `tEXt` chunks `ccv3`, which takes precedence, then `chara`; V1/V2/V3 JSON) lives in `apps/server/src/card.ts` and runs on the server.
