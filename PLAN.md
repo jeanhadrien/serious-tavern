@@ -17,6 +17,66 @@ Guiding principles: **high modularity**, a **simple baseline** the user can conf
 - **More node types**: code/JS node, transforms, tools, RAG, etc.
 - Test-run a workflow from the editor, workflow versioning, import/export (only character-card import/export exists).
 
+## Next: user-defined LLM providers (agreed design)
+
+**Problem.** OpenAI-compatible backends disagree on field names (message `name` support, `reasoning` vs `reasoning_content`, …), often per model, and OpenRouter does not reliably translate them. Users know things the app cannot, so they get control over the wire format.
+
+**Principles**
+- **Canonical vs wire.** The app keeps its own model of a call: messages with role, content and an optional `name`; samplers; reasoning settings. A **provider record** says how that model is spelled on the wire for one backend.
+- **Content stays in presets.** Anything that changes message *text* (e.g. writing "Alice: …" into the content because a model ignores `name`) is the user's preset decision, never a provider transform.
+- **Mapping is deliberately small.** Only the message-name field and the reasoning response fields are mappable, plus `extraBody` as a raw escape hatch. Samplers and max tokens keep fixed OpenAI names. No transform language, no request templates.
+- **Only `openai-compatible` backends** for now (OpenRouter, OpenAI, DeepSeek, Ollama, LM Studio, llama.cpp, vLLM…). Anthropic-native and text-completion backends are out of scope.
+
+Each step below is one commit (or a few), passes `npm run check`, and keeps existing user data working.
+
+### Step 1 — preset entry `name` → `displayName`, plus a real message `name`
+- **Schema (`packages/shared/src/preset.ts`):** every entry gets a required `displayName` (the editor label, what `name` is today). `message` entries get an optional `name: string`, a **template** rendered like `content`. `slot` entries have no `name` (a messages slot already carries one name per message).
+- **Legacy data:** an entry with `name` and no `displayName` is a legacy entry: its `name` becomes `displayName` and it has no message name. This is unambiguous because `displayName` is required. Apply it to **raw data before schema validation** where stored presets are read: the YAML loader (`presetCandidate` in `apps/server/src/storage/preset-yaml.ts`) and the JSON→YAML migration (`preset-migration.ts`). Export the helper from `shared`. Do **not** put it in the zod schema (`z.preprocess` erases the input type the web client relies on). Files are rewritten in the new shape on their next save (migrate-on-write); no eager rewrite and no version marker.
+- **Rendering (`packages/engine/src/preset.ts`):** render `name` with the same template context as `content`, trim it, and set `PromptMessage.name` only when non-empty. An entry whose content renders empty is still dropped.
+- **Validation:** the name template is checked like content: unknown `{{input.x}}` is a schema error; syntax problems and unknown macros are warnings (path `['entries', i, 'name']`). Inputs referenced only by a name count as used.
+- **YAML:** key order `id, displayName, name, kind, …`; readable slot-label ids are derived from `displayName`.
+- **SillyTavern import:** the mapper writes `displayName`; bump `mapperVersion` to 3 (extend the version comment) so Sync re-applies.
+- **Seeds and fixtures:** seeded presets (`apps/server/src/seed.ts`) and all test fixtures use `displayName`.
+- **Web:** the entry list and editor show and edit `displayName`. Message entries get a "Name" field (optional, with the existing template hints/warnings), described as the message name sent to the model. The preset preview shows a message's rendered name when it has one.
+- **Tests:** legacy file read (label preserved, no message name, new shape on save), name rendering incl. empty-name omission and macros, validation of name templates, mapper output.
+- **Docs:** README (preset format) and AGENTS.md Key contracts (`displayName` vs `name`, the legacy rule).
+
+### Step 2 — provider records and resolution
+- **Record (`packages/shared`, zod, passthrough):**
+  ```yaml
+  id: <uuid>                 # user providers; the built-in one has id "openrouter"
+  name: My DeepSeek
+  kind: openai-compatible
+  baseUrl: https://api.deepseek.com/v1     # requests go to <baseUrl>/chat/completions
+  secret: deepseek           # name of a secret in the encrypted store; optional (local servers need none)
+  headers: {}                # extra request headers
+  messageName: name          # wire field for the message name; null = never send it
+  reasoningFields: [reasoning, reasoning_content]   # read from the stream delta / response message, first non-empty wins
+  extraBody: {}              # merged into the request body last
+  overrides:                 # first match wins; its fields replace the provider's
+    - match: "deepseek/*"    # glob on the model id
+      messageName: null
+      reasoningFields: [reasoning_content]
+  ```
+  An override may set `messageName`, `reasoningFields`, `headers` and `extraBody` (objects shallow-merged over the provider's).
+- **Storage:** YAML files under `data/providers/<slug-of-name>.yaml`; identity is the `id` inside the file; same rules as presets (no cache, invalid files skipped with a warning, atomic writes, id lock). Reuse or generalize the preset YAML repository rather than copying it. Live reload (`providers.changed` through the directory watcher) is welcome but may come later; if skipped, note it in this file.
+- **Built-in OpenRouter provider:** defined in code, **read-only**, id `openrouter`, `secret: openrouter`, base URL `https://openrouter.ai/api/v1`, the `HTTP-Referer`/`X-Title` headers, `messageName: name`, `reasoningFields: [reasoning, reasoning_content]`. Listed with user providers and flagged `builtIn: true`. Writes to it return 409 `PROVIDER_READ_ONLY`. Existing nodes (`provider: 'openrouter'`) and the existing `openrouter` secret keep working with no migration.
+- **API (contract first, `packages/shared/src/api/`):** list, get, create, update, delete, and duplicate (so the built-in one can be copied). Today's `GET /api/providers` catalog (code-registered providers, used by node-ui) becomes the record list, keeping what node-ui needs (id and label).
+- **Engine:** the LLM node resolves its provider through `ctx.resources` (snapshotted by `prepareWorkflow`, like presets), not the in-code `providers` map. An unknown provider id is a node error naming the id. A missing secret keeps today's message.
+
+### Step 3 — the `openai-compatible` adapter
+- Turn `packages/engine/src/providers/openrouter.ts` into a generic adapter driven by the resolved record (override applied): URL from `baseUrl`, auth header only when a secret is set, `headers`, message name written to `messageName` (or dropped), reasoning read from `reasoningFields` on both the stream delta and the non-stream message, `extraBody` merged last.
+- Keep today's behaviour otherwise: idle timeout, abort handling, error parsing, and the OpenRouter-style `reasoning` object for effort/max tokens/exclude (other backends can neutralize it via `extraBody`; revisit if it causes 400s).
+- Error messages name the provider instead of hardcoding "OpenRouter".
+
+### Step 4 — wire log
+- The execution log records what was actually sent: URL, headers with secrets redacted, the final JSON body; and the raw response (accumulated for streams, as today's `raw`). Shown in the existing execution details (`apps/web/src/pages/chat/ExecutionDetails.tsx`) instead of the canonical request.
+
+### Step 5 — provider UI
+- A providers list and narrow editor in the layout shell, following the characters/personas pattern (list view + editor view sharing an editor store, URL-encoded layout, dirty flags).
+- A form for the common fields (name, base URL, secret name, message name field, reasoning fields) and a raw YAML view for `headers`, `extraBody` and `overrides`. The built-in provider opens read-only with a "Duplicate" action.
+- The LLM node's provider dropdown lists the records (node-ui gets them through its `context`, as today).
+
 ## Backlog from SillyTavern learnings
 
 [SillyTavern](https://github.com/SillyTavern/SillyTavern) is the mature chatbot app this project builds on conceptually (personas, characters, presets), minus the workflow layer. Items marked *(unverified)* are from general knowledge of SillyTavern and haven't been checked against the code.
