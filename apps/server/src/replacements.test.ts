@@ -74,7 +74,9 @@ it.each(
     });
     expect(created.statusCode).toBe(201);
     const { id, createdAt } = created.json();
-    const repository: Repository<Workflow | Preset> = context[resource];
+    // Workflows are wrapped to announce changes; spying on the repository underneath keeps update's internal calls visible.
+    const repository: Repository<Workflow | Preset> =
+      resource === 'workflows' ? context.workflows.silent : context.presets;
     const update = repository.update.bind(repository);
     const remove = repository.delete.bind(repository);
     const updateSpy = vi.spyOn(repository, 'update').mockImplementation((...args) => {

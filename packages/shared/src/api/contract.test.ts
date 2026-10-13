@@ -92,5 +92,13 @@ it('describes the change event stream, one event per resource type', () => {
   const event = { type: 'presets.changed', invalidFiles: [{ file: 'broken.yaml', reason: 'bad YAML' }] };
   expect(apiContract.streamChanges.response.parse(event)).toEqual(event);
   expect(apiContract.streamChanges.response.safeParse({ type: 'presets.changed' }).success).toBe(false);
-  expect(changeEventTypes).toEqual(['presets.changed']);
+  expect(changeEventTypes).toEqual([
+    'presets.changed',
+    'workflows.changed',
+    'characters.changed',
+    'personas.changed',
+    'sessions.changed',
+  ]);
+  for (const event of [{ type: 'sessions.changed' }, { type: 'workflows.changed', id: 'abc' }])
+    expect(apiContract.streamChanges.response.parse(event)).toEqual(event);
 });

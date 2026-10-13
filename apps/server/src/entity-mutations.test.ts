@@ -98,7 +98,7 @@ it.each(
     try {
       const created = await app.inject({ method: 'POST', url: `/api/${resource}`, payload: { name: 'Original' } });
       const { id } = created.json();
-      const repository = context[resource];
+      const repository = context[resource].silent;
       if (mutation === 'edit') {
         const get = repository.get.bind(repository);
         let paused = false;

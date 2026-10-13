@@ -308,9 +308,11 @@ The server watches `data/presets/` (`fs.watch`, non-recursive; temp files of our
 
 | Method and path | Purpose |
 | --- | --- |
-| `GET /api/events` | Server-Sent Events (`changeEventSchema`, event name = `type`). One event today: `presets.changed` with `invalidFiles: { file, reason }[]` (empty when every file loads). |
+| `GET /api/events` | Server-Sent Events (`changeEventSchema`, event name = `type`). `presets.changed` with `invalidFiles: { file, reason }[]` (empty when every file loads), plus `workflows.changed`, `characters.changed`, `personas.changed` and `sessions.changed`, each with an optional `id` of the affected record. |
 
 The server sends the current state right after a client connects, so a client that reconnected resyncs, plus a `: keepalive` comment every 15 seconds. Events only say that something changed; clients re-fetch. Writes made through the API trigger the event too, which is harmless.
+
+Record events are emitted by the repositories themselves: `workflows`, `characters`, `personas` and `sessions` in the context are `NotifyingRepository` wrappers (`services/change-events.ts`) that publish `<resource>.changed` with the record id after every successful `save`, `update` and `delete` (avatars, card import and message edit/delete included), so a new write path cannot forget it. The connect snapshot sends each of these without an `id`. Presets are not wrapped; the file watcher covers them. A chat turn writes through the wrapper's `silent` repository (streamed rows and flushes would otherwise fire per token) and publishes one `sessions.changed` when the turn settles, whether it completed, failed or was stopped. Tests that spy on a repository's internals must spy on `.silent`.
 
 In the web app, one shared `EventSource` (`api/events.ts`) serves every listener. On `presets.changed`, the Presets page:
 - refreshes the list, and leaves the list and editor untouched when the data is identical (a UI save followed by its own event is a no-op);

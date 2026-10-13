@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import Fastify from 'fastify';
+import Fastify, { type InjectOptions } from 'fastify';
 import { afterEach, beforeEach, expect, it, vi, type MockInstance } from 'vitest';
+import { providers } from '@st/engine';
 import { apiContract, type ChangeEvent, type Preset } from '@st/shared';
 import { createApp } from './app.js';
 import { createContext } from './context.js';
@@ -55,7 +56,11 @@ function readEvents(response: Response) {
   })();
   return { events, comments, done, cancel: () => reader.cancel() };
 }
-const last = (events: ChangeEvent[]) => events[events.length - 1];
+// The snapshot every new connection starts with: one event per type.
+const SNAPSHOT_SIZE = 5;
+type PresetsChanged = Extract<ChangeEvent, { type: 'presets.changed' }>;
+const last = (events: ChangeEvent[]) =>
+  events.filter((event): event is PresetsChanged => event.type === 'presets.changed').at(-1);
 
 it('streams the current state on connect, then a change event per edit with the invalid files', async () => {
   const app = await createApp(dataDir, { seed: false, watch: true });
@@ -64,7 +69,14 @@ it('streams the current state on connect, then a change event per edit with the 
     const response = await fetch(`${address}/api/events`);
     expect(response.headers.get('content-type')).toContain('text/event-stream');
     const stream = readEvents(response);
-    await vi.waitFor(() => expect(stream.events).toHaveLength(1));
+    await vi.waitFor(() => expect(stream.events).toHaveLength(SNAPSHOT_SIZE));
+    expect(stream.events.map((event) => event.type)).toEqual([
+      'presets.changed',
+      'workflows.changed',
+      'characters.changed',
+      'personas.changed',
+      'sessions.changed',
+    ]);
     expect(stream.events[0]).toEqual({ type: 'presets.changed', invalidFiles: [] });
 
     // A hand-written file with broken YAML is reported with its reason, and never modified.
@@ -95,14 +107,14 @@ it('publishes a change for writes made through the API as well', async () => {
   try {
     const address = await app.listen({ port: 0, host: '127.0.0.1' });
     const stream = readEvents(await fetch(`${address}/api/events`));
-    await vi.waitFor(() => expect(stream.events).toHaveLength(1));
+    await vi.waitFor(() => expect(stream.events).toHaveLength(SNAPSHOT_SIZE));
     const response = await app.inject({
       method: 'POST',
       url: '/api/presets',
       payload: { name: 'From API', inputs: [], entries: [] },
     });
     expect(response.statusCode).toBe(201);
-    await vi.waitFor(() => expect(stream.events.length).toBeGreaterThan(1));
+    await vi.waitFor(() => expect(stream.events.length).toBeGreaterThan(SNAPSHOT_SIZE));
     expect(last(stream.events)).toEqual({ type: 'presets.changed', invalidFiles: [] });
     await stream.cancel();
   } finally {
@@ -140,13 +152,13 @@ it('unsubscribes when the client disconnects and ends open streams when the app 
   const address = await app.listen({ port: 0, host: '127.0.0.1' });
 
   const first = readEvents(await fetch(`${address}/api/events`));
-  await vi.waitFor(() => expect(first.events).toHaveLength(1));
+  await vi.waitFor(() => expect(first.events).toHaveLength(SNAPSHOT_SIZE));
   await first.cancel();
   await vi.waitFor(() => expect(unsubscribed).toHaveBeenCalledTimes(1));
 
   // A second client is still connected when the app closes: close must not hang, and the client sees the end.
   const second = readEvents(await fetch(`${address}/api/events`));
-  await vi.waitFor(() => expect(second.events).toHaveLength(1));
+  await vi.waitFor(() => expect(second.events).toHaveLength(SNAPSHOT_SIZE));
   await app.close();
   await second.done;
   expect(unsubscribed).toHaveBeenCalledTimes(2);
@@ -158,4 +170,155 @@ it('closes the watcher with the app, so no timers or handles are left behind', a
   // Writing after close must not throw or trigger a scan of the (possibly removed) directory.
   await writeFile(join(dataDir, 'presets', 'late.yaml'), presetYaml('Late'));
   expect(warn).not.toHaveBeenCalled();
+});
+
+type App = Awaited<ReturnType<typeof createApp>>;
+
+/** Opens an event stream on the app; `events()` returns what arrived after the connect snapshot. */
+async function openStream(app: App) {
+  const address = await app.listen({ port: 0, host: '127.0.0.1' });
+  const stream = readEvents(await fetch(`${address}/api/events`));
+  await vi.waitFor(() => expect(stream.events).toHaveLength(SNAPSHOT_SIZE));
+  return { stream, events: () => stream.events.slice(SNAPSHOT_SIZE) };
+}
+const created = async (app: App, url: string, payload: object) =>
+  (await app.inject({ method: 'POST', url, payload })).json() as { id: string };
+const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
+
+it('publishes a change for every write to workflows, characters, personas and sessions', async () => {
+  const app = await createApp(dataDir, { seed: false });
+  try {
+    const { stream, events } = await openStream(app);
+    // Each step performs one write, then waits until exactly the events so far have arrived.
+    const expected: ChangeEvent[] = [];
+    const step = async (request: InjectOptions, event: ChangeEvent) => {
+      const response = await app.inject(request);
+      expect(response.statusCode).toBeLessThan(300);
+      expected.push(event);
+      await vi.waitFor(() => expect(events()).toEqual(expected));
+    };
+    const workflow = await created(app, '/api/workflows', { name: 'W' });
+    expected.push({ type: 'workflows.changed', id: workflow.id });
+    const character = await created(app, '/api/characters', { name: 'C' });
+    expected.push({ type: 'characters.changed', id: character.id });
+    const persona = await created(app, '/api/personas', { name: 'P' });
+    expected.push({ type: 'personas.changed', id: persona.id });
+    const session = await created(app, '/api/sessions', { workflowId: workflow.id });
+    expected.push({ type: 'sessions.changed', id: session.id });
+    await vi.waitFor(() => expect(events()).toEqual(expected));
+
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    await step(
+      { method: 'PUT', url: `/api/workflows/${workflow.id}`, payload: { name: 'W2', nodes: [], edges: [] } },
+      { type: 'workflows.changed', id: workflow.id },
+    );
+    await step(
+      { method: 'PUT', url: `/api/characters/${character.id}`, payload: { name: 'C2' } },
+      { type: 'characters.changed', id: character.id },
+    );
+    await step(
+      {
+        method: 'PUT',
+        url: `/api/characters/${character.id}/avatar`,
+        headers: { 'content-type': 'image/png' },
+        payload: png,
+      },
+      { type: 'characters.changed', id: character.id },
+    );
+    await step(
+      { method: 'PUT', url: `/api/personas/${persona.id}`, payload: { name: 'P2' } },
+      { type: 'personas.changed', id: persona.id },
+    );
+    await step(
+      { method: 'PATCH', url: `/api/sessions/${session.id}`, payload: { name: 'Renamed' } },
+      { type: 'sessions.changed', id: session.id },
+    );
+    await step({ method: 'DELETE', url: `/api/sessions/${session.id}` }, { type: 'sessions.changed', id: session.id });
+    await step(
+      { method: 'DELETE', url: `/api/characters/${character.id}` },
+      { type: 'characters.changed', id: character.id },
+    );
+    await step({ method: 'DELETE', url: `/api/personas/${persona.id}` }, { type: 'personas.changed', id: persona.id });
+    await step(
+      { method: 'DELETE', url: `/api/workflows/${workflow.id}` },
+      { type: 'workflows.changed', id: workflow.id },
+    );
+
+    // A failed write changes nothing and announces nothing.
+    const missing = await app.inject({
+      method: 'PUT',
+      url: '/api/personas/00000000-0000-4000-8000-000000000000',
+      payload: { name: 'x' },
+    });
+    expect(missing.statusCode).toBe(404);
+    await settle();
+    expect(events()).toEqual(expected);
+    await stream.cancel();
+  } finally {
+    await app.close();
+  }
+});
+
+it('publishes one session event per settled streamed turn, and one per message edit and delete', async () => {
+  const provider = `events-${randomUUID()}`;
+  providers.set(provider, {
+    id: provider,
+    label: provider,
+    secretName: 'events-key',
+    chat: async () => {
+      throw new Error('These tests stream');
+    },
+    stream: async (_request, { onToken }) => {
+      for (const token of ['a', 'b', 'c', 'd']) onToken(token);
+      await new Promise((resolve) => setTimeout(resolve, 400)); // long enough for a periodic flush
+      return { text: 'abcd', raw: {} };
+    },
+  });
+  const app = await createApp(dataDir, { seed: false });
+  try {
+    await app.inject({ method: 'PUT', url: '/api/secrets/events-key', payload: { value: 'k' } });
+    const preset = await created(app, '/api/presets', { name: 'P', inputs: [], entries: [] });
+    const workflow = await created(app, '/api/workflows', { name: 'W' });
+    const node = (id: string, type: string, config = {}) => ({ id, type, config, position: { x: 0, y: 0 } });
+    await app.inject({
+      method: 'PUT',
+      url: `/api/workflows/${workflow.id}`,
+      payload: {
+        name: 'W',
+        nodes: [
+          node('input', 'chat-input'),
+          node('llm', 'llm', { presetId: preset.id, provider, model: 'm' }),
+          node('output', 'chat-output'),
+        ],
+        edges: [{ id: 'e', source: 'llm', sourceHandle: 'text', target: 'output', targetHandle: 'value' }],
+      },
+    });
+    const session = await created(app, '/api/sessions', { workflowId: workflow.id });
+    const { stream, events } = await openStream(app);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${session.id}/messages/stream`,
+      payload: { content: 'hi' },
+    });
+    expect(response.body).toContain('turn.complete');
+    await vi.waitFor(() => expect(events()).not.toHaveLength(0));
+    await settle();
+    expect(events()).toEqual([{ type: 'sessions.changed', id: session.id }]);
+
+    // Editing and deleting a message change content without advancing updatedAt; clients still hear about them.
+    const { messages } = (await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json();
+    const messageUrl = `/api/sessions/${session.id}/messages/${messages[0].id}`;
+    await app.inject({ method: 'PATCH', url: messageUrl, payload: { content: 'edited' } });
+    await vi.waitFor(() => expect(events()).toHaveLength(2));
+    await app.inject({ method: 'DELETE', url: messageUrl });
+    await vi.waitFor(() => expect(events()).toHaveLength(3));
+    await stream.cancel();
+  } finally {
+    providers.delete(provider);
+    await app.close();
+  }
 });

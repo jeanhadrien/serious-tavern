@@ -73,7 +73,7 @@ async function startTurn(
       persona?: Persona;
     };
   } = {};
-  const session = await sessions.update(sessionId, async (current) => {
+  const session = await sessions.silent.update(sessionId, async (current) => {
     const workflow = await requireEntity(workflows, current.workflowId, 'Workflow');
     const { errors, prepared } = await prepareWorkflow(workflow, { presets, characters });
     if (!prepared)
@@ -105,7 +105,7 @@ async function executeTurn(
   const { prepared, userMessage, history, character, persona } = await startTurn(context, sessionId, content);
   const executionId = randomUUID();
   const stream = options.emit
-    ? new TurnStream({ sessions, sessionId, executionId, prepared, emit: options.emit })
+    ? new TurnStream({ sessions: sessions.silent, sessionId, executionId, prepared, emit: options.emit })
     : undefined;
   options.emit?.({ type: 'turn.start', executionId });
   let outcome: { replies: ChatReply[]; execution: ExecutionLog } | undefined;
@@ -131,11 +131,13 @@ async function executeTurn(
   if (!outcome && turn.stoppedBy && execution) execution.warnings.push(stopWarnings[turn.stoppedBy]);
   if (execution) await executions.save(execution);
   const settled: { value?: { userMessage: ChatMessage; assistantMessages: ChatMessage[] } } = {};
-  const session = await sessions.update(sessionId, (current) => {
+  // Everything a turn writes is silent; the settled turn announces itself once (success, failure or stop).
+  const session = await sessions.silent.update(sessionId, (current) => {
     settled.value = settleTurn(current, { executionId, userMessage, replies, streamed, interrupted: !outcome });
     return current;
   });
   if (!session) throw notFound('Session');
+  context.changes.publish({ type: 'sessions.changed', id: sessionId });
   const { userMessage: saved, assistantMessages } = settled.value!;
   if (outcome) return { userMessage: saved, assistantMessages, execution: outcome.execution };
   if (!(failure instanceof ExecutionFailure)) throw failure;
