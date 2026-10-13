@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import { presetSchema, type Preset, type PresetEntry } from '@st/shared';
-import { classifyDiskChange, planInvalidFileAlerts, reselectEntryId } from './liveSync.js';
+import { planInvalidFileAlerts } from '../fileLiveSync.js';
+import { classifyDiskChange, reselectEntryId } from './liveSync.js';
 
 const message = (id: string, content = 'Hi'): PresetEntry => ({
   id,
@@ -36,7 +37,7 @@ it('treats identical disk content as a no-op, including a UI save followed by it
 
 it('reloads a clean editor when the file differs', () => {
   const disk = preset('Changed on disk');
-  expect(classifyDiskChange(editorOf(preset()), [disk])).toEqual({ kind: 'reload', preset: disk });
+  expect(classifyDiskChange(editorOf(preset()), [disk])).toEqual({ kind: 'reload', item: disk });
 });
 
 it('closes a clean editor when the preset is gone', () => {
