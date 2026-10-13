@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { presetSchema, type Preset } from '@st/shared';
 import { presetsApi } from '../api.js';
-import { presetEditorStore, presetsStore, useEditorCommands, useList } from '../stores/index.js';
+import { presetEditorStore, presetsStore, useEditorCommands } from '../stores/index.js';
 import { alerts } from '../alerts/index.js';
 import { PresetEditor } from './presets/PresetEditor.js';
 import { PresetEntryEditor } from './presets/PresetEntryEditor.js';
@@ -12,7 +12,6 @@ import { usePresetLiveSync } from './presets/usePresetLiveSync.js';
 import './presets/presets.css';
 
 export function Presets() {
-  const list = useList(presetsStore);
   const [draft, setDraft] = useState<Preset>();
   const [saved, setSaved] = useState('');
   const [selectedEntryId, setSelectedEntryId] = useState('');
