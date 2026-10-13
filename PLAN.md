@@ -68,12 +68,12 @@ Each step below is one commit (or a few), passes `npm run check`, and keeps exis
 - (Now `providers/openai-compatible.ts` + `wire-settings.ts`.) Turn the OpenRouter adapter into a generic adapter driven by the resolved record (override applied): URL from `baseUrl`, auth header only when a secret is set, `headers`, message name written to `messageName` (or dropped), reasoning read from `reasoningFields` on both the stream delta and the non-stream message, `extraBody` merged last.
 - Keep today's behaviour otherwise: idle timeout, abort handling, error parsing, and the OpenRouter-style `reasoning` object for effort/max tokens/exclude (other backends can neutralize it via `extraBody`; revisit if it causes 400s).
 - Error messages name the provider instead of hardcoding "OpenRouter".
-
 - Known limits: `extraBody` is a shallow merge and cannot remove keys (e.g. the `reasoning` object); `extraBody.stream` would break stream parsing. Revisit if a backend needs key removal.
 
-### Step 4 — wire log
+### Step 4 — wire log ✅ done
 - The execution log records what was actually sent: URL, headers with secrets redacted, the final JSON body; and the raw response (accumulated for streams, as today's `raw`). Shown in the existing execution details (`apps/web/src/pages/chat/ExecutionDetails.tsx`) instead of the canonical request.
 - Non-streamed reasoning (`ChatResponse.reasoning`, filled since step 3) reaches the chat like streamed reasoning does.
+- Known limit: reasoning (streamed or not) is stored on chat messages only via the streaming endpoint and only for Chat Outputs fed directly by an LLM `text`; the plain `POST .../messages` endpoint and templated outputs drop it.
 
 ### Step 5 — provider UI
 - A providers list and narrow editor in the layout shell, following the characters/personas pattern (list view + editor view sharing an editor store, URL-encoded layout, dirty flags).
