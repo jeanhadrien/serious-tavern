@@ -2,7 +2,14 @@
 
 Design reference for the web app's chat-centred layout. It replaces the old "top nav bar plus one full-width page per tab" layout. The goal: the user can edit workflows, presets, characters, etc. while the chat stays visible.
 
-Status: agreed design, not yet implemented. Narrow (mobile) widths are out of scope for now.
+Status: implemented (October 2026). Narrow (mobile) widths are out of scope for now.
+
+What was built, and where it refines the design below:
+- **Code:** `apps/web/src/layout/`. The pure reducer is `state.ts`, view placement is `derive.ts`, and `Shell.tsx` mounts every view once and moves views by grid area.
+- **List ↔ editor link:** per-resource editor stores in `apps/web/src/stores/`. Shared list stores refresh from server change events.
+- **Two-column breakpoint:** 1000px viewport width.
+- **Settings has no list** (`LISTLESS`). Its L icon shows the form directly.
+- **URL:** the layout is encoded as `/?session=…&left=…&wide=preset:<id>&right=character:<id>` (`layout/url.ts`). Old paths such as `/presets?id=…` are inbound aliases.
 
 ## Layout
 
