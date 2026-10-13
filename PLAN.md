@@ -17,7 +17,7 @@ Guiding principles: **high modularity**, a **simple baseline** the user can conf
 - **More node types**: code/JS node, transforms, tools, RAG, etc.
 - Test-run a workflow from the editor, workflow versioning, import/export (only character-card import/export exists).
 
-## Next: user-defined LLM providers (agreed design)
+## Done: user-defined LLM providers (design record)
 
 **Problem.** OpenAI-compatible backends disagree on field names (message `name` support, `reasoning` vs `reasoning_content`, …), often per model, and OpenRouter does not reliably translate them. Users know things the app cannot, so they get control over the wire format.
 
@@ -59,7 +59,7 @@ Each step below is one commit (or a few), passes `npm run check`, and keeps exis
       reasoningFields: [reasoning_content]
   ```
   An override may set `messageName`, `reasoningFields`, `headers` and `extraBody` (objects shallow-merged over the provider's).
-- **Storage:** YAML files under `data/providers/<slug-of-name>.yaml`; identity is the `id` inside the file; same rules as presets (no cache, invalid files skipped with a warning, atomic writes, id lock). Reuse or generalize the preset YAML repository rather than copying it. Live reload (`providers.changed` through the directory watcher) is **not done yet**: edits on disk show up on the next API call, but open clients are not notified. Do it with step 5 at the latest.
+- **Storage:** YAML files under `data/providers/<slug-of-name>.yaml`; identity is the `id` inside the file; same rules as presets (no cache, invalid files skipped with a warning, atomic writes, id lock). Reuse or generalize the preset YAML repository rather than copying it. Live reload (`providers.changed` through the directory watcher) shipped with step 5.
 - **Built-in OpenRouter provider:** defined in code, **read-only**, id `openrouter`, `secret: openrouter`, base URL `https://openrouter.ai/api/v1`, the `HTTP-Referer`/`X-Title` headers, `messageName: name`, `reasoningFields: [reasoning, reasoning_content]`. Listed with user providers and flagged `builtIn: true`. Writes to it return 409 `PROVIDER_READ_ONLY`. Existing nodes (`provider: 'openrouter'`) and the existing `openrouter` secret keep working with no migration.
 - **API (contract first, `packages/shared/src/api/`):** list, get, create, update, delete, and duplicate (so the built-in one can be copied). Today's `GET /api/providers` catalog (code-registered providers, used by node-ui) becomes the record list, keeping what node-ui needs (id and label).
 - **Engine:** the LLM node resolves its provider through `ctx.resources` (snapshotted by `prepareWorkflow`, like presets), not the in-code `providers` map. An unknown provider id is a node error naming the id. A missing secret keeps today's message.
@@ -75,7 +75,7 @@ Each step below is one commit (or a few), passes `npm run check`, and keeps exis
 - Non-streamed reasoning (`ChatResponse.reasoning`, filled since step 3) reaches the chat like streamed reasoning does.
 - Known limit: reasoning (streamed or not) is stored on chat messages only via the streaming endpoint and only for Chat Outputs fed directly by an LLM `text`; the plain `POST .../messages` endpoint and templated outputs drop it.
 
-### Step 5 — provider UI
+### Step 5 — provider UI ✅ done
 - A providers list and narrow editor in the layout shell, following the characters/personas pattern (list view + editor view sharing an editor store, URL-encoded layout, dirty flags).
 - A form for the common fields (name, base URL, secret name, message name field, reasoning fields) and a raw YAML view for `headers`, `extraBody` and `overrides`. The built-in provider opens read-only with a "Duplicate" action.
 - The LLM node's provider dropdown lists the records (node-ui gets them through its `context`, as today).
