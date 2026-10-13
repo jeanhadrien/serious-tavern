@@ -1,6 +1,6 @@
 import { registerAdapter, type ChatOptions, type ChatRequest, type ChatResponse, type LlmAdapter } from './index.js';
 import { resolveWireSettings, type WireSettings } from './wire-settings.js';
-import { parseResponseText, streamFolder, wireRecorder } from './wire-log.js';
+import { parseResponseText, streamFolder, wireRecorder, withoutSecret } from './wire-log.js';
 
 // A stream is only considered stalled after this long without any bytes (keep-alive comments count).
 const streamIdleTimeoutMs = 120_000;
@@ -95,7 +95,8 @@ async function postCompletion(request: ChatRequest, stream: boolean, { provider,
     record({ status: response.status, response: parsed });
     const error = (parsed as { error?: { message?: string } | string } | undefined)?.error;
     const message = typeof error === 'string' ? error : (error?.message ?? text);
-    throw new Error(`${provider.name} ${response.status}: ${message.slice(0, 500)}`);
+    // Upstream text can echo the key back, and error messages end up in logs and toasts.
+    throw new Error(withoutSecret(`${provider.name} ${response.status}: ${message.slice(0, 500)}`, apiKey));
   }
   return { response, record };
 }
@@ -140,7 +141,7 @@ async function readStream(
   onToken: (textDelta: string) => void,
   onReasoning: (reasoningDelta: string) => void,
 ): Promise<ChatResponse> {
-  const { provider, wire } = call;
+  const { provider, wire, apiKey } = call;
   const { response, record } = await postCompletion(request, true, { ...call, signal: deadline.signal });
   if (!response.body) throw new Error(`${provider.name} returned no stream`);
   const wireLog = streamFolder();
@@ -156,7 +157,10 @@ async function readStream(
       if (data === '[DONE]') break;
       const chunk = JSON.parse(data) as StreamChunk;
       wireLog.add(chunk);
-      if (chunk.error) throw new Error(`${provider.name} stream error: ${chunk.error.message ?? 'unknown error'}`);
+      if (chunk.error)
+        throw new Error(
+          withoutSecret(`${provider.name} stream error: ${chunk.error.message ?? 'unknown error'}`, apiKey),
+        );
       id ??= chunk.id;
       model ??= chunk.model;
       usage ??= chunk.usage;

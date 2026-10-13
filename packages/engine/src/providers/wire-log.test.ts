@@ -82,7 +82,7 @@ describe('wire log', () => {
       signal: new AbortController().signal,
       onWire,
     });
-    await expect(call).rejects.toThrow('mapped 401');
+    await expect(call).rejects.toThrow(new Error('mapped 401: Invalid key [redacted]'));
     expect(reports.at(-1)).toMatchObject({
       status: 401,
       response: { error: { message: 'Invalid key [redacted]' } },
@@ -137,21 +137,29 @@ describe('wire log', () => {
     expect(response.raw).toMatchObject({ choices: [{ message: { content: 'Hello', reasoning: 'Think' } }] });
   });
 
-  it('records what had arrived when a stream fails midway', async () => {
-    const body = `data: ${JSON.stringify({ choices: [{ delta: { content: 'Hal' } }] })}\n\ndata: {"error":{"message":"overloaded"}}\n\n`;
+  it('records what had arrived when a stream fails midway, without an echoed secret', async () => {
+    const failure = { error: { message: `overloaded for ${secret}` } };
+    const body = [{ choices: [{ delta: { content: 'Hal' } }] }, failure]
+      .map(
+        (chunk) => `data: ${JSON.stringify(chunk)}
+
+`,
+      )
+      .join('');
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(body));
     const { reports, onWire } = recorder();
     const call = openaiCompatible.stream!(request, {
       provider,
+      apiKey: secret,
       signal: new AbortController().signal,
       onWire,
       onToken: () => {},
       onReasoning: () => {},
     });
-    await expect(call).rejects.toThrow('overloaded');
+    await expect(call).rejects.toThrow(new Error('mapped stream error: overloaded for [redacted]'));
     expect(reports.at(-1)?.response).toEqual({
       choices: [{ delta: { content: 'Hal' } }],
-      error: { message: 'overloaded' },
+      error: { message: 'overloaded for [redacted]' },
     });
   });
 });

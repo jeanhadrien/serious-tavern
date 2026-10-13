@@ -15,8 +15,11 @@ function redactHeaders(headers: Record<string, string>): Record<string, string> 
   );
 }
 
-/** Replaces every occurrence of the secret anywhere in a JSON value, as a last line of defence. */
-function withoutSecret<T>(value: T, secret: string | undefined): T {
+/**
+ * Replaces every occurrence of the secret anywhere in a JSON value (or string), as a last line of defence.
+ * Also used on error messages built from upstream text, which may echo the key back.
+ */
+export function withoutSecret<T>(value: T, secret: string | undefined): T {
   if (!secret) return value;
   const json = JSON.stringify(value);
   // The secret as it appears inside a JSON string.
