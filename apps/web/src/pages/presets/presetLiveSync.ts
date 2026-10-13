@@ -1,4 +1,4 @@
-import type { InvalidPresetFile, Preset } from '@st/shared';
+import type { InvalidFile, Preset } from '@st/shared';
 import { subscribeToChanges } from '../../api/events.js';
 import { alerts as defaultAlerts } from '../../alerts/index.js';
 import { classifyDiskChange, planInvalidFileAlerts, reselectEntryId } from './liveSync.js';
@@ -35,7 +35,7 @@ export function startPresetLiveSync(
   let again = false;
   let disposed = false;
 
-  const showInvalidFiles = (invalid: readonly InvalidPresetFile[]) => {
+  const showInvalidFiles = (invalid: readonly InvalidFile[]) => {
     const shown = new Map([...shownInvalid].map(([file, item]) => [file, item.reason]));
     const plan = planInvalidFileAlerts(shown, invalid);
     for (const file of plan.clear) {

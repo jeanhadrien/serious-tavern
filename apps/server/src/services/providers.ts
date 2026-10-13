@@ -9,8 +9,13 @@ import {
 } from '@st/shared';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound } from '../errors.js';
+import { publishFileChange } from './change-events.js';
 
 const view = (provider: Provider, builtIn: boolean): ProviderView => ({ ...provider, builtIn });
+
+// API writes announce themselves, so clients update even when no file watcher runs (the watcher, when on,
+// announces the same write again, which is harmless: clients just re-fetch).
+const announce = (context: AppContext) => publishFileChange(context.changes, 'providers', context.providers);
 
 /** The built-in providers, then the user's. */
 export async function listProviders({ providers }: AppContext): Promise<ProviderView[]> {
@@ -52,6 +57,7 @@ export async function createProvider(context: AppContext, body: ProviderFields):
     updatedAt: date,
   });
   await context.providers.save(provider);
+  await announce(context);
   // Answer with the stored form, like PUT and later GETs.
   return getProvider(context, provider.id);
 }
@@ -70,6 +76,7 @@ export async function updateProvider(context: AppContext, id: string, body: Prov
     }),
   );
   if (!updated) throw notFound('Provider');
+  await announce(context);
   return view(updated, false);
 }
 
@@ -86,6 +93,7 @@ export async function deleteProvider(context: AppContext, id: string): Promise<v
   const users = await workflowsUsing(context, id);
   if (users.length) throw new HttpError(409, 'PROVIDER_IN_USE', 'Provider is used by workflows', users);
   await context.providers.delete(id);
+  await announce(context);
 }
 
 /** Copies any provider, built-in ones included, into a new editable record. */
@@ -100,5 +108,6 @@ export async function duplicateProvider(context: AppContext, id: string): Promis
     updatedAt: date,
   });
   await context.providers.save(copy);
+  await announce(context);
   return getProvider(context, copy.id);
 }

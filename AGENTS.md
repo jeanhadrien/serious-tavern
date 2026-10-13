@@ -117,6 +117,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - `repo.silent` is the raw repository. Chat turns write through it and publish one `sessions.changed` when the turn settles, never per token.
   - Tests that spy on a repository's `get` to pause inside `update` must spy on `.silent`.
   - On connect, every event type is sent once (id-less for records) so clients resync.
+  - `providers.changed` has the presets shape (`invalidFiles`). It comes from the `data/providers/` watcher (`watchResourceFiles`, started with the preset one in `app.ts` only when `watch` is on) **and** from `services/providers.ts` after every API write (`publishFileChange`). Always publish with a fresh `listInvalid()`, never `[]`, or an API save clears the warning about a still-broken file. Tests of API-write events use an app without the watcher, which would announce each write twice.
 - **Creating a session** requires a `workflowId`. Sessions also store `characterId` and `personaId`, which the server loads and passes to the executor.
 - **Characters/personas:**
   - Card parsing and writing (PNG `tEXt` chunks `ccv3`, which takes precedence, then `chara`; V1/V2/V3 JSON) lives in `apps/server/src/card.ts` and runs on the server.

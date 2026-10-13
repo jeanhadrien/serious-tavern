@@ -1,4 +1,4 @@
-import type { InvalidPresetFile, Preset, PresetEntry } from '@st/shared';
+import type { InvalidFile, Preset, PresetEntry } from '@st/shared';
 
 /** What an on-disk change means for the preset open in the editor. */
 export type DiskChange =
@@ -46,8 +46,8 @@ export function reselectEntryId(
  */
 export function planInvalidFileAlerts(
   shown: ReadonlyMap<string, string>,
-  invalid: readonly InvalidPresetFile[],
-): { show: InvalidPresetFile[]; clear: string[] } {
+  invalid: readonly InvalidFile[],
+): { show: InvalidFile[]; clear: string[] } {
   const current = new Map(invalid.map((item) => [item.file, item.reason]));
   const clear = [...shown].filter(([file, reason]) => current.get(file) !== reason).map(([file]) => file);
   const show = invalid.filter((item) => shown.get(item.file) !== item.reason);

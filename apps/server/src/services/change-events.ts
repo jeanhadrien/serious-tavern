@@ -1,6 +1,8 @@
 import type { ApiResponse } from '@st/shared';
 import type { Repository } from '../storage/repository.js';
 import type { PresetRepository } from '../storage/preset-repository.js';
+import type { ProviderRepository } from '../storage/provider-repository.js';
+import type { YamlRecord, YamlRepository } from '../storage/yaml-repository.js';
 import { watchDirectory, type DirectoryWatcher } from '../storage/directory-watcher.js';
 import { isYamlFile } from '../storage/yaml-filenames.js';
 
@@ -67,10 +69,20 @@ export class NotifyingRepository<T extends { id: string }> implements Repository
   }
 }
 
+/** Resources stored as YAML files that users may edit by hand; a directory watcher announces their changes. */
+type FileResource = 'presets' | 'providers';
+
 /** The current state of every event type, sent to each new subscriber so it can resync. */
-export async function currentChangeEvents({ presets }: { presets: PresetRepository }): Promise<ChangeEvent[]> {
+export async function currentChangeEvents({
+  presets,
+  providers,
+}: {
+  presets: PresetRepository;
+  providers: ProviderRepository;
+}): Promise<ChangeEvent[]> {
   return [
     { type: 'presets.changed', invalidFiles: await presets.listInvalid() },
+    { type: 'providers.changed', invalidFiles: await providers.listInvalid() },
     { type: 'workflows.changed' },
     { type: 'characters.changed' },
     { type: 'personas.changed' },
@@ -78,16 +90,31 @@ export async function currentChangeEvents({ presets }: { presets: PresetReposito
   ];
 }
 
-/** Publishes `presets.changed` whenever the preset files change on disk (hand edits and our own writes alike). */
-export function watchPresetFiles(
-  { presets, changes }: { presets: PresetRepository; changes: ChangeHub },
+/**
+ * Publishes `<resource>.changed` with the files the repository currently cannot load. Always rescans: an
+ * event with an empty list would clear the client's warning about a file that is still broken.
+ */
+export async function publishFileChange<T extends YamlRecord>(
+  changes: ChangeHub,
+  resource: FileResource,
+  repository: YamlRepository<T>,
+): Promise<void> {
+  changes.publish({ type: `${resource}.changed`, invalidFiles: await repository.listInvalid() });
+}
+
+/**
+ * Publishes `<resource>.changed` whenever the resource's files change on disk (hand edits and our own writes
+ * alike). Started only by the server entry point (`createApp(dir, { watch: true })`).
+ */
+export function watchResourceFiles<T extends YamlRecord>(
+  changes: ChangeHub,
+  resource: FileResource,
+  repository: YamlRepository<T>,
   options: { debounceMs?: number } = {},
 ): Promise<DirectoryWatcher> {
-  return watchDirectory(presets.directory, {
+  return watchDirectory(repository.directory, {
     accept: isYamlFile,
     debounceMs: options.debounceMs,
-    onChange: async () => {
-      changes.publish({ type: 'presets.changed', invalidFiles: await presets.listInvalid() });
-    },
+    onChange: () => publishFileChange(changes, resource, repository),
   });
 }

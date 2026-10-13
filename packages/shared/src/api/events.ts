@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { endpoint } from './common.js';
 
-/** A preset file the server skipped, with the plain-language reason (bad YAML, schema error, duplicate id...). */
-export const invalidPresetFileSchema = z.object({ file: z.string(), reason: z.string() });
-export type InvalidPresetFile = z.infer<typeof invalidPresetFileSchema>;
+/** A YAML file (preset, provider) the server skipped, with the plain-language reason (bad YAML, schema error, duplicate id...). */
+export const invalidFileSchema = z.object({ file: z.string(), reason: z.string() });
+export type InvalidFile = z.infer<typeof invalidFileSchema>;
 
 // One Server-Sent Event per item of `streamChanges`; the event name is the `type` field.
 // Events say that a resource changed (clients re-fetch it), never carry the resource itself.
@@ -14,7 +14,9 @@ const resourceChanged = <Type extends string>(type: Type) =>
 
 export const changeEventSchema = z.discriminatedUnion('type', [
   // The preset files changed; `invalidFiles` lists the files the server could not load (empty when all are fine).
-  z.object({ type: z.literal('presets.changed'), invalidFiles: z.array(invalidPresetFileSchema) }),
+  z.object({ type: z.literal('presets.changed'), invalidFiles: z.array(invalidFileSchema) }),
+  // The provider files changed on disk or through the API; same shape as presets.
+  z.object({ type: z.literal('providers.changed'), invalidFiles: z.array(invalidFileSchema) }),
   // Created, updated or deleted through the API (avatars and imports included). Sessions also change when a
   // turn settles and when a message is edited or deleted; streamed tokens never emit.
   resourceChanged('workflows.changed'),

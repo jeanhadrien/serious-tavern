@@ -15,7 +15,7 @@ import { registerSecrets } from './routes/secrets.js';
 import { registerNodeTypes } from './routes/node-types.js';
 import { registerImports } from './routes/imports.js';
 import { registerEvents } from './routes/events.js';
-import { watchPresetFiles } from './services/change-events.js';
+import { watchResourceFiles } from './services/change-events.js';
 
 export async function createApp(
   dataDir = join(process.cwd(), 'data'),
@@ -48,8 +48,13 @@ export async function createApp(
   registerErrors(app);
   // Watching is opt-in (the server entry point enables it) so ordinary tests do not spawn watchers.
   if (options.watch) {
-    const watcher = await watchPresetFiles(context);
-    app.addHook('onClose', async () => watcher.close());
+    const watchers = [
+      await watchResourceFiles(context.changes, 'presets', context.presets),
+      await watchResourceFiles(context.changes, 'providers', context.providers),
+    ];
+    app.addHook('onClose', async () => {
+      for (const watcher of watchers) watcher.close();
+    });
   }
   return app;
 }

@@ -94,6 +94,7 @@ it('describes the change event stream, one event per resource type', () => {
   expect(apiContract.streamChanges.response.safeParse({ type: 'presets.changed' }).success).toBe(false);
   expect(changeEventTypes).toEqual([
     'presets.changed',
+    'providers.changed',
     'workflows.changed',
     'characters.changed',
     'personas.changed',

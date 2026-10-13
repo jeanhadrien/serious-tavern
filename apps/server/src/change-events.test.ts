@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Fastify, { type InjectOptions } from 'fastify';
@@ -57,7 +57,7 @@ function readEvents(response: Response) {
   return { events, comments, done, cancel: () => reader.cancel() };
 }
 // The snapshot every new connection starts with: one event per type.
-const SNAPSHOT_SIZE = 5;
+const SNAPSHOT_SIZE = 6;
 type PresetsChanged = Extract<ChangeEvent, { type: 'presets.changed' }>;
 const last = (events: ChangeEvent[]) =>
   events.filter((event): event is PresetsChanged => event.type === 'presets.changed').at(-1);
@@ -72,6 +72,7 @@ it('streams the current state on connect, then a change event per edit with the 
     await vi.waitFor(() => expect(stream.events).toHaveLength(SNAPSHOT_SIZE));
     expect(stream.events.map((event) => event.type)).toEqual([
       'presets.changed',
+      'providers.changed',
       'workflows.changed',
       'characters.changed',
       'personas.changed',
@@ -169,7 +170,71 @@ it('closes the watcher with the app, so no timers or handles are left behind', a
   await app.close();
   // Writing after close must not throw or trigger a scan of the (possibly removed) directory.
   await writeFile(join(dataDir, 'presets', 'late.yaml'), presetYaml('Late'));
+  await writeFile(join(dataDir, 'providers', 'late.yaml'), providerYaml('Late'));
+  await settle();
   expect(warn).not.toHaveBeenCalled();
+});
+
+const providerYaml = (name: string) => `name: ${name}\nbaseUrl: http://localhost:1234/v1\n`;
+const BROKEN_YAML = 'name: [unclosed\n';
+type ProvidersChanged = Extract<ChangeEvent, { type: 'providers.changed' }>;
+const lastProviders = (events: ChangeEvent[]) =>
+  events.filter((event): event is ProvidersChanged => event.type === 'providers.changed').at(-1);
+
+it('announces provider files edited on disk, with the files it could not load', async () => {
+  const app = await createApp(dataDir, { seed: false, watch: true });
+  try {
+    const { stream, events } = await openStream(app);
+    expect(lastProviders(stream.events)).toEqual({ type: 'providers.changed', invalidFiles: [] });
+
+    const broken = join(dataDir, 'providers', 'broken.yaml');
+    await writeFile(broken, BROKEN_YAML);
+    await vi.waitFor(() =>
+      expect(lastProviders(events())?.invalidFiles.map((file) => file.file)).toEqual(['broken.yaml']),
+    );
+
+    // A hand-written provider without id is stamped and listed; fixing the broken file clears the warning.
+    await writeFile(broken, providerYaml('Local'));
+    await vi.waitFor(() => expect(lastProviders(events())?.invalidFiles).toEqual([]));
+    const list = apiContract.listProviders.response.parse((await app.inject({ url: '/api/providers' })).json());
+    expect(list.map((provider) => provider.name)).toEqual(['OpenRouter', 'Local']);
+    await stream.cancel();
+  } finally {
+    await app.close();
+  }
+});
+
+it('announces provider writes made through the API, keeping invalid files listed', async () => {
+  // No watcher: the API itself must announce.
+  const app = await createApp(dataDir, { seed: false });
+  try {
+    await mkdir(join(dataDir, 'providers'), { recursive: true });
+    await writeFile(join(dataDir, 'providers', 'broken.yaml'), BROKEN_YAML);
+    const { stream, events } = await openStream(app);
+    const invalid = [{ file: 'broken.yaml', reason: expect.any(String) }];
+    const write = async (request: InjectOptions, status: number) => {
+      const before = events().length;
+      const response = await app.inject(request);
+      expect(response.statusCode).toBe(status);
+      if (status < 300) await vi.waitFor(() => expect(events().length).toBe(before + 1));
+      return response.body ? (response.json() as { id: string }) : undefined;
+    };
+    const body = { name: 'Mine', baseUrl: 'http://localhost:1234/v1' };
+    const created = await write({ method: 'POST', url: '/api/providers', payload: body }, 201);
+    await write({ method: 'PUT', url: `/api/providers/${created!.id}`, payload: { ...body, name: 'Renamed' } }, 200);
+    await write({ method: 'POST', url: '/api/providers/openrouter/duplicate' }, 201);
+    await write({ method: 'DELETE', url: `/api/providers/${created!.id}` }, 204);
+    expect(events()).toHaveLength(4);
+    for (const event of events()) expect(event).toEqual({ type: 'providers.changed', invalidFiles: invalid });
+
+    // A refused delete (read-only) announces nothing.
+    await write({ method: 'DELETE', url: '/api/providers/openrouter' }, 409);
+    await settle();
+    expect(events()).toHaveLength(4);
+    await stream.cancel();
+  } finally {
+    await app.close();
+  }
 });
 
 type App = Awaited<ReturnType<typeof createApp>>;
