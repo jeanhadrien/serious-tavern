@@ -3,6 +3,9 @@ import type { SecretSummary } from '@st/shared';
 import { secretsApi } from '../api.js';
 import { alerts } from '../alerts/index.js';
 import { ImportContent } from './settings/ImportContent.js';
+import './settings/settings.css';
+
+/** The settings form shown in L: API secrets and content import. */
 export function Settings() {
   const [secrets, setSecrets] = useState<SecretSummary[]>([]);
   const [name, setName] = useState('openrouter');
@@ -30,7 +33,7 @@ export function Settings() {
     }
   };
   return (
-    <div className="page narrow">
+    <div className="settings-panel">
       <h1>Settings</h1>
       <p className="hint">API keys are encrypted on the server and cannot be retrieved through the API.</p>
       <h2>Secrets</h2>

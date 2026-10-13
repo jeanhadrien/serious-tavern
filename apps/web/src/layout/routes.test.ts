@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { isHostedWhole, isKnownPath, routeTarget } from './routes.js';
+import { isKnownPath, routeTarget } from './routes.js';
 
 it('maps resource paths to resources and leaves the chat path alone', () => {
   expect(routeTarget('/presets', '')?.resource).toBe('presets');
@@ -17,8 +17,8 @@ it('opens the editor of a split resource only when the URL names an item', () =>
   expect(routeTarget('/presets', '?workflow=w1')?.openEditor).toBe(false);
 });
 
-it('always opens a resource that is still hosted whole', () => {
-  expect(routeTarget('/settings', '')?.openEditor).toBe(true);
-  expect(isHostedWhole('characters')).toBe(true);
-  expect(isHostedWhole('workflows')).toBe(false);
+it('only shows the column content of resources whose URLs cannot name an item', () => {
+  expect(routeTarget('/settings', '')).toEqual({ resource: 'settings', openEditor: false });
+  expect(routeTarget('/characters', '')).toEqual({ resource: 'characters', openEditor: false });
+  expect(routeTarget('/personas', '?id=p1')?.openEditor).toBe(false);
 });

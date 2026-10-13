@@ -18,3 +18,20 @@
   display: flex;
   gap: 8px;
 }
+
+.settings-panel {
+  padding: 14px;
+}
+.settings-panel h1 {
+  font-size: 1.3rem;
+  margin: 0 0 8px;
+}
+.settings-panel .list-row {
+  flex-wrap: wrap;
+}
+.settings-panel .list-row span {
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

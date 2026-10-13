@@ -1,50 +1,44 @@
-import { useState } from 'react';
-import type { Character, Persona, EntityImportResult } from '@st/shared';
+import { useEffect, useState } from 'react';
+import type { Character, Persona } from '@st/shared';
 import { alerts } from '../../alerts/index.js';
-import { useList } from '../../stores/index.js';
-import type { ListStore } from '../../stores/listStore.js';
+import { useLayoutActions } from '../../layout/LayoutActions.js';
+import { useEditorCommands } from '../../stores/index.js';
+import { importEntityFiles } from './entityActions.js';
+import type { EntityKind } from './entityKinds.js';
 
-interface EntityEditorOptions<T extends Character | Persona> {
-  label: string;
-  /** The shared list of this resource. */
-  store: ListStore<T>;
-  create: () => Promise<T>;
-  save: (draft: T) => Promise<T>;
-  delete: (id: string) => Promise<unknown>;
-  import: (body: FormData) => Promise<EntityImportResult<T>>;
-  uploadAvatar: (id: string, body: FormData) => Promise<T>;
-  validate: (draft: T) => boolean;
-  prepareFiles: (files: File[]) => File[];
-  imported: (count: number) => void;
-  failed: (failures: EntityImportResult<T>['failed']) => void;
-}
-
-export function useEntityEditor<T extends Character | Persona>(options: EntityEditorOptions<T>) {
-  const list = useList(options.store);
+/**
+ * The draft of the open character or persona. The editor stays mounted while hidden, so the draft survives the
+ * back arrow and wide editors taking the column. The list opens items through the kind's editor store.
+ */
+export function useEntityEditor<T extends Character | Persona>(kind: EntityKind<T>) {
+  const { closeEditor } = useLayoutActions();
   const [draft, setDraft] = useState<T>();
   const [saved, setSaved] = useState('');
-  const refresh = () => options.store.refresh();
+  const dirty = !!draft && JSON.stringify(draft) !== saved;
   const choose = (item: T) => {
     setDraft(structuredClone(item));
     setSaved(JSON.stringify(item));
   };
-  const create = async () => {
-    try {
-      const item = await options.create();
-      await refresh();
-      choose(item);
-      alerts.success(`${options.label} created`);
-    } catch {
-      /* API errors are toasted. */
-    }
+  const clear = () => {
+    setDraft(undefined);
+    setSaved('');
   };
+
+  const openId = draft?.id;
+  useEffect(() => kind.editorStore.report(openId, dirty), [kind, openId, dirty]);
+  useEditorCommands(kind.editorStore, {
+    open: choose,
+    close: (id) => {
+      if (draft?.id === id) clear();
+    },
+  });
+
   const save = async () => {
-    if (!draft || !options.validate(draft)) return;
+    if (!draft || !kind.validate(draft)) return;
     try {
-      const item = await options.save(draft);
-      choose(item);
-      await refresh();
-      alerts.success(`${options.label} saved`);
+      choose(await kind.save(draft));
+      await kind.listStore.refresh();
+      alerts.success(`${kind.label} saved`);
     } catch {
       /* API errors are toasted. */
     }
@@ -52,48 +46,32 @@ export function useEntityEditor<T extends Character | Persona>(options: EntityEd
   const remove = async () => {
     if (!draft || !window.confirm(`Delete ${draft.name}?`)) return;
     try {
-      await options.delete(draft.id);
-      setDraft(undefined);
-      setSaved('');
-      await refresh();
-      alerts.info(`${options.label} deleted`);
+      await kind.delete(draft.id);
+      clear();
+      closeEditor(kind.type);
+      await kind.listStore.refresh();
+      alerts.info(`${kind.label} deleted`);
     } catch {
       /* API errors are toasted. */
     }
   };
+  // Files dropped on the editor are imported; the imported item replaces the draft only when nothing would be lost.
   const importFiles = async (files: File[]) => {
-    const prepared = options.prepareFiles(files);
-    if (!prepared.length) return;
-    const form = new FormData();
-    prepared.forEach((file) => {
-      form.append('files', file, file.name);
-    });
-    try {
-      const result = await options.import(form);
-      if (result.imported.length) {
-        await refresh();
-        choose(result.imported.at(-1)!);
-        options.imported(result.imported.length);
-      }
-      if (result.failed.length) options.failed(result.failed);
-    } catch {
-      /* API errors are toasted. */
-    }
+    const item = await importEntityFiles(kind, files);
+    if (item && !dirty) choose(item);
   };
   const uploadAvatar = async (file?: File) => {
     if (!draft || !file) return;
     const form = new FormData();
     form.append('file', file, file.name);
     try {
-      const item = await options.uploadAvatar(draft.id, form);
-      choose(item);
-      await refresh();
+      choose(await kind.uploadAvatar(draft.id, form));
+      await kind.listStore.refresh();
       alerts.success('Avatar updated');
     } catch {
       /* API errors are toasted. */
     }
   };
   const change = (field: keyof T, value: unknown) => draft && setDraft({ ...draft, [field]: value });
-  const dirty = !!draft && JSON.stringify(draft) !== saved;
-  return { list, draft, dirty, choose, change, create, save, remove, importFiles, uploadAvatar };
+  return { draft, dirty, change, save, remove, importFiles, uploadAvatar, back: () => closeEditor(kind.type) };
 }

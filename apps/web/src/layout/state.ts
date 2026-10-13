@@ -20,6 +20,9 @@ export const LIST_COLUMN: Record<ListId, 'L' | 'R'> = {
   personas: 'R',
 };
 
+/** Narrow editors with no list in front of them: their icon shows the editor itself. */
+export const LISTLESS: readonly ResourceId[] = ['settings'];
+
 export const RESOURCE_IDS: readonly ResourceId[] = ['workflows', 'presets', 'settings', 'characters', 'personas'];
 
 export interface LayoutState {

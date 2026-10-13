@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 
-export function EntityPage({
+/** A column body that imports files dropped on it and shows an overlay while dragging. */
+export function EntityDropZone({
   dropLabel,
   importFiles,
   children,
@@ -12,7 +13,7 @@ export function EntityPage({
   const [dragging, setDragging] = useState(false);
   return (
     <div
-      className="entity-page"
+      className="entity-dropzone"
       onDragOver={(event) => {
         event.preventDefault();
         setDragging(true);

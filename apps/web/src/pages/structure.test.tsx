@@ -48,7 +48,14 @@ it('retains entity dirty/save state and versioned avatar URLs', () => {
     updatedAt: 'version',
   };
   const html = renderToStaticMarkup(
-    <EntityDetail title={persona.name} dirty={false} onDelete={async () => {}} onSave={async () => {}}>
+    <EntityDetail
+      title={persona.name}
+      backLabel="Back to personas"
+      dirty={false}
+      onBack={() => {}}
+      onDelete={async () => {}}
+      onSave={async () => {}}
+    >
       <EntityPortrait type="personas" item={persona} large />
     </EntityDetail>,
   );

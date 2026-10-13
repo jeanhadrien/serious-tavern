@@ -3,6 +3,7 @@
 import {
   chatInRight,
   LIST_COLUMN,
+  LISTLESS,
   RESOURCE_IDS,
   type Column,
   type IconId,
@@ -11,9 +12,10 @@ import {
   type ResourceId,
 } from './state.js';
 
-export type ViewKey = 'chat' | `list:${ListId}` | `editor:${ResourceId}`;
+type ListedId = Exclude<ListId, 'settings'>;
+export type ViewKey = 'chat' | `list:${ListedId}` | `editor:${ResourceId}`;
 
-const LISTS: readonly ListId[] = [...RESOURCE_IDS, 'chats'];
+const LISTS = [...RESOURCE_IDS.filter((id) => !LISTLESS.includes(id)), 'chats'] as ListedId[];
 
 /** Every view the shell mounts, in a fixed order so React never reorders or remounts them. */
 export const VIEW_KEYS: readonly ViewKey[] = [
@@ -33,7 +35,7 @@ function listSlot(state: LayoutState, id: ListId): Column | null {
   return state.tabs[column] === id ? column : null;
 }
 
-function narrowEditorOpen(state: LayoutState, id: ListId): boolean {
+function narrowEditorOpen(state: LayoutState, id: ListedId): boolean {
   return id !== 'chats' && state.kinds[id] === 'narrow' && state.narrowOpen[id];
 }
 
@@ -52,7 +54,7 @@ export function viewSlots(state: LayoutState): Record<ViewKey, Column | null> {
   for (const id of LISTS) slots[`list:${id}`] = narrowEditorOpen(state, id) ? null : listSlot(state, id);
   for (const id of RESOURCE_IDS) {
     if (state.kinds[id] === 'wide') slots[`editor:${id}`] = state.wide === id && wideEditorShown(state) ? 'M' : null;
-    else slots[`editor:${id}`] = state.narrowOpen[id] ? listSlot(state, id) : null;
+    else slots[`editor:${id}`] = state.narrowOpen[id] || LISTLESS.includes(id) ? listSlot(state, id) : null;
   }
   return slots;
 }

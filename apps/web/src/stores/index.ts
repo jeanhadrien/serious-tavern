@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { charactersApi, personasApi, presetsApi, sessionsApi, workflowsApi } from '../api.js';
 import { compareRecent } from '../pages/recentOrder.js';
-import type { Preset, Workflow } from '@st/shared';
+import type { Character, Persona, Preset, Workflow } from '@st/shared';
 import { createEditorStore } from './editorStore.js';
 import { createListStore, type ListStore } from './listStore.js';
 
@@ -45,3 +45,5 @@ export function useList<T>(store: ListStore<T>): T[] {
 // What each list shares with its editor: the open item, its dirty flag and the list's requests.
 export const workflowEditorStore = createEditorStore<Workflow>();
 export const presetEditorStore = createEditorStore<Preset>();
+export const characterEditorStore = createEditorStore<Character>();
+export const personaEditorStore = createEditorStore<Persona>();

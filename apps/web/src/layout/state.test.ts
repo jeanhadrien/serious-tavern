@@ -65,11 +65,16 @@ it('opens narrow editors inside their column and replaces the list', () => {
   expect(slot(state, 'editor:characters')).toBe('R');
   expect(slot(state, 'list:characters')).toBeNull();
   expect(slot(state, 'chat')).toBe('M');
-  const settings = run(state, open('settings'));
-  expect(slot(settings, 'editor:settings')).toBe('L');
-  const back = run(settings, { type: 'closeEditor', id: 'settings' });
-  expect(slot(back, 'editor:settings')).toBeNull();
-  expect(slot(back, 'list:settings')).toBe('L');
+  const back = run(state, { type: 'closeEditor', id: 'characters' });
+  expect(slot(back, 'editor:characters')).toBeNull();
+  expect(slot(back, 'list:characters')).toBe('R');
+});
+
+it('shows settings, which has no list, as soon as its icon is picked', () => {
+  const state = run(start(), select('settings'));
+  expect(slot(state, 'editor:settings')).toBe('L');
+  expect(slot(run(start(), select('presets')), 'editor:settings')).toBeNull();
+  expect(slot(run(initialLayout(DESIGN_KINDS, true), select('settings')), 'editor:settings')).toBe('L');
 });
 
 it('hides a narrow editor in R when a wide editor opens, keeping its state', () => {
@@ -135,7 +140,7 @@ it('re-places the chat when crossing the breakpoint with a wide editor open', ()
   expect(plain.tabs.R).toBe('chats');
 });
 
-it('treats every resource as a wide editor in the interim configuration', () => {
+it('supports any mix of editor kinds', () => {
   const interim = initialLayout({
     workflows: 'wide',
     presets: 'wide',

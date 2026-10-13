@@ -69,10 +69,6 @@
 .view[data-view^="editor:"] {
   overflow: auto;
 }
-.list-placeholder {
-  margin: 0;
-  padding: 16px;
-}
 .sidebar.resource-list {
   width: auto;
   height: 100%;
