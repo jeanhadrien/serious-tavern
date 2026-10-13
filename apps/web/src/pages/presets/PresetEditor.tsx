@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { macroInputKey, templateMacros, presetSchema, presetWarnings, type Preset, type PresetInput } from '@st/shared';
+import { entryUsesInput, presetSchema, presetWarnings, type Preset, type PresetInput } from '@st/shared';
 import { EntryList, newId } from './PresetEntryList.js';
 import { ImportedBanner } from './ImportedBanner.js';
 
@@ -21,6 +21,7 @@ function PresetInputs(props: { preset: Preset; readOnly: boolean; onChange(prese
     const isValidKey = /^[a-z][a-zA-Z0-9_]*$/.test(key);
     const escapedKey = oldKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const reference = new RegExp(`(\\{\\{\\s*inputs?\\.)${escapedKey}(?=[.\\s}]|$)`, 'g');
+    const rename = (template: string) => template.replace(reference, (_match, prefix: string) => `${prefix}${key}`);
     const entries =
       isValidKey && oldKey !== key
         ? props.preset.entries.map((entry) => {
@@ -28,7 +29,8 @@ function PresetInputs(props: { preset: Preset; readOnly: boolean; onChange(prese
             if (entry.kind === 'message')
               return {
                 ...entry,
-                content: entry.content.replace(reference, (_match, prefix: string) => `${prefix}${key}`),
+                content: rename(entry.content),
+                ...(entry.name === undefined ? {} : { name: rename(entry.name) }),
               };
             return entry;
           })
@@ -44,8 +46,7 @@ function PresetInputs(props: { preset: Preset; readOnly: boolean; onChange(prese
     props.preset.entries.some(
       (entry) =>
         (entry.kind === 'slot' && entry.inputKey === input.key) ||
-        (entry.kind === 'message' &&
-          templateMacros(entry.content).some((macro) => macroInputKey(macro.name) === input.key)),
+        (entry.kind === 'message' && entryUsesInput(entry, input.key)),
     );
   const warnings = parsed.success ? presetWarnings(parsed.data) : [];
   return (

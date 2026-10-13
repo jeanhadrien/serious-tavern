@@ -5,7 +5,7 @@ import { renderPreset } from './preset.js';
 const input = (key: string, dataType: 'messages' | 'text') => ({ id: `${key}-input`, key, dataType });
 const slot = (id: string, inputKey: string, enabled = true, role: 'system' | 'user' | 'assistant' = 'user') => ({
   id,
-  name: id,
+  displayName: id,
   kind: 'slot' as const,
   inputKey,
   enabled,
@@ -16,7 +16,7 @@ const message = (
   content: string,
   placement: { mode: 'ordered' } | { mode: 'depth'; entryId: string; depth: number } = { mode: 'ordered' },
   enabled = true,
-) => ({ id, name: id, kind: 'message' as const, content, role: 'system' as const, enabled, placement });
+) => ({ id, displayName: id, kind: 'message' as const, content, role: 'system' as const, enabled, placement });
 const preset = (inputs: ReturnType<typeof input>[], entries: PresetEntry[]): Preset =>
   presetSchema.parse({
     id: '8f1fe1a9-3480-4e52-834c-f25d90684d71',
@@ -255,5 +255,25 @@ describe('renderPreset', () => {
       { role: 'assistant', content: 'Answer' },
     ]);
     expect(reasoningHistory[1]?.reasoning).toBe('SECRET THOUGHT');
+  });
+
+  it('renders a message name like its content, trims it and leaves it out when empty', () => {
+    const named = (id: string, content: string, name: string) => ({ ...message(id, content), name });
+    const definition = preset(
+      [input('who', 'text'), input('nick', 'text')],
+      [
+        named('macro', 'Hi', '  {{input.who}}-{{trigger.sessionId}} '),
+        named('empty', 'No name', '{{input.nick}}'),
+        named('blank', 'Blank name', '   '),
+        named('dropped', '   ', 'Ignored'),
+        message('unnamed', 'Plain'),
+      ],
+    );
+    expect(renderPreset(definition, options({ who: 'Alice', nick: '' }))).toEqual([
+      { role: 'system', content: 'Hi', name: 'Alice-session-1' },
+      { role: 'system', content: 'No name' },
+      { role: 'system', content: 'Blank name' },
+      { role: 'system', content: 'Plain' },
+    ]);
   });
 });

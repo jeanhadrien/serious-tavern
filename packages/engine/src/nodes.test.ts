@@ -17,13 +17,13 @@ const preset: Preset = {
     {
       kind: 'message',
       id: 'system',
-      name: 'System',
+      displayName: 'System',
       enabled: true,
       role: 'system',
       content: 'Hello {{trigger.message}}',
       placement: { mode: 'ordered' },
     },
-    { kind: 'slot', id: 'prompt-slot', name: 'Prompt', enabled: true, inputKey: 'prompt', role: 'user' },
+    { kind: 'slot', id: 'prompt-slot', displayName: 'Prompt', enabled: true, inputKey: 'prompt', role: 'user' },
   ],
 };
 const ctx = (config: Record<string, unknown>): ExecutionContext => ({
@@ -220,7 +220,7 @@ describe('integration nodes', () => {
         {
           kind: 'message',
           id: 'empty',
-          name: 'Empty',
+          displayName: 'Empty',
           enabled: true,
           role: 'system',
           content: '{{character.scenario}}',
@@ -229,13 +229,13 @@ describe('integration nodes', () => {
         {
           kind: 'message',
           id: 'second',
-          name: 'Second',
+          displayName: 'Second',
           enabled: true,
           role: 'system',
           content: 'Second',
           placement: { mode: 'ordered' },
         },
-        { kind: 'slot', id: 'history', name: 'History', enabled: true, inputKey: 'history', role: 'user' },
+        { kind: 'slot', id: 'history', displayName: 'History', enabled: true, inputKey: 'history', role: 'user' },
       ],
     };
     const history: PromptMessage[] = [

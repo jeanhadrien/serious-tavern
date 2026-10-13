@@ -8,8 +8,8 @@ const preset = (content = 'Hi'): Preset =>
     name: 'Main',
     inputs: [],
     entries: [
-      { id: 'entry-1', name: 'One', kind: 'message', enabled: true, role: 'system', content },
-      { id: 'entry-2', name: 'Two', kind: 'message', enabled: true, role: 'system', content: 'x' },
+      { id: 'entry-1', displayName: 'One', kind: 'message', enabled: true, role: 'system', content },
+      { id: 'entry-2', displayName: 'Two', kind: 'message', enabled: true, role: 'system', content: 'x' },
     ],
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',

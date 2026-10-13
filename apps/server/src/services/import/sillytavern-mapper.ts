@@ -56,9 +56,9 @@ export function mapSillyTavernPreset(file: unknown, newId: () => string = random
 
   const entries = ordered.map((item, index): PresetEntry => {
     const id = ids[index]!;
-    const name = entryName(item.prompt, item.identifier);
+    const displayName = entryName(item.prompt, item.identifier);
     if (item.identifier === CHAT_HISTORY)
-      return { id, name, enabled: item.enabled, kind: 'slot', inputKey: 'history', role: 'user' };
+      return { id, displayName, enabled: item.enabled, kind: 'slot', inputKey: 'history', role: 'user' };
 
     // ST counts depth from the end of the chat including the new user message. Our history slot excludes
     // it, so ST depth N becomes N-1 here; ST depth 0 cannot be a history depth and is moved instead.
@@ -71,7 +71,7 @@ export function mapSillyTavernPreset(file: unknown, newId: () => string = random
     if (item.prompt.marker !== true)
       return {
         id,
-        name,
+        displayName,
         enabled: item.enabled,
         kind: 'message',
         role: roleOf(item.prompt.role),
@@ -81,7 +81,7 @@ export function mapSillyTavernPreset(file: unknown, newId: () => string = random
     const macro = MARKER_MACROS.get(item.identifier);
     return {
       id,
-      name,
+      displayName,
       enabled: macro === undefined ? false : item.enabled,
       kind: 'message',
       role: 'system',
@@ -103,7 +103,7 @@ function withCurrentMessage(entries: PresetEntry[], newId: () => string, afterCu
   if (!history) return entries;
   const current: PresetEntry = {
     id: newId(),
-    name: 'Current message',
+    displayName: 'Current message',
     enabled: history.enabled,
     kind: 'slot',
     inputKey: 'message',
@@ -130,7 +130,7 @@ function injectionDepth(prompt: Record_): number | undefined {
   return Math.max(0, Math.trunc(depth));
 }
 
-// Entry names must be non-empty, so they fall back to the identifier, then to a generic label.
+// Entry labels must be non-empty, so they fall back to the identifier, then to a generic label.
 function entryName(prompt: Record_, identifier: string): string {
   return nonEmptyString(prompt.name) ?? (identifier.trim() || 'Prompt');
 }

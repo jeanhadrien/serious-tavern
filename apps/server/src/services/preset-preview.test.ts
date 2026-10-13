@@ -38,7 +38,7 @@ it.each(
       createdAt: '',
       updatedAt: '',
       inputs: [{ id: 'history-input', key: 'history', dataType: 'messages' }],
-      entries: [{ id: 'slot', name: 'History', kind: 'slot', enabled: true, inputKey: 'history' }],
+      entries: [{ id: 'slot', displayName: 'History', kind: 'slot', enabled: true, inputKey: 'history' }],
     });
     const response = await app.inject({
       method: 'POST',

@@ -5,7 +5,7 @@ export const newId = () => crypto.randomUUID();
 
 const newMessage = (): PresetEntry => ({
   id: newId(),
-  name: 'New message',
+  displayName: 'New message',
   kind: 'message',
   enabled: true,
   role: 'system',
@@ -66,7 +66,7 @@ export function EntryList(props: {
     if (!input) return;
     const entry: PresetEntry = {
       id: newId(),
-      name: presetInputLabel(input.key),
+      displayName: presetInputLabel(input.key),
       kind: 'slot',
       enabled: true,
       inputKey: input.key,
@@ -76,7 +76,7 @@ export function EntryList(props: {
     props.onSelect(entry.id);
   };
   const duplicate = (entry: PresetEntry) => {
-    const copy = { ...entry, id: newId(), name: `${entry.name} copy` } as PresetEntry;
+    const copy = { ...entry, id: newId(), displayName: `${entry.displayName} copy` } as PresetEntry;
     updateEntries([...props.preset.entries, copy]);
     props.onSelect(copy.id);
   };
@@ -157,7 +157,7 @@ export function EntryList(props: {
           >
             <button className="preset-entry-select" onClick={() => props.onSelect(entry.id)}>
               <span>
-                {entryIcon(entry, props.preset)} {entry.name}
+                {entryIcon(entry, props.preset)} {entry.displayName}
               </span>
               <small>{entryPreview(entry) || 'Empty message'}</small>
             </button>

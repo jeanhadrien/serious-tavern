@@ -13,7 +13,8 @@ const DEFAULT_USER = 'default-user';
 export const sillyTavernConnector: ImportConnector = {
   app: 'sillytavern',
   // 1: original mapping, hashed on file bytes only. 2: dialogue examples mapped, depth off-by-one fixed.
-  mapperVersion: 2,
+  // 3: entry labels written as `displayName`.
+  mapperVersion: 3,
   async detect(installPath) {
     const dataDir = join(installPath, 'data');
     if (!(await isDirectory(dataDir)))

@@ -8,7 +8,7 @@ const preset: Preset = {
   createdAt: '',
   updatedAt: '',
   inputs: [{ id: 'prompt-input', key: 'prompt', dataType: 'text' }],
-  entries: [{ id: 'one', name: 'Prompt', kind: 'slot', enabled: true, inputKey: 'prompt', role: 'user' }],
+  entries: [{ id: 'one', displayName: 'Prompt', kind: 'slot', enabled: true, inputKey: 'prompt', role: 'user' }],
 };
 const resources = { presets: { get: async (id: string) => (id === preset.id ? preset : undefined) } };
 const graph = (nodes: Workflow['nodes'], edges: Workflow['edges']): Workflow => ({

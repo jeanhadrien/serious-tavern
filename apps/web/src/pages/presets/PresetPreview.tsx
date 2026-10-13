@@ -86,7 +86,10 @@ export function PresetPreview(props: { preset: Preset }) {
       {previewed &&
         messages.map((message, index) => (
           <div className="preview-message" key={index}>
-            <strong>{message.role}</strong>
+            <strong>
+              {message.role}
+              {message.name && <span> · {message.name}</span>}
+            </strong>
             <p>{message.content}</p>
           </div>
         ))}

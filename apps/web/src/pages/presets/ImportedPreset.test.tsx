@@ -23,14 +23,14 @@ const preset = (extra: object = {}): Preset =>
     entries: [
       {
         id: 'system',
-        name: 'System',
+        displayName: 'System',
         kind: 'message',
         enabled: true,
         role: 'system',
         content: 'Hi',
         placement: { mode: 'ordered' },
       },
-      { id: 'message-slot', name: 'Message', kind: 'slot', enabled: true, inputKey: 'message', role: 'user' },
+      { id: 'message-slot', displayName: 'Message', kind: 'slot', enabled: true, inputKey: 'message', role: 'user' },
     ],
     source,
     createdAt: '',

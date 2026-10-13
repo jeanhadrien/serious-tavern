@@ -23,7 +23,7 @@ const map = (file: unknown) => mapSillyTavernPreset(file, sequentialIds());
 
 describe('order selection', () => {
   const prompts = [prompt('main'), prompt('nsfw'), prompt('jailbreak')];
-  const names = (orders: unknown[]) => map({ prompts, prompt_order: orders }).entries.map((entry) => entry.name);
+  const names = (orders: unknown[]) => map({ prompts, prompt_order: orders }).entries.map((entry) => entry.displayName);
 
   it('prefers the global order (100001), then the stock order (100000), then the first entry', () => {
     expect(
@@ -43,10 +43,24 @@ describe('order selection', () => {
         ]),
       ],
     });
-    expect(result.entries.map((entry) => [entry.name, entry.enabled])).toEqual([
+    expect(result.entries.map((entry) => [entry.displayName, entry.enabled])).toEqual([
       ['jailbreak', false],
       ['main', true],
     ]);
+  });
+
+  it('writes the prompt name as the entry label, never as a message name', () => {
+    const result = map({
+      prompts: [prompt('main'), prompt('chatHistory')],
+      prompt_order: [
+        order(100000, [
+          ['main', true],
+          ['chatHistory', true],
+        ]),
+      ],
+    });
+    expect(result.entries.map((entry) => entry.displayName)).toEqual(['main', 'chatHistory', 'Current message']);
+    expect(result.entries.every((entry) => !('name' in entry))).toBe(true);
   });
 
   it('returns an empty preset when there is no order at all', () => {
@@ -73,7 +87,7 @@ describe('null and missing fields', () => {
     expect(result.entries).toEqual([
       {
         id: 'id-1',
-        name: 'loose',
+        displayName: 'loose',
         enabled: true,
         kind: 'message',
         role: 'system',
@@ -82,7 +96,7 @@ describe('null and missing fields', () => {
       },
       {
         id: 'id-2',
-        name: 'blank',
+        displayName: 'blank',
         enabled: true,
         kind: 'message',
         role: 'system',
@@ -91,7 +105,7 @@ describe('null and missing fields', () => {
       },
       {
         id: 'id-3',
-        name: 'charDescription',
+        displayName: 'charDescription',
         enabled: true,
         kind: 'message',
         role: 'system',
@@ -140,7 +154,7 @@ describe('markers', () => {
   });
 
   it('imports world info markers as disabled, empty entries named after the marker', () => {
-    expect(result.entries.slice(5).map((entry) => [entry.name, entry.enabled, entry.kind])).toEqual([
+    expect(result.entries.slice(5).map((entry) => [entry.displayName, entry.enabled, entry.kind])).toEqual([
       ['worldInfoBefore', false, 'message'],
       ['worldInfoAfter', false, 'message'],
     ]);
@@ -158,8 +172,8 @@ describe('markers', () => {
       { id: 'id-3', key: 'message', dataType: 'text' },
     ]);
     expect(history.entries).toEqual([
-      { id: 'id-1', name: 'chatHistory', enabled: true, kind: 'slot', inputKey: 'history', role: 'user' },
-      { id: 'id-4', name: 'Current message', enabled: true, kind: 'slot', inputKey: 'message', role: 'user' },
+      { id: 'id-1', displayName: 'chatHistory', enabled: true, kind: 'slot', inputKey: 'history', role: 'user' },
+      { id: 'id-4', displayName: 'Current message', enabled: true, kind: 'slot', inputKey: 'message', role: 'user' },
     ]);
   });
 
@@ -190,8 +204,9 @@ describe('depth injection', () => {
       ]),
     ],
   });
-  const names = (result: ReturnType<typeof map>) => result.entries.map((entry) => entry.name);
-  const find = (result: ReturnType<typeof map>, name: string) => result.entries.find((entry) => entry.name === name);
+  const names = (result: ReturnType<typeof map>) => result.entries.map((entry) => entry.displayName);
+  const find = (result: ReturnType<typeof map>, name: string) =>
+    result.entries.find((entry) => entry.displayName === name);
   const historyId = (result: ReturnType<typeof map>) =>
     result.entries.find((entry) => entry.kind === 'slot' && entry.inputKey === 'history')?.id;
   const injected = (depth: number, historyEnabled = true) =>

@@ -235,8 +235,8 @@ describe('executor', () => {
         { id: 'extra-input', key: 'extra', dataType: 'text' },
       ],
       entries: [
-        { id: 'one', name: 'Prompt', kind: 'slot', enabled: true, inputKey: 'prompt', role: 'user' },
-        { id: 'two', name: 'Extra', kind: 'slot', enabled: true, inputKey: 'extra', role: 'user' },
+        { id: 'one', displayName: 'Prompt', kind: 'slot', enabled: true, inputKey: 'prompt', role: 'user' },
+        { id: 'two', displayName: 'Extra', kind: 'slot', enabled: true, inputKey: 'extra', role: 'user' },
       ],
     };
     const resources = { presets: { get: async () => preset } };
@@ -708,7 +708,7 @@ describe('streaming events', () => {
       entries: [
         {
           id: 'system',
-          name: 'System',
+          displayName: 'System',
           kind: 'message',
           enabled: true,
           role: 'system',

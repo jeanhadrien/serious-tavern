@@ -14,7 +14,7 @@ it('keeps the built-in preset and entry IDs stable', () => {
     ['history', 'messages'],
     ['message', 'text'],
   ]);
-  expect(first.entries.map((entry) => [entry.kind, entry.name])).toEqual([
+  expect(first.entries.map((entry) => [entry.kind, entry.displayName])).toEqual([
     ['message', 'Main prompt'],
     ['message', 'Character description'],
     ['message', 'Personality'],

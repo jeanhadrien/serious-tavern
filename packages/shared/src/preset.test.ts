@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { presetInputLabel, presetSchema, presetWarnings } from './preset.js';
+import { presetInputLabel, presetSchema, presetWarnings, upgradeLegacyPreset } from './preset.js';
 import { findMacro, macroHints } from './macros.js';
 
 const base = () => ({
@@ -12,17 +12,17 @@ const base = () => ({
     { id: 'message-input', key: 'message', dataType: 'text' as const },
   ],
   entries: [
-    { id: 'history-slot', kind: 'slot' as const, enabled: true, name: 'History', inputKey: 'history' },
+    { id: 'history-slot', kind: 'slot' as const, enabled: true, displayName: 'History', inputKey: 'history' },
     {
       id: 'injection',
       kind: 'message' as const,
       enabled: true,
-      name: 'Note',
+      displayName: 'Note',
       role: 'system' as const,
       content: 'Remember',
       placement: { mode: 'depth' as const, entryId: 'history-slot', depth: 0 },
     },
-    { id: 'message-slot', kind: 'slot' as const, enabled: true, name: 'Message', inputKey: 'message' },
+    { id: 'message-slot', kind: 'slot' as const, enabled: true, displayName: 'Message', inputKey: 'message' },
   ],
 });
 
@@ -40,12 +40,19 @@ it('uses the registry for hints and warns on unknown macros only in enabled mess
         id: 'active',
         kind: 'message',
         enabled: true,
-        name: 'Active',
+        displayName: 'Active',
         role: 'system',
         content:
           '{{unknown}} {{char.name}} {{user.description}} {{random::a::b}} {{CHARACTER.Name}} {{input.message}} {{inputs.history}}',
       },
-      { id: 'disabled', kind: 'message', enabled: false, name: 'Disabled', role: 'system', content: '{{disabled}}' },
+      {
+        id: 'disabled',
+        kind: 'message',
+        enabled: false,
+        displayName: 'Disabled',
+        role: 'system',
+        content: '{{disabled}}',
+      },
     ],
   });
   expect(presetWarnings(parsed)).toEqual(
@@ -70,7 +77,7 @@ it('uses the registry for hints and warns on unknown macros only in enabled mess
 });
 
 it('validates input references case-sensitively and rejects ambiguous input keys', () => {
-  const message = { id: 'm', kind: 'message', enabled: true, name: 'M', role: 'system' };
+  const message = { id: 'm', kind: 'message', enabled: true, displayName: 'M', role: 'system' };
   expect(presetSchema.safeParse({ ...base(), entries: [{ ...message, content: '{{input.message}}' }] }).success).toBe(
     true,
   );
@@ -94,8 +101,8 @@ describe('preset schema', () => {
     const parsed = presetSchema.parse({
       ...base(),
       entries: [
-        { id: 'slot', kind: 'slot', enabled: true, name: 'Message', inputKey: 'message' },
-        { id: 'message', kind: 'message', enabled: true, name: 'Hello', role: 'user', content: 'Hi' },
+        { id: 'slot', kind: 'slot', enabled: true, displayName: 'Message', inputKey: 'message' },
+        { id: 'message', kind: 'message', enabled: true, displayName: 'Hello', role: 'user', content: 'Hi' },
       ],
     });
     expect(parsed.entries).toMatchObject([{ role: 'user' }, { placement: { mode: 'ordered' } }]);
@@ -134,7 +141,7 @@ describe('preset schema', () => {
   it('rejects slots for unknown inputs', () => {
     const result = presetSchema.safeParse({
       ...base(),
-      entries: [{ id: 'unknown', kind: 'slot', enabled: true, name: 'Missing', inputKey: 'missing' }],
+      entries: [{ id: 'unknown', kind: 'slot', enabled: true, displayName: 'Missing', inputKey: 'missing' }],
     });
     expect(result.success).toBe(false);
     if (!result.success)
@@ -188,7 +195,7 @@ describe('preset schema', () => {
           id: 'message',
           kind: 'message',
           enabled: true,
-          name: 'System',
+          displayName: 'System',
           role: 'system',
           content: '{{input.missing}} and {{input.Unknown}}',
         },
@@ -208,11 +215,11 @@ it('warns when an input is unused by enabled slots or message templates', () => 
         id: 'message',
         kind: 'message',
         enabled: true,
-        name: 'System',
+        displayName: 'System',
         role: 'system',
         content: 'Use {{input.message}}',
       },
-      { id: 'disabled', kind: 'slot', enabled: false, name: 'Disabled slot', inputKey: 'history' },
+      { id: 'disabled', kind: 'slot', enabled: false, displayName: 'Disabled slot', inputKey: 'history' },
     ],
   });
   expect(presetWarnings(parsed)).toEqual([
@@ -238,7 +245,7 @@ describe('block templates', () => {
     id: 'm',
     kind: 'message' as const,
     enabled: true,
-    name: 'M',
+    displayName: 'M',
     role: 'system' as const,
     content,
   });
@@ -246,14 +253,14 @@ describe('block templates', () => {
     id: 'history-slot',
     kind: 'slot' as const,
     enabled: true,
-    name: 'History',
+    displayName: 'History',
     inputKey: 'history',
   };
   const messageSlot = {
     id: 'message-slot',
     kind: 'slot' as const,
     enabled: true,
-    name: 'Message',
+    displayName: 'Message',
     inputKey: 'message',
   };
   const withContent = (content: string) => presetSchema.safeParse({ ...base(), entries: [message(content)] });
@@ -308,5 +315,64 @@ describe('block templates', () => {
       entries: [message('{{#if input.message}}{{/if}}'), historySlot],
     });
     expect(presetWarnings(parsed)).toEqual([]);
+  });
+});
+
+describe('message names', () => {
+  const named = (name: string, content = 'Hi') => ({
+    ...base(),
+    entries: [
+      ...base().entries,
+      { id: 'named', kind: 'message', enabled: true, displayName: 'Named', role: 'user', content, name },
+    ],
+  });
+
+  it('rejects unknown inputs in a name on the name path', () => {
+    const result = presetSchema.safeParse(named('{{input.missing}}'));
+    expect(result.success).toBe(false);
+    if (!result.success)
+      expect(result.error.issues.map((issue) => [issue.path.join('.'), issue.message])).toEqual([
+        ['entries.3.name', 'Unknown input: missing'],
+      ]);
+  });
+
+  it('warns on unknown macros and syntax problems in a name', () => {
+    expect(presetWarnings(presetSchema.parse(named('{{nope}}')))).toEqual([
+      { path: ['entries', 3, 'name'], message: 'Unknown macro: {{nope}}' },
+    ]);
+    const broken = presetWarnings(presetSchema.parse(named('{{#if}}')));
+    expect(broken.map((warning) => warning.path)).toEqual([['entries', 3, 'name']]);
+  });
+
+  it('counts an input referenced only by a name as used', () => {
+    const preset = named('{{input.message}}');
+    preset.entries = preset.entries.filter((entry) => entry.id !== 'message-slot');
+    expect(presetWarnings(presetSchema.parse(preset))).toEqual([]);
+  });
+});
+
+describe('upgradeLegacyPreset', () => {
+  it('turns a legacy entry name into its displayName and leaves new-shape entries alone', () => {
+    const raw = {
+      name: 'Preset',
+      entries: [
+        { id: 'a', name: 'Main', kind: 'message', content: 'x' },
+        { id: 'b', displayName: 'Note', name: '{{char}}', kind: 'message', content: 'y' },
+        { id: 'c', name: 'History', kind: 'slot', inputKey: 'history' },
+        'not an entry',
+      ],
+    };
+    const before = structuredClone(raw);
+    expect(upgradeLegacyPreset(raw)).toEqual({
+      name: 'Preset',
+      entries: [
+        { id: 'a', displayName: 'Main', kind: 'message', content: 'x' },
+        { id: 'b', displayName: 'Note', name: '{{char}}', kind: 'message', content: 'y' },
+        { id: 'c', displayName: 'History', kind: 'slot', inputKey: 'history' },
+        'not an entry',
+      ],
+    });
+    expect(raw).toEqual(before);
+    expect(upgradeLegacyPreset('text')).toBe('text');
   });
 });

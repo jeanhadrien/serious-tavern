@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { Document, parse, stringify, visit } from 'yaml';
-import { presetSchema, type Preset } from '@st/shared';
+import { presetSchema, upgradeLegacyPreset, type Preset } from '@st/shared';
 
 type Obj = Record<string, unknown>;
 
@@ -11,7 +11,7 @@ const isObj = (value: unknown): value is Obj => typeof value === 'object' && val
 const PRESET_FIRST = ['name', 'description', 'inputs', 'entries'];
 const PRESET_LAST = ['id', 'createdAt', 'updatedAt', 'source'];
 const INPUT_FIRST = ['id', 'key', 'dataType'];
-const ENTRY_FIRST = ['id', 'name', 'kind', 'role', 'enabled', 'inputKey', 'placement', 'content'];
+const ENTRY_FIRST = ['id', 'displayName', 'name', 'kind', 'role', 'enabled', 'inputKey', 'placement', 'content'];
 
 function arrange(value: Obj, first: string[], last: string[] = []): Obj {
   const result: Obj = {};
@@ -22,9 +22,9 @@ function arrange(value: Obj, first: string[], last: string[] = []): Obj {
 }
 
 /** Readable unique label for a slot that depth placements point at. */
-function slotLabel(name: unknown, taken: Set<string>): string {
+function slotLabel(displayName: unknown, taken: Set<string>): string {
   const base =
-    String(name ?? '')
+    String(displayName ?? '')
       .toLowerCase()
       .replace(/[^\p{L}\p{M}\p{Nd}]+/gu, '-')
       .replace(/^-+|-+$/g, '')
@@ -56,7 +56,7 @@ export function presetToYaml(preset: Preset): string {
     const id = String(entry.id);
     if (UUID.test(id)) {
       if (targets.has(id)) {
-        const label = slotLabel(entry.name, taken);
+        const label = slotLabel(entry.displayName, taken);
         renamed.set(id, label);
         entry.id = label;
       } else delete entry.id;
@@ -119,8 +119,12 @@ function fillIds(items: unknown, prefix: string): unknown {
   });
 }
 
-/** What a hand-written file may omit: ids, `enabled` (defaults to true) and empty `inputs`/`entries`. */
-function presetCandidate(raw: unknown): Obj | undefined {
+/**
+ * What a hand-written file may omit: ids, `enabled` (defaults to true) and empty `inputs`/`entries`.
+ * Legacy entries (label in `name`) are upgraded here; the file keeps its old shape until the next save.
+ */
+function presetCandidate(file: unknown): Obj | undefined {
+  const raw = upgradeLegacyPreset(file);
   if (!isObj(raw)) return undefined;
   const entries = fillIds(raw.entries ?? [], 'entry');
   return {

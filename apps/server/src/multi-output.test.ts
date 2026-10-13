@@ -219,7 +219,9 @@ it('persists multiple named assistant messages and forwards history names to pre
       updatedAt: '',
       name: 'History',
       inputs: [{ id: 'history', key: 'history', dataType: 'messages' }],
-      entries: [{ id: 'history', name: 'History', kind: 'slot', enabled: true, inputKey: 'history', role: 'user' }],
+      entries: [
+        { id: 'history', displayName: 'History', kind: 'slot', enabled: true, inputKey: 'history', role: 'user' },
+      ],
     };
     const preview = apiContract.previewPreset.response.parse(
       (

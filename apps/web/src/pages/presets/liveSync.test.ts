@@ -4,7 +4,7 @@ import { classifyDiskChange, planInvalidFileAlerts, reselectEntryId } from './li
 
 const message = (id: string, content = 'Hi'): PresetEntry => ({
   id,
-  name: id,
+  displayName: id,
   kind: 'message',
   enabled: true,
   role: 'system',

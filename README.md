@@ -133,7 +133,7 @@ Error `details` uses the same shared schema as a successful message result. The 
 
 A **preset** defines the final, ordered message list sent to an LLM. It has declared **inputs** (the values a workflow supplies) and an ordered list of discriminated **entries** (`message` or `slot`) that assembles those values with fixed prompts. Each input has an `id`, unique key, optional label and description, and type (`messages` or `text`). Every input becomes one correspondingly typed LLM input port named by its key; the port label defaults to the key. A `messages` input expands to its message list. A `text` input becomes one message using the slot's role (default `user`) and is skipped when empty. The same input may be placed by multiple slots.
 
-An enabled **message** entry has a system/user/assistant role and templated content; it can use `{{input.<key>}}`, `{{trigger.message}}`, `{{trigger.sessionId}}`, `{{history}}`, and character/persona variables. Character and persona fields are also expanded when referenced, with recursive references guarded. Missing character fields render as empty text; `{{user}}` falls back to `User`. A **slot** places a declared input at its position in the final message list. Fixed messages that render to whitespace only are omitted, as are empty text-slot values. Inputs unused by any enabled slot or message template produce non-blocking warnings. Model and sampler settings belong to each LLM node. Preview and execution use the same renderer, and the preview accepts `{ preset, inputs?, sessionId? }` and returns `{ messages, warnings }`.
+An enabled **message** entry has a system/user/assistant role and templated content; it can use `{{input.<key>}}`, `{{trigger.message}}`, `{{trigger.sessionId}}`, `{{history}}`, and character/persona variables. Character and persona fields are also expanded when referenced, with recursive references guarded. Missing character fields render as empty text; `{{user}}` falls back to `User`. Every entry has a required `displayName`, the label shown in the editor. A message entry may also have an optional `name`: a template rendered with the same context as the content, trimmed, and sent as the prompt message's `name` only when non-empty (an entry whose content renders empty is still dropped). Its unknown `{{input.x}}` references are errors, and syntax problems and unknown macros are warnings, exactly like content; an input referenced only by a name counts as used. A **slot** places a declared input at its position in the final message list. Fixed messages that render to whitespace only are omitted, as are empty text-slot values. Inputs unused by any enabled slot or message template produce non-blocking warnings. Model and sampler settings belong to each LLM node. Preview and execution use the same renderer, and the preview accepts `{ preset, inputs?, sessionId? }` and returns `{ messages, warnings }`.
 
 Preview `inputs` accepts strings for text inputs and arrays of `{ role, content, name? }` for messages inputs. Explicit messages arrays are used unchanged by the preview, including an empty array; only an omitted messages input falls back to the selected session's history or the sample conversation. The current preview UI still selects session/sample history rather than editing messages arrays.
 
@@ -169,7 +169,7 @@ In the web app, Settings → **Import content** saves the SillyTavern install fo
 
 `apps/server/src/services/import/sillytavern-mapper.ts` is a pure function from parsed JSON to inputs and entries.
 - Order: the `prompt_order` entry with `character_id` 100001 is used, then 100000, then the first entry. Only the identifiers listed there are imported, in that order, with `enabled` taken from the order entry. Anything absent is ignored.
-- A normal prompt becomes a `message` entry. The role is `system` when it is missing or unknown. The content is kept verbatim, macros included, so unsupported macros show up as preset warnings. The name is the prompt name, falling back to its identifier.
+- A normal prompt becomes a `message` entry. The role is `system` when it is missing or unknown. The content is kept verbatim, macros included, so unsupported macros show up as preset warnings. Its label (`displayName`) is the prompt name, falling back to its identifier; no message `name` is set.
 - `chatHistory` becomes a `messages` input named `history` plus a `slot` entry. A `message` text input and a `Current message` slot follow it (enabled together), because a turn's history is captured before the new user message is saved.
 - `charDescription`, `charPersonality`, `scenario`, `dialogueExamples` and `personaDescription` become system messages with `{{character.description}}`, `{{character.personality}}`, `{{character.scenario}}`, `{{character.mes_example}}` and `{{persona.description}}`.
 - `worldInfoBefore`, `worldInfoAfter` and any other marker become disabled, empty `message` entries named after the marker.
@@ -230,7 +230,7 @@ The LLM node selects a **provider**, **model**, **preset**, temperature, max tok
 
 **Merge consecutive system messages** (`mergeSystemMessages`, default `false`) is an LLM node checkbox. When enabled, after preset rendering it joins each consecutive run of system messages without a `name` using `"\n\n"`. User/assistant messages and named system messages break a run and remain unchanged (even an explicitly empty name is treated as set). Request logs contain the actual merged messages sent to the provider. Preset preview remains the unmerged preset output because merging is a node-level setting.
 
-Chat history and message inputs carry an optional string `name`. Chat Input, Memory in `messages` format, preset history previews and message slots preserve it (including through depth insertion and repeated slots); OpenRouter forwards it only when present. No speaker-name prefix is added to message content. A future per-slot option may control such prefixing; currently speaker names are metadata chosen through Chat Output.
+Chat history and message inputs carry an optional string `name`, and so do preset message entries (rendered from their `name` template). Chat Input, Memory in `messages` format, preset history previews and message slots preserve it (including through depth insertion and repeated slots); OpenRouter forwards it only when present. No speaker-name prefix is added to message content. A future per-slot option may control such prefixing; currently speaker names are metadata chosen through Chat Output.
 
 Seeding uses stable IDs so concurrent initializers do not create duplicate Default presets or demo workflows. Seeds are added only when the corresponding store is empty.
 
@@ -271,14 +271,15 @@ inputs:
   - key: message
     dataType: text
 entries:
-  - name: Main prompt
+  - displayName: Main prompt   # the editor label
     kind: message
     role: system
     enabled: true
     content: |
       Write a natural, in-character reply.
       {{character.system_prompt}}
-  - name: Author note
+  - displayName: Author note
+    name: "{{char}}"           # optional message name sent to the model (a template)
     kind: message
     role: system
     enabled: true
@@ -288,7 +289,7 @@ entries:
       depth: 1
     content: "{{character.personality}}"
   - id: chat-history  # slots targeted by a depth placement carry a readable id
-    name: Chat history
+    displayName: Chat history
     kind: slot
     inputKey: history
 id: 5d6c72c7-5185-4963-8227-527f12ef9eea   # bookkeeping last
@@ -298,7 +299,8 @@ updatedAt: 2026-01-01T00:00:00.000Z
 
 - **Identity** is the `id` inside the file, never the file name, so files can be renamed or edited by hand. Nothing is cached: every operation re-reads the directory.
 - **File names** are the slugified preset name (letters and digits of any script, lowercase, hyphens, at most 80 characters; reserved Windows names such as `con` get a `-preset` suffix; an empty slug becomes `preset`). A collision (compared case-insensitively) adds `-2`, `-3`, ... Renaming a preset writes the new file, then removes the old one. A file whose preset name did not change keeps its name, even if you renamed it by hand. `.yml` is read too; files are always written as `.yaml`.
-- **Optional keys:** `id` on inputs and entries, `enabled` (defaults to `true`), `placement` (defaults to ordered), `inputs`/`entries` (default empty). Items without an `id` get `input-<n>`/`entry-<n>` from their position (1-based); this is deterministic but shifts if you reorder them by hand. Machine ids (UUIDs) are not written: they are replaced by these derived ids on the next save, and slots targeted by depth placements get a label derived from their name.
+- **Optional keys:** `id` on inputs and entries, `enabled` (defaults to `true`), `placement` (defaults to ordered), `inputs`/`entries` (default empty). Items without an `id` get `input-<n>`/`entry-<n>` from their position (1-based); this is deterministic but shifts if you reorder them by hand. Machine ids (UUIDs) are not written: they are replaced by these derived ids on the next save, and slots targeted by depth placements get a label derived from their `displayName`.
+- **Legacy entries:** files written before entries had a `displayName` used `name` as the label. An entry with `name` and no `displayName` is read as `displayName` with no message name (`upgradeLegacyPreset` in `@st/shared`, applied to raw data before validation by the YAML loader and the JSON migration). The file is not rewritten on read; it gets the new shape on its next save. Entry keys are written in the order `id, displayName, name, kind, …`.
 - **Content** is lossless: multi-line strings are literal block scalars. Content that block scalars cannot carry (for example lines made only of whitespace, or CR characters) is written double-quoted instead. Unknown fields are preserved at every level.
 - **A new hand-written file** with no `id` is valid: the server stamps a fresh `id` (and `createdAt`/`updatedAt` if missing) into the file once, appending after your content, then treats it as a normal preset.
 - **Invalid files** (bad YAML, fail the preset schema) are skipped with a warning naming the file and the reason, and are never modified or deleted. If two files declare the same `id`, the first by file name wins and the other is skipped with a warning.

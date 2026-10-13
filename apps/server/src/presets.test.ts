@@ -97,14 +97,14 @@ it('answers a create with the stored form, so ids match later reads', async () =
       entries: [
         {
           id: randomUUID(),
-          name: 'Rules',
+          displayName: 'Rules',
           kind: 'message',
           enabled: true,
           role: 'system',
           content: 'Be nice',
           placement: { mode: 'ordered' },
         },
-        { id: randomUUID(), name: 'History', kind: 'slot', enabled: true, inputKey: 'history', role: 'user' },
+        { id: randomUUID(), displayName: 'History', kind: 'slot', enabled: true, inputKey: 'history', role: 'user' },
       ],
     },
   });

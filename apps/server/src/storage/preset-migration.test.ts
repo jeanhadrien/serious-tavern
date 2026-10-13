@@ -27,7 +27,7 @@ function legacyPreset(name: string): Preset {
     entries: [
       {
         id: randomUUID(),
-        name: 'Main',
+        displayName: 'Main',
         enabled: true,
         kind: 'message',
         role: 'system',
@@ -36,14 +36,14 @@ function legacyPreset(name: string): Preset {
       },
       {
         id: randomUUID(),
-        name: 'Note',
+        displayName: 'Note',
         enabled: true,
         kind: 'message',
         role: 'system',
         content: 'n',
         placement: { mode: 'depth', entryId: slotId, depth: 1 },
       },
-      { id: slotId, name: 'History', enabled: true, kind: 'slot', inputKey: 'history', role: 'user' },
+      { id: slotId, displayName: 'History', enabled: true, kind: 'slot', inputKey: 'history', role: 'user' },
     ],
     createdAt: date,
     updatedAt: date,
@@ -103,4 +103,20 @@ it('keeps the JSON and removes its YAML when verification fails', async () => {
   await migrateJsonPresets(directory, repository);
   expect(await names()).toEqual([`${a.id}.json`]);
   expect(await readFile(join(directory, `${a.id}.json`), 'utf8')).toBe(json);
+});
+
+it('migrates JSON whose entries still use `name` as their label', async () => {
+  const a = legacyPreset('Alpha');
+  const raw = JSON.parse(JSON.stringify(a)) as { entries: Record<string, unknown>[] };
+  for (const entry of raw.entries) {
+    entry.name = entry.displayName;
+    delete entry.displayName;
+  }
+  await writeFile(join(directory, `${a.id}.json`), JSON.stringify(raw));
+  const repository = new PresetRepository(directory);
+  await migrateJsonPresets(directory, repository);
+  expect(await names()).toEqual(['alpha.yaml', `${a.id}.json.migrated`].sort());
+  const stored = await repository.get(a.id);
+  expect(stored?.entries.map((entry) => entry.displayName)).toEqual(['Main', 'Note', 'History']);
+  expect(stored?.entries.some((entry) => 'name' in entry)).toBe(false);
 });

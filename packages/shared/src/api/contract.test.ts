@@ -23,7 +23,7 @@ it('validates preset writes with the same cross-field rules as complete presets'
   expect(
     apiContract.updatePreset.body.safeParse({
       ...body,
-      entries: [{ id: 'slot', name: 'History', enabled: true, kind: 'slot', inputKey: 'missing' }],
+      entries: [{ id: 'slot', displayName: 'History', enabled: true, kind: 'slot', inputKey: 'missing' }],
     }).success,
   ).toBe(false);
 });

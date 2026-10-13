@@ -354,7 +354,7 @@ it('supports workflow CRUD, secrets masking, and a chat execution through inject
         payload: {
           name: 'Test',
           inputs: [{ id: 'message-input', key: 'message', label: 'Message', dataType: 'text' }],
-          entries: [{ kind: 'slot', id: 'message-slot', name: 'Message', enabled: true, inputKey: 'message' }],
+          entries: [{ kind: 'slot', id: 'message-slot', displayName: 'Message', enabled: true, inputKey: 'message' }],
         },
       })
     ).json();
@@ -421,8 +421,8 @@ it('prunes orphaned preset-input edges when a preset is updated', async () => {
             { id: 'extra-input', key: 'extra', label: 'Extra', dataType: 'text' },
           ],
           entries: [
-            { id: 'message-slot', name: 'Message', enabled: true, kind: 'slot', inputKey: 'message' },
-            { id: 'extra-slot', name: 'Extra', enabled: true, kind: 'slot', inputKey: 'extra' },
+            { id: 'message-slot', displayName: 'Message', enabled: true, kind: 'slot', inputKey: 'message' },
+            { id: 'extra-slot', displayName: 'Extra', enabled: true, kind: 'slot', inputKey: 'extra' },
           ],
         },
       })
@@ -455,7 +455,7 @@ it('prunes orphaned preset-input edges when a preset is updated', async () => {
       payload: {
         name: 'Dynamic',
         inputs: [{ id: 'message-input', key: 'message', label: 'Message', dataType: 'text' }],
-        entries: [{ id: 'message-slot', name: 'Message', enabled: true, kind: 'slot', inputKey: 'message' }],
+        entries: [{ id: 'message-slot', displayName: 'Message', enabled: true, kind: 'slot', inputKey: 'message' }],
       },
     });
     expect(updated.statusCode).toBe(200);
@@ -649,13 +649,13 @@ it('supports presets CRUD, preview with a session, dynamic ports, and deletion c
           {
             id: 'system',
             kind: 'message',
-            name: 'System',
+            displayName: 'System',
             enabled: true,
             role: 'system',
             content: '{{trigger.message}}',
           },
-          { id: 'history', kind: 'slot', name: 'History', enabled: true, inputKey: 'history' },
-          { id: 'message', kind: 'slot', name: 'Message', enabled: true, inputKey: 'message' },
+          { id: 'history', kind: 'slot', displayName: 'History', enabled: true, inputKey: 'history' },
+          { id: 'message', kind: 'slot', displayName: 'Message', enabled: true, inputKey: 'message' },
         ],
       },
     });
@@ -669,7 +669,7 @@ it('supports presets CRUD, preview with a session, dynamic ports, and deletion c
         {
           id: 'note',
           kind: 'message',
-          name: 'Note',
+          displayName: 'Note',
           enabled: true,
           role: 'system',
           content: 'Last',

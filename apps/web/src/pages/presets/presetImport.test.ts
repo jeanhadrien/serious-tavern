@@ -23,17 +23,17 @@ const imported = (): Preset =>
     entries: [
       {
         id: 'system',
-        name: 'System',
+        displayName: 'System',
         kind: 'message',
         enabled: true,
         role: 'system',
         content: 'Hi',
         placement: { mode: 'ordered' },
       },
-      { id: 'history-slot', name: 'History', kind: 'slot', enabled: true, inputKey: 'history', role: 'user' },
+      { id: 'history-slot', displayName: 'History', kind: 'slot', enabled: true, inputKey: 'history', role: 'user' },
       {
         id: 'depth',
-        name: 'Depth note',
+        displayName: 'Depth note',
         kind: 'message',
         enabled: true,
         role: 'system',

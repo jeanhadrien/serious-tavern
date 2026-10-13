@@ -1,7 +1,7 @@
 import { access, mkdir, readdir, readFile, rename } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { presetSchema, type Preset } from '@st/shared';
+import { presetSchema, upgradeLegacyPreset, type Preset } from '@st/shared';
 import type { PresetRepository } from './preset-repository.js';
 
 const exists = (path: string) =>
@@ -31,7 +31,7 @@ export async function migrateJsonPresets(directory: string, repository: PresetRe
   for (const file of files) {
     const path = join(directory, file);
     try {
-      const parsed = presetSchema.safeParse(JSON.parse(await readFile(path, 'utf8')));
+      const parsed = presetSchema.safeParse(upgradeLegacyPreset(JSON.parse(await readFile(path, 'utf8'))));
       if (!parsed.success) {
         console.warn(`Not migrating preset ${path}: ${parsed.error.issues[0]?.message ?? 'invalid preset'}`);
         continue;

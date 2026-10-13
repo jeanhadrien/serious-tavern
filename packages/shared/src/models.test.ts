@@ -84,8 +84,8 @@ it('preserves unknown preset fields and defaults old placement/role', () => {
     futurePresetField: 'kept',
     inputs: [{ id: 'i', key: 'history', dataType: 'messages', futureInputField: 1 }],
     entries: [
-      { id: 'm', kind: 'message', enabled: true, name: 'M', role: 'system', content: 'hi', futureEntryField: 1 },
-      { id: 's', kind: 'slot', enabled: true, name: 'S', inputKey: 'history', futureSlotField: 2 },
+      { id: 'm', kind: 'message', enabled: true, displayName: 'M', role: 'system', content: 'hi', futureEntryField: 1 },
+      { id: 's', kind: 'slot', enabled: true, displayName: 'S', inputKey: 'history', futureSlotField: 2 },
     ],
   });
   expect((preset as Record<string, unknown>).futurePresetField).toBe('kept');

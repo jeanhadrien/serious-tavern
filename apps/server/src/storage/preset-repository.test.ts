@@ -28,14 +28,14 @@ function preset(overrides: Partial<Preset> = {}): Preset {
     entries: [
       {
         id: randomUUID(),
-        name: 'Main',
+        displayName: 'Main',
         enabled: true,
         kind: 'message',
         role: 'system',
         content: 'Hi',
         placement: { mode: 'ordered' },
       },
-      { id: randomUUID(), name: 'Chat history', enabled: true, kind: 'slot', inputKey: 'history', role: 'user' },
+      { id: randomUUID(), displayName: 'Chat history', enabled: true, kind: 'slot', inputKey: 'history', role: 'user' },
     ],
     createdAt: date,
     updatedAt: date,
@@ -100,7 +100,7 @@ it('round-trips hostile strings and unknown fields at every level', () => {
     entries: [
       ...hostile.map((content, index) => ({
         id: `entry-${index + 1}`,
-        name: `E${index}`,
+        displayName: `E${index}`,
         enabled: index % 2 === 0,
         kind: 'message' as const,
         role: 'user' as const,
@@ -157,7 +157,7 @@ it('round-trips random strings', () => {
   const original = preset({
     entries: strings.map((content, index) => ({
       id: `entry-${index + 1}`,
-      name: `E${index}`,
+      displayName: `E${index}`,
       enabled: true,
       kind: 'message' as const,
       role: 'user' as const,
@@ -176,7 +176,7 @@ it('writes multi-line content as readable block scalars and keeps bookkeeping la
       entries: [
         {
           id: 'entry-1',
-          name: 'Main',
+          displayName: 'Main',
           enabled: true,
           kind: 'message',
           role: 'system',
@@ -198,7 +198,7 @@ it('keeps entry ids deterministic across reads of a hand-written file', async ()
   const id = randomUUID();
   await writeFile(
     join(directory, 'hand.yaml'),
-    `name: Hand written\nid: ${id}\ncreatedAt: ${date}\nupdatedAt: ${date}\ninputs:\n  - key: history\n    dataType: messages\nentries:\n  - name: Rules\n    kind: message\n    role: system\n    content: Be nice\n  - name: History\n    kind: slot\n    inputKey: history\n`,
+    `name: Hand written\nid: ${id}\ncreatedAt: ${date}\nupdatedAt: ${date}\ninputs:\n  - key: history\n    dataType: messages\nentries:\n  - displayName: Rules\n    kind: message\n    role: system\n    content: Be nice\n  - displayName: History\n    kind: slot\n    inputKey: history\n`,
   );
   const repository = new PresetRepository(directory);
   const first = await repository.get(id);
@@ -215,14 +215,14 @@ it('gives depth-targeted slots a readable label that placements reference', asyn
     entries: [
       {
         id: randomUUID(),
-        name: 'Note',
+        displayName: 'Note',
         enabled: true,
         kind: 'message',
         role: 'system',
         content: 'n',
         placement: { mode: 'depth', entryId: slotId, depth: 1 },
       },
-      { id: slotId, name: 'Chat History!', enabled: true, kind: 'slot', inputKey: 'history', role: 'user' },
+      { id: slotId, displayName: 'Chat History!', enabled: true, kind: 'slot', inputKey: 'history', role: 'user' },
     ],
   });
   const repository = new PresetRepository(directory);
@@ -241,7 +241,7 @@ it('gives depth-targeted slots a readable label that placements reference', asyn
 
 it('stamps a missing id and timestamps once, keeping the file otherwise as written', async () => {
   const body =
-    '# my preset\nname: Fresh\ninputs: []\nentries:\n  - name: A\n    kind: message\n    role: user\n    content: |\n      hello\n      there\n';
+    '# my preset\nname: Fresh\ninputs: []\nentries:\n  - displayName: A\n    kind: message\n    role: user\n    content: |\n      hello\n      there\n';
   await writeFile(join(directory, 'fresh.yaml'), body);
   const repository = new PresetRepository(directory);
   const [listed, again] = await Promise.all([repository.list(), repository.list()]);
@@ -383,7 +383,7 @@ it('stores hostile content through the repository byte for byte', async () => {
   const original = preset({
     entries: hostile.map((content, index) => ({
       id: randomUUID(),
-      name: `E${index}`,
+      displayName: `E${index}`,
       enabled: true,
       kind: 'message' as const,
       role: 'user' as const,
@@ -394,4 +394,30 @@ it('stores hostile content through the repository byte for byte', async () => {
   await repository.save(original);
   const stored = await repository.get(original.id);
   expect(stored?.entries.map((_, index) => messageContent(stored, index))).toEqual(hostile);
+});
+
+it('reads legacy entries (label in `name`) without touching the file and saves them in the new shape', async () => {
+  const id = randomUUID();
+  const legacy = `name: Old\nid: ${id}\ncreatedAt: ${date}\nupdatedAt: ${date}\ninputs:\n  - key: history\n    dataType: messages\nentries:\n  - name: Main prompt\n    kind: message\n    role: system\n    content: Hi\n  - name: Chat history\n    kind: slot\n    inputKey: history\n`;
+  await writeFile(join(directory, 'old.yaml'), legacy);
+  const repository = new PresetRepository(directory);
+  const stored = await repository.get(id);
+  expect(stored?.entries.map((entry) => entry.displayName)).toEqual(['Main prompt', 'Chat history']);
+  expect(stored?.entries.some((entry) => 'name' in entry)).toBe(false);
+  expect(await read('old.yaml')).toBe(legacy);
+
+  await repository.update(id, (current) => current);
+  const text = await read('old.yaml');
+  expect(text).toContain('  - displayName: Main prompt\n    kind: message\n');
+  expect(text).not.toMatch(/^ {4}name:|^ {2}- name:/m);
+  expect((await repository.get(id))?.entries).toEqual(stored?.entries);
+});
+
+it('writes a message name right after the display name', async () => {
+  const original = preset();
+  original.entries[0] = { ...original.entries[0]!, name: '{{char}}' };
+  const repository = new PresetRepository(directory);
+  await repository.save(original);
+  expect(await read((await files())[0]!)).toContain('  - displayName: Main\n    name: "{{char}}"\n    kind: message\n');
+  expect((await repository.get(original.id))?.entries[0]).toMatchObject({ displayName: 'Main', name: '{{char}}' });
 });

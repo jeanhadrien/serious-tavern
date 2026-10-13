@@ -61,7 +61,7 @@ const preset: Preset = {
   createdAt: '',
   updatedAt: '',
   inputs: [{ id: 'prompt', key: 'prompt', dataType: 'text' }],
-  entries: [{ id: 'prompt', name: 'Prompt', kind: 'slot', enabled: true, inputKey: 'prompt', role: 'user' }],
+  entries: [{ id: 'prompt', displayName: 'Prompt', kind: 'slot', enabled: true, inputKey: 'prompt', role: 'user' }],
 };
 afterEach(() => {
   registry.delete('reply-fail-test');
@@ -362,7 +362,7 @@ describe('character nodes and history', () => {
       entries: [
         {
           id: 'macros',
-          name: 'Macros',
+          displayName: 'Macros',
           kind: 'message',
           enabled: true,
           role: 'system',
@@ -417,7 +417,9 @@ describe('character nodes and history', () => {
     const historyPreset: Preset = {
       ...preset,
       inputs: [{ id: 'history', key: 'history', dataType: 'messages' }],
-      entries: [{ id: 'history', name: 'History', kind: 'slot', enabled: true, inputKey: 'history', role: 'user' }],
+      entries: [
+        { id: 'history', displayName: 'History', kind: 'slot', enabled: true, inputKey: 'history', role: 'user' },
+      ],
     };
     for (const value of [fromMemory, fromInput]) {
       expect(

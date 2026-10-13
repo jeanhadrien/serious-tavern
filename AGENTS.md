@@ -93,6 +93,9 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Local row bookkeeping lives in the pure helpers of `pages/chat/turnMessages.ts`. Rows with `status: 'streaming'` are local until the turn settles.
 - **Editor:** never drop nodes. Unknown node types are kept as read-only placeholders and are saved unchanged.
 - **Presets:** fixed entries that render to empty text are dropped, so a template entry holding only one variable disappears when that variable is empty.
+  - **`displayName` vs `name`:** every entry's editor label is the required `displayName`. A message entry's optional `name` is a template rendered like `content`, trimmed, and sent as `PromptMessage.name` only when non-empty. Slots have no `name`. Name templates are validated like content (path `['entries', i, 'name']`); use `entryTemplates`/`entryUsesInput` from `shared` instead of reading `content` alone.
+  - **Legacy rule:** an entry with `name` and no `displayName` is a pre-`displayName` entry: its `name` is the label and it has no message name. `upgradeLegacyPreset` (shared) applies this to **raw** data before schema validation, in the YAML loader (`presetCandidate`) and the JSON migration only. Never put it in the zod schema (`z.preprocess` erases the input type the web client relies on) or apply it to API write bodies. Files keep the old shape until their next save.
+  - Entry types are `passthrough`, so a stray `name` key compiles anywhere. When building or copying entries, set `displayName`; a leftover `name` silently becomes a message name.
   - **Imported presets** carry a server-owned `source`. Client writes never set it, `PUT` on a preset with one returns 409 `PRESET_READ_ONLY`, and only `services/import/sync.ts` writes it, under `context.importLock`. New connectors implement `ImportConnector` in `services/import/`.
   - The stored `source.hash` covers the connector's `mapperVersion` as well as the file bytes. Any change to a mapper's output for the same input must bump `mapperVersion`, or Sync reports the files as unchanged and never applies it.
   - **Storage is YAML, not JSON:** presets live in `data/presets/<slug-of-name>.yaml` through `PresetRepository` (`storage/preset-repository.ts`). Identity is the `id` inside the file, never the filename. Users may edit or rename files while the server runs, so nothing is cached and every operation scans the directory.
@@ -124,7 +127,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Macros also resolve inside character and persona fields, with protection against cycles.
   - Unknown `{{input.x}}` is a preset validation **error**.
 - **Prompt behaviour is chosen by the user:** the engine never applies automatic SillyTavern rules (card system prompt overriding the main prompt, splitting examples at `<START>`, and so on). Users reference fields in their presets themselves.
-- **Prompt messages** have an optional `name`, passed through to the provider only when set. This is groundwork for a future "speaker names" option on the history slot.
+- **Prompt messages** have an optional `name`, passed through to the provider only when set. Preset message entries set it from their `name` template; messages slots carry the history's names. A future "speaker names" option on the history slot builds on this.
 - **LLM node option** `mergeSystemMessages`: merges consecutive system messages that have no name, after rendering.
 
 ## Adding a node type

@@ -49,20 +49,20 @@ export function renderPreset(
   );
   const history = options.templateContext.history?.map(withoutReasoning);
   const renderedMessages = new Map<string, PromptMessage>();
+  const context = {
+    inputs,
+    trigger: options.templateContext.trigger,
+    history,
+    character: options.templateContext.character,
+    persona: options.templateContext.persona,
+  };
   for (const entry of valid.entries) {
     if (entry.kind !== 'message' || !entry.enabled) continue;
-    const content = renderContextTemplate(
-      entry.content,
-      {
-        inputs,
-        trigger: options.templateContext.trigger,
-        history,
-        character: options.templateContext.character,
-        persona: options.templateContext.persona,
-      },
-      'preset',
-    );
-    if (content.trim()) renderedMessages.set(entry.id, { role: entry.role, content });
+    const content = renderContextTemplate(entry.content, context, 'preset');
+    if (!content.trim()) continue;
+    // The message name is optional: an empty rendering means "no name", never an empty one.
+    const name = entry.name === undefined ? '' : renderContextTemplate(entry.name, context, 'preset').trim();
+    renderedMessages.set(entry.id, { role: entry.role, content, ...(name ? { name } : {}) });
   }
 
   const result: PromptMessage[] = [];

@@ -8,7 +8,10 @@ export function PresetEntryEditor(props: {
   readOnly: boolean;
   onChange(entry: PresetEntry): void;
 }) {
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const contentRef = useRef<HTMLTextAreaElement | null>(null);
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  // Variable hints insert into whichever template field was focused last.
+  const hintTarget = useRef<'content' | 'name'>('content');
   const { entry, preset } = props;
   if (!entry)
     return (
@@ -33,13 +36,15 @@ export function PresetEntryEditor(props: {
   const update = (partial: Partial<PresetEntry>) => props.onChange({ ...entry, ...partial } as PresetEntry);
   const insert = (token: string) => {
     if (entry.kind !== 'message') return;
-    const textarea = textareaRef.current;
-    const start = textarea?.selectionStart ?? entry.content.length;
-    const end = textarea?.selectionEnd ?? start;
-    update({ content: entry.content.slice(0, start) + token + entry.content.slice(end) });
+    const field = hintTarget.current;
+    const element = field === 'name' ? nameRef.current : contentRef.current;
+    const value = (field === 'name' ? entry.name : entry.content) ?? '';
+    const start = element?.selectionStart ?? value.length;
+    const end = element?.selectionEnd ?? start;
+    update({ [field]: value.slice(0, start) + token + value.slice(end) });
     requestAnimationFrame(() => {
-      textarea?.focus();
-      textarea?.setSelectionRange(start + token.length, start + token.length);
+      element?.focus();
+      element?.setSelectionRange(start + token.length, start + token.length);
     });
   };
 
@@ -48,7 +53,8 @@ export function PresetEntryEditor(props: {
       <h3>Edit entry</h3>
       <fieldset disabled={props.readOnly} className="preset-entry-fields">
         <label>
-          Name <input value={entry.name} onChange={(event) => update({ name: event.target.value })} />
+          Display name{' '}
+          <input value={entry.displayName} onChange={(event) => update({ displayName: event.target.value })} />
         </label>
         {entry.kind === 'slot' ? (
           <>
@@ -97,11 +103,29 @@ export function PresetEntryEditor(props: {
               </select>
             </label>
             <label>
+              Name{' '}
+              <input
+                ref={nameRef}
+                value={entry.name ?? ''}
+                placeholder="Optional"
+                onFocus={() => {
+                  hintTarget.current = 'name';
+                }}
+                onChange={(event) => update({ name: event.target.value || undefined })}
+              />
+            </label>
+            <p className="hint">
+              Message name sent to the model (a template, like the content). Left out when it renders empty.
+            </p>
+            <label>
               Content{' '}
               <textarea
-                ref={textareaRef}
+                ref={contentRef}
                 rows={12}
                 value={entry.content}
+                onFocus={() => {
+                  hintTarget.current = 'content';
+                }}
                 onChange={(event) => update({ content: event.target.value })}
               />
             </label>
@@ -146,7 +170,7 @@ export function PresetEntryEditor(props: {
                   >
                     {slots.map((slot) => (
                       <option value={slot.id} key={slot.id}>
-                        {slot.name} · {slot.inputKey}
+                        {slot.displayName} · {slot.inputKey}
                       </option>
                     ))}
                     {!slots.some((slot) => slot.id === placement.entryId) && (

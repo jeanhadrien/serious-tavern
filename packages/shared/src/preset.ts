@@ -50,11 +50,14 @@ const depthPlacementSchema = z.discriminatedUnion('mode', [
     .passthrough(),
 ]);
 
+// `displayName` is the editor label. A message entry's optional `name` is a template rendered like
+// `content` and sent as the prompt message's name; slots have none (their messages carry their own).
 export const presetEntrySchema = z.discriminatedUnion('kind', [
   z
     .object({
       id: z.string().min(1),
-      name: z.string().trim().min(1),
+      displayName: z.string().trim().min(1),
+      name: z.string().optional(),
       enabled: z.boolean(),
       kind: z.literal('message'),
       role: presetRoleSchema,
@@ -65,7 +68,7 @@ export const presetEntrySchema = z.discriminatedUnion('kind', [
   z
     .object({
       id: z.string().min(1),
-      name: z.string().trim().min(1),
+      displayName: z.string().trim().min(1),
       enabled: z.boolean(),
       kind: z.literal('slot'),
       inputKey: presetInputKeySchema,
@@ -73,6 +76,34 @@ export const presetEntrySchema = z.discriminatedUnion('kind', [
     })
     .passthrough(),
 ]);
+
+/**
+ * Upgrades raw stored preset data written before entries had a `displayName`: an entry with `name` and no
+ * `displayName` used `name` as its label, so it becomes `displayName` and the entry has no message name.
+ * Apply to raw data before schema validation wherever stored presets are read. Returns a copy.
+ */
+export function upgradeLegacyPreset(raw: unknown): unknown {
+  if (!isRecord(raw) || !Array.isArray(raw.entries)) return raw;
+  const entries = raw.entries.map((entry: unknown) => {
+    if (!isRecord(entry) || entry.name === undefined || entry.displayName !== undefined) return entry;
+    const { name, ...rest } = entry;
+    return { ...rest, displayName: name };
+  });
+  return { ...raw, entries };
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+type MessageEntry = Extract<z.infer<typeof presetEntrySchema>, { kind: 'message' }>;
+
+/** The templated fields of a message entry, keyed by field name (the last segment of issue paths). */
+export function entryTemplates(entry: MessageEntry): { field: 'content' | 'name'; template: string }[] {
+  return [
+    { field: 'content', template: entry.content },
+    ...(entry.name === undefined ? [] : [{ field: 'name' as const, template: entry.name }]),
+  ];
+}
 
 export const presetFieldsSchema = z
   .object({
@@ -104,10 +135,12 @@ export const presetFieldsSchema = z
           message: `Unknown input: ${entry.inputKey}`,
         });
       if (entry.kind === 'message') {
-        for (const reference of analyzeTemplate(entry.content).references) {
-          const key = macroInputKey(reference.name);
-          if (key !== undefined && !inputByKey.has(key))
-            ctx.addIssue({ code: 'custom', path: ['entries', index, 'content'], message: `Unknown input: ${key}` });
+        for (const { field, template } of entryTemplates(entry)) {
+          for (const reference of analyzeTemplate(template).references) {
+            const key = macroInputKey(reference.name);
+            if (key !== undefined && !inputByKey.has(key))
+              ctx.addIssue({ code: 'custom', path: ['entries', index, field], message: `Unknown input: ${key}` });
+          }
         }
       }
     });
@@ -151,6 +184,13 @@ export const presetWarningSchema = z.object({
 export type PromptMessage = z.infer<typeof promptMessageSchema>;
 export type PresetWarning = z.infer<typeof presetWarningSchema>;
 
+/** Whether any template of a message entry (content or name) references `{{input.<key>}}`. */
+export function entryUsesInput(entry: MessageEntry, key: string): boolean {
+  return entryTemplates(entry).some(({ template }) =>
+    templateMacros(template).some((macro) => macroInputKey(macro.name) === key),
+  );
+}
+
 export function presetWarnings(preset: Preset): PresetWarning[] {
   const warnings: PresetWarning[] = [];
   preset.inputs.forEach((input, index) => {
@@ -158,21 +198,20 @@ export function presetWarnings(preset: Preset): PresetWarning[] {
       (entry) => entry.kind === 'slot' && entry.enabled && entry.inputKey === input.key,
     );
     const usedByTemplate = preset.entries.some(
-      (entry) =>
-        entry.kind === 'message' &&
-        entry.enabled &&
-        templateMacros(entry.content).some((macro) => macroInputKey(macro.name) === input.key),
+      (entry) => entry.kind === 'message' && entry.enabled && entryUsesInput(entry, input.key),
     );
     if (!usedBySlot && !usedByTemplate)
       warnings.push({ path: ['inputs', index], message: `Input "${input.key}" is not used by an enabled entry.` });
   });
   preset.entries.forEach((entry, index) => {
     if (entry.kind !== 'message' || !entry.enabled) return;
-    const { references, problems } = analyzeTemplate(entry.content);
-    for (const problem of problems) warnings.push({ path: ['entries', index, 'content'], message: problem });
-    for (const reference of references) {
-      if (reference.root && !findMacro(reference.name))
-        warnings.push({ path: ['entries', index, 'content'], message: `Unknown macro: ${reference.expression}` });
+    for (const { field, template } of entryTemplates(entry)) {
+      const { references, problems } = analyzeTemplate(template);
+      for (const problem of problems) warnings.push({ path: ['entries', index, field], message: problem });
+      for (const reference of references) {
+        if (reference.root && !findMacro(reference.name))
+          warnings.push({ path: ['entries', index, field], message: `Unknown macro: ${reference.expression}` });
+      }
     }
   });
   return warnings;

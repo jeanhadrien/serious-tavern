@@ -14,7 +14,7 @@ const preset = presetSchema.parse({
 it('shows slot previews and a messages-slot icon', () => {
   const slot: PresetEntry = {
     id: 'history-slot',
-    name: 'History',
+    displayName: 'History',
     kind: 'slot',
     enabled: true,
     inputKey: 'history',
@@ -27,7 +27,7 @@ it('shows slot previews and a messages-slot icon', () => {
 it('previews compact entry content and uses the role icon', () => {
   const message: PresetEntry = {
     id: 'system',
-    name: 'System',
+    displayName: 'System',
     kind: 'message',
     enabled: true,
     role: 'assistant',
@@ -42,7 +42,7 @@ const reorderFixture = () =>
   ['a', 'b', 'c'].map(
     (key): PresetEntry => ({
       id: key,
-      name: key,
+      displayName: key,
       kind: 'slot',
       enabled: true,
       inputKey: key,

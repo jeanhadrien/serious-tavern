@@ -46,7 +46,7 @@ export function defaultPreset(): Preset {
     entries: [
       {
         id: 'default-main-prompt',
-        name: 'Main prompt',
+        displayName: 'Main prompt',
         enabled: true,
         kind: 'message',
         role: 'system',
@@ -55,7 +55,7 @@ export function defaultPreset(): Preset {
       },
       {
         id: 'default-character-description',
-        name: 'Character description',
+        displayName: 'Character description',
         enabled: true,
         kind: 'message',
         role: 'system',
@@ -64,7 +64,7 @@ export function defaultPreset(): Preset {
       },
       {
         id: 'default-personality',
-        name: 'Personality',
+        displayName: 'Personality',
         enabled: true,
         kind: 'message',
         role: 'system',
@@ -73,7 +73,7 @@ export function defaultPreset(): Preset {
       },
       {
         id: 'default-scenario',
-        name: 'Scenario',
+        displayName: 'Scenario',
         enabled: true,
         kind: 'message',
         role: 'system',
@@ -82,7 +82,7 @@ export function defaultPreset(): Preset {
       },
       {
         id: 'default-persona',
-        name: 'Persona',
+        displayName: 'Persona',
         enabled: true,
         kind: 'message',
         role: 'system',
@@ -91,7 +91,7 @@ export function defaultPreset(): Preset {
       },
       {
         id: 'default-example-dialogue',
-        name: 'Example dialogue',
+        displayName: 'Example dialogue',
         enabled: true,
         kind: 'message',
         role: 'system',
@@ -100,7 +100,7 @@ export function defaultPreset(): Preset {
       },
       {
         id: 'default-history-slot',
-        name: 'Chat history',
+        displayName: 'Chat history',
         enabled: true,
         kind: 'slot',
         inputKey: 'history',
@@ -108,7 +108,7 @@ export function defaultPreset(): Preset {
       },
       {
         id: 'default-post-history-instructions',
-        name: 'Post-history instructions',
+        displayName: 'Post-history instructions',
         enabled: true,
         kind: 'message',
         role: 'system',
@@ -117,7 +117,7 @@ export function defaultPreset(): Preset {
       },
       {
         id: 'default-message-slot',
-        name: 'User message',
+        displayName: 'User message',
         enabled: true,
         kind: 'slot',
         inputKey: 'message',
