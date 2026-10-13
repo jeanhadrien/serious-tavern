@@ -1,12 +1,6 @@
 import { registerAdapter, type ChatOptions, type ChatRequest, type ChatResponse, type LlmAdapter } from './index.js';
 import { resolveWireSettings, type WireSettings } from './wire-settings.js';
 
-/**
- * The adapter for `openai-compatible` provider records (OpenRouter, OpenAI, DeepSeek, Ollama, ...).
- * Everything backend-specific comes from the record: URL, auth, headers, the message-name field,
- * where reasoning is read from, and raw `extraBody` fields; overrides adjust these per model.
- */
-
 // A stream is only considered stalled after this long without any bytes (keep-alive comments count).
 const streamIdleTimeoutMs = 120_000;
 // Without streaming there is no activity to observe, so this bounds the whole request.
@@ -196,6 +190,11 @@ async function readStream(
 
 type CompletionMessage = { content?: unknown } & Record<string, unknown>;
 
+/**
+ * The adapter for `openai-compatible` provider records (OpenRouter, OpenAI, DeepSeek, Ollama, ...).
+ * Everything backend-specific comes from the record: URL, auth, headers, the message-name field,
+ * where reasoning is read from, and raw `extraBody` fields; overrides adjust these per model.
+ */
 export const openaiCompatible: LlmAdapter = {
   async chat(request, options) {
     const { provider } = options;
