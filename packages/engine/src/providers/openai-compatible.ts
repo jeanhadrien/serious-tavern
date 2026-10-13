@@ -1,4 +1,11 @@
 import { registerAdapter, type ChatOptions, type ChatRequest, type ChatResponse, type LlmAdapter } from './index.js';
+import { resolveWireSettings, type WireSettings } from './wire-settings.js';
+
+/**
+ * The adapter for `openai-compatible` provider records (OpenRouter, OpenAI, DeepSeek, Ollama, ...).
+ * Everything backend-specific comes from the record: URL, auth, headers, the message-name field,
+ * where reasoning is read from, and raw `extraBody` fields; overrides adjust these per model.
+ */
 
 // A stream is only considered stalled after this long without any bytes (keep-alive comments count).
 const streamIdleTimeoutMs = 120_000;
@@ -27,13 +34,17 @@ function withIdleTimeout(signal: AbortSignal, ms: number, provider: string) {
   };
 }
 
-function requestBody(request: ChatRequest, stream: boolean) {
+// A call against one record, with the wire settings for the request's model already resolved.
+type Call = ChatOptions & { wire: WireSettings };
+
+function requestBody(request: ChatRequest, stream: boolean, { messageName, extraBody }: WireSettings) {
   return {
     model: request.model,
     messages: request.messages.map((message) => ({
       role: message.role,
       content: message.content,
-      ...(message.name === undefined ? {} : { name: message.name }),
+      // An empty name still counts as set.
+      ...(messageName === null || message.name === undefined ? {} : { [messageName]: message.name }),
     })),
     temperature: request.temperature,
     max_tokens: request.maxTokens,
@@ -43,7 +54,18 @@ function requestBody(request: ChatRequest, stream: boolean) {
     ...(request.presencePenalty === undefined ? {} : { presence_penalty: request.presencePenalty }),
     ...(request.stop === undefined ? {} : { stop: request.stop }),
     ...reasoningParams(request),
+    // Last, so the record can override or add any field.
+    ...extraBody,
   };
+}
+
+/** The first configured reasoning field holding non-empty text, in a stream delta or a response message. */
+function reasoningText(source: Record<string, unknown> | undefined, fields: string[]) {
+  for (const field of fields) {
+    const value = source?.[field];
+    if (typeof value === 'string' && value) return value;
+  }
+  return undefined;
 }
 
 /** Builds OpenRouter's unified `reasoning` object; nothing is sent when no option is set. */
@@ -57,15 +79,15 @@ function reasoningParams(request: ChatRequest) {
   return Object.keys(reasoning).length ? { reasoning } : {};
 }
 
-async function postCompletion(request: ChatRequest, stream: boolean, { provider, apiKey, signal }: ChatOptions) {
+async function postCompletion(request: ChatRequest, stream: boolean, { provider, apiKey, signal, wire }: Call) {
   const response = await fetch(`${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
     method: 'POST',
     headers: {
       ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
       'Content-Type': 'application/json',
-      ...provider.headers,
+      ...wire.headers,
     },
-    body: JSON.stringify(requestBody(request, stream)),
+    body: JSON.stringify(requestBody(request, stream, wire)),
     signal,
   });
   if (!response.ok) {
@@ -108,7 +130,7 @@ async function* serverSentData(body: ReadableStream<Uint8Array>, onChunk: () => 
 type StreamChunk = {
   id?: string;
   model?: string;
-  choices?: { delta?: { content?: string | null; reasoning?: string | null }; finish_reason?: string | null }[];
+  choices?: { delta?: { content?: string | null } & Record<string, unknown>; finish_reason?: string | null }[];
   usage?: unknown;
   error?: { message?: string };
 };
@@ -117,12 +139,13 @@ type Deadline = ReturnType<typeof withIdleTimeout>;
 
 async function readStream(
   request: ChatRequest,
-  { provider, apiKey }: ChatOptions,
+  call: Call,
   deadline: Deadline,
   onToken: (textDelta: string) => void,
   onReasoning: (reasoningDelta: string) => void,
 ): Promise<ChatResponse> {
-  const response = await postCompletion(request, true, { provider, apiKey, signal: deadline.signal });
+  const { provider, wire } = call;
+  const response = await postCompletion(request, true, { ...call, signal: deadline.signal });
   if (!response.body) throw new Error(`${provider.name} returned no stream`);
   let id: string | undefined;
   let model: string | undefined;
@@ -147,14 +170,15 @@ async function readStream(
       text += content;
       onToken(content);
     }
-    const reasoningDelta = choice.delta?.reasoning;
-    if (typeof reasoningDelta === 'string' && reasoningDelta) {
+    const reasoningDelta = reasoningText(choice.delta, wire.reasoningFields);
+    if (reasoningDelta) {
       reasoning += reasoningDelta;
       onReasoning(reasoningDelta);
     }
   }
   if (!sawChoice) throw new Error(`${provider.name} returned no assistant text`);
   // Mirrors the non-streaming response shape, so the node's `raw` output stays comparable.
+  // Reasoning is reported under `reasoning`, whichever wire field it came from.
   const raw = {
     id,
     model,
@@ -167,18 +191,24 @@ async function readStream(
     ],
     usage,
   };
-  return { text, raw, usage };
+  return { text, ...(reasoning ? { reasoning } : {}), raw, usage };
 }
 
-export const openrouter: LlmAdapter = {
-  async chat(request, { provider, apiKey, signal }) {
-    const deadline = withIdleTimeout(signal, requestTimeoutMs, provider.name);
+type CompletionMessage = { content?: unknown } & Record<string, unknown>;
+
+export const openaiCompatible: LlmAdapter = {
+  async chat(request, options) {
+    const { provider } = options;
+    const wire = resolveWireSettings(provider, request.model);
+    const deadline = withIdleTimeout(options.signal, requestTimeoutMs, provider.name);
     try {
-      const response = await postCompletion(request, false, { provider, apiKey, signal: deadline.signal });
+      const response = await postCompletion(request, false, { ...options, wire, signal: deadline.signal });
       const raw: unknown = await response.json();
-      const text = (raw as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content;
+      const message = (raw as { choices?: { message?: CompletionMessage }[] }).choices?.[0]?.message;
+      const text = message?.content;
       if (typeof text !== 'string') throw new Error(`${provider.name} returned no assistant text`);
-      return { text, raw, usage: (raw as { usage?: unknown }).usage };
+      const reasoning = reasoningText(message, wire.reasoningFields);
+      return { text, ...(reasoning ? { reasoning } : {}), raw, usage: (raw as { usage?: unknown }).usage };
     } finally {
       deadline.dispose();
     }
@@ -186,10 +216,11 @@ export const openrouter: LlmAdapter = {
   async stream(request, { onToken, onReasoning, ...options }) {
     const deadline = withIdleTimeout(options.signal, streamIdleTimeoutMs, options.provider.name);
     try {
-      return await readStream(request, options, deadline, onToken, onReasoning);
+      const wire = resolveWireSettings(options.provider, request.model);
+      return await readStream(request, { ...options, wire }, deadline, onToken, onReasoning);
     } finally {
       deadline.dispose();
     }
   },
 };
-registerAdapter('openai-compatible', openrouter);
+registerAdapter('openai-compatible', openaiCompatible);

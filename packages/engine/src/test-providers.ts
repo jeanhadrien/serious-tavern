@@ -1,6 +1,6 @@
 import { findBuiltInProvider, type Provider } from '@st/shared';
 import { adapters, type LlmAdapter } from './providers/index.js';
-import { openrouter } from './providers/openrouter.js';
+import { openaiCompatible } from './providers/openai-compatible.js';
 
 /** The built-in OpenRouter record. */
 export const openrouterProvider = findBuiltInProvider('openrouter')!;
@@ -23,4 +23,4 @@ export const providerResources = (...records: Provider[]) => ({
 
 /** Makes every provider record call `adapter`, until `restoreAdapter`. */
 export const useAdapter = (adapter: LlmAdapter) => adapters.set('openai-compatible', adapter);
-export const restoreAdapter = () => adapters.set('openai-compatible', openrouter);
+export const restoreAdapter = () => adapters.set('openai-compatible', openaiCompatible);

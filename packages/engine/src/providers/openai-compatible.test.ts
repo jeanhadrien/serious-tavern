@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ChatRequest } from './index.js';
 import { openrouterProvider, providerRecord } from '../test-providers.js';
-import { openrouter } from './openrouter.js';
+import { openaiCompatible } from './openai-compatible.js';
 
 const request: ChatRequest = {
   model: 'test',
@@ -39,7 +39,7 @@ describe('provider record', () => {
   it('sends to the record base URL with its headers, and no credentials without a secret', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(chatBody));
     const local = providerRecord('local', { baseUrl: 'http://localhost:11434/v1/', headers: { 'X-Local': '1' } });
-    await openrouter.chat(request, { provider: local, signal: new AbortController().signal });
+    await openaiCompatible.chat(request, { provider: local, signal: new AbortController().signal });
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(url).toBe('http://localhost:11434/v1/chat/completions');
     expect((init as RequestInit).headers).toEqual({ 'Content-Type': 'application/json', 'X-Local': '1' });
@@ -47,13 +47,13 @@ describe('provider record', () => {
   it('names the provider in upstream errors', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"error":"nope"}', { status: 401 }));
     const provider = providerRecord('deepseek', { name: 'My DeepSeek' });
-    await expect(openrouter.chat(request, { provider, signal: new AbortController().signal })).rejects.toThrow(
+    await expect(openaiCompatible.chat(request, { provider, signal: new AbortController().signal })).rejects.toThrow(
       'My DeepSeek 401: nope',
     );
   });
 });
 
-describe('OpenRouter streaming', () => {
+describe('streaming (built-in OpenRouter record)', () => {
   it('parses reply and reasoning deltas from frames split at arbitrary byte boundaries', async () => {
     const body = [
       ': OPENROUTER PROCESSING\n\n',
@@ -66,7 +66,7 @@ describe('OpenRouter streaming', () => {
     ].join('');
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(streamResponse(body.match(/[\s\S]{1,7}/g) ?? []));
     const { onToken, onReasoning } = callbacks();
-    const result = await openrouter.stream!(
+    const result = await openaiCompatible.stream!(
       { ...request, reasoningEffort: 'high' },
       { ...options(), onToken, onReasoning },
     );
@@ -74,6 +74,7 @@ describe('OpenRouter streaming', () => {
     expect(onReasoning.mock.calls).toEqual([['Think '], ['first']]);
     expect(result).toEqual({
       text: 'Hello world',
+      reasoning: 'Think first',
       usage: { total_tokens: 3 },
       raw: {
         id: 'gen-1',
@@ -102,7 +103,7 @@ describe('OpenRouter streaming', () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(streamResponse([`${event({ choices: [{ delta: { content: 'ok' } }] })}data: [DONE]\n\n`]));
-    await openrouter.stream!({ ...request, reasoningEffort: effort }, { ...options(), ...callbacks() });
+    await openaiCompatible.stream!({ ...request, reasoningEffort: effort }, { ...options(), ...callbacks() });
     expect(sentBody(fetchMock).reasoning).toEqual(reasoning);
   });
 
@@ -114,7 +115,7 @@ describe('OpenRouter streaming', () => {
 `,
       ]),
     );
-    await openrouter.stream!(
+    await openaiCompatible.stream!(
       { ...request, reasoningMaxTokens: 2000, reasoningExclude: true },
       { ...options(), ...callbacks() },
     );
@@ -129,7 +130,7 @@ describe('OpenRouter streaming', () => {
       ]),
     );
     const { onToken, onReasoning } = callbacks();
-    await expect(openrouter.stream!(request, { ...options(), onToken, onReasoning })).rejects.toThrow(
+    await expect(openaiCompatible.stream!(request, { ...options(), onToken, onReasoning })).rejects.toThrow(
       'OpenRouter stream error: Insufficient credits',
     );
     expect(onToken).toHaveBeenCalledWith('Partial');
@@ -139,7 +140,7 @@ describe('OpenRouter streaming', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ error: { message: 'limited' } }), { status: 429 }),
     );
-    await expect(openrouter.stream!(request, { ...options(), ...callbacks() })).rejects.toThrow(
+    await expect(openaiCompatible.stream!(request, { ...options(), ...callbacks() })).rejects.toThrow(
       'OpenRouter 429: limited',
     );
   });
@@ -160,7 +161,7 @@ describe('OpenRouter streaming', () => {
     });
     const onToken = vi.fn(() => controller.abort(new Error('client left')));
     await expect(
-      openrouter.stream!(request, { ...options(controller.signal), onToken, onReasoning: () => {} }),
+      openaiCompatible.stream!(request, { ...options(controller.signal), onToken, onReasoning: () => {} }),
     ).rejects.toThrow('client left');
     expect(fetchMock).toHaveBeenCalledWith(
       expect.any(String),
@@ -170,7 +171,7 @@ describe('OpenRouter streaming', () => {
   });
 });
 
-describe('OpenRouter idle timeout', () => {
+describe('idle timeout', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -194,7 +195,7 @@ describe('OpenRouter idle timeout', () => {
   it('fails a stream that goes silent for the idle window', async () => {
     vi.useFakeTimers();
     controlledStream(vi.spyOn(globalThis, 'fetch'));
-    const result = openrouter.stream!(request, { ...options(), ...callbacks() });
+    const result = openaiCompatible.stream!(request, { ...options(), ...callbacks() });
     const failed = expect(result).rejects.toThrow('timed out after 120s');
     await vi.advanceTimersByTimeAsync(120_000);
     await failed;
@@ -203,7 +204,7 @@ describe('OpenRouter idle timeout', () => {
   it('keeps a stream alive for longer than the idle window while data keeps arriving', async () => {
     vi.useFakeTimers();
     const feed = controlledStream(vi.spyOn(globalThis, 'fetch'));
-    const result = openrouter.stream!(request, { ...options(), ...callbacks() });
+    const result = openaiCompatible.stream!(request, { ...options(), ...callbacks() });
     await vi.advanceTimersByTimeAsync(0);
     for (let i = 0; i < 4; i++) {
       await vi.advanceTimersByTimeAsync(100_000);

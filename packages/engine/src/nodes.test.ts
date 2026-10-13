@@ -3,7 +3,7 @@ import type { Preset, PromptMessage } from '@st/shared';
 import { httpRequest } from './nodes/http-request/index.js';
 import { character } from './nodes/character/index.js';
 import { llm, mergeSystemMessages } from './nodes/llm/index.js';
-import { openrouter } from './providers/openrouter.js';
+import { openaiCompatible } from './providers/openai-compatible.js';
 import { openrouterProvider, providerRecord, providerResources, restoreAdapter, useAdapter } from './test-providers.js';
 import type { EngineEvent, ExecutionContext } from './types.js';
 
@@ -159,7 +159,7 @@ describe('integration nodes', () => {
     );
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: { message: 'limited' } }), { status: 429 }));
     await expect(
-      openrouter.chat(
+      openaiCompatible.chat(
         { model: 'test', messages: [], temperature: 0.7, maxTokens: 10 },
         { provider: openrouterProvider, apiKey: 'test-key', signal: new AbortController().signal },
       ),
@@ -172,7 +172,7 @@ describe('integration nodes', () => {
       .mockResolvedValue(
         new Response(JSON.stringify({ choices: [{ message: { content: 'reply' } }] }), { status: 200 }),
       );
-    await openrouter.chat(
+    await openaiCompatible.chat(
       {
         model: 'test',
         temperature: 0.7,

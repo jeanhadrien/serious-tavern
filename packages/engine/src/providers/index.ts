@@ -15,7 +15,13 @@ export type ChatRequest = {
   // Keep reasoning internal: the model still thinks (and bills for it) but returns no trace.
   reasoningExclude?: boolean;
 };
-export type ChatResponse = { text: string; raw: unknown; usage?: unknown };
+export type ChatResponse = {
+  text: string;
+  // The reasoning trace, read from the record's `reasoningFields`; absent when the model returned none.
+  reasoning?: string;
+  raw: unknown;
+  usage?: unknown;
+};
 export type ChatOptions = {
   // The resolved provider record the call is made against.
   provider: Provider;

@@ -7,4 +7,4 @@ export { orderOutputs } from './replies.js';
 export { pruneInvalidEdges } from './prune.js';
 export * from './preset.js';
 export * from './providers/index.js';
-export * from './providers/openrouter.js';
+export * from './providers/openai-compatible.js';

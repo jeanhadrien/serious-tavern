@@ -3,7 +3,7 @@ import { characterSchema, presetInputLabel, reasoningEfforts, type PromptMessage
 import type { NodeDefinition } from '../../types.js';
 import { renderPreset } from '../../preset.js';
 import { adapters } from '../../providers/index.js';
-import '../../providers/openrouter.js';
+import '../../providers/openai-compatible.js';
 
 export function mergeSystemMessages(messages: readonly PromptMessage[]): PromptMessage[] {
   const result: PromptMessage[] = [];
