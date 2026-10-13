@@ -6,6 +6,7 @@ import { MAX_UPLOAD_BYTES } from './uploads.js';
 import { registerCharacters } from './routes/characters.js';
 import { registerPersonas } from './routes/personas.js';
 import { registerPresets } from './routes/presets.js';
+import { registerProviders } from './routes/providers.js';
 import { registerWorkflows } from './routes/workflows.js';
 import { registerSessions } from './routes/sessions.js';
 import { registerMessages } from './routes/messages.js';
@@ -36,6 +37,7 @@ export async function createApp(
   registerCharacters(app, context);
   registerPersonas(app, context);
   registerPresets(app, context);
+  registerProviders(app, context);
   registerWorkflows(app, context);
   registerSessions(app, context);
   registerMessages(app, context);

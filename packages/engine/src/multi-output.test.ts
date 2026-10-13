@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Character, ChatMessage, Preset, Workflow } from '@st/shared';
 import { executeWorkflow, ExecutionFailure, validateWorkflow } from './executor.js';
 import { registry } from './registry.js';
-import { providers } from './providers/index.js';
+import { providerRecord, providerResources, restoreAdapter, useAdapter } from './test-providers.js';
 import { memory } from './nodes/memory/index.js';
 import { renderPreset } from './preset.js';
 import type { ExecutionContext } from './types.js';
@@ -65,7 +65,7 @@ const preset: Preset = {
 };
 afterEach(() => {
   registry.delete('reply-fail-test');
-  providers.delete('reply-test');
+  restoreAdapter();
   vi.restoreAllMocks();
 });
 
@@ -142,7 +142,7 @@ describe('multiple chat outputs', () => {
   });
   it('orders by dependencies before configured order, and chains replies into a later LLM', async () => {
     const chat = vi.fn(async (request) => ({ text: `bar(${request.messages[0].content})`, raw: {} }));
-    providers.set('reply-test', { id: 'reply-test', label: 'Test', secretName: 'test', chat });
+    useAdapter({ chat });
     const result = await executeWorkflow(
       graph(
         [
@@ -153,7 +153,10 @@ describe('multiple chat outputs', () => {
         ],
         [edge('input', 'foo'), edge('foo', 'llm', 'reply', 'prompt'), edge('llm', 'bar', 'text')],
       ),
-      { ...options, resources: { presets: { get: async () => preset } } },
+      {
+        ...options,
+        resources: { presets: { get: async () => preset }, providers: providerResources(providerRecord('reply-test')) },
+      },
     );
     expect(result.replies).toEqual([
       { nodeId: 'foo', content: 'hello', name: 'foo' },
@@ -162,7 +165,7 @@ describe('multiple chat outputs', () => {
   });
   it('orders outputs fed by a shared upstream node by dependency, not by order config', async () => {
     const chat = vi.fn(async (request) => ({ text: `second(${request.messages[0].content})`, raw: {} }));
-    providers.set('reply-test', { id: 'reply-test', label: 'Test', secretName: 'test', chat });
+    useAdapter({ chat });
     const result = await executeWorkflow(
       graph(
         [
@@ -173,7 +176,10 @@ describe('multiple chat outputs', () => {
         ],
         [edge('input', 'first'), edge('input', 'llm', 'message', 'prompt'), edge('llm', 'second', 'text')],
       ),
-      { ...options, resources: { presets: { get: async () => preset } } },
+      {
+        ...options,
+        resources: { presets: { get: async () => preset }, providers: providerResources(providerRecord('reply-test')) },
+      },
     );
     expect(result.replies.map((reply) => reply.name)).toEqual(['first', 'second']);
   });
@@ -355,7 +361,7 @@ describe('character nodes and history', () => {
   });
   it.each([false, true])('renders all character macros from the LLM render context (override=%s)', async (override) => {
     const chat = vi.fn(async () => ({ text: 'reply', raw: {} }));
-    providers.set('reply-test', { id: 'reply-test', label: 'Test', secretName: 'test', chat });
+    useAdapter({ chat });
     const definition: Preset = {
       ...preset,
       inputs: [],
@@ -386,6 +392,7 @@ describe('character nodes and history', () => {
         character: card('session', 'Session'),
         resources: {
           presets: { get: async () => definition },
+          providers: providerResources(providerRecord('reply-test')),
           characters: { get: async () => card('override', 'Override') },
         },
       },

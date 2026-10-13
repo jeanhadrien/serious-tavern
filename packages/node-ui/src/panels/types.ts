@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
-import type { ApiResponse, Character, NodeTypeDescriptor, Preset } from '@st/shared';
+import type { Character, NodeTypeDescriptor, Preset, ProviderView } from '@st/shared';
 
 export type NodePanelContext = {
   presets: readonly Preset[];
   characters: readonly Character[];
-  providers: readonly ApiResponse<'listProviders'>[number][];
+  providers: readonly Pick<ProviderView, 'id' | 'name'>[];
   renderLink?(to: string, label: string): ReactNode;
 };
 

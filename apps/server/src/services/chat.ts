@@ -60,7 +60,7 @@ export function runTurn(
 }
 
 async function startTurn(
-  { workflows, presets, sessions, characters, personas }: AppContext,
+  { workflows, presets, providers, sessions, characters, personas }: AppContext,
   sessionId: string,
   content: string,
 ) {
@@ -75,7 +75,7 @@ async function startTurn(
   } = {};
   const session = await sessions.silent.update(sessionId, async (current) => {
     const workflow = await requireEntity(workflows, current.workflowId, 'Workflow');
-    const { errors, prepared } = await prepareWorkflow(workflow, { presets, characters });
+    const { errors, prepared } = await prepareWorkflow(workflow, { presets, characters, providers });
     if (!prepared)
       throw new HttpError(400, 'WORKFLOW_INVALID', `Workflow "${workflow.name}" is invalid`, {
         workflowId: workflow.id,

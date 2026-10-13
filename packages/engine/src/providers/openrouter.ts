@@ -1,6 +1,5 @@
-import { registerProvider, type ChatRequest, type ChatResponse, type LlmProvider } from './index.js';
+import { registerAdapter, type ChatOptions, type ChatRequest, type ChatResponse, type LlmAdapter } from './index.js';
 
-const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
 // A stream is only considered stalled after this long without any bytes (keep-alive comments count).
 const streamIdleTimeoutMs = 120_000;
 // Without streaming there is no activity to observe, so this bounds the whole request.
@@ -10,13 +9,13 @@ const requestTimeoutMs = 600_000;
  * Wraps a caller's abort signal with an inactivity deadline. Call `touch` whenever
  * data arrives to push the deadline back, and `dispose` once the request is done.
  */
-function withIdleTimeout(signal: AbortSignal, ms: number) {
+function withIdleTimeout(signal: AbortSignal, ms: number, provider: string) {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout>;
   const touch = () => {
     clearTimeout(timer);
     timer = setTimeout(
-      () => controller.abort(new Error(`OpenRouter timed out after ${ms / 1000}s without a response`)),
+      () => controller.abort(new Error(`${provider} timed out after ${ms / 1000}s without a response`)),
       ms,
     );
   };
@@ -58,17 +57,16 @@ function reasoningParams(request: ChatRequest) {
   return Object.keys(reasoning).length ? { reasoning } : {};
 }
 
-async function postCompletion(request: ChatRequest, stream: boolean, options: { apiKey: string; signal: AbortSignal }) {
-  const response = await fetch(endpoint, {
+async function postCompletion(request: ChatRequest, stream: boolean, { provider, apiKey, signal }: ChatOptions) {
+  const response = await fetch(`${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${options.apiKey}`,
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://github.com/serious-tavern',
-      'X-Title': 'Serious Tavern',
+      ...provider.headers,
     },
     body: JSON.stringify(requestBody(request, stream)),
-    signal: options.signal,
+    signal,
   });
   if (!response.ok) {
     const body = await response.text();
@@ -79,7 +77,7 @@ async function postCompletion(request: ChatRequest, stream: boolean, options: { 
     } catch {
       message = body;
     }
-    throw new Error(`OpenRouter ${response.status}: ${message.slice(0, 500)}`);
+    throw new Error(`${provider.name} ${response.status}: ${message.slice(0, 500)}`);
   }
   return response;
 }
@@ -119,13 +117,13 @@ type Deadline = ReturnType<typeof withIdleTimeout>;
 
 async function readStream(
   request: ChatRequest,
-  apiKey: string,
+  { provider, apiKey }: ChatOptions,
   deadline: Deadline,
   onToken: (textDelta: string) => void,
   onReasoning: (reasoningDelta: string) => void,
 ): Promise<ChatResponse> {
-  const response = await postCompletion(request, true, { apiKey, signal: deadline.signal });
-  if (!response.body) throw new Error('OpenRouter returned no stream');
+  const response = await postCompletion(request, true, { provider, apiKey, signal: deadline.signal });
+  if (!response.body) throw new Error(`${provider.name} returned no stream`);
   let id: string | undefined;
   let model: string | undefined;
   let finishReason: string | null | undefined;
@@ -136,7 +134,7 @@ async function readStream(
   for await (const data of serverSentData(response.body, deadline.touch)) {
     if (data === '[DONE]') break;
     const chunk = JSON.parse(data) as StreamChunk;
-    if (chunk.error) throw new Error(`OpenRouter stream error: ${chunk.error.message ?? 'unknown error'}`);
+    if (chunk.error) throw new Error(`${provider.name} stream error: ${chunk.error.message ?? 'unknown error'}`);
     id ??= chunk.id;
     model ??= chunk.model;
     usage ??= chunk.usage;
@@ -155,7 +153,7 @@ async function readStream(
       onReasoning(reasoningDelta);
     }
   }
-  if (!sawChoice) throw new Error('OpenRouter returned no assistant text');
+  if (!sawChoice) throw new Error(`${provider.name} returned no assistant text`);
   // Mirrors the non-streaming response shape, so the node's `raw` output stays comparable.
   const raw = {
     id,
@@ -172,29 +170,26 @@ async function readStream(
   return { text, raw, usage };
 }
 
-export const openrouter: LlmProvider = {
-  id: 'openrouter',
-  label: 'OpenRouter',
-  secretName: 'openrouter',
-  async chat(request, { apiKey, signal }) {
-    const deadline = withIdleTimeout(signal, requestTimeoutMs);
+export const openrouter: LlmAdapter = {
+  async chat(request, { provider, apiKey, signal }) {
+    const deadline = withIdleTimeout(signal, requestTimeoutMs, provider.name);
     try {
-      const response = await postCompletion(request, false, { apiKey, signal: deadline.signal });
+      const response = await postCompletion(request, false, { provider, apiKey, signal: deadline.signal });
       const raw: unknown = await response.json();
       const text = (raw as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content;
-      if (typeof text !== 'string') throw new Error('OpenRouter returned no assistant text');
+      if (typeof text !== 'string') throw new Error(`${provider.name} returned no assistant text`);
       return { text, raw, usage: (raw as { usage?: unknown }).usage };
     } finally {
       deadline.dispose();
     }
   },
-  async stream(request, { apiKey, signal, onToken, onReasoning }) {
-    const deadline = withIdleTimeout(signal, streamIdleTimeoutMs);
+  async stream(request, { onToken, onReasoning, ...options }) {
+    const deadline = withIdleTimeout(options.signal, streamIdleTimeoutMs, options.provider.name);
     try {
-      return await readStream(request, apiKey, deadline, onToken, onReasoning);
+      return await readStream(request, options, deadline, onToken, onReasoning);
     } finally {
       deadline.dispose();
     }
   },
 };
-registerProvider(openrouter);
+registerAdapter('openai-compatible', openrouter);

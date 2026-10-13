@@ -3,8 +3,8 @@ import type { Preset, PromptMessage } from '@st/shared';
 import { httpRequest } from './nodes/http-request/index.js';
 import { character } from './nodes/character/index.js';
 import { llm, mergeSystemMessages } from './nodes/llm/index.js';
-import { providers } from './providers/index.js';
 import { openrouter } from './providers/openrouter.js';
+import { openrouterProvider, providerRecord, providerResources, restoreAdapter, useAdapter } from './test-providers.js';
 import type { EngineEvent, ExecutionContext } from './types.js';
 
 const preset: Preset = {
@@ -34,14 +34,14 @@ const ctx = (config: Record<string, unknown>): ExecutionContext => ({
   history: [],
   secrets: { get: async () => 'test-key' },
   signal: new AbortController().signal,
-  resources: { presets: { get: async () => preset } },
+  resources: { presets: { get: async () => preset }, providers: providerResources(providerRecord('fake')) },
   recordRequest: () => {},
   log: () => {},
   emit: () => {},
 });
 afterEach(() => {
   vi.restoreAllMocks();
-  providers.delete('fake');
+  restoreAdapter();
 });
 describe('integration nodes', () => {
   it('fails clearly when a directly executed character card is missing', async () => {
@@ -94,7 +94,7 @@ describe('integration nodes', () => {
   });
   it('uses a fake provider, rendered preset, secretName and request log', async () => {
     const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
-    providers.set('fake', { id: 'fake', label: 'Fake', secretName: 'fake-key', chat });
+    useAdapter({ chat });
     const get = vi.fn().mockResolvedValue('test-key');
     const request = vi.fn();
     const config = { ...llm.defaultConfig, presetId: preset.id, provider: 'fake' };
@@ -113,6 +113,30 @@ describe('integration nodes', () => {
     await expect(llm.execute({ ...ctx(config), secrets: { get: async () => undefined } })).rejects.toThrow(
       'Missing fake-key secret',
     );
+  });
+  it('hands the resolved provider record to the adapter', async () => {
+    const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
+    useAdapter({ chat });
+    await llm.execute(ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake' }));
+    expect(chat.mock.calls[0]?.[1]).toMatchObject({ provider: providerRecord('fake') });
+  });
+  it('names the provider id when it cannot be resolved', async () => {
+    await expect(llm.execute(ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'nope' }))).rejects.toThrow(
+      'Unknown LLM provider: nope',
+    );
+  });
+  it('calls a provider without a secret without asking for credentials', async () => {
+    const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
+    useAdapter({ chat });
+    const get = vi.fn();
+    const local = { ...providerRecord('local'), secret: undefined };
+    await llm.execute({
+      ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'local' }),
+      secrets: { get },
+      resources: { presets: { get: async () => preset }, providers: providerResources(local) },
+    });
+    expect(get).not.toHaveBeenCalled();
+    expect(chat.mock.calls[0]?.[1].apiKey).toBeUndefined();
   });
   it('sends OpenRouter request and decodes upstream errors', async () => {
     const fetchMock = vi
@@ -137,7 +161,7 @@ describe('integration nodes', () => {
     await expect(
       openrouter.chat(
         { model: 'test', messages: [], temperature: 0.7, maxTokens: 10 },
-        { apiKey: 'test-key', signal: new AbortController().signal },
+        { provider: openrouterProvider, apiKey: 'test-key', signal: new AbortController().signal },
       ),
     ).rejects.toThrow('OpenRouter 429: limited');
   });
@@ -159,7 +183,7 @@ describe('integration nodes', () => {
           { role: 'system', content: 'Empty name is still set', name: '' },
         ],
       },
-      { apiKey: 'test-key', signal: new AbortController().signal },
+      { provider: openrouterProvider, apiKey: 'test-key', signal: new AbortController().signal },
     );
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     expect(body.messages).toEqual([
@@ -211,7 +235,7 @@ describe('integration nodes', () => {
 
   it.each([undefined, false, true])('records and sends the final prompt with mergeSystemMessages=%s', async (merge) => {
     const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
-    providers.set('fake', { id: 'fake', label: 'Fake', secretName: 'fake-key', chat });
+    useAdapter({ chat });
     const definition: Preset = {
       ...preset,
       inputs: [{ id: 'history', key: 'history', dataType: 'messages' }],
@@ -247,7 +271,7 @@ describe('integration nodes', () => {
     await llm.execute({
       ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', mergeSystemMessages: merge }),
       inputs: { history },
-      resources: { presets: { get: async () => definition } },
+      resources: { presets: { get: async () => definition }, providers: providerResources(providerRecord('fake')) },
       recordRequest,
     });
     const expected = merge
@@ -266,7 +290,7 @@ describe('integration nodes', () => {
       onToken('lo');
       return { text: 'Hello', raw: { streamed: true } };
     });
-    providers.set('fake', { id: 'fake', label: 'Fake', secretName: 'fake-key', chat, stream });
+    useAdapter({ chat, stream });
     const events: EngineEvent[] = [];
     const result = await llm.execute({
       ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake' }),
@@ -284,7 +308,7 @@ describe('integration nodes', () => {
 
   it('falls back to chat without deltas when the provider cannot stream', async () => {
     const chat = vi.fn().mockResolvedValue({ text: 'whole', raw: { whole: true } });
-    providers.set('fake', { id: 'fake', label: 'Fake', secretName: 'fake-key', chat });
+    useAdapter({ chat });
     const emit = vi.fn();
     const result = await llm.execute({
       ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake' }),
@@ -298,7 +322,7 @@ describe('integration nodes', () => {
   it('uses chat without deltas when streaming is disabled, even if the provider supports it', async () => {
     const chat = vi.fn().mockResolvedValue({ text: 'whole', raw: { whole: true } });
     const stream = vi.fn();
-    providers.set('fake', { id: 'fake', label: 'Fake', secretName: 'fake-key', chat, stream });
+    useAdapter({ chat, stream });
     const emit = vi.fn();
     const result = await llm.execute({
       ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', streaming: false }),
@@ -314,7 +338,7 @@ describe('integration nodes', () => {
     'passes reasoningEffort %s to the provider request',
     async (reasoningEffort) => {
       const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
-      providers.set('fake', { id: 'fake', label: 'Fake', secretName: 'fake-key', chat });
+      useAdapter({ chat });
       const recordRequest = vi.fn();
       await llm.execute({
         ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', reasoningEffort }),

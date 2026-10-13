@@ -2,7 +2,7 @@ import { mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { isPresetFile } from './preset-filenames.js';
+import { isYamlFile } from './yaml-filenames.js';
 import { watchDirectory, type DirectoryWatcher } from './directory-watcher.js';
 
 let directory: string;
@@ -20,7 +20,7 @@ const DEBOUNCE_MS = 40;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function watch() {
   const onChange = vi.fn();
-  watcher = await watchDirectory(directory, { accept: isPresetFile, onChange, debounceMs: DEBOUNCE_MS });
+  watcher = await watchDirectory(directory, { accept: isYamlFile, onChange, debounceMs: DEBOUNCE_MS });
   return onChange;
 }
 
@@ -65,7 +65,7 @@ it('keeps watching after a failing handler and stops after close', async () => {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   try {
     const onChange = vi.fn().mockRejectedValueOnce(new Error('scan failed'));
-    watcher = await watchDirectory(directory, { accept: isPresetFile, onChange, debounceMs: DEBOUNCE_MS });
+    watcher = await watchDirectory(directory, { accept: isYamlFile, onChange, debounceMs: DEBOUNCE_MS });
     await writeFile(join(directory, 'a.yaml'), 'v: 1');
     await vi.waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
     await pause(DEBOUNCE_MS * 2);
@@ -83,7 +83,7 @@ it('keeps watching after a failing handler and stops after close', async () => {
 it('creates a missing directory and reports files created in it', async () => {
   const nested = join(directory, 'later');
   const onChange = vi.fn();
-  watcher = await watchDirectory(nested, { accept: isPresetFile, onChange, debounceMs: DEBOUNCE_MS });
+  watcher = await watchDirectory(nested, { accept: isYamlFile, onChange, debounceMs: DEBOUNCE_MS });
   await writeFile(join(nested, 'a.yaml'), 'v: 1');
   await vi.waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
 });

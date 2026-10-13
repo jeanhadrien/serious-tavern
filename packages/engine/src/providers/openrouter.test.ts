@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ChatRequest } from './index.js';
+import { openrouterProvider, providerRecord } from '../test-providers.js';
 import { openrouter } from './openrouter.js';
 
 const request: ChatRequest = {
@@ -8,7 +9,11 @@ const request: ChatRequest = {
   temperature: 0.7,
   maxTokens: 10,
 };
-const options = (signal = new AbortController().signal) => ({ apiKey: 'test-key', signal });
+const options = (signal = new AbortController().signal) => ({
+  provider: openrouterProvider,
+  apiKey: 'test-key',
+  signal,
+});
 const event = (payload: unknown, lineEnding = '\n') => `data: ${JSON.stringify(payload)}${lineEnding}${lineEnding}`;
 // Each part is one network read, so callers control where frames are split.
 const streamResponse = (parts: string[]) =>
@@ -27,6 +32,25 @@ const callbacks = () => ({ onToken: vi.fn(), onReasoning: vi.fn() });
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe('provider record', () => {
+  const chatBody = JSON.stringify({ choices: [{ message: { content: 'ok' } }] });
+  it('sends to the record base URL with its headers, and no credentials without a secret', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(chatBody));
+    const local = providerRecord('local', { baseUrl: 'http://localhost:11434/v1/', headers: { 'X-Local': '1' } });
+    await openrouter.chat(request, { provider: local, signal: new AbortController().signal });
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe('http://localhost:11434/v1/chat/completions');
+    expect((init as RequestInit).headers).toEqual({ 'Content-Type': 'application/json', 'X-Local': '1' });
+  });
+  it('names the provider in upstream errors', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"error":"nope"}', { status: 401 }));
+    const provider = providerRecord('deepseek', { name: 'My DeepSeek' });
+    await expect(openrouter.chat(request, { provider, signal: new AbortController().signal })).rejects.toThrow(
+      'My DeepSeek 401: nope',
+    );
+  });
 });
 
 describe('OpenRouter streaming', () => {

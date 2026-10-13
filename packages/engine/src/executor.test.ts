@@ -4,7 +4,7 @@ import type { Workflow, Edge, ChatMessage, Preset } from '@st/shared';
 import { executeWorkflow, validateWorkflow } from './executor.js';
 import { renderTemplate } from './template.js';
 import { registry } from './registry.js';
-import { providers } from './providers/index.js';
+import { providerRecord, providerResources, restoreAdapter, useAdapter } from './test-providers.js';
 import type { EngineEvent } from './types.js';
 
 const node = (id: string, type: string, config: Record<string, unknown> = {}) => ({
@@ -722,13 +722,7 @@ describe('streaming events', () => {
       onToken('Hi');
       return { text: 'Hi', raw: {} };
     });
-    providers.set('executor-stream', {
-      id: 'executor-stream',
-      label: 'Stream',
-      secretName: 'stream-key',
-      chat: vi.fn(),
-      stream,
-    });
+    useAdapter({ chat: vi.fn(), stream });
     const graph = workflow(
       [
         node('input', 'chat-input'),
@@ -742,7 +736,10 @@ describe('streaming events', () => {
       const result = await executeWorkflow(graph, {
         ...options,
         secrets: { get: async () => 'key' },
-        resources: { presets: { get: async () => preset } },
+        resources: {
+          presets: { get: async () => preset },
+          providers: providerResources(providerRecord('executor-stream')),
+        },
         onEvent: (event) => {
           events.push(event);
           throw new Error('observer failure');
@@ -755,7 +752,7 @@ describe('streaming events', () => {
         { type: 'node:delta', nodeId: 'llm', detail: { textDelta: 'Hi' } },
       ]);
     } finally {
-      providers.delete('executor-stream');
+      restoreAdapter();
     }
   });
 });

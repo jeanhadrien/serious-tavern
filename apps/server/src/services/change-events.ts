@@ -2,7 +2,7 @@ import type { ApiResponse } from '@st/shared';
 import type { Repository } from '../storage/repository.js';
 import type { PresetRepository } from '../storage/preset-repository.js';
 import { watchDirectory, type DirectoryWatcher } from '../storage/directory-watcher.js';
-import { isPresetFile } from '../storage/preset-filenames.js';
+import { isYamlFile } from '../storage/yaml-filenames.js';
 
 export type ChangeEvent = ApiResponse<'streamChanges'>;
 
@@ -84,7 +84,7 @@ export function watchPresetFiles(
   options: { debounceMs?: number } = {},
 ): Promise<DirectoryWatcher> {
   return watchDirectory(presets.directory, {
-    accept: isPresetFile,
+    accept: isYamlFile,
     debounceMs: options.debounceMs,
     onChange: async () => {
       changes.publish({ type: 'presets.changed', invalidFiles: await presets.listInvalid() });

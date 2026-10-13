@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { characterSchema, presetInputLabel, reasoningEfforts, type PromptMessage } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { renderPreset } from '../../preset.js';
-import { providers } from '../../providers/index.js';
+import { adapters } from '../../providers/index.js';
 import '../../providers/openrouter.js';
 
 export function mergeSystemMessages(messages: readonly PromptMessage[]): PromptMessage[] {
@@ -95,12 +95,15 @@ export const llm: NodeDefinition = {
     };
   },
   async execute(ctx) {
-    const provider = providers.get(String(ctx.config.provider));
+    const provider = await ctx.resources.providers?.get(String(ctx.config.provider));
     if (!provider) throw new Error(`Unknown LLM provider: ${ctx.config.provider}`);
+    const adapter = adapters.get(provider.kind);
+    if (!adapter) throw new Error(`Provider "${provider.name}" has unsupported kind: ${provider.kind}`);
     const preset = await ctx.resources.presets.get(String(ctx.config.presetId));
     if (!preset) throw new Error(`Preset ${ctx.config.presetId} not found`);
-    const key = await ctx.secrets.get(provider.secretName);
-    if (!key) throw new Error(`Missing ${provider.secretName} secret. Add it in Settings.`);
+    // A provider without a secret (a local server) is called without credentials.
+    const apiKey = provider.secret ? await ctx.secrets.get(provider.secret) : undefined;
+    if (provider.secret && !apiKey) throw new Error(`Missing ${provider.secret} secret. Add it in Settings.`);
     const rendered = renderPreset(preset, {
       inputs: ctx.inputs,
       templateContext: {
@@ -131,9 +134,9 @@ export const llm: NodeDefinition = {
       ),
     };
     ctx.recordRequest({ provider: provider.id, ...request });
-    const options = { apiKey: key, signal: ctx.signal };
+    const options = { provider, apiKey, signal: ctx.signal };
     // Deltas are notifications only; the outcome is the accumulated response returned below.
-    const stream = provider.stream;
+    const stream = adapter.stream;
     const useStream = ctx.config.streaming !== false && stream != null;
     const response = useStream
       ? await stream(request, {
@@ -142,7 +145,7 @@ export const llm: NodeDefinition = {
           onReasoning: (reasoningDelta) =>
             ctx.emit({ type: 'node:delta', nodeId: ctx.nodeId, detail: { reasoningDelta } }),
         })
-      : await provider.chat(request, options);
+      : await adapter.chat(request, options);
     return { text: response.text, raw: response.raw };
   },
 };

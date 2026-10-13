@@ -50,7 +50,23 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     ).toEqual(['character', 'llm']);
     for (const descriptor of nodeTypes)
       expect(descriptor.dynamicPorts).toBe(!!registry.get(descriptor.type)?.resolvePorts);
-    await request('listProviders', { method: 'GET', url: '/api/providers' });
+    const builtIn = await request('listProviders', { method: 'GET', url: '/api/providers' });
+    expect(builtIn.map((provider) => [provider.id, provider.builtIn])).toEqual([['openrouter', true]]);
+    const provider = await request('createProvider', {
+      method: 'POST',
+      url: '/api/providers',
+      payload: { name: 'Contract provider', baseUrl: 'https://api.example.com/v1' },
+    });
+    await request('getProvider', { method: 'GET', url: `/api/providers/${provider.id}` });
+    await request('updateProvider', {
+      method: 'PUT',
+      url: `/api/providers/${provider.id}`,
+      payload: { name: 'Contract provider', baseUrl: 'https://api.example.com/v1', secret: 'example' },
+    });
+    const copy = await request('duplicateProvider', { method: 'POST', url: '/api/providers/openrouter/duplicate' });
+    expect(copy).toMatchObject({ name: 'OpenRouter (copy)', builtIn: false, secret: 'openrouter' });
+    await request('deleteProvider', { method: 'DELETE', url: `/api/providers/${copy.id}` });
+    await request('deleteProvider', { method: 'DELETE', url: `/api/providers/${provider.id}` });
     const workflow = await request('createWorkflow', {
       method: 'POST',
       url: '/api/workflows',

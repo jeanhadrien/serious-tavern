@@ -3,6 +3,7 @@ export * from './node-names.js';
 export * from './ports.js';
 export * from './reasoning.js';
 export * from './preset.js';
+export * from './provider.js';
 export * from './imports.js';
 export * from './character.js';
 export * from './macros.js';

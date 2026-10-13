@@ -1,15 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { apiContract } from '@st/shared';
-import { descriptors, providers, registry } from '@st/engine';
+import { descriptors, registry } from '@st/engine';
 import type { AppContext } from '../context.js';
 import { errorMessage, HttpError, notFound } from '../errors.js';
 import type { ApiRoute } from './types.js';
 
 export function registerNodeTypes(app: FastifyInstance, { presets, characters }: AppContext) {
   app.get<ApiRoute<'listNodeTypes'>>('/api/node-types', async () => descriptors());
-  app.get<ApiRoute<'listProviders'>>('/api/providers', async () =>
-    [...providers.values()].map(({ id, label, secretName }) => ({ id, label, secretName })),
-  );
   app.post<ApiRoute<'resolvePorts'>>('/api/node-types/:type/ports', async (request) => {
     const { type } = apiContract.resolvePorts.params.parse(request.params);
     const definition = registry.get(type);

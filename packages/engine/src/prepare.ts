@@ -1,4 +1,4 @@
-import { nodeDisplayName } from '@st/shared';
+import { findBuiltInProvider, nodeDisplayName } from '@st/shared';
 import { canConnect } from '@st/shared/ports';
 import type { Edge, PortDef, ValidationIssue, Workflow } from '@st/shared';
 import { registry } from './registry.js';
@@ -42,6 +42,9 @@ export async function prepareWorkflow(
   const resources: NodeResources = {
     presets: { get: cachedGet((id) => sourceResources.presets.get(id)) },
     characters: { get: cachedGet(async (id) => sourceResources.characters?.get(id)) },
+    providers: {
+      get: cachedGet(async (id) => findBuiltInProvider(id) ?? (await sourceResources.providers?.get(id))),
+    },
   };
   const errors: ValidationIssue[] = [];
   const nameOf = (id: string) => nodeDisplayName(workflow.nodes, labelOf, id);

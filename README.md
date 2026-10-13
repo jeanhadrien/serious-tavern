@@ -48,8 +48,8 @@ git config blame.ignoreRevsFile .git-blame-ignore-revs
 
 ## Architecture
 
-- `packages/shared`: entity models plus the endpoint contract in `src/api/` (body, params, query, response schemas and inferred `ApiBody`, `ApiParams`, `ApiQuery`, `ApiResponse` types). The contract covers sessions/messages/executions, workflows/validation, presets/preview, characters/personas/import/export/avatars, node types/dynamic ports/providers, secrets and the common error envelope. Binary upload/download schemas describe bytes, not JSON; card extension values and error details intentionally remain `unknown`.
-- `packages/engine`: validated DAG executor, event callback, template helper, preset renderer, provider registry, node registry, and individual node implementations in `src/nodes/<type>/index.ts`. Internal `text.ts` centralizes compact node/template serialization and pretty JSON/transcript coercion shared by execution and presets; their distinct formatting remains intentional. Nodes backward-reachable from **any** Chat Output execute (the union of their dependencies); other nodes are logged as skipped. Independent ready nodes execute concurrently; condition branches skip and merges ignore skipped inputs.
+- `packages/shared`: entity models plus the endpoint contract in `src/api/` (body, params, query, response schemas and inferred `ApiBody`, `ApiParams`, `ApiQuery`, `ApiResponse` types). The contract covers sessions/messages/executions, workflows/validation, presets/preview, characters/personas/import/export/avatars, node types/dynamic ports, providers, secrets and the common error envelope. Binary upload/download schemas describe bytes, not JSON; card extension values and error details intentionally remain `unknown`.
+- `packages/engine`: validated DAG executor, event callback, template helper, preset renderer, LLM adapter registry (`providers/`, keyed by provider `kind`), node registry, and individual node implementations in `src/nodes/<type>/index.ts`. Internal `text.ts` centralizes compact node/template serialization and pretty JSON/transcript coercion shared by execution and presets; their distinct formatting remains intentional. Nodes backward-reachable from **any** Chat Output execute (the union of their dependencies); other nodes are logged as skipped. Independent ready nodes execute concurrently; condition branches skip and merges ignore skipped inputs.
 - `packages/node-ui`: JSON-Schema-driven config form and optional custom panels.
 - `apps/server`: `app.ts` assembles Fastify parsers, errors and resource routes; `context.ts` wires repositories, secrets and seed initialization. `routes/` parses shared contract schemas and types Fastify replies with `ApiResponse`; `services/` owns locked chat execution, preset preview, character/persona imports/exports and connector imports (`services/import/`). `errors.ts` centralizes HTTP errors and missing-entity checks. `storage/` and `secrets/` retain atomic JSON writes (presets use YAML via `PresetRepository`), per-session locking and encryption. `card.ts` and `uploads.ts` handle card/image transport. The server owns all data and secrets.
 - `apps/web`: React/Vite chat, React Flow workflow editor, Presets, Characters, Personas, and Settings. Every tab stays mounted and inactive tabs are only hidden, so each tab keeps its open item, drafts and scroll position; the lists of workflows, presets, characters, personas and chats come from shared stores (see below), so every page sees the same fresh data. `api/transport.ts` owns fetch, `ApiError`, JSON headers and automatic/silent toasts. Per-resource clients in `api/` use the shared request/response types; pages call methods such as `sessionsApi.sendMessage(id, body)` rather than declaring payloads or constructing route strings. The UI does not execute workflows.
@@ -94,7 +94,7 @@ Dynamic port updates preserve controlled canvas state, refresh React Flow's hand
 
 WORKFLOW_INVALID errors carry structured issues: `prepareWorkflow`/`validateWorkflow` return `ValidationIssue`s (`{ message, edgeId?, nodeIds? }`) whose messages name nodes as `Label #k (type)` (`nodeDisplayName`) instead of ids. The web transport renders those messages in the toast and links it (`layoutHref`) to `/?wide=workflow:<id>&edge=<id>`, where the editor opens the workflow and highlights the offending connection in red.
 
-Register custom panels in `packages/node-ui/src/index.tsx`'s `customPanels` map; focused panels live in `src/panels/`. `NodeConfigPanelProps` contains `{ descriptor, config, onChange, context? }`. The optional `NodePanelContext` contains `{ presets: readonly Preset[], characters: readonly Character[], providers: readonly ApiResponse<'listProviders'>[number][], renderLink?(to: string, label: string): ReactNode }`. The web editor passes fetched resources and a React Router link renderer; node-ui never imports web API clients or router code. LLM and Character panels use the same context, defaulting to empty lists when absent. Without a link renderer, the LLM's preset link uses a normal anchor. Generic panels retain macro-registry-driven template hints.
+Register custom panels in `packages/node-ui/src/index.tsx`'s `customPanels` map; focused panels live in `src/panels/`. `NodeConfigPanelProps` contains `{ descriptor, config, onChange, context? }`. The optional `NodePanelContext` contains `{ presets: readonly Preset[], characters: readonly Character[], providers: readonly Pick<ProviderView, 'id' | 'name'>[], renderLink?(to: string, label: string): ReactNode }`. The web editor passes fetched resources and a React Router link renderer; node-ui never imports web API clients or router code. LLM and Character panels use the same context, defaulting to empty lists when absent. Without a link renderer, the LLM's preset link uses a normal anchor. Generic panels retain macro-registry-driven template hints.
 
 The generic array editor supports only arrays whose item schema is an object with exactly two required string properties, `key` and `value` (e.g. HTTP headers). Other array shapes, tuple schemas and malformed stored row values are shown as read-only JSON with an unsupported notice; they are never coerced into key/value rows or changed implicitly. Add a custom panel for those fields, as the LLM panel does for its string-array stop sequences.
 
@@ -234,7 +234,38 @@ Chat history and message inputs carry an optional string `name`, and so do prese
 
 Seeding uses stable IDs so concurrent initializers do not create duplicate Default presets or demo workflows. Seeds are added only when the corresponding store is empty.
 
-To add a provider, implement `LlmProvider` in `packages/engine/src/providers/` with `id`, `label`, `secretName` and `chat(request, { apiKey, signal })`, returning `{ text, raw, usage? }`. Register the provider in the provider registry and import its module during startup (the existing OpenRouter implementation is an example). The request is provider-neutral; translate sampler names into your provider's API format. The provider picker is served by `/api/providers`, and the engine looks up the configured secret by `secretName`. Providers may also implement the optional `stream(request, { apiKey, signal, onToken, onReasoning })`; the LLM node uses it unless its `streaming` option is off.
+### Providers
+
+A **provider record** says how to reach one OpenAI-compatible backend (OpenRouter, OpenAI, DeepSeek, Ollama, LM Studio, vLLM, ...). Records are data, not code; the design is in PLAN.md ("user-defined LLM providers"). The LLM node's `provider` config holds a record id.
+
+| Field | Meaning |
+| --- | --- |
+| `id` | UUID for user records; the built-in one is `openrouter`. |
+| `name` | Label shown in the node's provider dropdown; the file is named after it. |
+| `kind` | `openai-compatible` (the only wire protocol today; default). |
+| `baseUrl` | `http(s)://` URL; requests go to `<baseUrl>/chat/completions`. |
+| `secret` | Optional name of a secret in the encrypted store. Without it no `Authorization` header is sent (local servers). |
+| `headers` | Extra request headers (default `{}`). |
+| `messageName` | Wire field carrying a message's `name`; `null` = never send it (default `name`). |
+| `reasoningFields` | Fields read for the reasoning trace, first non-empty wins (default `[reasoning, reasoning_content]`). |
+| `extraBody` | Merged into the request body last (default `{}`). |
+| `overrides` | `[{ match, messageName?, reasoningFields?, headers?, extraBody? }]`: first entry whose `match` glob fits the model id replaces those fields (`headers` and `extraBody` are shallow-merged). |
+
+Status: records, storage, API and resolution are done. The adapter (`providers/openrouter.ts`) already uses `baseUrl`, `headers` and `secret` (so a record never sends its key to another host) and names the provider in errors; `messageName`, `reasoningFields`, `extraBody` and `overrides` are stored and validated but not yet applied (step 3 of the plan makes the adapter fully record-driven).
+
+- **Built-in OpenRouter** (`builtInProviders` in `@st/shared`) is defined in code, read-only, has id `openrouter` and secret `openrouter`, so existing nodes and the existing secret need no migration. It is listed first with `builtIn: true`; `PUT`/`DELETE` on it answer `409 PROVIDER_READ_ONLY`. A stored file claiming a built-in id is invalid (user ids must be UUIDs).
+- **Storage:** `data/providers/<slug-of-name>.yaml` through `ProviderRepository`, the same `YamlRepository` as presets (see Preset files: identity is the `id` inside the file, nothing cached, invalid files skipped with a warning and never modified, a hand-written file without `id`/timestamps is stamped once, atomic writes under an id lock). Keys are written in the order `name, kind, baseUrl, secret, headers, messageName, reasoningFields, extraBody, overrides, …, id, createdAt, updatedAt`. Live reload (`providers.changed`) is not implemented yet: edits on disk show up on the next API call.
+- **Resolution:** `prepareWorkflow` snapshots provider records into `resources.providers` (built-in ids resolve in the engine, everything else through the `providers` resource the server passes). The LLM node reads its record from `ctx.resources.providers`; an unknown id is a node error `Unknown LLM provider: <id>`, and a record whose `secret` is set but missing fails with `Missing <secret> secret. Add it in Settings.` The adapter for the record's `kind` (`adapters` map, `LlmAdapter` in `providers/index.ts`) receives the record in its options: `chat(request, { provider, apiKey?, signal })`, and `stream(...)` with `onToken`/`onReasoning` in addition. Tests swap the `openai-compatible` adapter (`useAdapter` in `test-providers.ts` / `test-support/adapter.ts`).
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /api/providers` | `200` the built-in providers, then the user's (full records plus `builtIn`). |
+| `GET /api/providers/:id` | `200` one record (the id may be `openrouter`); `404`. |
+| `POST /api/providers` | Body: `name`, `baseUrl` and the optional fields above. `201` the stored record; `400` on a bad URL, secret name, kind... |
+| `PUT /api/providers/:id` | Same body; replaces the fields (an omitted `secret` is removed, unknown stored fields survive). `409 PROVIDER_READ_ONLY` for built-ins. |
+| `DELETE /api/providers/:id` | `204`; `409 PROVIDER_READ_ONLY` for built-ins, `409 PROVIDER_IN_USE` (details: workflow names) while an LLM node uses it. |
+| `POST /api/providers/:id/duplicate` | `201` an editable copy named `<name> (copy)` (works on the built-in one). |
+
 
 ## Ports & types
 
@@ -254,13 +285,13 @@ Memory's `history` output is `any` because its `format` setting can emit either 
 
 ## Data and secrets
 
-`data/` is gitignored and holds user data that must be preserved across upgrades: workflows, sessions, execution logs, characters, personas and avatars live as separate JSON files written via temporary-file-and-rename; presets are YAML files (see Preset files below). Never reset or delete `data/`. Persistence is behind a `Repository<T>` interface for a future database.
+`data/` is gitignored and holds user data that must be preserved across upgrades: workflows, sessions, execution logs, characters, personas and avatars live as separate JSON files written via temporary-file-and-rename; presets and providers are YAML files (see Preset files below and Providers above). Never reset or delete `data/`. Persistence is behind a `Repository<T>` interface for a future database.
 
 Schema changes stay additive and backward compatible: stored records keep unknown fields (zod `passthrough`), new optional fields use `.default()`/`.optional()` so old files still parse, and writes migrate-on-write (normalize with `safeParse` + defaults, keep unknown fields, no destructive rewrites). If a breaking change is unavoidable, ship an explicit migration script plus a backup step. Seeds only create missing records and never overwrite user-modified ones. Corrupt JSON files are never auto-deleted: `list()` skips them with a warning, `get()` throws with the file path.
 
 ### Preset files (YAML)
 
-Presets are the one record type stored as YAML instead of JSON: `data/presets/<slug-of-name>.yaml`, handled by `PresetRepository` (`storage/preset-repository.ts`; format in `preset-yaml.ts`, names in `preset-filenames.ts`). The HTTP API and contract are unchanged.
+Presets (and providers, see Providers) are the record types stored as YAML instead of JSON: `data/presets/<slug-of-name>.yaml`, handled by `PresetRepository` (`storage/preset-repository.ts`; format in `preset-yaml.ts`). The directory scan, stamping, locking, atomic writes and file naming are shared with providers through the generic `YamlRepository<T>` (`storage/yaml-repository.ts`, parameterized by a `YamlCodec`; names in `yaml-filenames.ts`). The HTTP API and contract are unchanged.
 
 ```yaml
 name: My roleplay preset
@@ -328,7 +359,7 @@ In the web app, one shared `EventSource` (`api/events.ts`) serves every listener
 
 The Presets page's list and live sync share the presets store: the sync calls `presetsStore.refresh()` (joining the store's own event-driven fetch, so there is one request per change), then decides what the fresh list means for the open editor. The workflow editor's preset catalog (LLM node ports) is the same store. A workflow whose LLM node points at a preset that was deleted or broken on disk is not guarded by `PRESET_IN_USE`; running it fails with `400 WORKFLOW_INVALID` whose issue names the node and the missing preset id.
 
-Back up the whole `data/` directory (at minimum `secrets.enc.json`, `.master.key`, the JSON files and the preset YAML files). Stop the server first, then copy the directory to a timestamped zip. `data/` stays gitignored.
+Back up the whole `data/` directory (at minimum `secrets.enc.json`, `.master.key`, the JSON files and the preset and provider YAML files). Stop the server first, then copy the directory to a timestamped zip. `data/` stays gitignored.
 
 Secrets are AES-256-GCM encrypted in `data/secrets.enc.json`; a 32-byte key comes from `SECRETS_KEY` (64 hex characters), or is generated in `data/.master.key` on first start. **Back up both encrypted secrets and the master key.** The secrets API returns only names and masked hints; key values can only be set or deleted. For a production deployment, provide `SECRETS_KEY`, restrict access to the server and data directory, and put authentication in front of the API.
 

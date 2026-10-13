@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, expect, it, type MockInstance, vi } from 'vitest';
 import type { Preset } from '@st/shared';
-import { allocatePresetFile, presetFileStem } from './preset-filenames.js';
+import { allocateYamlFile, yamlFileStem } from './yaml-filenames.js';
 import { PresetRepository } from './preset-repository.js';
 import { presetToYaml, parsePresetYaml } from './preset-yaml.js';
 
@@ -305,16 +305,16 @@ it('keeps the first file by name when two files declare the same id', async () =
 });
 
 it('slugs names safely and suffixes collisions case-insensitively', async () => {
-  expect(presetFileStem('My Roleplay Preset!')).toBe('my-roleplay-preset');
-  expect(presetFileStem('a/b\\c:d*e?f"g<h>i|j')).toBe('a-b-c-d-e-f-g-h-i-j');
-  expect(presetFileStem('CON')).toBe('con-preset');
-  expect(presetFileStem('nul')).toBe('nul-preset');
-  expect(presetFileStem('COM1')).toBe('com1-preset');
-  expect(presetFileStem('trail. ')).toBe('trail');
-  expect(presetFileStem('...')).toBe('preset');
-  expect(presetFileStem('日本語 プリセット')).toBe('日本語-プリセット');
-  expect(presetFileStem('x'.repeat(300)).length).toBe(80);
-  expect(allocatePresetFile('a', new Set(['a', 'a-2']))).toBe('a-3.yaml');
+  expect(yamlFileStem('My Roleplay Preset!', 'preset')).toBe('my-roleplay-preset');
+  expect(yamlFileStem('a/b\\c:d*e?f"g<h>i|j', 'preset')).toBe('a-b-c-d-e-f-g-h-i-j');
+  expect(yamlFileStem('CON', 'preset')).toBe('con-preset');
+  expect(yamlFileStem('nul', 'preset')).toBe('nul-preset');
+  expect(yamlFileStem('COM1', 'preset')).toBe('com1-preset');
+  expect(yamlFileStem('trail. ', 'preset')).toBe('trail');
+  expect(yamlFileStem('...', 'preset')).toBe('preset');
+  expect(yamlFileStem('日本語 プリセット', 'preset')).toBe('日本語-プリセット');
+  expect(yamlFileStem('x'.repeat(300), 'preset').length).toBe(80);
+  expect(allocateYamlFile('a', new Set(['a', 'a-2']))).toBe('a-3.yaml');
 
   const repository = new PresetRepository(directory);
   await repository.save(preset({ name: 'Same Name' }));

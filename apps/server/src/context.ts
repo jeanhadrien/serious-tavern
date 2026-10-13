@@ -3,6 +3,7 @@ import type { Character, Persona, Workflow, Session, ExecutionLog, ImportSource 
 import { JsonRepository, type Repository } from './storage/repository.js';
 import { KeyedLock } from './storage/lock.js';
 import { PresetRepository } from './storage/preset-repository.js';
+import { ProviderRepository } from './storage/provider-repository.js';
 import { migrateJsonPresets } from './storage/preset-migration.js';
 import { SecretStore } from './secrets/store.js';
 import { seed } from './seed.js';
@@ -12,6 +13,8 @@ import { ChangeHub, NotifyingRepository, type RecordResource } from './services/
 export interface AppContext {
   workflows: NotifyingRepository<Workflow>;
   presets: PresetRepository;
+  /** User-defined LLM providers; the built-in ones live in code (see `services/providers.ts`). */
+  providers: ProviderRepository;
   sessions: NotifyingRepository<Session>;
   executions: Repository<ExecutionLog>;
   characters: NotifyingRepository<Character>;
@@ -41,6 +44,7 @@ export async function createContext(dataDir: string, options: { seed?: boolean }
   return {
     workflows,
     presets,
+    providers: new ProviderRepository(join(dataDir, 'providers')),
     sessions: notifying<Session>('sessions'),
     executions: new JsonRepository<ExecutionLog>(join(dataDir, 'executions')),
     characters: notifying<Character>('characters'),

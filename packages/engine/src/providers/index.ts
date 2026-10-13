@@ -1,4 +1,4 @@
-import type { PromptMessage, ReasoningEffort } from '@st/shared';
+import type { PromptMessage, Provider, ReasoningEffort } from '@st/shared';
 
 export type ChatRequest = {
   messages: PromptMessage[];
@@ -16,20 +16,24 @@ export type ChatRequest = {
   reasoningExclude?: boolean;
 };
 export type ChatResponse = { text: string; raw: unknown; usage?: unknown };
-export type ChatOptions = { apiKey: string; signal: AbortSignal };
+export type ChatOptions = {
+  // The resolved provider record the call is made against.
+  provider: Provider;
+  // The record's secret, when it names one.
+  apiKey?: string;
+  signal: AbortSignal;
+};
 export type StreamOptions = ChatOptions & {
   onToken(textDelta: string): void;
   onReasoning(reasoningDelta: string): void;
 };
-export type LlmProvider = {
-  id: string;
-  label: string;
-  secretName: string;
+/** Speaks one wire protocol (a provider record's `kind`); the record says which backend to call and how. */
+export type LlmAdapter = {
   chat(request: ChatRequest, options: ChatOptions): Promise<ChatResponse>;
-  // Optional. Callers fall back to `chat` when a provider has no streaming support.
+  // Optional. Callers fall back to `chat` when an adapter has no streaming support.
   stream?(request: ChatRequest, options: StreamOptions): Promise<ChatResponse>;
 };
-export const providers = new Map<string, LlmProvider>();
-export function registerProvider(provider: LlmProvider) {
-  providers.set(provider.id, provider);
+export const adapters = new Map<Provider['kind'], LlmAdapter>();
+export function registerAdapter(kind: Provider['kind'], adapter: LlmAdapter) {
+  adapters.set(kind, adapter);
 }

@@ -6,7 +6,6 @@ export const secretSummarySchema = z.object({ name: z.string(), hint: z.string()
 const secretNameSchema = z.object({ name: z.string().regex(/^[a-zA-Z0-9_-]+$/) });
 export const catalogEndpoints = {
   listNodeTypes: endpoint(z.array(nodeTypeDescriptorSchema)),
-  listProviders: endpoint(z.array(z.object({ id: z.string(), label: z.string(), secretName: z.string() }))),
   resolvePorts: endpoint(
     z.object({ inputs: z.array(portSchema), outputs: z.array(portSchema) }),
     z.object({ config: z.record(z.string(), z.unknown()) }),

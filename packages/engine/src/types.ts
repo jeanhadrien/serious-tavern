@@ -1,4 +1,4 @@
-import type { Character, ChatMessage, Persona, PortDef, Preset } from '@st/shared';
+import type { Character, ChatMessage, Persona, PortDef, Preset, Provider } from '@st/shared';
 import type { z } from 'zod';
 
 export type EngineEvent = {
@@ -17,6 +17,8 @@ export type EngineEvent = {
 export type NodeResources = {
   presets: { get(id: string): Promise<Preset | undefined> };
   characters?: { get(id: string): Promise<Character | undefined> };
+  // Provider records by id. Built-in providers always resolve, with or without this.
+  providers?: { get(id: string): Promise<Provider | undefined> };
 };
 export type ChatReply = { nodeId: string; content: string; name?: string; characterId?: string };
 export type ExecutionContext = {

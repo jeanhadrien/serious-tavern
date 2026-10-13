@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
-import { providers, type ChatRequest, type StreamOptions } from '@st/engine';
+import type { ChatRequest, StreamOptions } from '@st/engine';
 import {
   apiContract,
   turnEventSchema,
@@ -15,16 +15,16 @@ import {
 } from '@st/shared';
 import { createApp } from './app.js';
 import { historyMessages, settleTurn } from './services/chat.js';
+import { restoreAdapter, useAdapter } from './test-support/adapter.js';
 import { parseEventStream } from './test-support/event-stream.js';
 
 type Script = (request: ChatRequest, options: StreamOptions) => Promise<{ text: string; raw: unknown }>;
 type Frame = ReturnType<typeof parseEventStream>[number];
 
 const directories: string[] = [];
-const providerIds: string[] = [];
 afterEach(async () => {
   vi.useRealTimers();
-  for (const id of providerIds.splice(0)) providers.delete(id);
+  restoreAdapter();
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
 
@@ -44,19 +44,15 @@ const edge = (source: string, sourceHandle: string, target: string, targetHandle
   targetHandle,
 });
 
+// The built-in OpenRouter record resolves to a scripted adapter; its `openrouter` secret is set by `setup`.
 function useProvider(script: Script): string {
-  const id = `stream-${randomUUID()}`;
-  providerIds.push(id);
-  providers.set(id, {
-    id,
-    label: id,
-    secretName: 'stream-test-key',
+  useAdapter({
     chat: async () => {
       throw new Error('These tests stream');
     },
     stream: script,
   });
-  return id;
+  return 'openrouter';
 }
 
 // Builds the app, a stream-test API key, a preset, a workflow and a session. Nodes get the preset id.
@@ -64,7 +60,7 @@ async function setup(build: (presetId: string) => { nodes: Workflow['nodes']; ed
   const directory = join(process.cwd(), '.test-data', `streaming-${randomUUID()}`);
   directories.push(directory);
   const app = await createApp(directory, { seed: false });
-  await app.inject({ method: 'PUT', url: '/api/secrets/stream-test-key', payload: { value: 'test-key' } });
+  await app.inject({ method: 'PUT', url: '/api/secrets/openrouter', payload: { value: 'test-key' } });
   const preset = (
     await app.inject({ method: 'POST', url: '/api/presets', payload: { name: 'Stream', inputs: [], entries: [] } })
   ).json();

@@ -41,7 +41,7 @@ it('renders the registered LLM panel with the same controls, preset summary and 
         current={{ id: 'llm', position: { x: 0, y: 0 }, data: { descriptor, config, name: 'LLM #1 (llm)' } }}
         presets={[preset]}
         characters={[]}
-        providersList={[{ id: 'openrouter', label: 'OpenRouter', secretName: 'openrouter' }]}
+        providersList={[{ id: 'openrouter', name: 'OpenRouter' }]}
         updateConfig={() => {}}
         onClose={() => {}}
       />

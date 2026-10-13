@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import { sessionEndpoints } from './sessions.js';
 import { workflowEndpoints } from './workflows.js';
 import { presetEndpoints } from './presets.js';
+import { providerEndpoints } from './providers.js';
 import { entityEndpoints } from './entities.js';
 import { catalogEndpoints } from './catalog.js';
 import { importEndpoints } from './imports.js';
@@ -11,6 +12,7 @@ export * from './common.js';
 export * from './sessions.js';
 export * from './workflows.js';
 export * from './presets.js';
+export * from './providers.js';
 export * from './entities.js';
 export * from './catalog.js';
 export * from './imports.js';
@@ -20,6 +22,7 @@ export const apiContract = {
   ...sessionEndpoints,
   ...workflowEndpoints,
   ...presetEndpoints,
+  ...providerEndpoints,
   ...entityEndpoints,
   ...catalogEndpoints,
   ...importEndpoints,

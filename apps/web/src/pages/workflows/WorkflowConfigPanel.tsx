@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
-import { NodeConfigPanel } from '@st/node-ui';
-import type { Character, NodeInstance, Preset, ApiResponse } from '@st/shared';
+import { NodeConfigPanel, type NodePanelContext } from '@st/node-ui';
+import type { Character, NodeInstance, Preset } from '@st/shared';
 import type { CanvasNode } from './model.js';
 
 export function WorkflowConfigPanel({
@@ -14,7 +14,7 @@ export function WorkflowConfigPanel({
   current: CanvasNode;
   presets: Preset[];
   characters: Character[];
-  providersList: ApiResponse<'listProviders'>;
+  providersList: NodePanelContext['providers'];
   updateConfig: (config: NodeInstance['config']) => void;
   onClose: () => void;
 }) {

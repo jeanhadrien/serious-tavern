@@ -4,11 +4,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Fastify, { type InjectOptions } from 'fastify';
 import { afterEach, beforeEach, expect, it, vi, type MockInstance } from 'vitest';
-import { providers } from '@st/engine';
 import { apiContract, type ChangeEvent, type Preset } from '@st/shared';
 import { createApp } from './app.js';
 import { createContext } from './context.js';
 import { registerEvents } from './routes/events.js';
+import { restoreAdapter, useAdapter } from './test-support/adapter.js';
 
 let dataDir: string;
 let warn: MockInstance<typeof console.warn>;
@@ -263,11 +263,8 @@ it('publishes a change for every write to workflows, characters, personas and se
 });
 
 it('publishes one session event per settled streamed turn, and one per message edit and delete', async () => {
-  const provider = `events-${randomUUID()}`;
-  providers.set(provider, {
-    id: provider,
-    label: provider,
-    secretName: 'events-key',
+  const provider = 'openrouter';
+  useAdapter({
     chat: async () => {
       throw new Error('These tests stream');
     },
@@ -279,7 +276,7 @@ it('publishes one session event per settled streamed turn, and one per message e
   });
   const app = await createApp(dataDir, { seed: false });
   try {
-    await app.inject({ method: 'PUT', url: '/api/secrets/events-key', payload: { value: 'k' } });
+    await app.inject({ method: 'PUT', url: '/api/secrets/openrouter', payload: { value: 'k' } });
     const preset = await created(app, '/api/presets', { name: 'P', inputs: [], entries: [] });
     const workflow = await created(app, '/api/workflows', { name: 'W' });
     const node = (id: string, type: string, config = {}) => ({ id, type, config, position: { x: 0, y: 0 } });
@@ -318,7 +315,7 @@ it('publishes one session event per settled streamed turn, and one per message e
     await vi.waitFor(() => expect(events()).toHaveLength(3));
     await stream.cancel();
   } finally {
-    providers.delete(provider);
+    restoreAdapter();
     await app.close();
   }
 });

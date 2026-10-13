@@ -5,19 +5,20 @@ import { parseStopSequences, updateNumericOption } from './llmConfig.js';
 export function LlmPanel({ config, onChange, context }: NodeConfigPanelProps) {
   const presets = context?.presets ?? [];
   const providers = context?.providers ?? [];
+  const provider = String(config.provider ?? 'openrouter');
   const selectedPreset = presets.find((preset) => preset.id === config.presetId);
   const presetPath = `/presets?id=${config.presetId}`;
   return (
     <div className="config-fields">
       <label>
         Provider
-        <select
-          value={String(config.provider ?? 'openrouter')}
-          onChange={(e) => onChange({ ...config, provider: e.target.value })}
-        >
-          {providers.map((provider) => (
-            <option key={provider.id} value={provider.id}>
-              {provider.label}
+        <select value={provider} onChange={(e) => onChange({ ...config, provider: e.target.value })}>
+          {providers.length > 0 && !providers.some((item) => item.id === provider) && (
+            <option value={provider}>Unknown provider ({provider})</option>
+          )}
+          {providers.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
             </option>
           ))}
         </select>

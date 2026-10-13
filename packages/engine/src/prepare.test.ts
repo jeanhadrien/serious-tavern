@@ -4,6 +4,7 @@ import type { Preset, Workflow } from '@st/shared';
 import { prepareWorkflow } from './prepare.js';
 import { executeWorkflow, ExecutionFailure } from './executor.js';
 import { registry } from './registry.js';
+import { providerRecord } from './test-providers.js';
 
 const graph = (): Workflow => ({
   id: 'workflow',
@@ -91,4 +92,49 @@ it('returns structured failing node identity independently of the error message 
   const error = await executeWorkflow(workflow, options).catch((error: unknown) => error);
   expect(error).toBeInstanceOf(ExecutionFailure);
   expect(error).toMatchObject({ nodeId: 'output with spaces', nodeType: 'chat-output', replies: [] });
+});
+
+it('snapshots provider records once and always resolves the built-in OpenRouter', async () => {
+  const record = providerRecord('11111111-1111-4111-8111-111111111111');
+  const get = vi.fn(async (id: string) => (id === record.id ? record : undefined));
+  const { prepared } = await prepareWorkflow(graph(), {
+    presets: { get: async () => undefined },
+    providers: { get },
+  });
+  const providers = prepared!.resources.providers!;
+  const [first, second] = await Promise.all([providers.get(record.id), providers.get(record.id)]);
+  expect(first).toEqual(record);
+  expect(first).not.toBe(record);
+  expect(second).toBe(first);
+  expect(get).toHaveBeenCalledTimes(1);
+  expect(await providers.get('openrouter')).toMatchObject({ id: 'openrouter', secret: 'openrouter' });
+  // Built-in ids never reach the source, so a stored record cannot shadow them.
+  expect(get).not.toHaveBeenCalledWith('openrouter');
+  expect(await providers.get('missing')).toBeUndefined();
+  expect(await (await prepareWorkflow(graph())).prepared!.resources.providers!.get('openrouter')).toBeDefined();
+});
+
+it('fails an LLM node that names an unknown provider, naming the id', async () => {
+  const preset: Preset = {
+    id: '2b041793-416b-4c94-a541-99ab866230b7',
+    name: 'P',
+    createdAt: '',
+    updatedAt: '',
+    inputs: [],
+    entries: [],
+  };
+  const workflow = graph();
+  workflow.nodes.push({
+    id: 'llm',
+    type: 'llm',
+    config: { presetId: preset.id, provider: 'ghost' },
+    position: { x: 0, y: 0 },
+  });
+  workflow.edges = [{ id: 'edge', source: 'llm', sourceHandle: 'text', target: 'output', targetHandle: 'value' }];
+  const failure = await executeWorkflow(workflow, {
+    ...options,
+    resources: { presets: { get: async () => preset } },
+  }).catch((error: unknown) => error);
+  expect(failure).toBeInstanceOf(ExecutionFailure);
+  expect(failure).toMatchObject({ nodeId: 'llm', message: expect.stringContaining('Unknown LLM provider: ghost') });
 });
