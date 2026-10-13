@@ -34,6 +34,21 @@ function ListPlaceholder({ children }: { children: ReactNode }) {
   return <p className="hint list-placeholder">{children}</p>;
 }
 
+// Views that take no props are created once: the shell re-renders on every streamed chat token,
+// and a stable element lets React skip re-rendering these pages (the workflow canvas above all).
+const STATIC_VIEWS = {
+  'list:workflows': <ListPlaceholder>Workflow list coming soon. The editor opens in the middle.</ListPlaceholder>,
+  'list:presets': <ListPlaceholder>Preset list coming soon. The editor opens in the middle.</ListPlaceholder>,
+  'list:settings': <ListPlaceholder>Settings open in the middle.</ListPlaceholder>,
+  'list:characters': <ListPlaceholder>Character list coming soon. The editor opens in the middle.</ListPlaceholder>,
+  'list:personas': <ListPlaceholder>Persona list coming soon. The editor opens in the middle.</ListPlaceholder>,
+  'editor:workflows': <Workflows />,
+  'editor:presets': <Presets />,
+  'editor:settings': <Settings />,
+  'editor:characters': <Characters />,
+  'editor:personas': <Personas />,
+} satisfies Partial<Record<ViewKey, ReactNode>>;
+
 /** The three-column shell: top bar, L | M | R columns, and every view mounted exactly once. */
 export function Shell() {
   const compact = useCompactMode();
@@ -68,16 +83,7 @@ export function Shell() {
         onDelete={chat.remove}
       />
     ),
-    'list:workflows': <ListPlaceholder>Workflow list coming soon. The editor opens in the middle.</ListPlaceholder>,
-    'list:presets': <ListPlaceholder>Preset list coming soon. The editor opens in the middle.</ListPlaceholder>,
-    'list:settings': <ListPlaceholder>Settings open in the middle.</ListPlaceholder>,
-    'list:characters': <ListPlaceholder>Character list coming soon. The editor opens in the middle.</ListPlaceholder>,
-    'list:personas': <ListPlaceholder>Persona list coming soon. The editor opens in the middle.</ListPlaceholder>,
-    'editor:workflows': <Workflows />,
-    'editor:presets': <Presets />,
-    'editor:settings': <Settings />,
-    'editor:characters': <Characters />,
-    'editor:personas': <Personas />,
+    ...STATIC_VIEWS,
   };
 
   // Interim: picking a resource icon also opens its page, since there is no list to pick an item from yet.
