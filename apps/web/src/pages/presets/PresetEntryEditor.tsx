@@ -10,8 +10,8 @@ export function PresetEntryEditor(props: {
 }) {
   const contentRef = useRef<HTMLTextAreaElement | null>(null);
   const nameRef = useRef<HTMLInputElement | null>(null);
-  // Variable hints insert into whichever template field was focused last.
-  const hintTarget = useRef<'content' | 'name'>('content');
+  // Variable hints insert into whichever template field of this entry was focused last (content by default).
+  const hintTarget = useRef<{ entryId: string; field: 'content' | 'name' } | undefined>(undefined);
   const { entry, preset } = props;
   if (!entry)
     return (
@@ -36,7 +36,7 @@ export function PresetEntryEditor(props: {
   const update = (partial: Partial<PresetEntry>) => props.onChange({ ...entry, ...partial } as PresetEntry);
   const insert = (token: string) => {
     if (entry.kind !== 'message') return;
-    const field = hintTarget.current;
+    const field = hintTarget.current?.entryId === entry.id ? hintTarget.current.field : 'content';
     const element = field === 'name' ? nameRef.current : contentRef.current;
     const value = (field === 'name' ? entry.name : entry.content) ?? '';
     const start = element?.selectionStart ?? value.length;
@@ -109,7 +109,7 @@ export function PresetEntryEditor(props: {
                 value={entry.name ?? ''}
                 placeholder="Optional"
                 onFocus={() => {
-                  hintTarget.current = 'name';
+                  hintTarget.current = { entryId: entry.id, field: 'name' };
                 }}
                 onChange={(event) => update({ name: event.target.value || undefined })}
               />
@@ -124,7 +124,7 @@ export function PresetEntryEditor(props: {
                 rows={12}
                 value={entry.content}
                 onFocus={() => {
-                  hintTarget.current = 'content';
+                  hintTarget.current = { entryId: entry.id, field: 'content' };
                 }}
                 onChange={(event) => update({ content: event.target.value })}
               />
