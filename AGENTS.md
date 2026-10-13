@@ -38,6 +38,10 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - `alerts/`: toast store and `<Toaster/>`.
   - `connection.ts`: `isValidConnection`.
   - `stores/`: shared list stores (`createListStore`, read with `useList`) for workflows, presets, characters, personas and sessions. They re-fetch on their change event. Pages read lists from them and never keep their own copies. After a local write, call `store.refresh()` to read your own write. Drafts and the open chat session stay local state that a list refresh never touches.
+  - `layout/`: the three-column shell (design in `docs/FRONTEND-LAYOUT.md`).
+    - `state.ts` is a pure reducer: slot rules, wide vs narrow editors, compact mode, dirty flags. `derive.ts` maps it to view placements and header icons. Change rules there, with tests, never in components.
+    - `Shell.tsx` mounts **every view exactly once, in the fixed `VIEW_KEYS` order**. Moving a view only changes its `grid-area`, and hiding it sets `hidden`, so nothing remounts (streams, drafts, canvases survive). Never render a view conditionally or in a different position.
+    - `useChat` lives in the shell, so it re-renders on every streamed token. Views that take no props are module-level constants (`STATIC_VIEWS`) so React skips them. Keep new views stable the same way, or memoize them.
   - `pages/<area>/`: components and hooks per page (chat, workflows, entities, presets). Keep files focused, roughly under 250 lines. Page components take explicit, minimal props interfaces (not a whole hook result); the page file is a thin composition.
   - `components/`: shared UI pieces (e.g. `IconButton`). Page-specific styles live next to the page (e.g. `pages/chat/chat.css`), not in `style.css`.
   - Icons: `lucide-react` only. Icon-only buttons need `aria-label` and `title`.
