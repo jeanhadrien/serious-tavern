@@ -2,7 +2,7 @@
 // Nothing here knows about React, the DOM or the URL: the shell renders whatever
 // `viewSlots`/`columnIcons` derive from this state, and `url.ts` serializes it.
 
-export type ResourceId = 'workflows' | 'presets' | 'settings' | 'characters' | 'personas';
+export type ResourceId = 'workflows' | 'presets' | 'providers' | 'settings' | 'characters' | 'personas';
 /** Something a column can list: a resource's list, or the chat history. */
 export type ListId = ResourceId | 'chats';
 /** Header icons also include the chat itself, which only appears while it sits in R. */
@@ -14,6 +14,7 @@ export type EditorKind = 'wide' | 'narrow';
 export const LIST_COLUMN: Record<ListId, 'L' | 'R'> = {
   workflows: 'L',
   presets: 'L',
+  providers: 'L',
   settings: 'L',
   chats: 'R',
   characters: 'R',
@@ -23,7 +24,14 @@ export const LIST_COLUMN: Record<ListId, 'L' | 'R'> = {
 /** Narrow editors with no list in front of them: their icon shows the editor itself. */
 export const LISTLESS: readonly ResourceId[] = ['settings'];
 
-export const RESOURCE_IDS: readonly ResourceId[] = ['workflows', 'presets', 'settings', 'characters', 'personas'];
+export const RESOURCE_IDS: readonly ResourceId[] = [
+  'workflows',
+  'presets',
+  'providers',
+  'settings',
+  'characters',
+  'personas',
+];
 
 export interface LayoutState {
   /** Wide editors take M; narrow editors open inside their own column. */
@@ -52,6 +60,8 @@ export interface LayoutTarget {
   /** 'chat' only counts while a wide editor is open. */
   right: ListId | 'chat';
   wide?: ResourceId;
+  /** A narrow editor is open in the left column's tab (its list is replaced by the editor). */
+  leftEditorOpen: boolean;
   /** A narrow editor is open in the right column's tab (its list is replaced by the editor). */
   rightEditorOpen: boolean;
 }
@@ -68,6 +78,7 @@ export type LayoutAction =
 const noResources = (): Record<ResourceId, boolean> => ({
   workflows: false,
   presets: false,
+  providers: false,
   settings: false,
   characters: false,
   personas: false,
@@ -77,6 +88,7 @@ const noResources = (): Record<ResourceId, boolean> => ({
 export const DESIGN_KINDS: Record<ResourceId, EditorKind> = {
   workflows: 'wide',
   presets: 'wide',
+  providers: 'narrow',
   settings: 'narrow',
   characters: 'narrow',
   personas: 'narrow',
@@ -112,23 +124,29 @@ function returnChatToMiddle(state: LayoutState): LayoutState {
 }
 
 // Applies a layout described by a URL. Unsaved state (dirty flags, hidden narrow editors) is left alone.
-function restoreLayout(state: LayoutState, { left, right, wide, rightEditorOpen }: LayoutTarget): LayoutState {
+function restoreLayout(
+  state: LayoutState,
+  { left, right, wide, leftEditorOpen, rightEditorOpen }: LayoutTarget,
+): LayoutState {
   const wideId = wide !== undefined && state.kinds[wide] === 'wide' ? wide : undefined;
   const chatInR = right === 'chat' && wideId !== undefined && !state.compact;
   const rightTab = right === 'chat' ? (chatInR ? 'chat' : state.rightReturn) : right;
+  const tabs: LayoutState['tabs'] = { L: left, R: rightTab };
+  const editorOpen = { L: leftEditorOpen, R: rightEditorOpen };
   const narrowOpen = { ...state.narrowOpen };
   for (const id of RESOURCE_IDS) {
-    if (state.kinds[id] !== 'narrow') continue;
-    const shownTab = LIST_COLUMN[id] === 'L' ? left : rightTab;
-    if (shownTab !== id) continue;
-    narrowOpen[id] = LIST_COLUMN[id] === 'R' && rightEditorOpen;
+    if (state.kinds[id] !== 'narrow' || tabs[LIST_COLUMN[id]] !== id) continue;
+    narrowOpen[id] = editorOpen[LIST_COLUMN[id]];
   }
-  const editing = RESOURCE_IDS.find((id) => narrowOpen[id] && LIST_COLUMN[id] === 'R' && rightTab === id);
+  // Compact mode shows one view in L: an open editor (R's first, as before), else settings, else what it showed.
+  const editingIn = (column: 'L' | 'R') =>
+    RESOURCE_IDS.find((id) => narrowOpen[id] && LIST_COLUMN[id] === column && tabs[column] === id);
+  const editing = editingIn('R') ?? editingIn('L');
   return {
     ...state,
     wide: wideId,
     compactChat: false,
-    tabs: { L: left, R: rightTab },
+    tabs,
     rightReturn: rightTab === 'chat' ? state.rightReturn : rightTab,
     compactTab: editing ?? (left === 'settings' ? left : state.compactTab),
     narrowOpen,

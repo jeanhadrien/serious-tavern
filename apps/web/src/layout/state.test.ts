@@ -70,6 +70,20 @@ it('opens narrow editors inside their column and replaces the list', () => {
   expect(slot(back, 'list:characters')).toBe('R');
 });
 
+it('opens the providers editor in L in place of its list', () => {
+  const state = run(start(), select('providers'), open('providers'));
+  expect(slot(state, 'editor:providers')).toBe('L');
+  expect(slot(state, 'list:providers')).toBeNull();
+  expect(slot(state, 'list:chats')).toBe('R');
+  expect(columnIcons(state, 'L')).toEqual(['workflows', 'presets', 'providers', 'settings']);
+  // Another L tab hides the editor (keeping it open); coming back shows it again.
+  const away = run(state, select('presets'));
+  expect(slot(away, 'editor:providers')).toBeNull();
+  expect(slot(run(away, select('providers')), 'editor:providers')).toBe('L');
+  const back = run(state, { type: 'closeEditor', id: 'providers' });
+  expect(slot(back, 'list:providers')).toBe('L');
+});
+
 it('shows settings, which has no list, as soon as its icon is picked', () => {
   const state = run(start(), select('settings'));
   expect(slot(state, 'editor:settings')).toBe('L');
@@ -103,7 +117,7 @@ it('ignores selecting the chat icon when the chat is in M', () => {
 
 it('collapses to L | M in compact mode', () => {
   const compact = initialLayout(DESIGN_KINDS, true);
-  expect(columnIcons(compact, 'L')).toHaveLength(6);
+  expect(columnIcons(compact, 'L')).toHaveLength(7);
   expect(columnIcons(compact, 'R')).toEqual([]);
   expect(slot(compact, 'chat')).toBe('M');
   expect(slot(compact, 'list:chats')).toBe('L');
@@ -144,6 +158,7 @@ it('supports any mix of editor kinds', () => {
   const interim = initialLayout({
     workflows: 'wide',
     presets: 'wide',
+    providers: 'wide',
     settings: 'wide',
     characters: 'wide',
     personas: 'wide',

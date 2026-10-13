@@ -1,0 +1,133 @@
+/* Providers live in L (a side column of about 180-450px), so everything stacks in one column. */
+.provider-list {
+  height: 100%;
+  padding: 14px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.provider-list > .toolbar h2 {
+  margin: 8px 0;
+}
+.provider-list > .hint {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+}
+.provider-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 7px 9px;
+}
+.provider-row.selected {
+  background: #33394b;
+  border-color: #59617a;
+}
+.provider-row > small,
+.provider-row-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.provider-badge {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #3b4256;
+  font-size: 0.75rem;
+}
+.provider-editor {
+  height: 100%;
+  min-width: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.provider-toolbar {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid #363b46;
+}
+.provider-toolbar .toolbar {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.provider-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.provider-title h1 {
+  font-size: 1.2rem;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.provider-banner {
+  margin: 12px 14px 0;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: #2f3547;
+  border: 1px solid #4a5370;
+}
+.provider-errors {
+  margin: 12px 14px 0;
+  padding-left: 20px;
+}
+.provider-form {
+  margin: 0;
+  padding: 14px;
+  border: 0;
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+.provider-form input,
+.provider-form select,
+.provider-form textarea {
+  width: 100%;
+}
+/* The global label style capitalizes every word, which also hits the hints inside these labels. */
+.provider-form label {
+  text-transform: none;
+}
+.provider-field {
+  display: grid;
+  gap: 8px;
+}
+.provider-reasoning {
+  margin: 0;
+  padding: 10px;
+  border: 1px solid #414757;
+  border-radius: 7px;
+  min-width: 0;
+}
+.provider-reasoning legend {
+  font-size: 0.88rem;
+  padding: 0 4px;
+}
+.provider-reasoning-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.provider-reasoning-row input {
+  flex: 1;
+  width: auto;
+}
+.provider-yaml {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.85rem;
+}

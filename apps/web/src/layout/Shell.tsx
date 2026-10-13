@@ -8,8 +8,16 @@ import { Presets } from '../pages/Presets.js';
 import { Settings } from '../pages/Settings.js';
 import { Workflows } from '../pages/Workflows.js';
 import { PresetListView } from '../pages/presets/PresetListView.js';
+import { ProviderListView } from '../pages/providers/ProviderListView.js';
+import { Providers } from '../pages/providers/Providers.js';
 import { WorkflowList } from '../pages/workflows/WorkflowList.js';
-import { characterEditorStore, personaEditorStore, presetEditorStore, workflowEditorStore } from '../stores/index.js';
+import {
+  characterEditorStore,
+  personaEditorStore,
+  presetEditorStore,
+  providerEditorStore,
+  workflowEditorStore,
+} from '../stores/index.js';
 import { ColumnHeader } from './ColumnHeader.js';
 import { activeIcon, columnIcons, VIEW_KEYS, viewSlots, type ViewKey } from './derive.js';
 import { MiddleHeader } from './MiddleHeader.js';
@@ -31,10 +39,12 @@ const BODY_AREA: Record<Column, string> = { L: 'lb', M: 'mb', R: 'rb' };
 const STATIC_VIEWS = {
   'list:workflows': <WorkflowList />,
   'list:presets': <PresetListView />,
+  'list:providers': <ProviderListView />,
   'list:characters': <CharacterList />,
   'list:personas': <PersonaList />,
   'editor:workflows': <Workflows />,
   'editor:presets': <Presets />,
+  'editor:providers': <Providers />,
   'editor:settings': <Settings />,
   'editor:characters': <Characters />,
   'editor:personas': <Personas />,
@@ -44,6 +54,7 @@ const STATIC_VIEWS = {
 const DIRTY_SOURCES = {
   workflows: workflowEditorStore,
   presets: presetEditorStore,
+  providers: providerEditorStore,
   characters: characterEditorStore,
   personas: personaEditorStore,
 };

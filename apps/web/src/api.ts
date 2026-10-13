@@ -4,5 +4,6 @@ export { streamMessage } from './api/turnStream.js';
 export { workflowsApi } from './api/workflows.js';
 export { presetsApi } from './api/presets.js';
 export { charactersApi, personasApi } from './api/entities.js';
-export { nodeTypesApi, providersApi, secretsApi } from './api/catalog.js';
+export { nodeTypesApi, secretsApi } from './api/catalog.js';
+export { providersApi } from './api/providers.js';
 export { importsApi } from './api/imports.js';

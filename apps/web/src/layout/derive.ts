@@ -59,7 +59,7 @@ export function viewSlots(state: LayoutState): Record<ViewKey, Column | null> {
   return slots;
 }
 
-const LEFT_ICONS: readonly IconId[] = ['workflows', 'presets', 'settings'];
+const LEFT_ICONS: readonly IconId[] = ['workflows', 'presets', 'providers', 'settings'];
 const RIGHT_ICONS: readonly IconId[] = ['chats', 'characters', 'personas'];
 
 /** The icons a column header shows. M has none. */

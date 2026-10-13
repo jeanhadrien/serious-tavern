@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Edge } from '@xyflow/react';
-import { workflowInvalidDetailsSchema, type Workflow, type NodeTypeDescriptor, type ApiResponse } from '@st/shared';
-import { ApiError, workflowsApi, nodeTypesApi, providersApi } from '../../api.js';
+import { workflowInvalidDetailsSchema, type Workflow, type NodeTypeDescriptor } from '@st/shared';
+import { ApiError, workflowsApi, nodeTypesApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
 import {
   charactersStore,
   presetsStore,
+  providersStore,
   useEditorCommands,
   useList,
   workflowEditorStore,
@@ -28,7 +29,8 @@ export function useWorkflowEditor() {
   const characters = useList(charactersStore);
   const [types, setTypes] = useState<NodeTypeDescriptor[]>([]);
   const [typesReady, setTypesReady] = useState(false);
-  const [providersList, setProvidersList] = useState<ApiResponse<'listProviders'>>([]);
+  // The LLM node's provider dropdown; the store follows `providers.changed`.
+  const providersList = useList(providersStore);
   const [workflow, setWorkflow] = useState<Workflow>();
   const [saved, setSaved] = useState('');
   const canvas = useWorkflowCanvas(types, presets, characters);
@@ -39,10 +41,6 @@ export function useWorkflowEditor() {
       .then(setTypes)
       .catch(() => {})
       .finally(() => setTypesReady(true));
-    void providersApi
-      .list()
-      .then(setProvidersList)
-      .catch(() => {});
   }, []);
 
   const load = (next: Workflow) => {

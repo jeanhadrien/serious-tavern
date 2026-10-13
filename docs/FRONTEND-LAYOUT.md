@@ -31,7 +31,7 @@ What was built, and where it refines the design below:
 
 | Column | Content | Notes |
 |---|---|---|
-| **L** | Technical lists: workflows, presets. Settings. | Settings is a narrow editor shown in L. |
+| **L** | Technical lists: workflows, presets, providers. Settings. | Providers and settings are narrow editors shown in L (settings has no list). |
 | **M** | The chat, by default. | Wide editors take M over. |
 | **R** | Content lists: chats (session history), characters, personas. | Browsing and editing only (see below). |
 
@@ -39,7 +39,7 @@ What was built, and where it refines the design below:
 
 Every editor is either **narrow** or **wide**.
 
-- **Narrow editors** (character, persona, settings) open **inside their own column** and replace its list. A back arrow returns to the list. They are mostly text; the user resizes the column if they need room.
+- **Narrow editors** (character, persona, provider, settings) open **inside their own column** and replace its list. A back arrow returns to the list. They are mostly text; the user resizes the column if they need room.
 - **Wide editors** (workflow, preset) open in **M**, and the **chat moves to R**. A close button on the editor returns the chat to M.
 
 Example: `preset list | chat | character list` becomes `preset list | preset editor | chat`.

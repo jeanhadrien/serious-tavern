@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
-import { charactersApi, personasApi, presetsApi, sessionsApi, workflowsApi } from '../api.js';
+import { charactersApi, personasApi, presetsApi, providersApi, sessionsApi, workflowsApi } from '../api.js';
 import { compareRecent } from '../pages/recentOrder.js';
-import type { Character, Persona, Preset, Workflow } from '@st/shared';
+import type { Character, Persona, Preset, ProviderView, Workflow } from '@st/shared';
 import { createEditorStore } from './editorStore.js';
 import { createListStore, type ListStore } from './listStore.js';
 
@@ -37,6 +37,13 @@ export const personasStore = createListStore({
   compare: byName,
 });
 
+// Built-in providers first (as the server lists them), then the user's by name.
+export const providersStore = createListStore({
+  event: 'providers.changed',
+  load: () => providersApi.list(silent),
+  compare: (a, b) => Number(b.builtIn) - Number(a.builtIn) || byName(a, b),
+});
+
 /** Reads a shared list; the component re-renders when the list changes. */
 export function useList<T>(store: ListStore<T>): T[] {
   return useSyncExternalStore(store.subscribe, store.getSnapshot);
@@ -47,3 +54,4 @@ export const workflowEditorStore = createEditorStore<Workflow>();
 export const presetEditorStore = createEditorStore<Preset>();
 export const characterEditorStore = createEditorStore<Character>();
 export const personaEditorStore = createEditorStore<Persona>();
+export const providerEditorStore = createEditorStore<ProviderView>();

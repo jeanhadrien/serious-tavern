@@ -6,9 +6,6 @@ export const nodeTypesApi = {
   resolvePorts: (type: string, config: ApiBody<'resolvePorts'>['config'], options?: RequestOptions) =>
     api<ApiResponse<'resolvePorts'>>(`/node-types/${type}/ports`, { ...json('POST', { config }), ...options }),
 };
-export const providersApi = {
-  list: (options?: RequestOptions) => api<ApiResponse<'listProviders'>>('/providers', options),
-};
 export const secretsApi = {
   list: (options?: RequestOptions) => api<ApiResponse<'listSecrets'>>('/secrets', options),
   set: (name: string, body: ApiBody<'setSecret'>, options?: RequestOptions) =>

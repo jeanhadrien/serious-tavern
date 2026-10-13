@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { viewSlots } from './derive.js';
 import { DESIGN_KINDS, initialLayout, layoutReducer, type LayoutAction, type LayoutState } from './state.js';
 import {
   formatLayoutUrl,
@@ -31,6 +32,14 @@ it('round-trips layouts through the URL and the reducer', () => {
     ['right=character:c1', { characters: 'c1' }, undefined],
     ['left=settings&right=personas', {}, undefined],
     ['left=presets&wide=preset:p1&right=persona:x', { presets: 'p1', personas: 'x' }, undefined],
+    ['left=providers', {}, undefined],
+    ['left=provider:openrouter', { providers: 'openrouter' }, undefined],
+    ['left=provider:x&right=character:c', { providers: 'x', characters: 'c' }, undefined],
+    [
+      'session=s1&left=provider:x&wide=workflow:w1&right=persona:p',
+      { providers: 'x', workflows: 'w1', personas: 'p' },
+      's1',
+    ],
   ];
   for (const [search, ids, session] of cases) expect(reload(search, ids, session)).toBe(search);
 });
@@ -52,6 +61,7 @@ it('falls back to defaults on garbage', () => {
     'wide=chat:1&right=chat',
     'right=character&left=chat',
     'wide=preset:&right=persona:',
+    'left=character:c1&right=provider:x',
     '%E0%A4%A&&===',
   ]) {
     const url = parseLayoutUrl(garbage);
@@ -59,6 +69,7 @@ it('falls back to defaults on garbage', () => {
     expect(url.session).toBeUndefined();
     expect(url.wideId).toBeUndefined();
     expect(url.rightId).toBeUndefined();
+    expect(url.leftId).toBeUndefined();
     expect(() => run(start(), { type: 'restore', target: urlTarget(url) })).not.toThrow();
   }
   expect(parseLayoutUrl('right=chat').right).toBe('chats');
@@ -98,11 +109,26 @@ it('does not put the chat in R in compact mode', () => {
   expect(run(restored, { type: 'setCompact', compact: false }).tabs.R).toBe('chat');
 });
 
+it('opens the providers editor in compact mode, where L shows one view', () => {
+  const compact = initialLayout(DESIGN_KINDS, true);
+  const restored = run(compact, { type: 'restore', target: urlTarget(parseLayoutUrl('left=provider:x')) });
+  expect(restored.narrowOpen.providers).toBe(true);
+  expect(viewSlots(restored)['editor:providers']).toBe('L');
+  expect(formatLayoutUrl(layoutToUrl(restored, { providers: 'x' }))).toBe('left=provider:x');
+  // An editor open in R is shown first, as before.
+  const both = run(compact, {
+    type: 'restore',
+    target: urlTarget(parseLayoutUrl('left=provider:x&right=character:c')),
+  });
+  expect(viewSlots(both)['editor:characters']).toBe('L');
+});
+
 it('tells content changes from tab switches', () => {
   expect(sameContent(parseLayoutUrl('left=presets'), parseLayoutUrl(''))).toBe(true);
   expect(sameContent(parseLayoutUrl('session=a'), parseLayoutUrl('session=b'))).toBe(false);
   expect(sameContent(parseLayoutUrl('wide=preset:a'), parseLayoutUrl('wide=preset:b'))).toBe(false);
   expect(sameContent(parseLayoutUrl('right=character:a'), parseLayoutUrl('right=characters'))).toBe(false);
+  expect(sameContent(parseLayoutUrl('left=provider:a'), parseLayoutUrl('left=providers'))).toBe(false);
 });
 
 it('builds links for other parts of the app', () => {

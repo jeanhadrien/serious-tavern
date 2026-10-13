@@ -8,6 +8,8 @@ import {
   personasStore,
   presetEditorStore,
   presetsStore,
+  providerEditorStore,
+  providersStore,
   sessionsStore,
   workflowEditorStore,
   workflowsStore,
@@ -25,6 +27,7 @@ interface Item {
 const ITEM_SOURCES: Partial<Record<ResourceId, { list: ListStore<Item>; editor: EditorStore<Item> }>> = {
   workflows: { list: workflowsStore, editor: workflowEditorStore },
   presets: { list: presetsStore, editor: presetEditorStore },
+  providers: { list: providersStore, editor: providerEditorStore },
   characters: { list: charactersStore, editor: characterEditorStore },
   personas: { list: personasStore, editor: personaEditorStore },
 };
@@ -116,6 +119,7 @@ export function useLayoutUrl(layout: LayoutState, dispatch: Dispatch<LayoutActio
     };
     await Promise.all([
       url.wide && url.wideId ? openItem(url.wide, url.wideId, url.edge) : undefined,
+      url.leftId ? openItem(url.left as ResourceId, url.leftId) : undefined,
       url.rightId ? openItem(url.right as ResourceId, url.rightId) : undefined,
       openSession(url.session),
     ]);
@@ -145,7 +149,14 @@ export function useLayoutUrl(layout: LayoutState, dispatch: Dispatch<LayoutActio
   const presetId = useOpenId(presetEditorStore);
   const characterId = useOpenId(characterEditorStore);
   const personaId = useOpenId(personaEditorStore);
-  const openIds = { workflows: workflowId, presets: presetId, characters: characterId, personas: personaId };
+  const providerId = useOpenId(providerEditorStore);
+  const openIds = {
+    workflows: workflowId,
+    presets: presetId,
+    providers: providerId,
+    characters: characterId,
+    personas: personaId,
+  };
   const next = formatLayoutUrl(layoutToUrl(layout, openIds, chat.session?.id));
   useEffect(() => {
     if (applying.current) return;
