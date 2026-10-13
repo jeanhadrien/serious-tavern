@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Edge } from '@xyflow/react';
-import { useLocation } from 'react-router-dom';
 import { workflowInvalidDetailsSchema, type Workflow, type NodeTypeDescriptor, type ApiResponse } from '@st/shared';
 import { ApiError, workflowsApi, nodeTypesApi, providersApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
@@ -21,11 +20,10 @@ const snapshot = (workflow: Workflow, nodes: CanvasNode[], edges: Edge[]) =>
 
 /**
  * The state of the workflow editor in M: the open workflow, its canvas and node types. Which workflow to open
- * comes from the list in L (through `workflowEditorStore`) or from a `?workflow=&edge=` link; the open workflow and
- * its dirty flag are published back to the store for the list and the header icon.
+ * comes from the list in L or from the layout URL (both through `workflowEditorStore`); the open workflow and
+ * its dirty flag are published back to the store for the list, the header icon and the URL.
  */
 export function useWorkflowEditor() {
-  const { key: locationKey, search } = useLocation();
   const presets = useList(presetsStore);
   const characters = useList(charactersStore);
   const [types, setTypes] = useState<NodeTypeDescriptor[]>([]);
@@ -66,41 +64,21 @@ export function useWorkflowEditor() {
   const openId = workflow?.id;
   useEffect(() => workflowEditorStore.report(openId, dirty), [openId, dirty]);
 
+  // The store's `focus` is an edge to highlight (validation links). Opening the workflow that is already
+  // showing only moves the highlight, so unsaved canvas edits survive.
   useEditorCommands(
     workflowEditorStore,
     {
-      open: load,
+      open: (next, edgeId) => {
+        if (workflow?.id !== next.id) load(next);
+        if (edgeId) canvas.setHighlightedEdge(edgeId);
+      },
       close: (id) => {
         if (workflow?.id === id) close();
       },
     },
     typesReady,
   );
-
-  // A validation link (`?workflow=…&edge=…`) opens that workflow and highlights the edge. It is handled once per
-  // navigation, so it also works when the editor already shows another workflow.
-  const linkHandled = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    const params = new URLSearchParams(search);
-    const requestedWorkflowId = params.get('workflow');
-    const requestedEdgeId = params.get('edge') ?? undefined;
-    if (!requestedWorkflowId || !typesReady || linkHandled.current === locationKey) return;
-    linkHandled.current = locationKey;
-    if (workflow?.id === requestedWorkflowId) {
-      // Already open: only move the highlight and keep unsaved canvas edits.
-      canvas.setHighlightedEdge(requestedEdgeId);
-      return;
-    }
-    void workflowsApi
-      .get(requestedWorkflowId)
-      .then((loaded) => {
-        load(loaded);
-        canvas.setHighlightedEdge(requestedEdgeId);
-      })
-      .catch(() => {
-        linkHandled.current = undefined;
-      });
-  }, [locationKey, search, typesReady]);
 
   const save = async (showToast = true): Promise<boolean> => {
     if (!workflow) return false;

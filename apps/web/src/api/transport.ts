@@ -1,5 +1,6 @@
 import { workflowInvalidDetailsSchema, type ExecutionLog, type ErrorEnvelope } from '@st/shared';
 import { alerts } from '../alerts/store.js';
+import { layoutHref } from '../layout/url.js';
 type ApiOptions = RequestInit & { silent?: boolean };
 export type RequestOptions = Omit<ApiOptions, 'method' | 'body'>;
 export class ApiError extends Error {
@@ -43,7 +44,7 @@ export function notifyError(error: ApiError) {
         details: detailText(error.details),
         action: {
           label: 'Open workflow',
-          to: `/workflows?workflow=${invalid.data.workflowId}${edgeId ? `&edge=${edgeId}` : ''}`,
+          to: layoutHref({ wide: 'workflows', wideId: invalid.data.workflowId, edge: edgeId }),
         },
       });
       return;

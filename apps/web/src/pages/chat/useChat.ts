@@ -47,6 +47,13 @@ export function useChat() {
       /* API errors are toasted. */
     }
   };
+  // Leaves the open chat (e.g. browser Back to a URL without one).
+  const close = () => {
+    if (busyRef.current || messageActions.isPending()) return;
+    ++opening.current;
+    setSession(undefined);
+    setContent('');
+  };
   const create = async () => {
     if (busyRef.current || messageActions.isPending()) return;
     const request = ++opening.current;
@@ -166,6 +173,7 @@ export function useChat() {
     busy,
     logs,
     open,
+    close,
     create,
     update,
     remove,

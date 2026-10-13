@@ -50,7 +50,7 @@ it('turns backend errors into typed ApiErrors and toasts unless silent', async (
       message: 'Invalid workflow',
       details:
         'Missing chat output\nConnection from "LLM #2 (llm)" [output "text"] to "Chat Output #1 (chat-output)" [input "value"]',
-      action: { label: 'Open workflow', to: '/workflows?workflow=workflow-id&edge=edge-1' },
+      action: { label: 'Open workflow', to: '/?wide=workflow:workflow-id&edge=edge-1' },
     },
   ]);
   alerts.clear();

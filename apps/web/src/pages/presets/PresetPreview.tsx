@@ -9,6 +9,7 @@ import {
   type PromptMessage,
 } from '@st/shared';
 import { presetsApi } from '../../api.js';
+import { layoutHref } from '../../layout/url.js';
 import { sessionsStore, useList } from '../../stores/index.js';
 
 export function PresetPreview(props: { preset: Preset }) {
@@ -90,7 +91,7 @@ export function PresetPreview(props: { preset: Preset }) {
           </div>
         ))}
       <p className="hint">
-        Connect inputs to an LLM node in <Link to="/workflows">Workflows</Link>.
+        Connect inputs to an LLM node in <Link to={layoutHref({ left: 'workflows' })}>Workflows</Link>.
       </p>
     </section>
   );

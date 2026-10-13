@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useRef, type CSSProperties, type ReactNode } from 'react';
-import { useLocation, Navigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Chat } from '../pages/Chat.js';
 import { ChatSidebar } from '../pages/chat/ChatSidebar.js';
 import { useChat } from '../pages/chat/useChat.js';
@@ -15,11 +15,12 @@ import { activeIcon, columnIcons, VIEW_KEYS, viewSlots, type ViewKey } from './d
 import { MiddleHeader } from './MiddleHeader.js';
 import { ResizeHandle } from './ResizeHandle.js';
 import { LayoutActionsProvider } from './LayoutActions.js';
-import { isKnownPath, routeTarget } from './routes.js';
 import { DESIGN_KINDS, initialLayout, layoutReducer, type Column, type IconId, type ResourceId } from './state.js';
+import { parseLayoutUrl, urlTarget } from './url.js';
 import { useColumnWidths } from './useColumnWidths.js';
 import { useCompactMode } from './useCompactMode.js';
 import { useDirtySync } from './useDirtySync.js';
+import { searchOf, useLayoutUrl } from './useLayoutUrl.js';
 import { HANDLE_WIDTH } from './widths.js';
 import './shell.css';
 
@@ -50,7 +51,14 @@ const DIRTY_SOURCES = {
 /** The three-column shell: top bar, L | M | R columns, and every view mounted exactly once. */
 export function Shell() {
   const compact = useCompactMode();
-  const [layout, dispatch] = useReducer(layoutReducer, compact, (isCompact) => initialLayout(DESIGN_KINDS, isCompact));
+  const location = useLocation();
+  // The first layout comes straight from the URL, so a reload shows it without a flash of the default.
+  const [layout, dispatch] = useReducer(layoutReducer, compact, (isCompact) =>
+    layoutReducer(initialLayout(DESIGN_KINDS, isCompact), {
+      type: 'restore',
+      target: urlTarget(parseLayoutUrl(searchOf(location.pathname, location.search))),
+    }),
+  );
   useEffect(() => dispatch({ type: 'setCompact', compact }), [compact]);
 
   useDirtySync(DIRTY_SOURCES, dispatch);
@@ -62,20 +70,10 @@ export function Shell() {
     [],
   );
 
-  // Existing URLs (e.g. /presets?id=…) show that resource's list and, when they name an item, its editor;
-  // the editor reads the query itself.
-  const location = useLocation();
-  useEffect(() => {
-    const target = routeTarget(location.pathname, location.search);
-    if (target) {
-      dispatch({ type: 'selectTab', id: target.resource });
-      if (target.openEditor) dispatch({ type: 'openEditor', id: target.resource });
-    }
-  }, [location.key, location.pathname, location.search]);
-
   const gridRef = useRef<HTMLDivElement>(null);
   const { widths, resize } = useColumnWidths(gridRef, compact ? 2 : 3);
   const chat = useChat();
+  useLayoutUrl(layout, dispatch, chat);
 
   const slots = viewSlots(layout);
   const views: Record<ViewKey, ReactNode> = {
@@ -104,7 +102,6 @@ export function Shell() {
   return (
     <LayoutActionsProvider value={actions}>
       <div className="app">
-        {!isKnownPath(location.pathname) && <Navigate to="/" replace />}
         <header className="top-bar">
           <strong>Serious Tavern</strong>
         </header>

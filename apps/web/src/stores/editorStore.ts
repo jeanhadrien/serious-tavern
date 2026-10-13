@@ -1,7 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 
 /** A request from a list to its editor. `seq` makes every request distinct so each is handled once. */
-type EditorCommand<T> = { seq: number; open: T } | { seq: number; close: string };
+type EditorCommand<T> = { seq: number; open: T; focus?: string } | { seq: number; close: string };
 
 export interface EditorState<T> {
   /** The item the editor has open. */
@@ -15,8 +15,11 @@ export interface EditorState<T> {
 export interface EditorStore<T> {
   getSnapshot(): EditorState<T>;
   subscribe(listener: () => void): () => void;
-  /** List side: ask the editor to open an item. Does nothing when it is already the open one (keeps its draft). */
-  open(item: T): void;
+  /**
+   * List side: ask the editor to open an item. Does nothing when it is already the open one (keeps its draft),
+   * unless a `focus` is given: a hint about where to look inside the item (e.g. an edge id to highlight).
+   */
+  open(item: T, focus?: string): void;
   /** List side: tell the editor an item was deleted, so it drops that draft. */
   discard(id: string): void;
   /** Editor side: publish which item is open and whether it is dirty. */
@@ -43,8 +46,8 @@ export function createEditorStore<T extends { id: string }>(): EditorStore<T> {
       listeners.add(listener);
       return () => void listeners.delete(listener);
     },
-    open: (item) => {
-      if (state.currentId !== item.id) send({ open: item });
+    open: (item, focus) => {
+      if (state.currentId !== item.id || focus !== undefined) send({ open: item, focus });
     },
     discard: (id) => send({ close: id }),
     report: (currentId, dirty) => {
@@ -64,7 +67,7 @@ export function useEditorState<T>(store: EditorStore<T>): EditorState<T> {
  */
 export function useEditorCommands<T>(
   store: EditorStore<T>,
-  handlers: { open(item: T): void; close(id: string): void },
+  handlers: { open(item: T, focus?: string): void; close(id: string): void },
   ready = true,
 ) {
   const command = useSyncExternalStore(store.subscribe, () => store.getSnapshot().command);
@@ -76,7 +79,7 @@ export function useEditorCommands<T>(
     if ('open' in command) {
       if (!ready) return;
       handled.current = command.seq;
-      latest.current.open(command.open);
+      latest.current.open(command.open, command.focus);
     } else {
       handled.current = command.seq;
       latest.current.close(command.close);

@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { presetSchema, type Preset } from '@st/shared';
 import { presetsApi } from '../api.js';
 import { presetEditorStore, presetsStore, useEditorCommands, useList } from '../stores/index.js';
@@ -13,9 +12,6 @@ import { usePresetLiveSync } from './presets/usePresetLiveSync.js';
 import './presets/presets.css';
 
 export function Presets() {
-  const { key: locationKey, search } = useLocation();
-  const requestedId = new URLSearchParams(search).get('id');
-  const linkHandled = useRef<string | undefined>(undefined);
   const list = useList(presetsStore);
   const [draft, setDraft] = useState<Preset>();
   const [saved, setSaved] = useState('');
@@ -23,17 +19,6 @@ export function Presets() {
   const dirty = !!draft && JSON.stringify(draft) !== saved;
   const readOnly = draft !== undefined && isImportedPreset(draft);
   const refresh = () => presetsStore.refresh();
-
-  useEffect(() => {
-    // The editor stays mounted: a preset link (handled once per navigation) must open even when another
-    // draft is showing, and waits for the list if it has not loaded yet.
-    if (!requestedId || linkHandled.current === locationKey) return;
-    const preset = list.find((item) => item.id === requestedId);
-    if (preset) {
-      linkHandled.current = locationKey;
-      if (draft?.id !== preset.id) choose(preset);
-    }
-  }, [list, requestedId, locationKey]);
 
   const openPreset = (preset: Preset, entryId: string) => {
     setDraft(structuredClone(preset));

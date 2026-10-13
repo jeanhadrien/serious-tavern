@@ -1,6 +1,6 @@
 // Pure layout model for the three-column shell (see docs/FRONTEND-LAYOUT.md).
 // Nothing here knows about React, the DOM or the URL: the shell renders whatever
-// `viewSlots`/`columnIcons` derive from this state, and step 4 can serialize it.
+// `viewSlots`/`columnIcons` derive from this state, and `url.ts` serializes it.
 
 export type ResourceId = 'workflows' | 'presets' | 'settings' | 'characters' | 'personas';
 /** Something a column can list: a resource's list, or the chat history. */
@@ -46,7 +46,18 @@ export interface LayoutState {
   dirty: Record<ResourceId, boolean>;
 }
 
+/** The part of the layout a URL can describe; `restore` applies it. */
+export interface LayoutTarget {
+  left: ListId;
+  /** 'chat' only counts while a wide editor is open. */
+  right: ListId | 'chat';
+  wide?: ResourceId;
+  /** A narrow editor is open in the right column's tab (its list is replaced by the editor). */
+  rightEditorOpen: boolean;
+}
+
 export type LayoutAction =
+  | { type: 'restore'; target: LayoutTarget }
   | { type: 'selectTab'; id: IconId }
   | { type: 'openEditor'; id: ResourceId }
   | { type: 'closeEditor'; id: ResourceId }
@@ -100,8 +111,34 @@ function returnChatToMiddle(state: LayoutState): LayoutState {
   return { ...state, tabs: { ...state.tabs, R: state.rightReturn } };
 }
 
+// Applies a layout described by a URL. Unsaved state (dirty flags, hidden narrow editors) is left alone.
+function restoreLayout(state: LayoutState, { left, right, wide, rightEditorOpen }: LayoutTarget): LayoutState {
+  const wideId = wide !== undefined && state.kinds[wide] === 'wide' ? wide : undefined;
+  const chatInR = right === 'chat' && wideId !== undefined && !state.compact;
+  const rightTab = right === 'chat' ? (chatInR ? 'chat' : state.rightReturn) : right;
+  const narrowOpen = { ...state.narrowOpen };
+  for (const id of RESOURCE_IDS) {
+    if (state.kinds[id] !== 'narrow') continue;
+    const shownTab = LIST_COLUMN[id] === 'L' ? left : rightTab;
+    if (shownTab !== id) continue;
+    narrowOpen[id] = LIST_COLUMN[id] === 'R' && rightEditorOpen;
+  }
+  const editing = RESOURCE_IDS.find((id) => narrowOpen[id] && LIST_COLUMN[id] === 'R' && rightTab === id);
+  return {
+    ...state,
+    wide: wideId,
+    compactChat: false,
+    tabs: { L: left, R: rightTab },
+    rightReturn: rightTab === 'chat' ? state.rightReturn : rightTab,
+    compactTab: editing ?? (left === 'settings' ? left : state.compactTab),
+    narrowOpen,
+  };
+}
+
 export function layoutReducer(state: LayoutState, action: LayoutAction): LayoutState {
   switch (action.type) {
+    case 'restore':
+      return restoreLayout(state, action.target);
     case 'selectTab': {
       if (action.id === 'chat') return chatInRight(state) ? { ...state, tabs: { ...state.tabs, R: 'chat' } } : state;
       const tabs = { ...state.tabs, [LIST_COLUMN[action.id]]: action.id };
