@@ -29,7 +29,7 @@ Guiding principles: **high modularity**, a **simple baseline** the user can conf
 
 Each step below is one commit (or a few), passes `npm run check`, and keeps existing user data working.
 
-### Step 1 — preset entry `name` → `displayName`, plus a real message `name`
+### Step 1 — preset entry `name` → `displayName`, plus a real message `name` ✅ done
 - **Schema (`packages/shared/src/preset.ts`):** every entry gets a required `displayName` (the editor label, what `name` is today). `message` entries get an optional `name: string`, a **template** rendered like `content`. `slot` entries have no `name` (a messages slot already carries one name per message).
 - **Legacy data:** an entry with `name` and no `displayName` is a legacy entry: its `name` becomes `displayName` and it has no message name. This is unambiguous because `displayName` is required. Apply it to **raw data before schema validation** where stored presets are read: the YAML loader (`presetCandidate` in `apps/server/src/storage/preset-yaml.ts`) and the JSON→YAML migration (`preset-migration.ts`). Export the helper from `shared`. Do **not** put it in the zod schema (`z.preprocess` erases the input type the web client relies on). Files are rewritten in the new shape on their next save (migrate-on-write); no eager rewrite and no version marker.
 - **Rendering (`packages/engine/src/preset.ts`):** render `name` with the same template context as `content`, trim it, and set `PromptMessage.name` only when non-empty. An entry whose content renders empty is still dropped.
@@ -41,7 +41,7 @@ Each step below is one commit (or a few), passes `npm run check`, and keeps exis
 - **Tests:** legacy file read (label preserved, no message name, new shape on save), name rendering incl. empty-name omission and macros, validation of name templates, mapper output.
 - **Docs:** README (preset format) and AGENTS.md Key contracts (`displayName` vs `name`, the legacy rule).
 
-### Step 2 — provider records and resolution
+### Step 2 — provider records and resolution ✅ done
 - **Record (`packages/shared`, zod, passthrough):**
   ```yaml
   id: <uuid>                 # user providers; the built-in one has id "openrouter"
@@ -64,13 +64,16 @@ Each step below is one commit (or a few), passes `npm run check`, and keeps exis
 - **API (contract first, `packages/shared/src/api/`):** list, get, create, update, delete, and duplicate (so the built-in one can be copied). Today's `GET /api/providers` catalog (code-registered providers, used by node-ui) becomes the record list, keeping what node-ui needs (id and label).
 - **Engine:** the LLM node resolves its provider through `ctx.resources` (snapshotted by `prepareWorkflow`, like presets), not the in-code `providers` map. An unknown provider id is a node error naming the id. A missing secret keeps today's message.
 
-### Step 3 — the `openai-compatible` adapter
-- Turn `packages/engine/src/providers/openrouter.ts` into a generic adapter driven by the resolved record (override applied): URL from `baseUrl`, auth header only when a secret is set, `headers`, message name written to `messageName` (or dropped), reasoning read from `reasoningFields` on both the stream delta and the non-stream message, `extraBody` merged last.
+### Step 3 — the `openai-compatible` adapter ✅ done
+- (Now `providers/openai-compatible.ts` + `wire-settings.ts`.) Turn the OpenRouter adapter into a generic adapter driven by the resolved record (override applied): URL from `baseUrl`, auth header only when a secret is set, `headers`, message name written to `messageName` (or dropped), reasoning read from `reasoningFields` on both the stream delta and the non-stream message, `extraBody` merged last.
 - Keep today's behaviour otherwise: idle timeout, abort handling, error parsing, and the OpenRouter-style `reasoning` object for effort/max tokens/exclude (other backends can neutralize it via `extraBody`; revisit if it causes 400s).
 - Error messages name the provider instead of hardcoding "OpenRouter".
 
+- Known limits: `extraBody` is a shallow merge and cannot remove keys (e.g. the `reasoning` object); `extraBody.stream` would break stream parsing. Revisit if a backend needs key removal.
+
 ### Step 4 — wire log
 - The execution log records what was actually sent: URL, headers with secrets redacted, the final JSON body; and the raw response (accumulated for streams, as today's `raw`). Shown in the existing execution details (`apps/web/src/pages/chat/ExecutionDetails.tsx`) instead of the canonical request.
+- Non-streamed reasoning (`ChatResponse.reasoning`, filled since step 3) reaches the chat like streamed reasoning does.
 
 ### Step 5 — provider UI
 - A providers list and narrow editor in the layout shell, following the characters/personas pattern (list view + editor view sharing an editor store, URL-encoded layout, dirty flags).
