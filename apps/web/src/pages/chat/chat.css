@@ -307,6 +307,12 @@ button.stop-generation:hover {
   margin-top: 8px;
   padding: 8px 0;
 }
+.wire summary {
+  overflow-wrap: anywhere;
+}
+.wire details {
+  margin-left: 12px;
+}
 @media (hover: none) {
   .message-actions {
     opacity: 1;

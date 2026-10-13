@@ -1,5 +1,6 @@
 import { registerAdapter, type ChatOptions, type ChatRequest, type ChatResponse, type LlmAdapter } from './index.js';
 import { resolveWireSettings, type WireSettings } from './wire-settings.js';
+import { parseResponseText, streamFolder, wireRecorder } from './wire-log.js';
 
 // A stream is only considered stalled after this long without any bytes (keep-alive comments count).
 const streamIdleTimeoutMs = 120_000;
@@ -73,29 +74,30 @@ function reasoningParams(request: ChatRequest) {
   return Object.keys(reasoning).length ? { reasoning } : {};
 }
 
-async function postCompletion(request: ChatRequest, stream: boolean, { provider, apiKey, signal, wire }: Call) {
-  const response = await fetch(`${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-      'Content-Type': 'application/json',
-      ...wire.headers,
-    },
-    body: JSON.stringify(requestBody(request, stream, wire)),
-    signal,
-  });
+/**
+ * Sends the request and reports it to `onWire` before it leaves. Returns the ok response together with
+ * the recorder, so callers report the response once they have read it; an error response is reported here.
+ */
+async function postCompletion(request: ChatRequest, stream: boolean, { provider, apiKey, signal, wire, onWire }: Call) {
+  const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
+  const headers = {
+    ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+    'Content-Type': 'application/json',
+    ...wire.headers,
+  };
+  const body = requestBody(request, stream, wire);
+  const record = wireRecorder(onWire, apiKey, { url, headers, body });
+  record();
+  const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal });
   if (!response.ok) {
-    const body = await response.text();
-    let message = body;
-    try {
-      const parsed = JSON.parse(body) as { error?: { message?: string } | string };
-      message = typeof parsed.error === 'string' ? parsed.error : (parsed.error?.message ?? body);
-    } catch {
-      message = body;
-    }
+    const text = await response.text();
+    const parsed = parseResponseText(text);
+    record({ status: response.status, response: parsed });
+    const error = (parsed as { error?: { message?: string } | string } | undefined)?.error;
+    const message = typeof error === 'string' ? error : (error?.message ?? text);
     throw new Error(`${provider.name} ${response.status}: ${message.slice(0, 500)}`);
   }
-  return response;
+  return { response, record };
 }
 
 // Yields the payload of each `data:` line. Comment lines (`: ...`) and other fields are ignored.
@@ -139,8 +141,9 @@ async function readStream(
   onReasoning: (reasoningDelta: string) => void,
 ): Promise<ChatResponse> {
   const { provider, wire } = call;
-  const response = await postCompletion(request, true, { ...call, signal: deadline.signal });
+  const { response, record } = await postCompletion(request, true, { ...call, signal: deadline.signal });
   if (!response.body) throw new Error(`${provider.name} returned no stream`);
+  const wireLog = streamFolder();
   let id: string | undefined;
   let model: string | undefined;
   let finishReason: string | null | undefined;
@@ -148,27 +151,33 @@ async function readStream(
   let text = '';
   let reasoning = '';
   let sawChoice = false;
-  for await (const data of serverSentData(response.body, deadline.touch)) {
-    if (data === '[DONE]') break;
-    const chunk = JSON.parse(data) as StreamChunk;
-    if (chunk.error) throw new Error(`${provider.name} stream error: ${chunk.error.message ?? 'unknown error'}`);
-    id ??= chunk.id;
-    model ??= chunk.model;
-    usage ??= chunk.usage;
-    const choice = chunk.choices?.[0];
-    if (!choice) continue;
-    sawChoice = true;
-    finishReason = choice.finish_reason ?? finishReason;
-    const content = choice.delta?.content;
-    if (typeof content === 'string' && content) {
-      text += content;
-      onToken(content);
+  try {
+    for await (const data of serverSentData(response.body, deadline.touch)) {
+      if (data === '[DONE]') break;
+      const chunk = JSON.parse(data) as StreamChunk;
+      wireLog.add(chunk);
+      if (chunk.error) throw new Error(`${provider.name} stream error: ${chunk.error.message ?? 'unknown error'}`);
+      id ??= chunk.id;
+      model ??= chunk.model;
+      usage ??= chunk.usage;
+      const choice = chunk.choices?.[0];
+      if (!choice) continue;
+      sawChoice = true;
+      finishReason = choice.finish_reason ?? finishReason;
+      const content = choice.delta?.content;
+      if (typeof content === 'string' && content) {
+        text += content;
+        onToken(content);
+      }
+      const reasoningDelta = reasoningText(choice.delta, wire.reasoningFields);
+      if (reasoningDelta) {
+        reasoning += reasoningDelta;
+        onReasoning(reasoningDelta);
+      }
     }
-    const reasoningDelta = reasoningText(choice.delta, wire.reasoningFields);
-    if (reasoningDelta) {
-      reasoning += reasoningDelta;
-      onReasoning(reasoningDelta);
-    }
+  } finally {
+    // Also after a mid-stream error, so the log shows what had arrived.
+    record({ status: response.status, response: wireLog.folded });
   }
   if (!sawChoice) throw new Error(`${provider.name} returned no assistant text`);
   // Mirrors the non-streaming response shape, so the node's `raw` output stays comparable.
@@ -201,13 +210,16 @@ export const openaiCompatible: LlmAdapter = {
     const wire = resolveWireSettings(provider, request.model);
     const deadline = withIdleTimeout(options.signal, requestTimeoutMs, provider.name);
     try {
-      const response = await postCompletion(request, false, { ...options, wire, signal: deadline.signal });
-      const raw: unknown = await response.json();
+      const { response, record } = await postCompletion(request, false, { ...options, wire, signal: deadline.signal });
+      const text = await response.text();
+      const raw = parseResponseText(text);
+      record({ status: response.status, response: raw });
+      if (typeof raw === 'string') throw new Error(`${provider.name} returned a response that is not JSON`);
       const message = (raw as { choices?: { message?: CompletionMessage }[] }).choices?.[0]?.message;
-      const text = message?.content;
-      if (typeof text !== 'string') throw new Error(`${provider.name} returned no assistant text`);
+      const content = message?.content;
+      if (typeof content !== 'string') throw new Error(`${provider.name} returned no assistant text`);
       const reasoning = reasoningText(message, wire.reasoningFields);
-      return { text, ...(reasoning ? { reasoning } : {}), raw, usage: (raw as { usage?: unknown }).usage };
+      return { text: content, ...(reasoning ? { reasoning } : {}), raw, usage: (raw as { usage?: unknown }).usage };
     } finally {
       deadline.dispose();
     }

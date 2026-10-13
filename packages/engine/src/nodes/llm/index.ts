@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { characterSchema, presetInputLabel, reasoningEfforts, type PromptMessage } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { renderPreset } from '../../preset.js';
-import { adapters } from '../../providers/index.js';
+import { adapters, type ChatResponse } from '../../providers/index.js';
 import '../../providers/openai-compatible.js';
 
 export function mergeSystemMessages(messages: readonly PromptMessage[]): PromptMessage[] {
@@ -133,19 +133,23 @@ export const llm: NodeDefinition = {
           .map((field) => [field, ctx.config[field]]),
       ),
     };
-    ctx.recordRequest({ provider: provider.id, ...request });
-    const options = { provider, apiKey, signal: ctx.signal };
+    const options = { provider, apiKey, signal: ctx.signal, onWire: ctx.recordWire };
+    const delta = (detail: { textDelta?: string; reasoningDelta?: string }) =>
+      ctx.emit({ type: 'node:delta', nodeId: ctx.nodeId, detail });
     // Deltas are notifications only; the outcome is the accumulated response returned below.
     const stream = adapter.stream;
-    const useStream = ctx.config.streaming !== false && stream != null;
-    const response = useStream
-      ? await stream(request, {
-          ...options,
-          onToken: (textDelta) => ctx.emit({ type: 'node:delta', nodeId: ctx.nodeId, detail: { textDelta } }),
-          onReasoning: (reasoningDelta) =>
-            ctx.emit({ type: 'node:delta', nodeId: ctx.nodeId, detail: { reasoningDelta } }),
-        })
-      : await adapter.chat(request, options);
+    let response: ChatResponse;
+    if (ctx.config.streaming !== false && stream != null) {
+      response = await stream(request, {
+        ...options,
+        onToken: (textDelta) => delta({ textDelta }),
+        onReasoning: (reasoningDelta) => delta({ reasoningDelta }),
+      });
+    } else {
+      response = await adapter.chat(request, options);
+      // A whole reasoning trace reaches the chat like a streamed one: as a single delta.
+      if (response.reasoning) delta({ reasoningDelta: response.reasoning });
+    }
     return { text: response.text, raw: response.raw };
   },
 };

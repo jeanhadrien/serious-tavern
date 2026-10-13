@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ExecutionLog } from '@st/shared';
 import { executionsApi } from '../../api.js';
+import { LegacyRequestDetails, WireDetails } from './WireDetails.js';
 
 export function ExecutionDetails({ id, cached }: { id: string; cached?: ExecutionLog }) {
   const [execution, setExecution] = useState(cached);
@@ -28,11 +29,10 @@ export function ExecutionDetails({ id, cached }: { id: string; cached?: Executio
             <div className="execution-node" key={nodeId}>
               <strong>{node.name ?? nodeId}</strong> · {node.status} · {node.durationMs ?? 0}ms
               {node.error && <p className="error">{node.error}</p>}
-              {node.request !== undefined && (
-                <details>
-                  <summary>LLM request (no secrets)</summary>
-                  <pre>{JSON.stringify(node.request, null, 2)}</pre>
-                </details>
+              {node.wire ? (
+                <WireDetails wire={node.wire} />
+              ) : (
+                node.request !== undefined && <LegacyRequestDetails request={node.request} />
               )}
               {node.output !== undefined && <pre>{JSON.stringify(node.output, null, 2)}</pre>}
             </div>

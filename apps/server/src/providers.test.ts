@@ -325,6 +325,41 @@ describe('LLM node provider resolution', () => {
     }
   });
 
+  it('logs the wire exchange of a real adapter call without the secret', async () => {
+    const reply = `data: ${JSON.stringify({ choices: [{ delta: { content: 'ok' } }] })}
+
+data: [DONE]
+
+`;
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(reply));
+    const { app, send, use, create } = await chat({ deepseek: 'ds-secret-value' });
+    try {
+      const provider = await create({ ...body, extraBody: { top_k: 40 } });
+      await use(provider.id);
+      const result = apiContract.sendMessage.response.parse((await send()).json());
+      const stored = apiContract.getExecution.response.parse(
+        (await app.inject({ method: 'GET', url: `/api/executions/${result.execution.id}` })).json(),
+      );
+      const sent = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body));
+      expect(stored.nodes.llm?.wire).toMatchObject({
+        url: 'https://api.deepseek.com/v1/chat/completions',
+        headers: { Authorization: 'Bearer [redacted]' },
+        body: sent,
+        status: 200,
+        response: { choices: [{ delta: { content: 'ok' } }] },
+      });
+      expect(sent).toMatchObject({ top_k: 40, stream: true });
+      expect(stored.nodes.llm).not.toHaveProperty('request');
+      const files = await readdir(join(directory, 'executions'));
+      const onDisk = await Promise.all(files.map((file) => readFile(join(directory, 'executions', file), 'utf8')));
+      expect(onDisk.join('')).toContain('[redacted]');
+      expect(onDisk.join('')).not.toContain('ds-secret-value');
+    } finally {
+      fetchMock.mockRestore();
+      await app.close();
+    }
+  });
+
   it('fails the node naming the provider id when it no longer exists', async () => {
     echo();
     const { app, send, use } = await chat({});

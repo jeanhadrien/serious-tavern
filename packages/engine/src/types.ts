@@ -1,4 +1,4 @@
-import type { Character, ChatMessage, Persona, PortDef, Preset, Provider } from '@st/shared';
+import type { Character, ChatMessage, Persona, PortDef, Preset, Provider, WireExchange } from '@st/shared';
 import type { z } from 'zod';
 
 export type EngineEvent = {
@@ -33,7 +33,8 @@ export type ExecutionContext = {
   resources: NodeResources;
   signal: AbortSignal;
   log(message: string): void;
-  recordRequest(request: unknown): void;
+  // Stores the node's HTTP exchange in the execution log (`wire`); each call replaces the previous one.
+  recordWire(exchange: WireExchange): void;
   emit(event: EngineEvent): void;
 };
 export type NodeDefinition = {

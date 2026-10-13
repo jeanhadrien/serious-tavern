@@ -212,6 +212,33 @@ describe('streamed turns', () => {
     }
   });
 
+  it('stores the reasoning of a non-streamed LLM call on its reply, like streamed reasoning', async () => {
+    useAdapter({ chat: async () => ({ text: 'Hello', reasoning: 'think', raw: {} }) });
+    const { app, session } = await setup((presetId) => ({
+      nodes: [
+        node('input', 'chat-input'),
+        node('llm', 'llm', { presetId, provider: 'openrouter', model: 'm', streaming: false }),
+        node('output', 'chat-output'),
+      ],
+      edges: [edge('llm', 'text', 'output', 'value')],
+    }));
+    try {
+      const frames = framesOf((await app.inject(streamRequest(session.id, 'hi'))).body);
+      expect(frames.filter((frame) => frame.data.type === 'node.delta').map((frame) => frame.data)).toEqual([
+        { type: 'node.delta', nodeId: 'output', reasoningDelta: 'think' },
+      ]);
+      expect(frames.at(-1)!.data).toMatchObject({
+        type: 'turn.complete',
+        assistantMessages: [{ content: 'Hello', reasoning: 'think', status: 'final' }],
+      });
+      expect(assistantRows(await readSession(app, session.id))).toMatchObject([
+        { content: 'Hello', reasoning: 'think', status: 'final' },
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('keeps templated outputs off the live stream and writes them once, at completion', async () => {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));

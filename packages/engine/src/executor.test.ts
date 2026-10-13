@@ -469,9 +469,9 @@ describe('executor', () => {
       outputs: [{ name: 'out', label: 'Out', dataType: 'any' }],
       configSchema: z.object({}),
       defaultConfig: {},
-      async execute({ recordRequest }) {
+      async execute({ recordWire }) {
         await new Promise((resolve) => setTimeout(resolve, 40));
-        recordRequest({ late: true });
+        recordWire({ url: 'late', method: 'POST', headers: {}, body: {} });
         return { out: 'late' };
       },
     });
@@ -500,7 +500,7 @@ describe('executor', () => {
     const snapshot = structuredClone(failedExecution);
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(failedExecution).toEqual(snapshot);
-    expect(failedExecution?.nodes.slow).not.toHaveProperty('request');
+    expect(failedExecution?.nodes.slow).not.toHaveProperty('wire');
   });
   it.each(['never', 'late'] as const)('bounds cleanup of a %s-settling sibling by its deadline', async (settlement) => {
     let finish!: () => void;
@@ -515,11 +515,11 @@ describe('executor', () => {
     registry.set('ignore-abort-test', {
       ...registry.get('chat-input')!,
       type: 'ignore-abort-test',
-      async execute({ recordRequest, emit }) {
+      async execute({ recordWire, emit }) {
         await new Promise<void>((resolve) => {
           finish = resolve;
         });
-        recordRequest({ late: true });
+        recordWire({ url: 'late', method: 'POST', headers: {}, body: {} });
         emit({ type: 'node:complete', nodeId: 'late-event' });
         return { message: 'late', history: [] };
       },

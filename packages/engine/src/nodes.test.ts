@@ -35,7 +35,7 @@ const ctx = (config: Record<string, unknown>): ExecutionContext => ({
   secrets: { get: async () => 'test-key' },
   signal: new AbortController().signal,
   resources: { presets: { get: async () => preset }, providers: providerResources(providerRecord('fake')) },
-  recordRequest: () => {},
+  recordWire: () => {},
   log: () => {},
   emit: () => {},
 });
@@ -92,13 +92,13 @@ describe('integration nodes', () => {
     );
     expect(result.body).toEqual({ ok: true });
   });
-  it('uses a fake provider, rendered preset, secretName and request log', async () => {
+  it('uses a fake provider, rendered preset, secretName and wire recorder', async () => {
     const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
     useAdapter({ chat });
     const get = vi.fn().mockResolvedValue('test-key');
-    const request = vi.fn();
+    const recordWire = vi.fn();
     const config = { ...llm.defaultConfig, presetId: preset.id, provider: 'fake' };
-    expect((await llm.execute({ ...ctx(config), secrets: { get }, recordRequest: request })).text).toBe('reply');
+    expect((await llm.execute({ ...ctx(config), secrets: { get }, recordWire })).text).toBe('reply');
     expect(get).toHaveBeenCalledWith('fake-key');
     expect(chat).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -107,9 +107,9 @@ describe('integration nodes', () => {
           { role: 'user', content: 'What is up?' },
         ],
       }),
-      expect.objectContaining({ apiKey: 'test-key' }),
+      // The adapter reports the wire exchange straight into the execution log.
+      expect.objectContaining({ apiKey: 'test-key', onWire: recordWire }),
     );
-    expect(request).toHaveBeenCalledWith(expect.objectContaining({ provider: 'fake' }));
     await expect(llm.execute({ ...ctx(config), secrets: { get: async () => undefined } })).rejects.toThrow(
       'Missing fake-key secret',
     );
@@ -267,18 +267,15 @@ describe('integration nodes', () => {
       { role: 'system', content: 'Named system', name: 'Narrator' },
       { role: 'user', content: 'Hi', name: 'Alex' },
     ];
-    const recordRequest = vi.fn();
     await llm.execute({
       ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', mergeSystemMessages: merge }),
       inputs: { history },
       resources: { presets: { get: async () => definition }, providers: providerResources(providerRecord('fake')) },
-      recordRequest,
     });
     const expected = merge
       ? [{ role: 'system', content: 'Hello hello\n\nSecond\n\nHistory system' }, ...history.slice(1)]
       : [{ role: 'system', content: 'Hello hello' }, { role: 'system', content: 'Second' }, ...history];
     expect(chat.mock.calls[0]?.[0].messages).toEqual(expected);
-    expect(recordRequest.mock.calls[0]?.[0]).toEqual({ provider: 'fake', ...chat.mock.calls[0]?.[0] });
     expect(history[0]?.content).toBe('History system');
   });
 
@@ -334,18 +331,25 @@ describe('integration nodes', () => {
     expect(emit).not.toHaveBeenCalled();
   });
 
+  it('surfaces a non-streamed reasoning trace as one reasoning delta', async () => {
+    useAdapter({ chat: vi.fn().mockResolvedValue({ text: 'whole', reasoning: 'Plan.', raw: {} }) });
+    const events: EngineEvent[] = [];
+    const result = await llm.execute({
+      ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', streaming: false }),
+      nodeId: 'llm-node',
+      emit: (event) => events.push(event),
+    });
+    expect(result).toEqual({ text: 'whole', raw: {} });
+    expect(events).toEqual([{ type: 'node:delta', nodeId: 'llm-node', detail: { reasoningDelta: 'Plan.' } }]);
+  });
+
   it.each(['off', 'low', 'medium', 'high'] as const)(
     'passes reasoningEffort %s to the provider request',
     async (reasoningEffort) => {
       const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
       useAdapter({ chat });
-      const recordRequest = vi.fn();
-      await llm.execute({
-        ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', reasoningEffort }),
-        recordRequest,
-      });
+      await llm.execute(ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', reasoningEffort }));
       expect(chat.mock.calls[0]?.[0]).toMatchObject({ reasoningEffort });
-      expect(recordRequest).toHaveBeenCalledWith(expect.objectContaining({ reasoningEffort }));
     },
   );
 

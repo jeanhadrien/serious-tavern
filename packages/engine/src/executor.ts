@@ -155,8 +155,8 @@ export async function executeWorkflow(
                 resources,
                 signal: nodeSignal,
                 log: () => {},
-                recordRequest: (request) => {
-                  if (callbacksActive) execution.nodes[node.id] = { ...execution.nodes[node.id]!, request };
+                recordWire: (wire) => {
+                  if (callbacksActive) execution.nodes[node.id] = { ...execution.nodes[node.id]!, wire };
                 },
                 emit: (event) => {
                   if (callbacksActive) emit(event);

@@ -7,6 +7,7 @@ import { providerRecord, providerResources, restoreAdapter, useAdapter } from '.
 import { memory } from './nodes/memory/index.js';
 import { renderPreset } from './preset.js';
 import type { ExecutionContext } from './types.js';
+import type { ChatRequest } from './providers/index.js';
 
 const node = (id: string, type = 'chat-output', config: Record<string, unknown> = {}) => ({
   id,
@@ -360,7 +361,7 @@ describe('character nodes and history', () => {
     );
   });
   it.each([false, true])('renders all character macros from the LLM render context (override=%s)', async (override) => {
-    const chat = vi.fn(async () => ({ text: 'reply', raw: {} }));
+    const chat = vi.fn(async (_request: ChatRequest) => ({ text: 'reply', raw: {} }));
     useAdapter({ chat });
     const definition: Preset = {
       ...preset,
@@ -398,7 +399,8 @@ describe('character nodes and history', () => {
       },
     );
     const name = override ? 'Override' : 'Session';
-    expect(result.execution.nodes.llm?.request).toMatchObject({
+    expect(result.execution.nodes.llm?.status).toBe('completed');
+    expect(chat.mock.calls[0]?.[0]).toMatchObject({
       messages: [{ role: 'system', content: `${name}/${name}/Description of ${name}/Kind/Garden` }],
     });
   });
@@ -417,7 +419,7 @@ describe('character nodes and history', () => {
       signal: new AbortController().signal,
       log: () => {},
       emit: () => {},
-      recordRequest: () => {},
+      recordWire: () => {},
     } satisfies ExecutionContext;
     const fromMemory = (await memory.execute(context)).history;
     const fromInput = (await registry.get('chat-input')!.execute(context)).history;

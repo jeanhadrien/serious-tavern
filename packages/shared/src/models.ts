@@ -62,6 +62,23 @@ export const sessionSchema = z
     updatedAt: z.string(),
   })
   .passthrough();
+/**
+ * One HTTP exchange as it went over the wire: what an LLM node actually sent (credentials redacted by
+ * the adapter) and what came back. Recorded before the request, then again once the response is known.
+ */
+export const wireExchangeSchema = z
+  .object({
+    url: z.string(),
+    method: z.string(),
+    headers: z.record(z.string(), z.string()),
+    // The exact JSON body that was sent.
+    body: z.unknown(),
+    // Absent while no response has arrived (e.g. a timeout before any byte).
+    status: z.number().optional(),
+    // The response JSON (or its text when it is not JSON); a stream's chunks folded into one object.
+    response: z.unknown().optional(),
+  })
+  .passthrough();
 export const nodeExecutionSchema = z
   .object({
     /** Display name (`Label #k (type)`) stamped at run time; absent in older logs. */
@@ -72,7 +89,10 @@ export const nodeExecutionSchema = z
     durationMs: z.number().optional(),
     output: z.unknown().optional(),
     error: z.string().optional(),
+    /** The canonical LLM request; only in logs written before the wire log existed. */
     request: z.unknown().optional(),
+    /** What an LLM node actually sent and received. */
+    wire: wireExchangeSchema.optional(),
   })
   .passthrough();
 export const executionLogSchema = z
@@ -115,4 +135,5 @@ export type Edge = z.infer<typeof edgeSchema>;
 export type ChatMessage = z.infer<typeof messageSchema>;
 export type Session = z.infer<typeof sessionSchema>;
 export type ExecutionLog = z.infer<typeof executionLogSchema>;
+export type WireExchange = z.infer<typeof wireExchangeSchema>;
 export type NodeTypeDescriptor = z.infer<typeof nodeTypeDescriptorSchema>;

@@ -28,6 +28,22 @@ it('loads old executions without warnings', () => {
   expect(executionLogSchema.parse(execution).warnings).toEqual([]);
 });
 
+it('loads old executions that logged the canonical LLM request, next to new wire logs', () => {
+  const request = { provider: 'openrouter', model: 'm', messages: [{ role: 'user', content: 'Hi' }] };
+  const wire = { url: 'https://x.test/chat/completions', method: 'POST', headers: {}, body: { model: 'm' } };
+  const execution = executionLogSchema.parse({
+    id: 'execution',
+    workflowId: 'workflow',
+    sessionId: 'session',
+    status: 'completed',
+    startedAt: '',
+    nodes: { old: { status: 'completed', request }, new: { status: 'completed', wire } },
+  });
+  expect(execution.nodes.old).toMatchObject({ request });
+  expect(execution.nodes.old).not.toHaveProperty('wire');
+  expect(execution.nodes.new?.wire).toEqual(wire);
+});
+
 it('preserves unknown fields on stored records for forward compatibility', () => {
   const workflow = workflowSchema.parse({
     id: 'w',

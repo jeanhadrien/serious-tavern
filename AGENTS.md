@@ -135,6 +135,11 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 - **Prompt behaviour is chosen by the user:** the engine never applies automatic SillyTavern rules (card system prompt overriding the main prompt, splitting examples at `<START>`, and so on). Users reference fields in their presets themselves.
 - **Prompt messages** have an optional `name`, passed through to the provider only when set. Preset message entries set it from their `name` template; messages slots carry the history's names. A future "speaker names" option on the history slot builds on this.
 - **LLM node option** `mergeSystemMessages`: merges consecutive system messages that have no name, after rendering.
+- **Wire log:** an LLM node logs what actually went over the wire in `nodes[id].wire` (`wireExchangeSchema`: `url`, `method`, redacted `headers`, the exact `body` object given to `fetch`, `status`, `response`; a stream's chunks are folded under the backend's own field names).
+  - Adapters report it through `ChatOptions.onWire` (the node passes `ctx.recordWire`): once before `fetch`, again with the response. Each report replaces the last, so a failed call keeps what was sent.
+  - Redaction happens **inside the adapter**, before the callback (`providers/wire-log.ts`): credential-looking header names are masked and the secret value is scrubbed everywhere. Never hand an unredacted exchange out of the adapter.
+  - The canonical `request` field exists only in older logs. Keep it parseable and displayed as a fallback.
+  - Non-stream reasoning: after `chat`, the LLM node emits `ChatResponse.reasoning` as one `reasoningDelta`, so it reaches the chat like streamed reasoning. Never emit it on the stream path, or it doubles.
 
 ## Adding a node type
 1. Create `packages/engine/src/nodes/<type>/index.ts` exporting a `NodeDefinition`: `type`, `label`, `category`, typed `inputs`/`outputs` with `dataType` and `description`, zod `configSchema`, `defaultConfig`, and `execute(ctx)`, which returns one key per output port.

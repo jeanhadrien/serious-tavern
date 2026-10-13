@@ -1,4 +1,4 @@
-import type { PromptMessage, Provider, ReasoningEffort } from '@st/shared';
+import type { PromptMessage, Provider, ReasoningEffort, WireExchange } from '@st/shared';
 
 export type ChatRequest = {
   messages: PromptMessage[];
@@ -28,6 +28,8 @@ export type ChatOptions = {
   // The record's secret, when it names one.
   apiKey?: string;
   signal: AbortSignal;
+  // Receives what actually goes over the wire, credentials redacted: first the request, then again with the response.
+  onWire?(exchange: WireExchange): void;
 };
 export type StreamOptions = ChatOptions & {
   onToken(textDelta: string): void;
