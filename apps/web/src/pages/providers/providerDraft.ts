@@ -118,11 +118,12 @@ function normalized(draft: ProviderDraft, provider: ProviderView): ProviderDraft
  * draft that the disk already holds (its own save, seen before the save's response) is a reload, not a conflict.
  */
 export function classifyProviderChange(
-  editor: { draft?: ProviderDraft; provider?: ProviderView },
+  editor: { draft?: ProviderDraft; provider?: ProviderView; deleting?: boolean },
   fresh: readonly ProviderView[],
 ): DiskChange<ProviderView> {
   const { draft, provider } = editor;
-  if (!draft || !provider) return { kind: 'unchanged' };
+  // The editor's own delete is announced before its response: the item vanishing is expected, not news.
+  if (!draft || !provider || editor.deleting) return { kind: 'unchanged' };
   const dirty = draftChanged(draft, provider);
   const onDisk = fresh.find((item) => item.id === provider.id);
   if (!onDisk) return dirty ? { kind: 'conflict', removed: true, version: 'removed' } : { kind: 'removed' };

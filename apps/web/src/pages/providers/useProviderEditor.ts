@@ -54,15 +54,20 @@ export function useProviderEditor() {
 
   const latest = useRef({ provider, draft });
   latest.current = { provider, draft };
+  // The provider this editor deleted (or is deleting). Provider writes are announced before their response
+  // arrives, so the sync must not report the editor's own delete as "removed from disk". Ids are never reused,
+  // so it is not reset after a successful delete.
+  const deleting = useRef<string>(undefined);
   useEffect(
     () =>
       startFileLiveSync<ProviderView>(PROVIDERS, () => {
         const editor = latest.current;
+        const baseline = editor.provider ? JSON.stringify(toDraft(editor.provider)) : '';
         return {
-          signature: () =>
-            `${editor.provider?.id ?? ''}\n${editor.provider ? JSON.stringify(toDraft(editor.provider)) : ''}`,
+          signature: () => [editor.provider?.id ?? '', deleting.current ?? '', baseline].join('\n'),
           refresh: () => providersStore.refresh(),
-          classify: (fresh) => classifyProviderChange(editor, fresh),
+          classify: (fresh) =>
+            classifyProviderChange({ ...editor, deleting: deleting.current === editor.provider?.id }, fresh),
           openName: () => editor.provider?.name ?? '',
           onReload: open,
           onClose: () => {
@@ -93,7 +98,11 @@ export function useProviderEditor() {
   };
   const remove = async () => {
     if (!provider || readOnly || !window.confirm(`Delete provider "${provider.name}"?`)) return;
-    if (!(await deleteProvider(provider))) return;
+    deleting.current = provider.id;
+    if (!(await deleteProvider(provider))) {
+      deleting.current = undefined;
+      return;
+    }
     clear();
     closeEditor('providers');
   };

@@ -83,6 +83,8 @@ it('tells disk changes from the editor echo of its own save', () => {
   const edited = provider({ baseUrl: 'http://localhost:9000/v1' });
   expect(classifyProviderChange(clean, [edited])).toEqual({ kind: 'reload', item: edited });
   expect(classifyProviderChange(clean, [])).toEqual({ kind: 'removed' });
+  // The editor's own delete, announced before its response: not reported as removed from disk.
+  expect(classifyProviderChange({ ...clean, deleting: true }, [])).toEqual({ kind: 'unchanged' });
 
   const dirty = { provider: saved, draft: { ...toDraft(saved), name: 'Mine' } };
   expect(classifyProviderChange(dirty, [edited])).toMatchObject({ kind: 'conflict', removed: false });
