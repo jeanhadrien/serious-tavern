@@ -1,6 +1,7 @@
 # AGENTS.md — notes for AI agents working on this repo
 
 Read `PLAN.md` for the vision and `README.md` for usage and architecture before making changes.
+For web layout work, `docs/FRONTEND-LAYOUT.md` is the agreed design reference.
 
 ## What this is
 A chatbot web app. Each chat reply comes from a user-built workflow of nodes, edited visually in an n8n-style editor. The frontend is a **thin client**: all storage, secrets and workflow execution live in the backend.
@@ -13,7 +14,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - After a task, the orchestrator updates this file with any new conventions, contracts or gotchas the agent discovered.
 - **PLAN.md is owned by the orchestrator/user.** Coding agents must not modify or delete it; they update `README.md` for technical docs.
 - **Commits:** commit each feature separately. Include the trailer `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`. Commit any pending changes before starting new work.
-- **Scope:** keep it modular and simple. Prefer no new dependencies; justify any you add.
+- **Scope:** keep it modular and simple. 
 
 ## Layout (npm workspaces, TypeScript strict, ESM, packages consumed as TS source)
 - `packages/shared`: zod schemas and types (workflow, ports, `canConnect` compatibility and coercion rules). This is the single source of truth for both front and back.
@@ -85,6 +86,15 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 - **Editor:** never drop nodes. Unknown node types are kept as read-only placeholders and are saved unchanged.
 - **Presets:** fixed entries that render to empty text are dropped, so a template entry holding only one variable disappears when that variable is empty.
   - **Imported presets** carry a server-owned `source`. Client writes never set it, `PUT` on a preset with one returns 409 `PRESET_READ_ONLY`, and only `services/import/sync.ts` writes it, under `context.importLock`. New connectors implement `ImportConnector` in `services/import/`.
+  - The stored `source.hash` covers the connector's `mapperVersion` as well as the file bytes. Any change to a mapper's output for the same input must bump `mapperVersion`, or Sync reports the files as unchanged and never applies it.
+  - **Storage is YAML, not JSON:** presets live in `data/presets/<slug-of-name>.yaml` through `PresetRepository` (`storage/preset-repository.ts`). Identity is the `id` inside the file, never the filename. Users may edit or rename files while the server runs, so nothing is cached and every operation scans the directory.
+    - Legacy `<id>.json` files are renamed to `.json.migrated` at startup after their YAML is verified. Never delete them.
+    - Invalid files are skipped with a warning and never modified. A valid file without `id`/timestamps gets them stamped in place.
+    - UUID entry and input ids are not stored: they are re-derived as `entry-<n>`/`input-<n>` on read, and depth-target slots get a readable label id. Never rely on UUID entry ids surviving a save.
+    - Mutations go through the id lock and `update`, as with every repository.
+  - **Live reload:** a debounced `fs.watch` on the presets directory feeds `GET /api/events` (SSE, `changeEventSchema` in the shared contract). Event `presets.changed` carries the currently invalid files. The watcher is started only from `main.ts` (`createApp(dir, { watch: true })`), never from `createContext`.
+    - The web editor never overwrites a dirty draft and keeps the selected entry by position, because entry ids are re-derived on read.
+    - New SSE routes that must not block `app.close()` end their streams in the Fastify `preClose` hook, not `onClose`.
 - **Creating a session** requires a `workflowId`. Sessions also store `characterId` and `personaId`, which the server loads and passes to the executor.
 - **Characters/personas:**
   - Card parsing and writing (PNG `tEXt` chunks `ccv3`, which takes precedence, then `chara`; V1/V2/V3 JSON) lives in `apps/server/src/card.ts` and runs on the server.
@@ -124,6 +134,8 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Killing the npm/npx parent leaves node child processes running.
   - `&&` only chains native commands.
 - **Git worktrees:** `@st/*` resolves through `node_modules/@st` links. Without the worktree's own links, the packages resolve to the main checkout, so tests and typecheck silently use the wrong `shared`. Create junctions for `shared`, `engine` and `node-ui` inside the worktree's `node_modules/@st`.
+- **Windows 8.3 short paths:** `fs.watch` on a directory given by its short name (e.g. `C:\Users\JEANHA~1\...`, what `os.tmpdir()` returns here) kills the whole process with a libuv assertion. Watch `fs.promises.realpath(dir)`.
+- **Nested worktrees break Biome:** a leftover worktree under `.claude/worktrees/` (it contains its own `biome.json`) makes `biome check .` fail on the main checkout with "nested root configuration". Remove finished worktrees: unlink their `node_modules/@st` junctions first (`[System.IO.Directory]::Delete(path, $false)`), then `git worktree remove`.
 - **Tooling:** pnpm isn't installed; use npm. No browser or Playwright is set up yet, so UI changes need a manual check by the user.
 - **Line endings:** the repo has no `.gitattributes`, so on Windows with `core.autocrlf=true` checkouts land as CRLF and repo-wide `biome check` fails on files nobody touched. Don't reformat unrelated files to fix it; normalize line endings only in files your own commit touches.
 - **Server integration tests that build a workflow by hand** must include exactly one `chat-input` node, even when its outputs are not wired to anything. `prepareWorkflow` rejects workflows with zero or multiple chat-input nodes before execution begins.
