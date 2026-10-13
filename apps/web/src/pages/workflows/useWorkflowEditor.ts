@@ -1,79 +1,34 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import {
-  workflowInvalidDetailsSchema,
-  type Character,
-  type Workflow,
-  type NodeTypeDescriptor,
-  type Preset,
-  type ApiResponse,
-} from '@st/shared';
-import { subscribeToChanges } from '../../api/events.js';
-import { ApiError, charactersApi, workflowsApi, nodeTypesApi, presetsApi, providersApi } from '../../api.js';
+import { workflowInvalidDetailsSchema, type Workflow, type NodeTypeDescriptor, type ApiResponse } from '@st/shared';
+import { ApiError, workflowsApi, nodeTypesApi, providersApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
-import { compareRecent } from '../recentOrder.js';
+import { charactersStore, presetsStore, useList, workflowsStore } from '../../stores/index.js';
 import { canvasToWorkflow } from './model.js';
 import { useWorkflowCanvas } from './useWorkflowCanvas.js';
 
 export function useWorkflowEditor() {
   const [searchParams] = useSearchParams();
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const workflows = useList(workflowsStore);
+  const presets = useList(presetsStore);
+  const characters = useList(charactersStore);
   const [types, setTypes] = useState<NodeTypeDescriptor[]>([]);
   const [typesReady, setTypesReady] = useState(false);
-  const [presets, setPresets] = useState<Preset[]>([]);
-  const [characters, setCharacters] = useState<Character[]>([]);
   const [providersList, setProvidersList] = useState<ApiResponse<'listProviders'>>([]);
   const [workflow, setWorkflow] = useState<Workflow>();
   const canvas = useWorkflowCanvas(types, presets, characters);
-  const refresh = () =>
-    workflowsApi.list().then((list) => setWorkflows(list.sort((a, b) => compareRecent(a, b, (item) => item.name))));
-  const refreshResources = () => {
-    void charactersApi
-      .list()
-      .then(setCharacters)
-      .catch(() => {});
-    void presetsApi
-      .list()
-      .then(setPresets)
-      .catch(() => {});
-  };
+  const refresh = () => workflowsStore.refresh();
   useEffect(() => {
-    void refresh().catch(() => {});
-    void charactersApi
-      .list()
-      .then(setCharacters)
-      .catch(() => {});
     void nodeTypesApi
       .list()
       .then(setTypes)
       .catch(() => {})
       .finally(() => setTypesReady(true));
-    void presetsApi
-      .list()
-      .then(setPresets)
-      .catch(() => {});
     void providersApi
       .list()
       .then(setProvidersList)
       .catch(() => {});
   }, []);
-  useEffect(() => {
-    window.addEventListener('focus', refreshResources);
-    return () => window.removeEventListener('focus', refreshResources);
-  }, []);
-  useEffect(
-    // Preset files edited on disk: refetch so LLM nodes re-resolve their ports. An unchanged catalog keeps
-    // its identity, so our own saves do not trigger port resolution.
-    () =>
-      subscribeToChanges((event) => {
-        if (event.type !== 'presets.changed') return;
-        void presetsApi
-          .list({ silent: true })
-          .then((next) => setPresets((current) => (JSON.stringify(current) === JSON.stringify(next) ? current : next)))
-          .catch(() => {});
-      }),
-    [],
-  );
   const load = (next: Workflow) => {
     setWorkflow(next);
     canvas.load(next);
@@ -185,6 +140,5 @@ export function useWorkflowEditor() {
     save,
     validate,
     remove,
-    refreshResources,
   };
 }

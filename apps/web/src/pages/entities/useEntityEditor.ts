@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Character, Persona, EntityImportResult } from '@st/shared';
 import { alerts } from '../../alerts/index.js';
+import { useList } from '../../stores/index.js';
+import type { ListStore } from '../../stores/listStore.js';
 
 interface EntityEditorOptions<T extends Character | Persona> {
   label: string;
-  list: () => Promise<T[]>;
+  /** The shared list of this resource. */
+  store: ListStore<T>;
   create: () => Promise<T>;
   save: (draft: T) => Promise<T>;
   delete: (id: string) => Promise<unknown>;
@@ -17,17 +20,14 @@ interface EntityEditorOptions<T extends Character | Persona> {
 }
 
 export function useEntityEditor<T extends Character | Persona>(options: EntityEditorOptions<T>) {
-  const [list, setList] = useState<T[]>([]);
+  const list = useList(options.store);
   const [draft, setDraft] = useState<T>();
   const [saved, setSaved] = useState('');
-  const refresh = async () => setList((await options.list()).sort((a, b) => a.name.localeCompare(b.name)));
+  const refresh = () => options.store.refresh();
   const choose = (item: T) => {
     setDraft(structuredClone(item));
     setSaved(JSON.stringify(item));
   };
-  useEffect(() => {
-    void refresh().catch(() => {});
-  }, []);
   const create = async () => {
     try {
       const item = await options.create();

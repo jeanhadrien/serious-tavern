@@ -2,28 +2,24 @@ import { useEffect, useRef, useState } from 'react';
 import {
   turnFailureDetailsSchema,
   type TurnFailureDetails,
-  type Workflow,
   type Session,
   type ExecutionLog,
-  type SessionSummary,
   type ApiBody,
-  type Character,
-  type Persona,
   type ChatMessage,
 } from '@st/shared';
-import { sessionsApi, workflowsApi, charactersApi, personasApi, streamMessage } from '../../api.js';
+import { sessionsApi, streamMessage } from '../../api.js';
 import { ApiError, notifyError } from '../../api/transport.js';
 import type { TurnResult } from '../../api/turnStream.js';
 import { alerts } from '../../alerts/index.js';
-import { compareRecent } from '../recentOrder.js';
+import { charactersStore, personasStore, sessionsStore, useList, workflowsStore } from '../../stores/index.js';
 import { applyDelta, settleTurn } from './turnMessages.js';
 import { useMessageActions } from './useMessageActions.js';
 
 export function useChat() {
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
-  const [characters, setCharacters] = useState<Character[]>([]);
-  const [personas, setPersonas] = useState<Persona[]>([]);
-  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const workflows = useList(workflowsStore);
+  const characters = useList(charactersStore);
+  const personas = useList(personasStore);
+  const sessions = useList(sessionsStore);
   const [session, setSession] = useState<Session>();
   const [content, setContent] = useState('');
   const [busy, setBusy] = useState(false);
@@ -31,27 +27,8 @@ export function useChat() {
   const opening = useRef(0);
   const streamControllerRef = useRef<AbortController | undefined>(undefined);
   const [logs, setLogs] = useState<Record<string, ExecutionLog>>({});
-  const refresh = () =>
-    sessionsApi.list().then((list) => setSessions(list.sort((a, b) => compareRecent(a, b, (item) => item.title))));
+  const refresh = () => sessionsStore.refresh().then(() => {});
   const messageActions = useMessageActions(session, setSession, refresh, () => busyRef.current);
-  const refreshAll = () => {
-    void workflowsApi
-      .list()
-      .then(setWorkflows)
-      .catch(() => {});
-    void charactersApi
-      .list()
-      .then(setCharacters)
-      .catch(() => {});
-    void personasApi
-      .list()
-      .then(setPersonas)
-      .catch(() => {});
-    void refresh().catch(() => {});
-  };
-  useEffect(() => {
-    refreshAll();
-  }, []);
   useEffect(() => {
     return () => {
       streamControllerRef.current?.abort();
@@ -194,7 +171,6 @@ export function useChat() {
     remove,
     send,
     stop,
-    refreshAll,
     mutating: messageActions.mutating,
     editMessage: messageActions.editMessage,
     deleteMessage: messageActions.deleteMessage,

@@ -55,4 +55,3 @@ export function planInvalidFileAlerts(
 }
 
 /** True when both lists serialize the same, so replacing one by the other would only cause a re-render. */
-export const sameList = (a: readonly unknown[], b: readonly unknown[]) => JSON.stringify(a) === JSON.stringify(b);

@@ -1,5 +1,6 @@
 import { personaSchema, type Persona } from '@st/shared';
 import { personasApi } from '../../api.js';
+import { personasStore } from '../../stores/index.js';
 import { alerts } from '../../alerts/index.js';
 import { useEntityEditor } from './useEntityEditor.js';
 import { EntityPage } from './EntityPage.js';
@@ -11,7 +12,7 @@ import { PersonaFields } from './PersonaFields.js';
 export function Personas() {
   const editor = useEntityEditor<Persona>({
     label: 'Persona',
-    list: personasApi.list,
+    store: personasStore,
     create: () => personasApi.create({ name: 'New persona' }),
     save: (draft) => personasApi.update(draft.id, draft),
     delete: personasApi.delete,

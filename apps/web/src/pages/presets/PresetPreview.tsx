@@ -7,12 +7,12 @@ import {
   type Preset,
   type PresetWarning,
   type PromptMessage,
-  type SessionSummary,
 } from '@st/shared';
-import { presetsApi, sessionsApi } from '../../api.js';
+import { presetsApi } from '../../api.js';
+import { sessionsStore, useList } from '../../stores/index.js';
 
 export function PresetPreview(props: { preset: Preset }) {
-  const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const sessions = useList(sessionsStore);
   const [sessionId, setSessionId] = useState('');
   const [samples, setSamples] = useState<Record<string, string>>({});
   const [messages, setMessages] = useState<PromptMessage[]>([]);
@@ -21,12 +21,6 @@ export function PresetPreview(props: { preset: Preset }) {
   const parsed = presetSchema.safeParse(props.preset);
   const warnings = parsed.success ? presetWarnings(parsed.data) : [];
 
-  useEffect(() => {
-    void sessionsApi
-      .list()
-      .then(setSessions)
-      .catch(() => {});
-  }, []);
   useEffect(() => {
     setPreviewed(false);
   }, [props.preset]);

@@ -2,16 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { presetSchema, type Preset } from '@st/shared';
 import { presetsApi } from '../api.js';
-import type { RequestOptions } from '../api/transport.js';
-import { useRefreshOnTabActive } from '../useTabActivation.js';
+import { presetsStore, useList } from '../stores/index.js';
 import { alerts } from '../alerts/index.js';
-import { compareRecent } from './recentOrder.js';
 import { PresetList } from './presets/PresetList.js';
 import { PresetEditor } from './presets/PresetEditor.js';
 import { PresetEntryEditor } from './presets/PresetEntryEditor.js';
 import { PresetPreview } from './presets/PresetPreview.js';
 import { copyPresetBody, isImportedPreset } from './presets/presetImport.js';
-import { sameList } from './presets/liveSync.js';
 import { usePresetLiveSync } from './presets/usePresetLiveSync.js';
 import './presets/presets.css';
 
@@ -19,22 +16,14 @@ export function Presets() {
   const [params] = useSearchParams();
   const requestedId = params.get('id');
   const requestedPresetRef = useRef<string | null>(null);
-  const [list, setList] = useState<Preset[]>([]);
+  const list = useList(presetsStore);
   const [draft, setDraft] = useState<Preset>();
   const [saved, setSaved] = useState('');
   const [selectedEntryId, setSelectedEntryId] = useState('');
   const dirty = !!draft && JSON.stringify(draft) !== saved;
   const readOnly = draft !== undefined && isImportedPreset(draft);
-  // Fetches the catalog, newest first. An unchanged list keeps its identity, so nothing re-renders.
-  const refresh = async (options?: RequestOptions) => {
-    const fresh = (await presetsApi.list(options)).sort((a, b) => compareRecent(a, b, (preset) => preset.name));
-    setList((current) => (sameList(current, fresh) ? current : fresh));
-    return fresh;
-  };
+  const refresh = () => presetsStore.refresh();
 
-  useEffect(() => {
-    void refresh().catch(() => {});
-  }, []);
   useEffect(() => {
     // Tabs stay mounted: a preset link must open even when another draft is showing.
     if (!requestedId || requestedPresetRef.current === requestedId) return;
@@ -44,7 +33,6 @@ export function Presets() {
       choose(preset);
     }
   }, [list, requestedId]);
-  useRefreshOnTabActive('/presets', () => void refresh());
 
   const openPreset = (preset: Preset, entryId: string) => {
     setDraft(structuredClone(preset));
@@ -59,7 +47,7 @@ export function Presets() {
   };
   usePresetLiveSync({
     editor: { draft, saved, selectedEntryId },
-    refresh: () => refresh({ silent: true }),
+    refresh: () => presetsStore.refresh(),
     onReload: openPreset,
     onClose: closeEditor,
   });

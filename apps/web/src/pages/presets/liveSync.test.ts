@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { presetSchema, type Preset, type PresetEntry } from '@st/shared';
-import { classifyDiskChange, planInvalidFileAlerts, reselectEntryId, sameList } from './liveSync.js';
+import { classifyDiskChange, planInvalidFileAlerts, reselectEntryId } from './liveSync.js';
 
 const message = (id: string, content = 'Hi'): PresetEntry => ({
   id,
@@ -73,9 +73,4 @@ it('plans invalid-file warnings once per (file, reason) and clears fixed files',
   expect(planInvalidFileAlerts(shown, [])).toEqual({ show: [], clear: ['a.yaml'] });
   const reworded = { file: 'a.yaml', reason: 'missing name' };
   expect(planInvalidFileAlerts(shown, [reworded])).toEqual({ show: [reworded], clear: ['a.yaml'] });
-});
-
-it('compares lists by content', () => {
-  expect(sameList([preset()], [preset()])).toBe(true);
-  expect(sameList([preset()], [preset('x')])).toBe(false);
 });

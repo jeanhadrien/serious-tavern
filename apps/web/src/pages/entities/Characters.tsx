@@ -1,5 +1,6 @@
 import { characterSchema, type Character } from '@st/shared';
 import { charactersApi } from '../../api.js';
+import { charactersStore } from '../../stores/index.js';
 import { alerts } from '../../alerts/index.js';
 import { useEntityEditor } from './useEntityEditor.js';
 import { EntityPage } from './EntityPage.js';
@@ -11,7 +12,7 @@ import { CharacterFields } from './CharacterFields.js';
 export function Characters() {
   const editor = useEntityEditor<Character>({
     label: 'Character',
-    list: charactersApi.list,
+    store: charactersStore,
     create: () => charactersApi.create({ name: 'New character' }),
     save: (draft) => charactersApi.update(draft.id, draft),
     delete: charactersApi.delete,
