@@ -153,7 +153,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 - **Windows 8.3 short paths:** `fs.watch` on a directory given by its short name (e.g. `C:\Users\JEANHA~1\...`, what `os.tmpdir()` returns here) kills the whole process with a libuv assertion. Watch `fs.promises.realpath(dir)`.
 - **Nested worktrees break Biome:** a leftover worktree under `.claude/worktrees/` (it contains its own `biome.json`) makes `biome check .` fail on the main checkout with "nested root configuration". Remove finished worktrees: unlink their `node_modules/@st` junctions first (`[System.IO.Directory]::Delete(path, $false)`), then `git worktree remove`.
 - **Tooling:** pnpm isn't installed; use npm. No browser or Playwright is set up yet, so UI changes need a manual check by the user.
-- **Line endings:** the repo has no `.gitattributes`, so on Windows with `core.autocrlf=true` checkouts land as CRLF and repo-wide `biome check` fails on files nobody touched. Don't reformat unrelated files to fix it; normalize line endings only in files your own commit touches.
+- **Line endings:** `.gitattributes` pins text files to LF (`* text=auto eol=lf`). Write new files with LF; don't mass-reformat unrelated files.
 - **Server integration tests that build a workflow by hand** must include exactly one `chat-input` node, even when its outputs are not wired to anything. `prepareWorkflow` rejects workflows with zero or multiple chat-input nodes before execution begins.
 - **Verification:** for server changes, a quick live check is to start the server with `npx tsx src/index.ts` in `apps/server` and `curl.exe` the endpoints.
 
