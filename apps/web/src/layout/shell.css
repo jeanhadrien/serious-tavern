@@ -1,0 +1,75 @@
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.top-bar {
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: #22252e;
+  border-bottom: 1px solid #3b4050;
+}
+.shell-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.column-header,
+.middle-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 8px;
+  background: #1d2028;
+  border-bottom: 1px solid #343844;
+  min-width: 0;
+}
+.middle-header {
+  justify-content: space-between;
+  padding: 0 12px;
+}
+.middle-actions {
+  display: flex;
+  gap: 4px;
+}
+.column-header .icon-button {
+  background: transparent;
+  border-color: transparent;
+}
+.column-header .icon-button:hover {
+  background: #303440;
+}
+.column-header .icon-button.active {
+  background: #33394b;
+  border-color: #59617a;
+  color: #c5cdff;
+}
+.resize-handle {
+  cursor: col-resize;
+  background: #343844;
+  touch-action: none;
+}
+.resize-handle:hover,
+.resize-handle:focus-visible,
+.resize-handle:active {
+  background: #6f7ddf;
+  outline: none;
+}
+.view {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.view[data-view^="editor:"] {
+  overflow: auto;
+}
+.list-placeholder {
+  margin: 0;
+  padding: 16px;
+}

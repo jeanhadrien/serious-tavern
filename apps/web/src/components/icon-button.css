@@ -9,3 +9,15 @@
   outline: 2px solid #9aa8ff;
   outline-offset: 2px;
 }
+button.icon-button {
+  position: relative;
+}
+.icon-button-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f1c477;
+}

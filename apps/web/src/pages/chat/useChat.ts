@@ -176,3 +176,5 @@ export function useChat() {
     deleteMessage: messageActions.deleteMessage,
   };
 }
+
+export type ChatState = ReturnType<typeof useChat>;

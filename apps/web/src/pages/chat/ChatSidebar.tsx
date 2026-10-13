@@ -14,7 +14,7 @@ interface ChatSidebarProps {
 
 export function ChatSidebar({ sessions, activeId, canCreate, disabled, onOpen, onCreate, onDelete }: ChatSidebarProps) {
   return (
-    <aside className="sidebar" aria-label="Chats">
+    <aside className="sidebar chat-sessions" aria-label="Chats">
       <div className="toolbar">
         <h2>Chats</h2>
         <button
