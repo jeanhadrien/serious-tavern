@@ -73,3 +73,12 @@
   margin: 0;
   padding: 16px;
 }
+.sidebar.resource-list {
+  width: auto;
+  height: 100%;
+  border-right: 0;
+}
+/* Editors adapt to the width of their slot, not of the viewport. */
+.view[data-view^="editor:"] {
+  container: editor / inline-size;
+}

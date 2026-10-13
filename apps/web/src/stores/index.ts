@@ -1,7 +1,11 @@
 import { useSyncExternalStore } from 'react';
 import { charactersApi, personasApi, presetsApi, sessionsApi, workflowsApi } from '../api.js';
 import { compareRecent } from '../pages/recentOrder.js';
+import type { Preset, Workflow } from '@st/shared';
+import { createEditorStore } from './editorStore.js';
 import { createListStore, type ListStore } from './listStore.js';
+
+export { useEditorCommands, useEditorState } from './editorStore.js';
 
 // Stores refresh in the background: a failed fetch must not toast on every event.
 const silent = { silent: true };
@@ -37,3 +41,7 @@ export const personasStore = createListStore({
 export function useList<T>(store: ListStore<T>): T[] {
   return useSyncExternalStore(store.subscribe, store.getSnapshot);
 }
+
+// What each list shares with its editor: the open item, its dirty flag and the list's requests.
+export const workflowEditorStore = createEditorStore<Workflow>();
+export const presetEditorStore = createEditorStore<Preset>();

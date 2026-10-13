@@ -149,6 +149,7 @@ export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]
     nodes,
     edges,
     visibleEdges,
+    canvasVersion,
     current,
     canvasRef,
     setSelected,

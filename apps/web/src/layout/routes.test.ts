@@ -1,11 +1,24 @@
 import { expect, it } from 'vitest';
-import { isKnownPath, resourceForPath } from './routes.js';
+import { isHostedWhole, isKnownPath, routeTarget } from './routes.js';
 
 it('maps resource paths to resources and leaves the chat path alone', () => {
-  expect(resourceForPath('/presets')).toBe('presets');
-  expect(resourceForPath('/workflows')).toBe('workflows');
-  expect(resourceForPath('/')).toBeUndefined();
+  expect(routeTarget('/presets', '')?.resource).toBe('presets');
+  expect(routeTarget('/workflows', '')?.resource).toBe('workflows');
+  expect(routeTarget('/', '')).toBeUndefined();
   expect(isKnownPath('/')).toBe(true);
   expect(isKnownPath('/settings')).toBe(true);
   expect(isKnownPath('/nope')).toBe(false);
+});
+
+it('opens the editor of a split resource only when the URL names an item', () => {
+  expect(routeTarget('/workflows', '')).toEqual({ resource: 'workflows', openEditor: false });
+  expect(routeTarget('/workflows', '?workflow=w1&edge=e1')).toEqual({ resource: 'workflows', openEditor: true });
+  expect(routeTarget('/presets', '?id=p1')).toEqual({ resource: 'presets', openEditor: true });
+  expect(routeTarget('/presets', '?workflow=w1')?.openEditor).toBe(false);
+});
+
+it('always opens a resource that is still hosted whole', () => {
+  expect(routeTarget('/settings', '')?.openEditor).toBe(true);
+  expect(isHostedWhole('characters')).toBe(true);
+  expect(isHostedWhole('workflows')).toBe(false);
 });

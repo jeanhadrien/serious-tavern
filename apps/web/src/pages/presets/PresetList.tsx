@@ -1,4 +1,6 @@
+import { Copy, Plus, Trash2 } from 'lucide-react';
 import type { Preset } from '@st/shared';
+import { IconButton } from '../../components/IconButton.js';
 
 export function PresetList(props: {
   presets: Preset[];
@@ -10,11 +12,11 @@ export function PresetList(props: {
   onDelete(preset: Preset): void;
 }) {
   return (
-    <aside className="preset-list">
+    <aside className="sidebar resource-list" aria-label="Presets">
       <div className="toolbar">
         <h2>Presets</h2>
-        <button className="primary" onClick={props.onCreate}>
-          + New
+        <button type="button" className="primary" onClick={props.onCreate}>
+          <Plus size={18} aria-hidden="true" /> New
         </button>
       </div>
       {props.presets.map((preset) => (
@@ -36,16 +38,8 @@ export function PresetList(props: {
               </span>
             )}
           </button>
-          <button
-            title="Duplicate preset"
-            aria-label={`Duplicate ${preset.name}`}
-            onClick={() => props.onDuplicate(preset)}
-          >
-            ⧉
-          </button>
-          <button title="Delete preset" aria-label={`Delete ${preset.name}`} onClick={() => props.onDelete(preset)}>
-            ×
-          </button>
+          <IconButton icon={Copy} label={`Duplicate ${preset.name}`} onClick={() => props.onDuplicate(preset)} />
+          <IconButton icon={Trash2} label={`Delete ${preset.name}`} onClick={() => props.onDelete(preset)} />
         </div>
       ))}
     </aside>

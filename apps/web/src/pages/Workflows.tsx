@@ -4,6 +4,7 @@ import { WorkflowToolbar } from './workflows/WorkflowToolbar.js';
 import { NodePalette } from './workflows/NodePalette.js';
 import { WorkflowCanvas } from './workflows/WorkflowCanvas.js';
 import { WorkflowConfigPanel } from './workflows/WorkflowConfigPanel.js';
+import './workflows/workflows.css';
 
 export function Workflows() {
   return (
@@ -14,42 +15,10 @@ export function Workflows() {
 }
 
 function WorkflowEditor() {
-  const {
-    workflows,
-    types,
-    typesReady,
-    presets,
-    characters,
-    providersList,
-    workflow,
-    setWorkflow,
-    canvas,
-    load,
-    create,
-    save,
-    validate,
-    remove,
-  } = useWorkflowEditor();
+  const { types, presets, characters, providersList, workflow, setWorkflow, canvas, save, validate } =
+    useWorkflowEditor();
   return (
     <div className="workflow-layout">
-      <aside className="sidebar">
-        <div className="toolbar">
-          <h2>Workflows</h2>
-          <button className="primary" disabled={!typesReady} onClick={() => void create()}>
-            + New
-          </button>
-        </div>
-        {workflows.map((w) => (
-          <div key={w.id} className={`session-row ${workflow?.id === w.id ? 'selected' : ''}`}>
-            <button className="session-link" disabled={!typesReady} onClick={() => load(structuredClone(w))}>
-              {w.name}
-            </button>
-            <button title="Delete workflow" onClick={() => void remove(w.id)}>
-              ×
-            </button>
-          </div>
-        ))}
-      </aside>
       {workflow ? (
         <div className="editor">
           <WorkflowToolbar
@@ -76,7 +45,7 @@ function WorkflowEditor() {
       ) : (
         <div className="empty-state">
           <h1>Build a workflow</h1>
-          <p>Choose a workflow or create a new one.</p>
+          <p>Choose a workflow in the list or create a new one.</p>
         </div>
       )}
     </div>

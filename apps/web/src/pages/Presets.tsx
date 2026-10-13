@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { presetSchema, type Preset } from '@st/shared';
 import { presetsApi } from '../api.js';
-import { presetsStore, useList } from '../stores/index.js';
+import { presetEditorStore, presetsStore, useEditorCommands, useList } from '../stores/index.js';
 import { alerts } from '../alerts/index.js';
-import { PresetList } from './presets/PresetList.js';
 import { PresetEditor } from './presets/PresetEditor.js';
 import { PresetEntryEditor } from './presets/PresetEntryEditor.js';
 import { PresetPreview } from './presets/PresetPreview.js';
-import { copyPresetBody, isImportedPreset } from './presets/presetImport.js';
+import { isImportedPreset } from './presets/presetImport.js';
+import { duplicatePreset } from './presets/presetActions.js';
 import { usePresetLiveSync } from './presets/usePresetLiveSync.js';
 import './presets/presets.css';
 
 export function Presets() {
-  const [params] = useSearchParams();
-  const requestedId = params.get('id');
-  const requestedPresetRef = useRef<string | null>(null);
+  const { key: locationKey, search } = useLocation();
+  const requestedId = new URLSearchParams(search).get('id');
+  const linkHandled = useRef<string | undefined>(undefined);
   const list = useList(presetsStore);
   const [draft, setDraft] = useState<Preset>();
   const [saved, setSaved] = useState('');
@@ -25,14 +25,15 @@ export function Presets() {
   const refresh = () => presetsStore.refresh();
 
   useEffect(() => {
-    // Tabs stay mounted: a preset link must open even when another draft is showing.
-    if (!requestedId || requestedPresetRef.current === requestedId) return;
+    // The editor stays mounted: a preset link (handled once per navigation) must open even when another
+    // draft is showing, and waits for the list if it has not loaded yet.
+    if (!requestedId || linkHandled.current === locationKey) return;
     const preset = list.find((item) => item.id === requestedId);
     if (preset) {
-      requestedPresetRef.current = requestedId;
-      choose(preset);
+      linkHandled.current = locationKey;
+      if (draft?.id !== preset.id) choose(preset);
     }
-  }, [list, requestedId]);
+  }, [list, requestedId, locationKey]);
 
   const openPreset = (preset: Preset, entryId: string) => {
     setDraft(structuredClone(preset));
@@ -45,6 +46,14 @@ export function Presets() {
     setSaved('');
     setSelectedEntryId('');
   };
+  const openId = draft?.id;
+  useEffect(() => presetEditorStore.report(openId, dirty), [openId, dirty]);
+  useEditorCommands(presetEditorStore, {
+    open: choose,
+    close: (id) => {
+      if (draft?.id === id) closeEditor();
+    },
+  });
   usePresetLiveSync({
     editor: { draft, saved, selectedEntryId },
     refresh: () => presetsStore.refresh(),
@@ -54,15 +63,6 @@ export function Presets() {
   // Imported presets never change in the editor, so no edit can make them dirty.
   const change = (next: Preset) => {
     if (!readOnly) setDraft(next);
-  };
-  const create = async () => {
-    try {
-      const created = await presetsApi.create({ name: 'New preset', inputs: [], entries: [] });
-      await refresh();
-      choose(created);
-    } catch {
-      /* API errors are toasted. */
-    }
   };
   const save = async () => {
     if (!draft || readOnly) return;
@@ -83,39 +83,10 @@ export function Presets() {
       /* API errors are toasted. */
     }
   };
-  const duplicate = async (preset: Preset) => {
-    try {
-      const copy = await presetsApi.create(copyPresetBody(preset));
-      await refresh();
-      choose(copy);
-      alerts.success('Preset duplicated');
-    } catch {
-      /* API errors are toasted. */
-    }
-  };
-  const remove = async (preset: Preset) => {
-    if (!window.confirm(`Delete ${preset.name}?`)) return;
-    try {
-      await presetsApi.delete(preset.id);
-      if (draft?.id === preset.id) closeEditor();
-      await refresh();
-    } catch {
-      /* In-use errors are toasted automatically. */
-    }
-  };
   const selectedEntry = draft?.entries.find((entry) => entry.id === selectedEntryId);
 
   return (
     <div className="presets-layout">
-      <PresetList
-        presets={list}
-        selectedId={draft?.id}
-        dirtyId={dirty ? draft?.id : undefined}
-        onSelect={choose}
-        onCreate={() => void create()}
-        onDuplicate={(preset) => void duplicate(preset)}
-        onDelete={(preset) => void remove(preset)}
-      />
       {draft ? (
         <>
           <PresetEditor
@@ -124,7 +95,7 @@ export function Presets() {
             readOnly={readOnly}
             onChange={change}
             onSave={() => void save()}
-            onDuplicate={() => void duplicate(draft)}
+            onDuplicate={() => void duplicatePreset(draft)}
             selectedEntryId={selectedEntryId}
             onSelectEntry={setSelectedEntryId}
           />
@@ -145,7 +116,7 @@ export function Presets() {
       ) : (
         <div className="empty-state">
           <h1>Presets</h1>
-          <p>Select or create a preset.</p>
+          <p>Select or create a preset in the list.</p>
         </div>
       )}
     </div>

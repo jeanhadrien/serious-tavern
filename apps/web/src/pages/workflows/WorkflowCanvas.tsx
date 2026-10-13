@@ -16,7 +16,9 @@ export function WorkflowCanvas({ canvas }: { canvas: ReturnType<typeof useWorkfl
       }}
       onDrop={canvas.onDrop}
     >
+      {/* Remounted for each loaded workflow, so `fitView` fits it into this (possibly narrow) column. */}
       <ReactFlow
+        key={canvas.canvasVersion}
         nodes={canvas.nodes}
         edges={canvas.visibleEdges}
         nodeTypes={nodeTypes}

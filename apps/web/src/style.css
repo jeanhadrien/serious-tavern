@@ -415,14 +415,6 @@ pre {
   display: flex;
   min-width: 0;
 }
-.preset-list {
-  width: 230px;
-  flex-shrink: 0;
-  padding: 14px;
-  background: #20232b;
-  border-right: 1px solid #343844;
-  overflow: auto;
-}
 .preset-editor-column {
   width: min(40%, 500px);
   min-width: 330px;
@@ -825,23 +817,5 @@ pre {
   }
   .entity-toolbar .toolbar {
     justify-content: flex-start;
-  }
-}
-@media (max-width: 1050px) {
-  .presets-layout {
-    overflow: auto;
-  }
-  .preset-list {
-    width: 195px;
-  }
-  .preset-editor-column {
-    width: 380px;
-    min-width: 320px;
-  }
-  .preset-detail-column {
-    min-width: 280px;
-  }
-  .preset-preview-column {
-    min-width: 300px;
   }
 }

@@ -1,0 +1,21 @@
+/* In a narrow middle column the palette shrinks and the config panel floats over the canvas. */
+@container editor (max-width: 820px) {
+  .workflow-layout .palette {
+    width: 150px;
+    padding: 10px;
+  }
+  .workflow-layout .editor-body {
+    position: relative;
+  }
+  .workflow-layout .config-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    box-shadow: -6px 0 16px rgba(0, 0, 0, 0.35);
+  }
+  .workflow-layout .editor-toolbar {
+    padding: 10px 12px;
+  }
+}

@@ -35,3 +35,29 @@
   padding: 0;
   border: 0;
 }
+/* In a narrow middle column the preview drops below the entry list and the entry editor. */
+@container editor (max-width: 1000px) {
+  .view .presets-layout {
+    display: grid;
+    grid-template-columns: minmax(260px, 2fr) minmax(0, 3fr);
+    grid-auto-rows: min-content;
+    align-content: start;
+    overflow: auto;
+  }
+  .view .presets-layout > .empty-state {
+    grid-column: 1 / -1;
+  }
+  .presets-layout .preset-editor-column {
+    width: auto;
+    min-width: 0;
+  }
+  .presets-layout .preset-detail-column {
+    min-width: 0;
+    border-right: 0;
+  }
+  .presets-layout .preset-preview-column {
+    grid-column: 1 / -1;
+    min-width: 0;
+    border-top: 1px solid #343844;
+  }
+}
