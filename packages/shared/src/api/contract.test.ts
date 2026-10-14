@@ -103,3 +103,10 @@ it('describes the change event stream, one event per resource type', () => {
   for (const event of [{ type: 'sessions.changed' }, { type: 'workflows.changed', id: 'abc' }])
     expect(apiContract.streamChanges.response.parse(event)).toEqual(event);
 });
+
+it('takes the model list refresh flag as the strings "true" or "false" only', () => {
+  const { query } = apiContract.listProviderModels;
+  expect(query.parse({})).toEqual({});
+  expect(query.parse({ refresh: 'true' })).toEqual({ refresh: 'true' });
+  expect(query.safeParse({ refresh: '1' }).success).toBe(false);
+});

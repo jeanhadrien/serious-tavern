@@ -8,6 +8,7 @@ import { migrateJsonPresets } from './storage/preset-migration.js';
 import { SecretStore } from './secrets/store.js';
 import { seed } from './seed.js';
 import { TurnRegistry } from './services/turns.js';
+import { ModelCatalog } from './services/provider-models.js';
 import { ChangeHub, NotifyingRepository, type RecordResource } from './services/change-events.js';
 
 export interface AppContext {
@@ -25,6 +26,8 @@ export interface AppContext {
   characterAvatars: string;
   personaAvatars: string;
   secrets: SecretStore;
+  /** The models each provider serves, fetched on demand and cached in memory. */
+  modelCatalog: ModelCatalog;
   turns: TurnRegistry;
   /** Fan-out of resource change events (preset files edited on disk, writes to records) to the open event streams. */
   changes: ChangeHub;
@@ -54,6 +57,7 @@ export async function createContext(dataDir: string, options: { seed?: boolean }
     characterAvatars: join(dataDir, 'avatars', 'characters'),
     personaAvatars: join(dataDir, 'avatars', 'personas'),
     secrets,
+    modelCatalog: new ModelCatalog(secrets),
     turns: new TurnRegistry(),
     changes,
   };

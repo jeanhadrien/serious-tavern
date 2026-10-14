@@ -5,6 +5,7 @@ import {
   providerSchema,
   type Provider,
   type ProviderFields,
+  type ProviderModelList,
   type ProviderView,
 } from '@st/shared';
 import { now, type AppContext } from '../context.js';
@@ -110,4 +111,13 @@ export async function duplicateProvider(context: AppContext, id: string): Promis
   await context.providers.save(copy);
   await announce(context);
   return getProvider(context, copy.id);
+}
+
+/** The models a provider's backend serves, from the in-memory catalog unless `refresh` asks for a new fetch. */
+export async function listProviderModels(
+  context: AppContext,
+  id: string,
+  refresh: boolean,
+): Promise<ProviderModelList> {
+  return context.modelCatalog.list(await getProvider(context, id), refresh);
 }

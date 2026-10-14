@@ -6,6 +6,7 @@ import {
   deleteProvider,
   duplicateProvider,
   getProvider,
+  listProviderModels,
   listProviders,
   updateProvider,
 } from '../services/providers.js';
@@ -31,6 +32,13 @@ export function registerProviders(app: FastifyInstance, context: AppContext) {
     await deleteProvider(context, idOf(request.params));
     return reply.code(204).send();
   });
+  app.get<ApiRoute<'listProviderModels'>>('/api/providers/:id/models', async (request) =>
+    listProviderModels(
+      context,
+      idOf(request.params),
+      apiContract.listProviderModels.query.parse(request.query).refresh === 'true',
+    ),
+  );
   app.post<ApiRoute<'duplicateProvider'>>('/api/providers/:id/duplicate', async (request, reply) =>
     reply.code(201).send(await duplicateProvider(context, idOf(request.params))),
   );

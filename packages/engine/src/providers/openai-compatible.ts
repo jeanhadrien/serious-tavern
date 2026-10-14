@@ -1,33 +1,13 @@
 import { registerAdapter, type ChatOptions, type ChatRequest, type ChatResponse, type LlmAdapter } from './index.js';
 import { resolveWireSettings, type WireSettings } from './wire-settings.js';
+import { failedResponse, withIdleTimeout } from './http.js';
+import { listOpenAiModels } from './openai-models.js';
 import { parseResponseText, streamFolder, wireRecorder, withoutSecret } from './wire-log.js';
 
 // A stream is only considered stalled after this long without any bytes (keep-alive comments count).
 const streamIdleTimeoutMs = 120_000;
 // Without streaming there is no activity to observe, so this bounds the whole request.
 const requestTimeoutMs = 600_000;
-
-/**
- * Wraps a caller's abort signal with an inactivity deadline. Call `touch` whenever
- * data arrives to push the deadline back, and `dispose` once the request is done.
- */
-function withIdleTimeout(signal: AbortSignal, ms: number, provider: string) {
-  const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout>;
-  const touch = () => {
-    clearTimeout(timer);
-    timer = setTimeout(
-      () => controller.abort(new Error(`${provider} timed out after ${ms / 1000}s without a response`)),
-      ms,
-    );
-  };
-  touch();
-  return {
-    signal: AbortSignal.any([signal, controller.signal]),
-    touch,
-    dispose: () => clearTimeout(timer),
-  };
-}
 
 // A call against one record, with the wire settings for the request's model already resolved.
 type Call = ChatOptions & { wire: WireSettings };
@@ -90,13 +70,9 @@ async function postCompletion(request: ChatRequest, stream: boolean, { provider,
   record();
   const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal });
   if (!response.ok) {
-    const text = await response.text();
-    const parsed = parseResponseText(text);
+    const { parsed, error } = await failedResponse(provider, response, apiKey);
     record({ status: response.status, response: parsed });
-    const error = (parsed as { error?: { message?: string } | string } | undefined)?.error;
-    const message = typeof error === 'string' ? error : (error?.message ?? text);
-    // Upstream text can echo the key back, and error messages end up in logs and toasts.
-    throw new Error(withoutSecret(`${provider.name} ${response.status}: ${message.slice(0, 500)}`, apiKey));
+    throw error;
   }
   return { response, record };
 }
@@ -228,6 +204,7 @@ export const openaiCompatible: LlmAdapter = {
       deadline.dispose();
     }
   },
+  listModels: listOpenAiModels,
   async stream(request, { onToken, onReasoning, ...options }) {
     const deadline = withIdleTimeout(options.signal, streamIdleTimeoutMs, options.provider.name);
     try {

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { characterSchema, presetInputLabel, reasoningEfforts, type PromptMessage } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { renderPreset } from '../../preset.js';
-import { adapters, type ChatResponse } from '../../providers/index.js';
+import { adapters, missingSecretMessage, type ChatResponse } from '../../providers/index.js';
 import '../../providers/openai-compatible.js';
 
 export function mergeSystemMessages(messages: readonly PromptMessage[]): PromptMessage[] {
@@ -103,7 +103,7 @@ export const llm: NodeDefinition = {
     if (!preset) throw new Error(`Preset ${ctx.config.presetId} not found`);
     // A provider without a secret (a local server) is called without credentials.
     const apiKey = provider.secret ? await ctx.secrets.get(provider.secret) : undefined;
-    if (provider.secret && !apiKey) throw new Error(`Missing ${provider.secret} secret. Add it in Settings.`);
+    if (provider.secret && !apiKey) throw new Error(missingSecretMessage(provider.secret));
     const rendered = renderPreset(preset, {
       inputs: ctx.inputs,
       templateContext: {

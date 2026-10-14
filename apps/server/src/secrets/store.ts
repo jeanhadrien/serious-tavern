@@ -9,8 +9,13 @@ export class SecretStore {
   private key!: Buffer;
   private readonly file: string;
   private readonly mutations = new KeyedLock();
+  private changes = 0;
   constructor(private readonly directory: string) {
     this.file = join(directory, 'secrets.enc.json');
+  }
+  /** Counts writes and deletes, so caches of anything fetched with a secret can tell it may have changed. */
+  get revision(): number {
+    return this.changes;
   }
   async init(): Promise<void> {
     await mkdir(this.directory, { recursive: true });
@@ -60,6 +65,7 @@ export class SecretStore {
         hint: value.length > 7 ? `${value.slice(0, 5)}…${value.slice(-3)}` : '••••',
       };
       await atomicWrite(this.file, JSON.stringify(entries, null, 2));
+      this.changes++;
     });
   }
   async delete(name: string): Promise<void> {
@@ -67,6 +73,7 @@ export class SecretStore {
       const entries = await this.read();
       delete entries[name];
       await atomicWrite(this.file, JSON.stringify(entries, null, 2));
+      this.changes++;
     });
   }
 }

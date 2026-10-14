@@ -15,10 +15,12 @@ import {
 } from '@st/shared';
 import type { InjectOptions } from 'fastify';
 import { registry } from '@st/engine';
+import { restoreAdapter, useAdapter } from './test-support/adapter.js';
 import { parseEventStream } from './test-support/event-stream.js';
 
 const directories: string[] = [];
 afterEach(async () => {
+  restoreAdapter();
   vi.restoreAllMocks();
   await Promise.all(directories.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
@@ -61,6 +63,12 @@ it('returns payloads conforming to every shared endpoint response contract', asy
       payload: { name: 'Contract provider', baseUrl: 'https://api.example.com/v1' },
     });
     await request('getProvider', { method: 'GET', url: `/api/providers/${provider.id}` });
+    useAdapter({
+      chat: async () => ({ text: '', raw: {} }),
+      listModels: async () => [{ id: 'model-a', contextLength: 8192 }],
+    });
+    const catalog = await request('listProviderModels', { method: 'GET', url: `/api/providers/${provider.id}/models` });
+    expect(catalog.models).toEqual([{ id: 'model-a', contextLength: 8192 }]);
     await request('updateProvider', {
       method: 'PUT',
       url: `/api/providers/${provider.id}`,
