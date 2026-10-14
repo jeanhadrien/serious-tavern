@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -114,6 +114,24 @@ describe('GET /api/providers/:id/models', () => {
       expect(calls.map((call) => call.provider.baseUrl)).toEqual([
         'http://localhost:11434/v1',
         'http://localhost:1234/v1',
+      ]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('refetches when the provider file is edited by hand, though its updatedAt stays the same', async () => {
+    const { app, calls, create, models } = await setup();
+    try {
+      const { id } = await create();
+      await models(id);
+      const file = join(directory, 'providers', 'local.yaml');
+      const text = await readFile(file, 'utf8');
+      await writeFile(file, text.replace('localhost:11434', 'localhost:9999'));
+      await models(id);
+      expect(calls.map((call) => call.provider.baseUrl)).toEqual([
+        'http://localhost:11434/v1',
+        'http://localhost:9999/v1',
       ]);
     } finally {
       await app.close();
