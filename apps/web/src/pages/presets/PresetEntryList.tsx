@@ -1,5 +1,7 @@
 import { useState, type DragEvent } from 'react';
+import { ArrowDown, ArrowUp } from 'lucide-react';
 import { presetInputLabel, type Preset, type PresetEntry } from '@st/shared';
+import { IconButton } from '../../components/IconButton.js';
 
 export const newId = () => crypto.randomUUID();
 
@@ -41,6 +43,15 @@ export function reorderEntries(
   return [...rest.slice(0, at), moving, ...rest.slice(at)];
 }
 
+// Moves an entry one place up (-1) or down (1): the touch-friendly twin of drag and drop.
+// Returns the original array at either end of the list or for an unknown id.
+export function moveEntry(entries: PresetEntry[], id: string, offset: -1 | 1): PresetEntry[] {
+  const index = entries.findIndex((entry) => entry.id === id);
+  const neighbour = index === -1 ? undefined : entries[index + offset];
+  if (!neighbour) return entries;
+  return reorderEntries(entries, id, neighbour.id, offset === 1);
+}
+
 // Read-only lists still allow selecting entries, so they can be browsed; every change control is disabled.
 export function EntryList(props: {
   preset: Preset;
@@ -80,6 +91,8 @@ export function EntryList(props: {
     updateEntries([...props.preset.entries, copy]);
     props.onSelect(copy.id);
   };
+  const selectedIndex = props.preset.entries.findIndex((entry) => entry.id === props.selectedId);
+  const move = (offset: -1 | 1) => updateEntries(moveEntry(props.preset.entries, props.selectedId, offset));
   const getDepthLabel = (entry: PresetEntry) => {
     if (entry.kind !== 'message' || entry.placement.mode !== 'depth') return undefined;
     const entryId = entry.placement.entryId;
@@ -134,6 +147,18 @@ export function EntryList(props: {
       <div className="toolbar">
         <h3>Entries</h3>
         <div>
+          <IconButton
+            icon={ArrowUp}
+            label="Move selected entry up"
+            disabled={props.readOnly || selectedIndex <= 0}
+            onClick={() => move(-1)}
+          />
+          <IconButton
+            icon={ArrowDown}
+            label="Move selected entry down"
+            disabled={props.readOnly || selectedIndex === -1 || selectedIndex === props.preset.entries.length - 1}
+            onClick={() => move(1)}
+          />
           <button onClick={addMessage} disabled={props.readOnly}>
             + Message
           </button>

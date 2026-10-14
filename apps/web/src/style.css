@@ -414,6 +414,8 @@ pre {
   overflow: auto;
   border-right: 1px solid #343844;
   display: grid;
+  /* One track no wider than the column, so wide content shrinks or wraps instead of overflowing. */
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 14px;
 }
@@ -423,6 +425,11 @@ pre {
 }
 .preset-toolbar input {
   flex: 1;
+  /* Shrinks for the "Unsaved changes" note instead of pushing Save out of a narrow column. */
+  min-width: 0;
+}
+.preset-toolbar small {
+  white-space: nowrap;
 }
 .preset-inputs,
 .preset-entry-list {
@@ -541,6 +548,7 @@ pre {
   overflow: auto;
   border-right: 1px solid #343844;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 16px;
 }
@@ -550,6 +558,7 @@ pre {
   padding: 16px;
   overflow: auto;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 16px;
 }
