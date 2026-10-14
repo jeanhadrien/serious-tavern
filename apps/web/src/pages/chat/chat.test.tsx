@@ -20,6 +20,16 @@ it.each([
 });
 
 it.each([
+  [key, false],
+  [{ ...key, shiftKey: true }, false],
+  [{ ...key, ctrlKey: true }, true],
+  [{ ...key, metaKey: true }, true],
+  [{ ...key, ctrlKey: true, isComposing: true }, false],
+])('adds a line on Enter from a touch keyboard %j', (event, expected) => {
+  expect(composerShouldSend(event, true)).toBe(expected);
+});
+
+it.each([
   [key, undefined],
   [{ ...key, ctrlKey: true }, 'save'],
   [{ ...key, metaKey: true }, 'save'],

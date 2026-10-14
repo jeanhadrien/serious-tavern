@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import { Send, Square } from 'lucide-react';
 import { IconButton } from '../../components/IconButton.js';
+import { useMediaQuery } from '../../useMediaQuery.js';
 import { composerShouldSend } from './keyboard.js';
 
 interface ComposerProps {
@@ -16,6 +17,8 @@ export function Composer({ content, busy, locked, onChange, onSend, onStop }: Co
   const input = useRef<HTMLTextAreaElement>(null);
   const composing = useRef(false);
   const restoreFocus = useRef(false);
+  // A touch screen's main pointer is a finger: its on-screen keyboard has no Shift+Enter.
+  const touch = useMediaQuery('(pointer: coarse)');
   useLayoutEffect(() => {
     const element = input.current;
     if (!element) return;
@@ -64,11 +67,14 @@ export function Composer({ content, busy, locked, onChange, onSend, onStop }: Co
             return;
           }
           if (
-            composerShouldSend({
-              ...event,
-              isComposing: composing.current || event.nativeEvent.isComposing,
-              keyCode: event.nativeEvent.keyCode,
-            })
+            composerShouldSend(
+              {
+                ...event,
+                isComposing: composing.current || event.nativeEvent.isComposing,
+                keyCode: event.nativeEvent.keyCode,
+              },
+              touch,
+            )
           ) {
             event.preventDefault();
             send();
@@ -82,7 +88,9 @@ export function Composer({ content, busy, locked, onChange, onSend, onStop }: Co
         disabled={!busy && locked}
         onClick={busy ? onStop : send}
       />
-      <small className="composer-hint">Enter to send · Shift+Enter for a new line</small>
+      <small className="composer-hint">
+        {touch ? 'Enter for a new line · tap Send to send' : 'Enter to send · Shift+Enter for a new line'}
+      </small>
     </form>
   );
 }
