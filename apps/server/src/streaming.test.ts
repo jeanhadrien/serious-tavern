@@ -502,9 +502,9 @@ describe('streamed turns', () => {
       expect(missing.statusCode).toBe(404);
       expect(missing.headers['content-type']).toContain('application/json');
       expect(missing.json()).toEqual({ error: { code: 'NOT_FOUND', message: 'Session not found' } });
-      const empty = await app.inject(streamRequest(session.id, '  '));
-      expect(empty.statusCode).toBe(400);
-      expect(empty.json().error.code).toBe('VALIDATION_ERROR');
+      const malformed = await app.inject({ ...streamRequest(session.id, ''), payload: { content: 42 } });
+      expect(malformed.statusCode).toBe(400);
+      expect(malformed.json().error.code).toBe('VALIDATION_ERROR');
       expect((await app.inject(stopRequest('not-a-uuid'))).statusCode).toBe(400);
     } finally {
       await app.close();

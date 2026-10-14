@@ -15,10 +15,14 @@ export const updateSessionSchema = z.object({
   characterId: z.string().uuid().nullable().optional(),
   personaId: z.string().uuid().nullable().optional(),
 });
-export const sendMessageSchema = z.object({ content: z.string().trim().min(1) });
+// An empty `content` sends no user message: the turn runs on the session's history as it is.
+export const sendMessageSchema = z.object({ content: z.string().trim().default('') });
+// Editing a stored message may never leave it empty.
+export const editMessageSchema = z.object({ content: z.string().trim().min(1) });
 const messageParamsSchema = idParamsSchema.extend({ messageId: z.string().uuid() });
 export const sendMessageResultSchema = z.object({
-  userMessage: messageSchema,
+  // Absent when the turn was sent empty.
+  userMessage: messageSchema.optional(),
   assistantMessages: z.array(messageSchema),
   execution: executionLogSchema,
 });
@@ -51,7 +55,7 @@ export const sessionEndpoints = {
   sendMessage: endpoint(sendMessageResultSchema, sendMessageSchema, idParamsSchema),
   streamTurn: endpoint(turnEventSchema, sendMessageSchema, idParamsSchema),
   stopTurn: endpoint(noContentSchema, undefined, idParamsSchema),
-  updateMessage: endpoint(messageSchema, sendMessageSchema, messageParamsSchema),
+  updateMessage: endpoint(messageSchema, editMessageSchema, messageParamsSchema),
   deleteMessage: endpoint(noContentSchema, undefined, messageParamsSchema),
   getExecution: endpoint(executionLogSchema, undefined, idParamsSchema),
 };

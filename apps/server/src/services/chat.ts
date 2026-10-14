@@ -67,7 +67,7 @@ async function startTurn(
   const started: {
     value?: {
       prepared: PreparedWorkflow;
-      userMessage: ChatMessage;
+      userMessage?: ChatMessage;
       history: ChatMessage[];
       character?: Character;
       persona?: Persona;
@@ -84,9 +84,12 @@ async function startTurn(
       } satisfies WorkflowInvalidDetails);
     const character = current.characterId ? await prepared.resources.characters?.get(current.characterId) : undefined;
     const persona = current.personaId ? await personas.get(current.personaId) : undefined;
-    const userMessage: ChatMessage = { id: randomUUID(), role: 'user', content, createdAt: now() };
+    // An empty send adds no user message: the turn runs on the history as it is.
+    const userMessage: ChatMessage | undefined = content.trim()
+      ? { id: randomUUID(), role: 'user', content, createdAt: now() }
+      : undefined;
     started.value = { prepared, userMessage, history: historyMessages(current.messages), character, persona };
-    current.messages.push(userMessage);
+    if (userMessage) current.messages.push(userMessage);
     current.updatedAt = now();
     return current;
   });
@@ -130,7 +133,7 @@ async function executeTurn(
   const replies = outcome?.replies ?? (failure instanceof ExecutionFailure ? failure.replies : []);
   if (!outcome && turn.stoppedBy && execution) execution.warnings.push(stopWarnings[turn.stoppedBy]);
   if (execution) await executions.save(execution);
-  const settled: { value?: { userMessage: ChatMessage; assistantMessages: ChatMessage[] } } = {};
+  const settled: { value?: { userMessage?: ChatMessage; assistantMessages: ChatMessage[] } } = {};
   // Everything a turn writes is silent; the settled turn announces itself once (success, failure or stop).
   const session = await sessions.silent.update(sessionId, (current) => {
     settled.value = settleTurn(current, { executionId, userMessage, replies, streamed, interrupted: !outcome });
@@ -158,7 +161,7 @@ async function executeTurn(
 
 export type Settlement = {
   executionId: string;
-  userMessage: ChatMessage;
+  userMessage?: ChatMessage;
   replies: ChatReply[];
   streamed: StreamedRow[];
   interrupted: boolean;
@@ -207,8 +210,8 @@ export function settleTurn(current: Session, { executionId, userMessage, replies
     : [];
   const assistantMessages = [...replied, ...partial];
   current.messages = current.messages.filter((message) => !streamedIds.has(message.id));
-  const saved = current.messages.find((message) => message.id === userMessage.id) ?? userMessage;
-  saved.executionId = executionId;
+  const saved = userMessage && (current.messages.find((message) => message.id === userMessage.id) ?? userMessage);
+  if (saved) saved.executionId = executionId;
   current.messages.push(...assistantMessages);
   current.updatedAt = now();
   return { userMessage: saved, assistantMessages };

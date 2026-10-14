@@ -292,7 +292,7 @@ it('allows a turn without assistant messages, persists its execution warning and
     const result = apiContract.sendMessage.response.parse(response.json());
     expect(result.assistantMessages).toEqual([]);
     expect(result.execution.warnings).toHaveLength(1);
-    expect(result.userMessage.executionId).toBe(result.execution.id);
+    expect(result.userMessage!.executionId).toBe(result.execution.id);
     expect((await load()).messages).toEqual([result.userMessage]);
   } finally {
     await app.close();

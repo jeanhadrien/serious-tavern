@@ -46,7 +46,7 @@ it('edits either role without changing metadata or executing, then deletes only 
   const { app, session, result } = await fixture();
   try {
     const before = (await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json();
-    for (const message of [result.userMessage, ...result.assistantMessages]) {
+    for (const message of [result.userMessage!, ...result.assistantMessages]) {
       const response = await app.inject({
         method: 'PATCH',
         url: `/api/sessions/${session.id}/messages/${message.id}`,
@@ -63,7 +63,7 @@ it('edits either role without changing metadata or executing, then deletes only 
     expect(edited.updatedAt).toBe(before.updatedAt);
     const response = await app.inject({
       method: 'DELETE',
-      url: `/api/sessions/${session.id}/messages/${result.userMessage.id}`,
+      url: `/api/sessions/${session.id}/messages/${result.userMessage!.id}`,
     });
     expect(response.statusCode).toBe(204);
     expect(response.body).toBe('');
@@ -83,7 +83,7 @@ it('only advances session updatedAt on message send, not on edits, deletes or me
     const before = (await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json();
     const edited = await app.inject({
       method: 'PATCH',
-      url: `/api/sessions/${session.id}/messages/${result.userMessage.id}`,
+      url: `/api/sessions/${session.id}/messages/${result.userMessage!.id}`,
       payload: { content: 'Edited' },
     });
     expect(edited.statusCode).toBe(200);
@@ -124,7 +124,7 @@ it('returns standard 404s for missing sessions/messages and rejects invalid edit
   try {
     for (const method of ['PATCH', 'DELETE'] as const) {
       for (const [id, messageId] of [
-        [randomUUID(), result.userMessage.id],
+        [randomUUID(), result.userMessage!.id],
         [session.id, randomUUID()],
       ]) {
         const response = await app.inject({
@@ -139,7 +139,7 @@ it('returns standard 404s for missing sessions/messages and rejects invalid edit
     for (const payload of [{}, { content: '' }, { content: ' \n ' }, { content: 1 }]) {
       const response = await app.inject({
         method: 'PATCH',
-        url: `/api/sessions/${session.id}/messages/${result.userMessage.id}`,
+        url: `/api/sessions/${session.id}/messages/${result.userMessage!.id}`,
         payload,
       });
       expect(response.statusCode).toBe(400);
@@ -170,7 +170,7 @@ it('serializes concurrent edits, deletion and a new turn without losing session 
         url: `/api/sessions/${session.id}/messages/${result.assistantMessages[0]!.id}`,
         payload: { content: 'Edited assistant' },
       }),
-      app.inject({ method: 'DELETE', url: `/api/sessions/${session.id}/messages/${result.userMessage.id}` }),
+      app.inject({ method: 'DELETE', url: `/api/sessions/${session.id}/messages/${result.userMessage!.id}` }),
       app.inject({
         method: 'POST',
         url: `/api/sessions/${session.id}/messages`,
@@ -184,6 +184,41 @@ it('serializes concurrent edits, deletion and a new turn without losing session 
       'Next turn',
       'Next turn',
     ]);
+  } finally {
+    await app.close();
+  }
+});
+
+it('runs an empty send on the history as it is, without storing a user message', async () => {
+  const { app, session } = await fixture();
+  try {
+    const count = async () =>
+      apiContract.getSession.response
+        .parse((await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json())
+        .messages.filter((message) => message.role === 'user').length;
+    expect(await count()).toBe(1);
+    for (const payload of [{ content: '  ' }, {}]) {
+      const response = await app.inject({ method: 'POST', url: `/api/sessions/${session.id}/messages`, payload });
+      expect(response.statusCode).toBe(200);
+      const body = apiContract.sendMessage.response.parse(response.json());
+      expect(body.userMessage).toBeUndefined();
+      expect(body.execution.status).toBe('completed');
+    }
+    expect(await count()).toBe(1);
+  } finally {
+    await app.close();
+  }
+});
+
+it('still rejects editing a stored message to empty', async () => {
+  const { app, session, result } = await fixture();
+  try {
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/sessions/${session.id}/messages/${result.userMessage!.id}`,
+      payload: { content: '   ' },
+    });
+    expect(response.statusCode).toBe(400);
   } finally {
     await app.close();
   }

@@ -29,7 +29,7 @@ export function Composer({ content, busy, locked, onChange, onSend, onStop }: Co
     }
   }, [busy]);
   const send = () => {
-    if (locked || composing.current || !content.trim()) return;
+    if (locked || composing.current) return;
     restoreFocus.current = true;
     input.current?.focus();
     void onSend();
@@ -49,7 +49,7 @@ export function Composer({ content, busy, locked, onChange, onSend, onStop }: Co
         aria-label="Message"
         aria-disabled={locked}
         readOnly={locked}
-        placeholder={busy ? 'Generating… Esc to stop' : 'Write a message…'}
+        placeholder={busy ? 'Generating… Esc to stop' : 'Write a message… (empty to generate a reply)'}
         value={content}
         onChange={(event) => onChange(event.target.value)}
         onCompositionStart={() => {
@@ -79,7 +79,7 @@ export function Composer({ content, busy, locked, onChange, onSend, onStop }: Co
         icon={busy ? Square : Send}
         label={busy ? 'Stop generation' : 'Send message'}
         className={`primary${busy ? ' stop-generation' : ''}`}
-        disabled={!busy && (locked || !content.trim())}
+        disabled={!busy && locked}
         onClick={busy ? onStop : send}
       />
       <small className="composer-hint">Enter to send · Shift+Enter for a new line</small>

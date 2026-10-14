@@ -25,14 +25,15 @@ export function applyDelta(
 }
 
 /**
- * Replaces the turn's local rows (the optimistic user message and every live streaming row) with what
- * the server settled: the saved user message and the final or partial assistant messages.
+ * Replaces the turn's local rows (the optimistic user message, if any, and every live streaming row) with
+ * what the server settled: the saved user message (absent for an empty send) and the final or partial
+ * assistant messages.
  */
 export function settleTurn(
   messages: ChatMessage[],
-  optimisticId: string,
-  saved: { userMessage: ChatMessage; assistantMessages: ChatMessage[] },
+  optimisticId: string | undefined,
+  saved: { userMessage?: ChatMessage; assistantMessages: ChatMessage[] },
 ): ChatMessage[] {
   const kept = messages.filter((message) => message.id !== optimisticId && message.status !== 'streaming');
-  return [...kept, saved.userMessage, ...saved.assistantMessages];
+  return [...kept, ...(saved.userMessage ? [saved.userMessage] : []), ...saved.assistantMessages];
 }

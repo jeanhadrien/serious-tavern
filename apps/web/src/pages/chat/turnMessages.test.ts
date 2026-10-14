@@ -28,3 +28,9 @@ it('settles a turn by replacing local rows with the saved ones and keeping older
   const saved = { userMessage: user('saved'), assistantMessages: [assistant('final', { status: 'final' })] };
   expect(settleTurn(messages, 'optimistic', saved).map((message) => message.id)).toEqual(['old', 'saved', 'final']);
 });
+
+it('settles an empty send, which has no user message, without adding one', () => {
+  const messages = [user('old'), assistant('live', { status: 'streaming', nodeId: 'out' })];
+  const saved = { assistantMessages: [assistant('final', { status: 'final' })] };
+  expect(settleTurn(messages, undefined, saved).map((message) => message.id)).toEqual(['old', 'final']);
+});

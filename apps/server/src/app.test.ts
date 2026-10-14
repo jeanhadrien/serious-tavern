@@ -198,12 +198,12 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     await request('stopTurn', { method: 'POST', url: `/api/sessions/${session.id}/stop` });
     await request('updateMessage', {
       method: 'PATCH',
-      url: `/api/sessions/${session.id}/messages/${message.userMessage.id}`,
+      url: `/api/sessions/${session.id}/messages/${message.userMessage!.id}`,
       payload: { content: 'Edited reply' },
     });
     await request('deleteMessage', {
       method: 'DELETE',
-      url: `/api/sessions/${session.id}/messages/${message.userMessage.id}`,
+      url: `/api/sessions/${session.id}/messages/${message.userMessage!.id}`,
     });
     await request('previewPreset', {
       method: 'POST',
