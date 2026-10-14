@@ -197,7 +197,7 @@ it('announces provider files edited on disk, with the files it could not load', 
     await writeFile(broken, providerYaml('Local'));
     await vi.waitFor(() => expect(lastProviders(events())?.invalidFiles).toEqual([]));
     const list = apiContract.listProviders.response.parse((await app.inject({ url: '/api/providers' })).json());
-    expect(list.map((provider) => provider.name)).toEqual(['OpenRouter', 'Local']);
+    expect(list.filter((provider) => !provider.builtIn).map((provider) => provider.name)).toEqual(['Local']);
     await stream.cancel();
   } finally {
     await app.close();

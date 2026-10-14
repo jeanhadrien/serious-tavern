@@ -51,7 +51,10 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     for (const descriptor of nodeTypes)
       expect(descriptor.dynamicPorts).toBe(!!registry.get(descriptor.type)?.resolvePorts);
     const builtIn = await request('listProviders', { method: 'GET', url: '/api/providers' });
-    expect(builtIn.map((provider) => [provider.id, provider.builtIn])).toEqual([['openrouter', true]]);
+    expect(builtIn.map((provider) => [provider.id, provider.builtIn])).toEqual([
+      ['openrouter', true],
+      ['abliteration', true],
+    ]);
     const provider = await request('createProvider', {
       method: 'POST',
       url: '/api/providers',

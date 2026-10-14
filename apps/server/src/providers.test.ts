@@ -120,13 +120,14 @@ describe('providers API', () => {
     payload?: object,
   ) => app.inject({ method, url, payload });
 
-  it('lists the built-in OpenRouter provider first, then user providers', async () => {
+  it('lists the built-in providers first, then user providers', async () => {
     const app = await open();
     try {
       const created = (await json(app, 'POST', '/api/providers', body)).json() as ProviderView;
       const list = apiContract.listProviders.response.parse((await json(app, 'GET', '/api/providers')).json());
       expect(list.map((provider) => [provider.id, provider.builtIn])).toEqual([
         ['openrouter', true],
+        ['abliteration', true],
         [created.id, false],
       ]);
       expect(list[0]).toMatchObject({

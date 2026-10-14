@@ -25,7 +25,14 @@ A provider record lets you describe how *your* backend spells these things. The 
 2. **Create a provider.** Click the **Providers** icon (left column), then click **+ New**, or open **OpenRouter** and click **Duplicate**. Fill in the name, base URL and secret name, then **Save**.
 3. **Use it.** In a workflow, open an **LLM** node, pick your provider in the provider dropdown and set the model id the backend expects (for example `deepseek-chat`).
 
-The built-in **OpenRouter** provider is always there and can't be edited. It uses the secret named `openrouter`. To change anything about it, **Duplicate** it and edit the copy.
+Two providers are built in, always there and can't be edited:
+
+| Provider | Secret name | Example models |
+| --- | --- | --- |
+| **OpenRouter** | `openrouter` | `openai/gpt-4o-mini`, `deepseek/deepseek-r1`, … |
+| **abliteration.ai** | `abliteration` | `abliterated-model`, `abliterated-model-large-v2`, `abliterated-model-large` |
+
+To use one, save a key under its secret name in **Settings** and pick it in the LLM node. To change anything about it, **Duplicate** it and edit the copy.
 
 ## Provider fields
 
@@ -113,6 +120,8 @@ Two limits to keep in mind:
 - It can add or replace fields, but it **can't remove** one. Setting a field to `null` sends a JSON `null`.
 - Don't set `stream` in it, because that breaks reading the reply.
 
+Some backends reject any body field they don't know. abliteration.ai is one of them, so only add fields its API reference lists (for example `prompt_cache_key` or `include_reasoning`).
+
 ## Checking what was actually sent
 
 Every assistant message produced by a workflow has **Execution details**. For each LLM node they show an **LLM call** entry with:
@@ -136,7 +145,7 @@ name: Local Ollama
 baseUrl: http://localhost:11434/v1
 ```
 
-Everything else gets its default. On first load the app adds an `id` and timestamps to the file. The built-in OpenRouter provider has no file.
+Everything else gets its default. On first load the app adds an `id` and timestamps to the file. Built-in providers have no file.
 
 ## Examples
 
@@ -206,4 +215,4 @@ Then select the copy, not **OpenRouter**, in your LLM nodes. Your existing secre
 | No reasoning in the chat | Check **Response** in Execution details for the field that holds it, and add that field to **Reasoning fields**. Reasoning is also only kept when the LLM's text goes straight into a Chat Output, not through a template. |
 | `<provider> returned a response that is not JSON` | The base URL probably doesn't point at the API: a missing `/v1`, or a web page instead of an API. The response text is in Execution details. |
 | Can't delete a provider | It's still used by LLM nodes. The message lists the workflows: switch those nodes to another provider first. |
-| Can't edit **OpenRouter** | It's built in and read-only. **Duplicate** it and edit the copy. |
+| Can't edit **OpenRouter** or **abliteration.ai** | It's built in and read-only. **Duplicate** it and edit the copy. |

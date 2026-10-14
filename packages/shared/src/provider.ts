@@ -60,7 +60,10 @@ export const providerViewSchema = providerFieldsSchema
 export type ProviderView = z.infer<typeof providerViewSchema>;
 
 const builtInDate = '1970-01-01T00:00:00.000Z';
-/** Defined in code so existing `provider: 'openrouter'` nodes and the `openrouter` secret need no migration. */
+/**
+ * Read-only providers shipped in code, so fixes reach every install. OpenRouter keeps the id and secret
+ * that existing `provider: 'openrouter'` nodes already use. Users duplicate one to customize it.
+ */
 export const builtInProviders: readonly Provider[] = [
   {
     id: 'openrouter',
@@ -71,6 +74,22 @@ export const builtInProviders: readonly Provider[] = [
     headers: { 'HTTP-Referer': 'https://github.com/serious-tavern', 'X-Title': 'Serious Tavern' },
     messageName: 'name',
     reasoningFields: ['reasoning', 'reasoning_content'],
+    extraBody: {},
+    overrides: [],
+    createdAt: builtInDate,
+    updatedAt: builtInDate,
+  },
+  // https://docs.abliteration.ai: accepts message names and OpenRouter's `reasoning` object; returns
+  // reasoning as `reasoning_content`. Its request schema rejects unknown fields, so keep `extraBody` empty.
+  {
+    id: 'abliteration',
+    name: 'abliteration.ai',
+    kind: 'openai-compatible',
+    baseUrl: 'https://api.abliteration.ai/v1',
+    secret: 'abliteration',
+    headers: {},
+    messageName: 'name',
+    reasoningFields: ['reasoning_content', 'reasoning'],
     extraBody: {},
     overrides: [],
     createdAt: builtInDate,
