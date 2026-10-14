@@ -31,7 +31,7 @@ export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]
   const [canvasVersion, setCanvasVersion] = useState(0);
   useDynamicPorts(nodes, setNodes, edges, setEdges, types, presets, characters, canvasVersion);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, deleteElements } = useReactFlow();
   const visibleEdges = useMemo(
     () =>
       edges.map((edge) => {
@@ -141,6 +141,13 @@ export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]
     const descriptor = types.find((item) => item.type === type);
     if (descriptor) addNode(descriptor, screenToFlowPosition({ x: event.clientX, y: event.clientY }));
   };
+  // The selection as an on-screen action, for touch screens where the Delete key is out of reach. It goes through
+  // the same change handlers as the key, so a removed node takes its edges with it.
+  const selectedNodes = nodes.filter((node) => node.selected);
+  const selectedEdges = edges.filter((edge) => edge.selected);
+  const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
+  const deleteSelection = () => void deleteElements({ nodes: selectedNodes, edges: selectedEdges });
+  const deleteNode = (id: string) => void deleteElements({ nodes: [{ id }] });
   const current = nodes.find((n) => n.id === selected);
   const updateConfig = (config: NodeInstance['config']) => {
     setNodes((prev) => prev.map((n) => (n.id === selected ? { ...n, data: { ...n.data, config } } : n)));
@@ -164,5 +171,8 @@ export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[]
     addAtCenter,
     onDrop,
     updateConfig,
+    hasSelection,
+    deleteSelection,
+    deleteNode,
   };
 }

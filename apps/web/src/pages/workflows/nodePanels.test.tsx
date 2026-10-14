@@ -43,6 +43,7 @@ it('renders the registered LLM panel with the same controls, preset summary and 
         characters={[]}
         providersList={[{ id: 'openrouter', name: 'OpenRouter' }]}
         updateConfig={() => {}}
+        onDelete={() => {}}
         onClose={() => {}}
       />
     </MemoryRouter>,

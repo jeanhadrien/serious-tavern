@@ -29,6 +29,7 @@ it('renders unavailable workflow node configuration read-only', () => {
       characters={[]}
       providersList={[]}
       updateConfig={() => {}}
+      onDelete={() => {}}
       onClose={() => {}}
     />,
   );

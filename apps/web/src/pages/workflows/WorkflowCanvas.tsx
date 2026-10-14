@@ -1,9 +1,27 @@
-import { ReactFlow, Background, Controls } from '@xyflow/react';
+import { useEffect, useRef } from 'react';
+import { ReactFlow, Background, Controls, Panel, useNodesInitialized, useReactFlow } from '@xyflow/react';
+import { Trash2 } from 'lucide-react';
+import { IconButton } from '../../components/IconButton.js';
 import { checkConnection } from '../../connection.js';
 import { WorkflowNode } from './WorkflowNode.js';
 import type { useWorkflowCanvas } from './useWorkflowCanvas.js';
 
 const nodeTypes = { workflow: WorkflowNode };
+
+// React Flow's `fitView` prop can run before the nodes are measured and then zooms right in on nothing.
+// This fits once they are, once per mounted canvas (it remounts for each loaded workflow): nodes added later
+// briefly read as unmeasured again and must not move the view.
+function FitWhenMeasured() {
+  const measured = useNodesInitialized();
+  const { fitView } = useReactFlow();
+  const fitted = useRef(false);
+  useEffect(() => {
+    if (!measured || fitted.current) return;
+    fitted.current = true;
+    void fitView();
+  }, [measured, fitView]);
+  return null;
+}
 
 export function WorkflowCanvas({ canvas }: { canvas: ReturnType<typeof useWorkflowCanvas> }) {
   return (
@@ -30,10 +48,21 @@ export function WorkflowCanvas({ canvas }: { canvas: ReturnType<typeof useWorkfl
         onNodeClick={(_, node) => canvas.setSelected(node.id)}
         onPaneClick={() => canvas.setSelected(undefined)}
         deleteKeyCode={['Backspace', 'Delete']}
-        fitView
+        minZoom={0.2}
       >
+        <FitWhenMeasured />
         <Background color="#414652" gap={20} />
         <Controls />
+        {canvas.hasSelection && (
+          <Panel position="top-right">
+            <IconButton
+              icon={Trash2}
+              label="Delete selection"
+              className="canvas-delete"
+              onClick={canvas.deleteSelection}
+            />
+          </Panel>
+        )}
       </ReactFlow>
     </div>
   );

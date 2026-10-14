@@ -40,6 +40,7 @@ function WorkflowEditor() {
                 characters={characters}
                 providersList={providersList}
                 updateConfig={canvas.updateConfig}
+                onDelete={canvas.deleteNode}
                 onClose={() => canvas.setSelected(undefined)}
               />
             )}

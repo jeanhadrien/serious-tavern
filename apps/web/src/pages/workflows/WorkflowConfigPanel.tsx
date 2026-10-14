@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
+import { Trash2 } from 'lucide-react';
 import { NodeConfigPanel, type NodePanelContext } from '@st/node-ui';
 import type { Character, NodeInstance, Preset } from '@st/shared';
 import { providersApi } from '../../api.js';
+import { IconButton } from '../../components/IconButton.js';
 import type { CanvasNode } from './model.js';
 import './modelPicker.css';
 
@@ -15,6 +17,7 @@ export function WorkflowConfigPanel({
   characters,
   providersList,
   updateConfig,
+  onDelete,
   onClose,
 }: {
   current: CanvasNode;
@@ -22,6 +25,7 @@ export function WorkflowConfigPanel({
   characters: Character[];
   providersList: NodePanelContext['providers'];
   updateConfig: (config: NodeInstance['config']) => void;
+  onDelete: (id: string) => void;
   onClose: () => void;
 }) {
   const currentDescriptor = current.data.descriptor;
@@ -29,7 +33,15 @@ export function WorkflowConfigPanel({
     <aside className="config-panel">
       <div className="toolbar">
         <h3>{current.data.name}</h3>
-        <button onClick={onClose}>×</button>
+        <span className="config-panel-actions">
+          <IconButton
+            icon={Trash2}
+            label="Delete node"
+            className="canvas-delete"
+            onClick={() => onDelete(current.id)}
+          />
+          <button onClick={onClose}>×</button>
+        </span>
       </div>
       <p className="hint">{currentDescriptor.description}</p>
       {current.data.unknown ? (
