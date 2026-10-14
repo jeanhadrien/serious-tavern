@@ -80,7 +80,15 @@ Each step below is one commit (or a few), passes `npm run check`, and keeps exis
 - A form for the common fields (name, base URL, secret name, message name field, reasoning fields) and a raw YAML view for `headers`, `extraBody` and `overrides`. The built-in provider opens read-only with a "Duplicate" action.
 - The LLM node's provider dropdown lists the records (node-ui gets them through its `context`, as today).
 
-## In progress: provider model catalogs
+## Done: provider model catalogs (design record)
+
+Shipped in `6c82920`, `1d5888e` and `bdce48c`. Deviations from the spec below:
+- The cache key is the whole record plus a secrets revision counter, not `updatedAt`.
+- `listModels` is optional on `LlmAdapter`.
+- Error codes: `400 PROVIDER_SECRET_MISSING`, `501 PROVIDER_MODELS_UNSUPPORTED`, `502 PROVIDER_MODELS_FAILED` (also for a payload without `data`).
+- TTL expiry is untested.
+
+Checked live against OpenRouter (462 models) and abliteration.ai (3 models). The picker UI still needs a manual check in a browser.
 
 **Goal.** The app knows which models each provider serves, with what it can learn about them (readable name, context size, output limit, supported parameters, pricing), and the LLM node offers a searchable model picker instead of a bare text field. Later features (warnings like "this model ignores reasoning", cost estimates, context trimming) build on the same data; they are **not** part of this work.
 
