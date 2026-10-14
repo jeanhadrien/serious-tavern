@@ -337,6 +337,15 @@ pre {
   gap: 10px;
   pointer-events: none;
 }
+/* Phones: the bottom is the message box, so toasts drop in under the header instead. */
+@media (max-width: 699px) {
+  .toaster {
+    top: 52px;
+    right: 16px;
+    bottom: auto;
+    width: calc(100vw - 32px);
+  }
+}
 .toast {
   pointer-events: auto;
   background: #292e39;
