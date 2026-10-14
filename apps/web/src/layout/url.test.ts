@@ -6,6 +6,7 @@ import {
   layoutHref,
   layoutToUrl,
   parseLayoutUrl,
+  phoneEditorLoading,
   sameContent,
   urlTarget,
   type LayoutUrl,
@@ -134,4 +135,53 @@ it('tells content changes from tab switches', () => {
 it('builds links for other parts of the app', () => {
   expect(layoutHref({ wide: 'workflows', wideId: 'w1', edge: 'e1' })).toBe('/?wide=workflow:w1&edge=e1');
   expect(layoutHref({ left: 'workflows' })).toBe('/');
+});
+
+const phone = () => initialLayout(DESIGN_KINDS, false, true);
+/** URL -> phone layout -> URL. */
+const phoneReload = (search: string, ids: Parameters<typeof layoutToUrl>[1]) =>
+  formatLayoutUrl(layoutToUrl(run(phone(), { type: 'restore', target: urlTarget(parseLayoutUrl(search)) }), ids));
+
+it('writes what a phone shows only when it is not what the rest of the URL opens', () => {
+  expect(formatLayoutUrl(layoutToUrl(phone(), {}))).toBe('');
+  expect(formatLayoutUrl(layoutToUrl(run(phone(), { type: 'selectTab', id: 'presets' }), {}))).toBe(
+    'left=presets&view=presets',
+  );
+  const editing = run(phone(), { type: 'openEditor', id: 'presets' });
+  // Compact layouts keep R's list, so `right` is written next to a wide editor.
+  expect(formatLayoutUrl(layoutToUrl(editing, { presets: 'p1' }))).toBe('wide=preset:p1&right=chats');
+  const chatting = run(editing, { type: 'showMiddle', chat: true });
+  expect(formatLayoutUrl(layoutToUrl(chatting, { presets: 'p1' }))).toBe('wide=preset:p1&right=chats&view=chat');
+  // Desktop never writes it.
+  expect(formatLayoutUrl(layoutToUrl(run(start(), { type: 'selectTab', id: 'presets' }), {}))).toBe('left=presets');
+});
+
+it('round-trips what a phone shows', () => {
+  for (const [search, ids] of [
+    ['left=presets&view=presets', {}],
+    ['right=characters&view=characters', {}],
+    ['wide=preset:p1&right=chats&view=chat', { presets: 'p1' }],
+    ['wide=preset:p1&right=chats', { presets: 'p1' }],
+    ['right=character:c1', { characters: 'c1' }],
+    ['right=character:c1&view=chat', { characters: 'c1' }],
+  ] as const) {
+    expect(phoneReload(search, ids)).toBe(search);
+  }
+  expect(parseLayoutUrl('view=nonsense').view).toBeUndefined();
+});
+
+it('makes a phone view switch a history step', () => {
+  const chat = parseLayoutUrl('');
+  expect(sameContent(chat, parseLayoutUrl('left=presets&view=presets'))).toBe(false);
+  expect(sameContent(parseLayoutUrl('left=presets'), parseLayoutUrl('left=workflows'))).toBe(true);
+});
+
+it('holds the URL while a phone shows an editor that is still loading', () => {
+  const wide = run(phone(), { type: 'selectTab', id: 'workflows' }, { type: 'openEditor', id: 'workflows' });
+  expect(phoneEditorLoading(wide, {})).toBe(true);
+  expect(phoneEditorLoading(wide, { workflows: 'w1' })).toBe(false);
+  const narrow = run(phone(), { type: 'selectTab', id: 'characters' }, { type: 'openEditor', id: 'characters' });
+  expect(phoneEditorLoading(narrow, {})).toBe(true);
+  expect(phoneEditorLoading(narrow, { characters: 'c1' })).toBe(false);
+  expect(phoneEditorLoading(run(start(), { type: 'openEditor', id: 'workflows' }), {})).toBe(false);
 });

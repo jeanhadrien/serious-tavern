@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { PencilLine, X, type LucideIcon } from 'lucide-react';
 import { IconButton } from '../components/IconButton.js';
-import type { MobileView } from './derive.js';
-import type { IconId, ResourceId } from './state.js';
+import type { IconId, MobileView, ResourceId } from './state.js';
 import { VIEW_INFO, WIDE_EDITOR_LABEL } from './views.js';
 
 const SECTIONS: readonly { title: string; items: readonly IconId[] }[] = [

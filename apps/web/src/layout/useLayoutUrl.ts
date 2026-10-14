@@ -18,7 +18,15 @@ import type { EditorStore } from '../stores/editorStore.js';
 import type { ListStore } from '../stores/listStore.js';
 import { legacySearch } from './routes.js';
 import type { LayoutAction, LayoutState, ResourceId } from './state.js';
-import { layoutToUrl, formatLayoutUrl, parseLayoutUrl, sameContent, urlTarget, type LayoutUrl } from './url.js';
+import {
+  formatLayoutUrl,
+  layoutToUrl,
+  parseLayoutUrl,
+  phoneEditorLoading,
+  sameContent,
+  urlTarget,
+  type LayoutUrl,
+} from './url.js';
 
 interface Item {
   id: string;
@@ -158,13 +166,14 @@ export function useLayoutUrl(layout: LayoutState, dispatch: Dispatch<LayoutActio
     personas: personaId,
   };
   const next = formatLayoutUrl(layoutToUrl(layout, openIds, chat.session?.id));
+  const loading = phoneEditorLoading(layout, openIds);
   useEffect(() => {
-    if (applying.current) return;
+    if (applying.current || loading) return;
     const correction = forceReplace.current;
     forceReplace.current = false;
     if (next === synced.current) return;
     const replace = correction || sameContent(parseLayoutUrl(synced.current), parseLayoutUrl(next));
     synced.current = next;
     navigate({ pathname: '/', search: next }, { replace });
-  }, [next, settled]);
+  }, [next, settled, loading]);
 }

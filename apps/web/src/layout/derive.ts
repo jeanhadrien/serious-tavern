@@ -9,6 +9,7 @@ import {
   type IconId,
   type LayoutState,
   type ListId,
+  type MobileView,
   type ResourceId,
 } from './state.js';
 
@@ -61,9 +62,7 @@ export function viewSlots(state: LayoutState): Record<ViewKey, Column | null> {
   return slots;
 }
 
-/** What phone mode shows: a list or narrow editor (by its icon), the chat, or the open wide editor. */
-export type MobileView = IconId | 'editor';
-
+/** What phone mode shows. */
 export function mobileView(state: LayoutState): MobileView {
   if (state.pane === 'L') return state.compactTab;
   return wideEditorShown(state) ? 'editor' : 'chat';

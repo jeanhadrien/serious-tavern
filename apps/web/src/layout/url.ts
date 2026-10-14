@@ -8,8 +8,17 @@
 //   wide=workflow|preset[:<id>]   the wide editor in M (the chat then moves to R)
 //   right=chats|characters|personas|chat   what R shows ('chat' is only meaningful with a wide editor)
 //   right=character:<id>|persona:<id>      a narrow editor open in R
+//   view=<list>|chat|editor   phones only: what is on screen, when it is not what the rest opens
 //   edge=<id>                 one-shot: highlight this edge of the opened workflow
-import { RESOURCE_IDS, type LayoutState, type LayoutTarget, type ListId, type ResourceId } from './state.js';
+import { mobileView } from './derive.js';
+import {
+  RESOURCE_IDS,
+  type LayoutState,
+  type LayoutTarget,
+  type ListId,
+  type MobileView,
+  type ResourceId,
+} from './state.js';
 
 export interface LayoutUrl extends Omit<LayoutTarget, 'leftEditorOpen' | 'rightEditorOpen'> {
   session?: string;
@@ -30,6 +39,15 @@ const NARROW_NAMES: Partial<Record<ResourceId, string>> = {
   characters: 'character',
   personas: 'persona',
 };
+
+const MOBILE_VIEWS: readonly MobileView[] = [...LEFT_TABS, ...RIGHT_TABS, 'editor'];
+
+/** What a phone shows for a layout without `view`: an open narrow editor, else the wide editor, else the chat. */
+function defaultView(url: LayoutUrl): MobileView {
+  if (url.rightId) return url.right;
+  if (url.leftId) return url.left;
+  return url.wide ? 'editor' : 'chat';
+}
 
 const nameToResource = (names: Partial<Record<ResourceId, string>>, name: string) =>
   RESOURCE_IDS.find((id) => names[id] === name);
@@ -58,6 +76,7 @@ export function parseLayoutUrl(search: string): LayoutUrl {
   const left = leftColumn.tab as ListId;
   const rightTab = rightColumn.tab as ListId | 'chat';
   const right = RIGHT_TABS.includes(rightTab) && (rightTab !== 'chat' || wide) ? rightTab : defaultRight(wide);
+  const view = params.get('view') as MobileView;
   return {
     session: params.get('session') || undefined,
     left: LEFT_TABS.includes(left) ? left : 'workflows',
@@ -66,6 +85,7 @@ export function parseLayoutUrl(search: string): LayoutUrl {
     wideId: wide ? wideId : undefined,
     leftId: LEFT_TABS.includes(left) ? leftColumn.id : undefined,
     rightId: RIGHT_TABS.includes(rightTab) ? rightColumn.id : undefined,
+    view: MOBILE_VIEWS.includes(view) ? view : undefined,
     edge: params.get('edge') || undefined,
   };
 }
@@ -82,6 +102,7 @@ export function formatLayoutUrl(url: LayoutUrl): string {
   const narrowName = url.rightId ? NARROW_NAMES[url.right as ResourceId] : undefined;
   if (narrowName) parts.push(`right=${item(narrowName, url.rightId)}`);
   else if (url.right !== defaultRight(url.wide)) parts.push(`right=${url.right}`);
+  if (url.view) parts.push(`view=${url.view}`);
   if (url.edge) parts.push(`edge=${encodeURIComponent(url.edge)}`);
   return parts.join('&');
 }
@@ -107,6 +128,7 @@ export const urlTarget = (url: LayoutUrl): LayoutTarget => ({
   wide: url.wide,
   leftEditorOpen: url.leftId !== undefined,
   rightEditorOpen: url.rightId !== undefined,
+  view: url.view,
 });
 
 /**
@@ -122,7 +144,7 @@ export function layoutToUrl(
   const right = state.tabs.R === 'chat' && !wide ? state.rightReturn : state.tabs.R;
   const editing = (tab: ListId | 'chat') =>
     tab !== 'chat' && tab !== 'chats' && state.narrowOpen[tab] ? openIds[tab] : undefined;
-  return {
+  const url: LayoutUrl = {
     session,
     left: state.tabs.L,
     right,
@@ -131,12 +153,29 @@ export function layoutToUrl(
     leftId: editing(state.tabs.L),
     rightId: editing(right),
   };
+  const view = state.mobile ? mobileView(state) : undefined;
+  return view === undefined || view === defaultView(url) ? url : { ...url, view };
 }
 
-/** True when two layouts open the same chat and editor items; only chrome (tabs) differs. */
+/**
+ * True while a phone shows an editor whose item has not loaded yet. The URL waits for it: written in between, the
+ * half-open layout would become its own history step, and Back would land on it instead of the list.
+ */
+export function phoneEditorLoading(state: LayoutState, openIds: Partial<Record<ResourceId, string>>): boolean {
+  if (!state.mobile) return false;
+  const view = mobileView(state);
+  if (view === 'editor') return state.wide !== undefined && !openIds[state.wide];
+  return view !== 'chat' && view !== 'chats' && state.narrowOpen[view] && !openIds[view];
+}
+
+/**
+ * True when two layouts open the same chat and editor items; only chrome (tabs) differs. On a phone the view on
+ * screen counts as content, so Back steps through what the menu showed.
+ */
 export function sameContent(a: LayoutUrl, b: LayoutUrl): boolean {
   return (
     a.session === b.session &&
+    a.view === b.view &&
     a.wide === b.wide &&
     a.wideId === b.wideId &&
     a.leftId === b.leftId &&

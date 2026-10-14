@@ -21,12 +21,20 @@ import {
 } from '../stores/index.js';
 import { IconButton } from '../components/IconButton.js';
 import { ColumnHeader } from './ColumnHeader.js';
-import { activeIcon, columnIcons, mobileView, VIEW_KEYS, viewSlots, type MobileView, type ViewKey } from './derive.js';
+import { activeIcon, columnIcons, mobileView, VIEW_KEYS, viewSlots, type ViewKey } from './derive.js';
 import { MiddleHeader } from './MiddleHeader.js';
 import { MobileMenu } from './MobileMenu.js';
 import { ResizeHandle } from './ResizeHandle.js';
 import { LayoutActionsProvider } from './LayoutActions.js';
-import { DESIGN_KINDS, initialLayout, layoutReducer, type Column, type IconId, type ResourceId } from './state.js';
+import {
+  DESIGN_KINDS,
+  initialLayout,
+  layoutReducer,
+  type Column,
+  type IconId,
+  type MobileView,
+  type ResourceId,
+} from './state.js';
 import { parseLayoutUrl, urlTarget } from './url.js';
 import { useColumnWidths } from './useColumnWidths.js';
 import { useCompactMode, useMobileMode } from './useCompactMode.js';

@@ -8,6 +8,8 @@ export type ListId = ResourceId | 'chats';
 /** Header icons also include the chat itself, which only appears while it sits in R. */
 export type IconId = ListId | 'chat';
 export type Column = 'L' | 'M' | 'R';
+/** What phone mode shows: a list or narrow editor (by its icon), the chat, or the open wide editor. */
+export type MobileView = IconId | 'editor';
 export type EditorKind = 'wide' | 'narrow';
 
 /** Which side column owns each list in the three-column layout. */
@@ -68,6 +70,8 @@ export interface LayoutTarget {
   leftEditorOpen: boolean;
   /** A narrow editor is open in the right column's tab (its list is replaced by the editor). */
   rightEditorOpen: boolean;
+  /** Phone mode: what is on screen. Without it, a phone shows what the rest of the target opens. */
+  view?: MobileView;
 }
 
 export type LayoutAction =
@@ -135,7 +139,7 @@ function returnChatToMiddle(state: LayoutState): LayoutState {
 // Applies a layout described by a URL. Unsaved state (dirty flags, hidden narrow editors) is left alone.
 function restoreLayout(
   state: LayoutState,
-  { left, right, wide, leftEditorOpen, rightEditorOpen }: LayoutTarget,
+  { left, right, wide, leftEditorOpen, rightEditorOpen, view }: LayoutTarget,
 ): LayoutState {
   const wideId = wide !== undefined && state.kinds[wide] === 'wide' ? wide : undefined;
   const chatInR = right === 'chat' && wideId !== undefined && !state.compact;
@@ -151,16 +155,17 @@ function restoreLayout(
   const editingIn = (column: 'L' | 'R') =>
     RESOURCE_IDS.find((id) => narrowOpen[id] && LIST_COLUMN[id] === column && tabs[column] === id);
   const editing = editingIn('R') ?? editingIn('L');
-  // Phone mode follows what the URL opened: a narrow editor shows L, a wide one M; otherwise the pane stays.
-  const pane = editing ? 'L' : wideId !== undefined && wideId !== state.wide ? 'M' : state.pane;
+  // Phone mode shows the URL's view, else what the URL opens: a narrow editor in L, otherwise M.
+  const listView = view === 'chat' || view === 'editor' ? undefined : view;
+  const pane: LayoutState['pane'] = listView || (view === undefined && editing) ? 'L' : 'M';
   return {
     ...state,
     pane,
     wide: wideId,
-    compactChat: false,
+    compactChat: view === 'chat' && wideId !== undefined,
     tabs,
     rightReturn: rightTab === 'chat' ? state.rightReturn : rightTab,
-    compactTab: editing ?? (left === 'settings' ? left : state.compactTab),
+    compactTab: listView ?? editing ?? (left === 'settings' ? left : state.compactTab),
     narrowOpen,
   };
 }
