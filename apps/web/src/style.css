@@ -3,6 +3,9 @@
   color: #e5e7ed;
   background: #17191f;
   font-synthesis: none;
+  /* The app never scrolls as a page; this stops mobile pull-to-refresh (and scroll chaining) from reloading it
+     when a drag inside it, e.g. a workflow node moved downwards, runs past the top. */
+  overscroll-behavior: none;
 }
 * {
   box-sizing: border-box;
@@ -224,6 +227,8 @@ pre {
   min-width: 0;
   height: 100%;
   background: #1b1e26;
+  /* Every touch gesture here (node drags, pan, pinch zoom) belongs to React Flow, never to the browser. */
+  touch-action: none;
 }
 .flow-node {
   min-width: 175px;
