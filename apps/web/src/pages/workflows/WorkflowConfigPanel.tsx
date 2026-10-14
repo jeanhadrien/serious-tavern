@@ -37,7 +37,7 @@ export function WorkflowConfigPanel({
           <IconButton
             icon={Trash2}
             label="Delete node"
-            className="canvas-delete"
+            className="delete-button"
             onClick={() => onDelete(current.id)}
           />
           <button onClick={onClose}>×</button>

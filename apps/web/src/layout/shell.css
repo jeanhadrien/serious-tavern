@@ -96,7 +96,7 @@
 .shell-grid[data-mobile="true"] .middle-header {
   padding: 0 6px;
 }
-.middle-header .icon-button {
+.shell-grid[data-mobile="true"] .middle-header .icon-button {
   background: transparent;
   border-color: transparent;
 }

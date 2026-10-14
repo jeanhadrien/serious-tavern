@@ -139,6 +139,8 @@ export function Shell() {
   const selectMobile = (view: MobileView) =>
     view === 'chat' || view === 'editor' ? dispatch({ type: 'showMiddle', chat: view === 'chat' }) : select(view);
   const anyDirty = Object.values(layout.dirty).some(Boolean);
+  const titleId = shown === 'editor' ? layout.wide : shown;
+  const mobileTitle = titleId && VIEW_INFO[titleId].label;
   const gridStyle: CSSProperties = mobile
     ? { gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateAreas: '"mh" "mb"' }
     : {
@@ -176,7 +178,7 @@ export function Shell() {
             menu={
               mobile && <IconButton icon={Menu} label="Open menu" dot={anyDirty} onClick={() => setMenuOpen(true)} />
             }
-            title={mobile ? VIEW_INFO[shown === 'editor' ? (layout.wide as ResourceId) : shown].label : undefined}
+            title={mobile ? mobileTitle : undefined}
           />
           {!compact && (
             <ColumnHeader

@@ -58,7 +58,7 @@ export function WorkflowCanvas({ canvas }: { canvas: ReturnType<typeof useWorkfl
             <IconButton
               icon={Trash2}
               label="Delete selection"
-              className="canvas-delete"
+              className="delete-button"
               onClick={canvas.deleteSelection}
             />
           </Panel>

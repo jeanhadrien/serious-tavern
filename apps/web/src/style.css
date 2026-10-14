@@ -342,7 +342,8 @@ pre {
   gap: 10px;
   pointer-events: none;
 }
-/* Phones: the bottom is the message box, so toasts drop in under the header instead. */
+/* Phones (MOBILE_BREAKPOINT in layout/useCompactMode.ts): the bottom is the message box, so toasts drop in
+   under the header instead. */
 @media (max-width: 699px) {
   .toaster {
     top: 52px;
