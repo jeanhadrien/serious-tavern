@@ -10,6 +10,7 @@ A provider record lets you describe how *your* backend spells these things. The 
 
 - [Quick start](#quick-start)
 - [Provider fields](#provider-fields)
+- [Picking a model](#picking-a-model)
 - [Message names: from preset to wire](#message-names-from-preset-to-wire)
 - [Reasoning fields](#reasoning-fields)
 - [Per-model overrides](#per-model-overrides)
@@ -46,6 +47,16 @@ To use one, save a key under its secret name in **Settings** and pick it in the 
 | **Headers, extra body and overrides (YAML)** | Advanced settings: extra request headers, raw fields added to every request, and per-model overrides. |
 
 Sampling settings (temperature, max tokens, top-p, penalties, stop) always use their standard OpenAI names and are set on the LLM node, not on the provider.
+
+## Picking a model
+
+In the LLM node, the **Model** field is a text box with a list attached. Click it, or start typing, to see the models the provider serves. Each entry shows its name, its id, the context size and the price per million tokens when the backend reports them. Type to narrow the list (every word has to appear in the id or the name), move with the arrow keys, and press Enter or click to choose.
+
+- **You can always type any id.** The box holds exactly what you type and the list never overrides it. This matters because lists are not exhaustive: OpenRouter variants such as `:free` or `:online`, new models, and local servers that don't publish a list may be missing. A model that is not in a loaded list gets a quiet note ("Not in this provider's list. It is used as typed."), nothing more.
+- **Where the list comes from.** The server asks the provider's backend for `<base URL>/models`, using the provider's secret and headers like a normal call, so your key never reaches the browser. OpenRouter, OpenAI, DeepSeek, Ollama, LM Studio, vLLM and abliteration.ai all answer this. Names, context size and prices only appear when the backend includes them (OpenRouter does, plain OpenAI-style lists usually don't).
+- **Refresh.** The server keeps each list in memory for an hour and refetches it when you change the provider's settings or save any secret. The refresh button next to the field fetches it again right now, for example after pulling a new model into Ollama.
+- **Switching provider** reloads the list and keeps the model id you had.
+- **No model list?** If the backend doesn't have a `/models` endpoint, answers an error, or the secret isn't saved yet, the field shows the reason under it ("Could not load the model list: …") and works as a plain text box. Nothing is blocked and saved workflows are unaffected.
 
 ## Message names: from preset to wire
 
@@ -214,5 +225,7 @@ Then select the copy, not **OpenRouter**, in your LLM nodes. Your existing secre
 | A `400` mentioning `reasoning` | The app sends reasoning options as OpenRouter's `reasoning` object when **reasoning effort** (or a reasoning budget or exclude) is set on the node. Backends other than OpenRouter may refuse it: set reasoning effort to *off* on the node. |
 | No reasoning in the chat | Check **Response** in Execution details for the field that holds it, and add that field to **Reasoning fields**. Reasoning is also only kept when the LLM's text goes straight into a Chat Output, not through a template. |
 | `<provider> returned a response that is not JSON` | The base URL probably doesn't point at the API: a missing `/v1`, or a web page instead of an API. The response text is in Execution details. |
+| "Could not load the model list: …" under the Model field | Only the suggestions failed, typing still works. The message says why: a missing secret (`Missing <name> secret…`, add it in **Settings**), a `401`/`403` (the key is wrong), a `404` or "not JSON" (the base URL has no `/models` endpoint, or is missing `/v1`), or an unreachable server. The refresh button retries. |
+| "This provider returned no models" | The backend answered an empty list (an Ollama server with nothing pulled, or an API key scoped to no models). Type the model id yourself. |
 | Can't delete a provider | It's still used by LLM nodes. The message lists the workflows: switch those nodes to another provider first. |
 | Can't edit **OpenRouter** or **abliteration.ai** | It's built in and read-only. **Duplicate** it and edit the copy. |

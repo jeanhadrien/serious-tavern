@@ -1,0 +1,61 @@
+/* The LLM node's searchable Model field (packages/node-ui/src/panels/ModelPicker.tsx). */
+.model-picker {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.model-picker-field {
+  display: flex;
+  gap: 4px;
+}
+.model-picker-field input {
+  flex: 1;
+  min-width: 0;
+}
+.model-picker-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  flex-shrink: 0;
+}
+.model-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 3px;
+  max-height: 16rem;
+  overflow-y: auto;
+  background: #242832;
+  border: 1px solid #444a58;
+  border-radius: 6px;
+}
+.model-picker-list .model-option {
+  display: grid;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  text-transform: none;
+}
+.model-picker-list .model-option:hover,
+.model-picker-list .model-option[aria-selected="true"] {
+  background: #363d4c;
+}
+.model-picker-list .model-option.current .model-name {
+  color: #9aa8ff;
+}
+.model-picker-list .model-name {
+  font-size: 0.85rem;
+}
+.model-picker-list .model-id,
+.model-picker-list .model-facts {
+  font-size: 0.72rem;
+  color: #a7adbd;
+}
+.model-picker-list .model-facts:empty {
+  display: none;
+}
+.model-picker .hint {
+  text-transform: none;
+}

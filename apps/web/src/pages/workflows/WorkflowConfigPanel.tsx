@@ -1,7 +1,13 @@
 import { Link } from 'react-router-dom';
 import { NodeConfigPanel, type NodePanelContext } from '@st/node-ui';
 import type { Character, NodeInstance, Preset } from '@st/shared';
+import { providersApi } from '../../api.js';
 import type { CanvasNode } from './model.js';
+import './modelPicker.css';
+
+// The panel shows load errors inline, so the request must not toast. Module-level, so the panel's effect stays stable.
+const loadModels: NonNullable<NodePanelContext['loadModels']> = (providerId, options) =>
+  providersApi.models(providerId, options?.refresh === true, { silent: true });
 
 export function WorkflowConfigPanel({
   current,
@@ -37,6 +43,7 @@ export function WorkflowConfigPanel({
             presets,
             characters,
             providers: providersList,
+            loadModels,
             renderLink: (to, label) => <Link to={to}>{label}</Link>,
           }}
         />

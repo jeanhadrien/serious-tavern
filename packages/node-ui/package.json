@@ -5,6 +5,7 @@
   "exports": "./src/index.tsx",
   "dependencies": {
     "@st/shared": "*",
+    "lucide-react": "^1.49.0",
     "react": "^19.3.0"
   },
   "devDependencies": {

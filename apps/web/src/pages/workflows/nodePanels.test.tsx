@@ -157,3 +157,23 @@ it('renders malformed values in supported array schemas read-only instead of cra
   expect(html).toContain('original');
   expect(html).not.toContain('kv-list');
 });
+
+it('renders the Model field as a combobox with a refresh button only when the host can load models', () => {
+  const render = (loadModels?: () => Promise<never>) =>
+    renderToStaticMarkup(
+      <NodeConfigPanel
+        descriptor={descriptor}
+        config={config}
+        onChange={() => {}}
+        context={{ presets: [], characters: [], providers: [], loadModels }}
+      />,
+    );
+  const withLoader = render(() => new Promise(() => {}));
+  expect(withLoader).toContain('role="combobox"');
+  expect(withLoader).toContain('value="test/model"');
+  expect(withLoader).toContain('aria-label="Refresh model list"');
+  expect(withLoader).toContain('Loading models');
+  const without = render();
+  expect(without).toContain('role="combobox"');
+  expect(without).not.toContain('Refresh model list');
+});

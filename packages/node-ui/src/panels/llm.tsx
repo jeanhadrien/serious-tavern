@@ -1,5 +1,6 @@
 import { reasoningEfforts } from '@st/shared';
 import type { NodeConfigPanelProps } from './types.js';
+import { ModelPicker } from './ModelPicker.js';
 import { parseStopSequences, updateNumericOption } from './llmConfig.js';
 
 export function LlmPanel({ config, onChange, context }: NodeConfigPanelProps) {
@@ -23,10 +24,12 @@ export function LlmPanel({ config, onChange, context }: NodeConfigPanelProps) {
           ))}
         </select>
       </label>
-      <label>
-        Model
-        <input value={String(config.model ?? '')} onChange={(e) => onChange({ ...config, model: e.target.value })} />
-      </label>
+      <ModelPicker
+        providerId={provider}
+        value={String(config.model ?? '')}
+        onChange={(model) => onChange({ ...config, model })}
+        loadModels={context?.loadModels}
+      />
       <label>
         Preset
         <select
