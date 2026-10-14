@@ -80,6 +80,30 @@ Each step below is one commit (or a few), passes `npm run check`, and keeps exis
 - A form for the common fields (name, base URL, secret name, message name field, reasoning fields) and a raw YAML view for `headers`, `extraBody` and `overrides`. The built-in provider opens read-only with a "Duplicate" action.
 - The LLM node's provider dropdown lists the records (node-ui gets them through its `context`, as today).
 
+## In progress: provider model catalogs
+
+**Goal.** The app knows which models each provider serves, with what it can learn about them (readable name, context size, output limit, supported parameters, pricing), and the LLM node offers a searchable model picker instead of a bare text field. Later features (warnings like "this model ignores reasoning", cost estimates, context trimming) build on the same data; they are **not** part of this work.
+
+**Facts this design rests on**
+- There is no formal standard, but `GET <baseUrl>/models` answering `{ data: [{ id, … }] }` (OpenAI's shape: `id`, `object`, `created`, `owned_by`) is the de facto one. OpenRouter (`https://openrouter.ai/api/v1/models`, ~460 models, no key required), abliteration.ai (`/v1/models`, scoped to the key's project), OpenAI, DeepSeek, Ollama, LM Studio, vLLM all serve it.
+- OpenRouter entries are a superset: `name`, `description`, `context_length`, `top_provider.max_completion_tokens`, `architecture.input_modalities`/`output_modalities`, `supported_parameters` (e.g. `reasoning`, `tools`, `top_p`), `pricing` (USD **per token** as decimal strings, e.g. `"0.0000025"`; other keys like `input_cache_read` may appear).
+- So **one generic code path** reads every backend; richer fields are filled when present. No OpenRouter-specific branch (same rule as the adapter).
+
+**Decisions**
+- **Normalized model** (`packages/shared`, zod): `{ id, name?, description?, contextLength?, maxOutputTokens?, inputModalities?, outputModalities?, supportedParameters?, pricing?: { prompt?, completion? } }`. Pricing is numbers in USD per token; values that are missing, non-numeric or negative (OpenRouter uses `-1` for variable pricing) are dropped. Entries without a string `id` are skipped; unknown fields are ignored (these lists are not stored, so no passthrough needed).
+- **Fetching is the adapter's job**, because only the adapter knows how its `kind` talks to a backend: `LlmAdapter` gets a `listModels({ provider, apiKey?, signal })`. The `openai-compatible` one does `GET <baseUrl>/models` with the same auth rule as chat (Bearer only when the record names a secret) and the record's top-level `headers` (not override headers: overrides are per model). Errors name the provider and never contain the key (`withoutSecret`). Bounded by a timeout (~30 s).
+- **Through the server only:** the key never reaches the browser, and there is no CORS problem. Endpoint `GET /api/providers/:id/models` (`?refresh=true` bypasses the cache), contract first, response `{ models, fetchedAt }`. Same secret rules as running an LLM node (set-but-missing secret is a client error with the "Missing <secret> secret" message; no secret means no auth). An upstream failure is an API error (e.g. `502 PROVIDER_MODELS_FAILED`) carrying the adapter's redacted message.
+- **Cache in server memory**, per provider id, ~1 h TTL; an entry is stale as soon as the record changes (compare `updatedAt`) or any secret is written/deleted. Concurrent requests for the same provider share one in-flight fetch. Nothing is persisted; a restart refetches on demand.
+- **Picker (node-ui):** a searchable combobox replacing the LLM node's Model text input.
+  - Free text always wins: the user can type any id, the node config stays a plain `model` string, and nothing changes for saved workflows. Lists are not exhaustive (OpenRouter suffixes like `:free`/`:online`, local servers without `/models`).
+  - Filters by id and name as you type; each option shows name, id, context size, and price per 1M tokens when known. Keyboard (arrows, Enter, Escape) and combobox ARIA roles.
+  - A refresh button (lucide icon, `aria-label` + `title`) forces `refresh=true`. Loading and fetch errors show inline in the panel, not as toasts (`{ silent: true }`); a failed list never blocks typing.
+  - A model typed that isn't in a successfully loaded list gets a quiet, non-blocking hint.
+  - Changing the provider reloads the list and keeps the current `model` value.
+  - node-ui still never calls the API: the web app passes a loader through the panel `context` (like `providers`), e.g. `loadModels(providerId, { refresh })`.
+
+**Out of scope:** using the metadata anywhere else (validation, warnings, cost display outside the picker, context trimming), persisting lists, a per-provider models URL override, OpenRouter's `/models/user` or `/endpoints`.
+
 ## Backlog from SillyTavern learnings
 
 [SillyTavern](https://github.com/SillyTavern/SillyTavern) is the mature chatbot app this project builds on conceptually (personas, characters, presets), minus the workflow layer. Items marked *(unverified)* are from general knowledge of SillyTavern and haven't been checked against the code.
@@ -92,7 +116,7 @@ Each step below is one commit (or a few), passes `npm run check`, and keeps exis
 - The upstream request is aborted when the client disconnects. SillyTavern has **no retry on 429**.
 - **For us:**
   - Extend the LLM node config with reasoning, provider routing, seed, top_k, min_p, repetition_penalty, response format, streaming, transforms, plus an "exclude body keys" escape hatch. (Basic samplers — temperature, topP, penalties, stop, maxTokens — are done.)
-  - Add a backend service that caches `/models` with a time limit (context length for trimming, pricing for cost estimates).
+  - Use the cached `/models` metadata (see "Provider model catalogs") for context trimming and cost estimates.
   - Retry with backoff on 429.
 
 ### Secrets
