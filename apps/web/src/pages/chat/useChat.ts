@@ -103,23 +103,21 @@ export function useChat() {
     sessionsApi.stopTurn(session.id, { silent: true }).catch(() => streamControllerRef.current?.abort());
   };
   const send = async () => {
-    if (!session || !content.trim() || busyRef.current || messageActions.isPending()) return;
+    if (!session || busyRef.current || messageActions.isPending()) return;
     busyRef.current = true;
     const sessionId = session.id;
     const text = content.trim();
     setContent('');
     setBusy(true);
 
-    const optimisticUser: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: text,
-      createdAt: new Date().toISOString(),
-    };
+    // An empty send adds no user message; the turn runs on the history as it is.
+    const optimisticUser: ChatMessage | undefined = text
+      ? { id: crypto.randomUUID(), role: 'user', content: text, createdAt: new Date().toISOString() }
+      : undefined;
     const patchMessages = (change: (messages: ChatMessage[]) => ChatMessage[]) =>
       setSession((prev) => (prev?.id === sessionId ? { ...prev, messages: change(prev.messages) } : prev));
     const settle = (result: TurnResult | TurnFailureDetails) => {
-      patchMessages((messages) => settleTurn(messages, optimisticUser.id, result));
+      patchMessages((messages) => settleTurn(messages, optimisticUser?.id, result));
       setLogs((prev) => ({ ...prev, [result.execution.id]: result.execution }));
     };
     const resync = () =>
@@ -127,7 +125,7 @@ export function useChat() {
         .get(sessionId, { silent: true })
         .then((current) => setSession((prev) => (prev?.id === current.id ? current : prev)))
         .catch(() => {});
-    patchMessages((messages) => [...messages, optimisticUser]);
+    if (optimisticUser) patchMessages((messages) => [...messages, optimisticUser]);
 
     const controller = new AbortController();
     streamControllerRef.current = controller;
