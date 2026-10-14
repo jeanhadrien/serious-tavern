@@ -9,7 +9,7 @@ import {
   Workflow,
   type LucideIcon,
 } from 'lucide-react';
-import type { IconId } from './state.js';
+import type { IconId, ResourceId } from './state.js';
 
 /** Header icon and name of every list, editor and the chat. */
 export const VIEW_INFO: Record<IconId, { icon: LucideIcon; label: string }> = {
@@ -21,4 +21,10 @@ export const VIEW_INFO: Record<IconId, { icon: LucideIcon; label: string }> = {
   settings: { icon: Settings, label: 'Settings' },
   characters: { icon: Users, label: 'Characters' },
   personas: { icon: UserRound, label: 'Personas' },
+};
+
+/** Names of the wide editors, for places that list them next to their lists (the phone menu). */
+export const WIDE_EDITOR_LABEL: Partial<Record<ResourceId, string>> = {
+  workflows: 'Workflow editor',
+  presets: 'Preset editor',
 };

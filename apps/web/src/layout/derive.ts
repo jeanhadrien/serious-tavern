@@ -56,7 +56,17 @@ export function viewSlots(state: LayoutState): Record<ViewKey, Column | null> {
     if (state.kinds[id] === 'wide') slots[`editor:${id}`] = state.wide === id && wideEditorShown(state) ? 'M' : null;
     else slots[`editor:${id}`] = state.narrowOpen[id] || LISTLESS.includes(id) ? listSlot(state, id) : null;
   }
+  // Phone mode is the compact layout with only one of its two columns on screen.
+  if (state.mobile) for (const key of VIEW_KEYS) if (slots[key] !== state.pane) slots[key] = null;
   return slots;
+}
+
+/** What phone mode shows: a list or narrow editor (by its icon), the chat, or the open wide editor. */
+export type MobileView = IconId | 'editor';
+
+export function mobileView(state: LayoutState): MobileView {
+  if (state.pane === 'L') return state.compactTab;
+  return wideEditorShown(state) ? 'editor' : 'chat';
 }
 
 const LEFT_ICONS: readonly IconId[] = ['workflows', 'presets', 'providers', 'settings'];

@@ -2,7 +2,7 @@
 
 Design reference for the web app's chat-centred layout. It replaces the old "top nav bar plus one full-width page per tab" layout. The goal: the user can edit workflows, presets, characters, etc. while the chat stays visible.
 
-Status: implemented (October 2026). Narrow (mobile) widths are out of scope for now.
+Status: implemented (October 2026), including the phone layout (see Phone mode).
 
 What was built, and where it refines the design below:
 - **Code:** `apps/web/src/layout/`. The pure reducer is `state.ts`, view placement is `derive.ts`, and `Shell.tsx` mounts every view once and moves views by grid area.
@@ -60,6 +60,15 @@ Below a width breakpoint the layout collapses to **L | M**:
 - L holds every list (technical and content, all switched by its header icons) and the narrow editors.
 - M holds the chat.
 - A wide editor takes M, and the chat becomes a **toggle in the M header**. Hiding the chat is acceptable in this mode.
+
+## Phone mode
+
+Below 700px the two-column layout is shown **one column at a time**:
+
+- A menu button in the header opens a drawer listing the chat, the open wide editor (if any) and every list, grouped as Content (chats, characters, personas) and Setup (workflows, presets, providers, settings). Dirty dots show on the items and on the menu button.
+- Picking a list shows it full width. Opening an item follows it: a narrow editor replaces its list, a wide editor or a chat (from the chats list) takes the screen.
+- The header shows what is on screen. With a wide editor open it keeps the chat toggle and the close button.
+- The top bar, the column icon rows and the resize handles are hidden. Editors adapt with container queries (the preset editor stacks; the workflow palette becomes a strip and the node config covers the canvas).
 
 ## Unchanged behaviour
 

@@ -38,6 +38,10 @@ export interface LayoutState {
   kinds: Record<ResourceId, EditorKind>;
   /** Two-column mode (below the width breakpoint): L | M only. */
   compact: boolean;
+  /** Phone mode (below the narrower breakpoint): compact mode shown one column at a time. */
+  mobile: boolean;
+  /** Which of compact mode's two columns phone mode shows; the menu switches it. */
+  pane: 'L' | 'M';
   /** What each side column shows. R is 'chat' while a wide editor owns M. */
   tabs: { L: ListId; R: ListId | 'chat' };
   /** What R goes back to when the chat leaves it. */
@@ -72,7 +76,10 @@ export type LayoutAction =
   | { type: 'openEditor'; id: ResourceId }
   | { type: 'closeEditor'; id: ResourceId }
   | { type: 'setCompact'; compact: boolean }
+  | { type: 'setMobile'; mobile: boolean }
   | { type: 'toggleCompactChat' }
+  /** Phone mode: show M with the chat (`chat`) or with the open wide editor. No-op elsewhere. */
+  | { type: 'showMiddle'; chat: boolean }
   | { type: 'setDirty'; id: ResourceId; dirty: boolean };
 
 const noResources = (): Record<ResourceId, boolean> => ({
@@ -94,10 +101,12 @@ export const DESIGN_KINDS: Record<ResourceId, EditorKind> = {
   personas: 'narrow',
 };
 
-export function initialLayout(kinds: Record<ResourceId, EditorKind>, compact = false): LayoutState {
+export function initialLayout(kinds: Record<ResourceId, EditorKind>, compact = false, mobile = false): LayoutState {
   return {
     kinds,
-    compact,
+    compact: compact || mobile,
+    mobile,
+    pane: 'M',
     tabs: { L: 'workflows', R: 'chats' },
     rightReturn: 'chats',
     compactTab: 'chats',
@@ -142,8 +151,11 @@ function restoreLayout(
   const editingIn = (column: 'L' | 'R') =>
     RESOURCE_IDS.find((id) => narrowOpen[id] && LIST_COLUMN[id] === column && tabs[column] === id);
   const editing = editingIn('R') ?? editingIn('L');
+  // Phone mode follows what the URL opened: a narrow editor shows L, a wide one M; otherwise the pane stays.
+  const pane = editing ? 'L' : wideId !== undefined && wideId !== state.wide ? 'M' : state.pane;
   return {
     ...state,
+    pane,
     wide: wideId,
     compactChat: false,
     tabs,
@@ -160,11 +172,11 @@ export function layoutReducer(state: LayoutState, action: LayoutAction): LayoutS
     case 'selectTab': {
       if (action.id === 'chat') return chatInRight(state) ? { ...state, tabs: { ...state.tabs, R: 'chat' } } : state;
       const tabs = { ...state.tabs, [LIST_COLUMN[action.id]]: action.id };
-      return { ...state, tabs, compactTab: action.id };
+      return { ...state, tabs, compactTab: action.id, pane: 'L' };
     }
     case 'openEditor': {
       if (state.kinds[action.id] === 'wide') {
-        const opened = { ...state, wide: action.id, compactChat: false };
+        const opened = { ...state, wide: action.id, compactChat: false, pane: 'M' as const };
         return state.compact ? opened : sendChatToRight(opened);
       }
       const column = LIST_COLUMN[action.id];
@@ -173,6 +185,7 @@ export function layoutReducer(state: LayoutState, action: LayoutAction): LayoutS
         narrowOpen: { ...state.narrowOpen, [action.id]: true },
         tabs: { ...state.tabs, [column]: action.id },
         compactTab: action.id,
+        pane: 'L',
       };
     }
     case 'closeEditor': {
@@ -187,6 +200,15 @@ export function layoutReducer(state: LayoutState, action: LayoutAction): LayoutS
       const next = { ...state, compact: action.compact, compactChat: false };
       return action.compact || state.wide === undefined ? returnChatToMiddle(next) : sendChatToRight(next);
     }
+    case 'setMobile': {
+      if (state.mobile === action.mobile) return state;
+      // Phone mode is compact mode shown one column at a time, so entering it enters compact mode too.
+      const compact = action.mobile ? layoutReducer(state, { type: 'setCompact', compact: true }) : state;
+      return { ...compact, mobile: action.mobile };
+    }
+    case 'showMiddle':
+      if (!state.mobile) return state;
+      return { ...state, pane: 'M', compactChat: action.chat && state.wide !== undefined };
     case 'toggleCompactChat':
       return state.compact && state.wide !== undefined ? { ...state, compactChat: !state.compactChat } : state;
     case 'setDirty':

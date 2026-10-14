@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { MessageSquare, PencilLine, X } from 'lucide-react';
 import { IconButton } from '../components/IconButton.js';
 import type { ResourceId } from './state.js';
@@ -11,13 +12,20 @@ interface MiddleHeaderProps {
   chatShown: boolean;
   onClose: (id: ResourceId) => void;
   onToggleChat: () => void;
+  /** Phone mode: the menu button, shown before the title. */
+  menu?: ReactNode;
+  /** Phone mode: the name of a list shown instead of M's content. */
+  title?: string;
 }
 
 /** The title bar over M: the open wide editor with its close button, or just the chat. */
-export function MiddleHeader({ editor, compact, chatShown, onClose, onToggleChat }: MiddleHeaderProps) {
+export function MiddleHeader({ editor, compact, chatShown, onClose, onToggleChat, menu, title }: MiddleHeaderProps) {
   return (
     <header className="middle-header" style={{ gridArea: 'mh' }}>
-      <strong>{editor ? VIEW_INFO[editor].label : VIEW_INFO.chat.label}</strong>
+      <span className="middle-title">
+        {menu}
+        <strong>{title ?? (editor ? VIEW_INFO[editor].label : VIEW_INFO.chat.label)}</strong>
+      </span>
       {editor && (
         <span className="middle-actions">
           {compact && (

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { activeIcon, columnIcons, VIEW_KEYS, viewSlots, type ViewKey } from './derive.js';
+import { activeIcon, columnIcons, mobileView, VIEW_KEYS, viewSlots, type ViewKey } from './derive.js';
 import {
   DESIGN_KINDS,
   initialLayout,
@@ -154,6 +154,65 @@ it('re-places the chat when crossing the breakpoint with a wide editor open', ()
   expect(plain.tabs.R).toBe('chats');
 });
 
+const phone = () => initialLayout(DESIGN_KINDS, false, true);
+const shownViews = (state: LayoutState) => VIEW_KEYS.filter((key) => slot(state, key) !== null);
+
+it('shows one view at a time in phone mode, starting with the chat', () => {
+  const state = phone();
+  expect(state.compact).toBe(true);
+  expect(shownViews(state)).toEqual(['chat']);
+  expect(mobileView(state)).toBe('chat');
+  const list = run(state, select('presets'));
+  expect(shownViews(list)).toEqual(['list:presets']);
+  expect(slot(list, 'list:presets')).toBe('L');
+  expect(mobileView(list)).toBe('presets');
+  expect(shownViews(run(list, { type: 'showMiddle', chat: true }))).toEqual(['chat']);
+});
+
+it('follows what a phone opens: narrow editors in L, wide editors in M', () => {
+  const character = run(phone(), select('characters'), open('characters'));
+  expect(shownViews(character)).toEqual(['editor:characters']);
+  const preset = run(character, select('presets'), open('presets'));
+  expect(shownViews(preset)).toEqual(['editor:presets']);
+  expect(mobileView(preset)).toBe('editor');
+  const chatting = run(preset, { type: 'showMiddle', chat: true });
+  expect(shownViews(chatting)).toEqual(['chat']);
+  expect(chatting.wide).toBe('presets');
+  expect(shownViews(run(chatting, { type: 'showMiddle', chat: false }))).toEqual(['editor:presets']);
+  // The header toggle still swaps the editor and the chat.
+  expect(shownViews(run(chatting, { type: 'toggleCompactChat' }))).toEqual(['editor:presets']);
+});
+
+it('ignores showMiddle outside phone mode', () => {
+  const compact = run(initialLayout(DESIGN_KINDS, true), open('presets'));
+  expect(run(compact, { type: 'showMiddle', chat: true })).toBe(compact);
+});
+
+it('enters compact mode with phone mode and keeps it when leaving', () => {
+  const wide = run(start(), open('presets'));
+  const onPhone = run(wide, { type: 'setMobile', mobile: true });
+  expect(onPhone.compact).toBe(true);
+  expect(shownViews(onPhone)).toEqual(['editor:presets']);
+  const tablet = run(onPhone, { type: 'setMobile', mobile: false });
+  expect(slot(tablet, 'editor:presets')).toBe('M');
+  expect(slot(tablet, 'list:chats')).toBe('L');
+  const desktop = run(tablet, { type: 'setCompact', compact: false });
+  expect(slot(desktop, 'chat')).toBe('R');
+});
+
+it('shows on a phone what a restored URL opens', () => {
+  const target = { left: 'workflows', right: 'chats', leftEditorOpen: false, rightEditorOpen: false } as const;
+  const wide = run(phone(), select('presets'), { type: 'restore', target: { ...target, wide: 'workflows' } });
+  expect(shownViews(wide)).toEqual(['editor:workflows']);
+  const narrow = run(phone(), {
+    type: 'restore',
+    target: { ...target, right: 'characters', rightEditorOpen: true },
+  });
+  expect(shownViews(narrow)).toEqual(['editor:characters']);
+  // A plain tab change keeps what the phone shows.
+  expect(shownViews(run(phone(), { type: 'restore', target: { ...target, left: 'presets' } }))).toEqual(['chat']);
+});
+
 it('supports any mix of editor kinds', () => {
   const interim = initialLayout({
     workflows: 'wide',
@@ -180,7 +239,7 @@ it('does not mutate the previous state', () => {
 });
 
 it('derives a slot for exactly the mounted views, in every mode', () => {
-  for (const state of [start(), initialLayout(DESIGN_KINDS, true), run(start(), open('presets'))]) {
+  for (const state of [start(), initialLayout(DESIGN_KINDS, true), run(start(), open('presets')), phone()]) {
     expect(Object.keys(viewSlots(state)).sort()).toEqual([...VIEW_KEYS].sort());
   }
   expect(new Set(VIEW_KEYS).size).toBe(VIEW_KEYS.length);

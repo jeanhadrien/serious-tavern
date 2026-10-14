@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useReducer, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Menu } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { Chat } from '../pages/Chat.js';
 import { ChatSidebar } from '../pages/chat/ChatSidebar.js';
@@ -18,21 +19,26 @@ import {
   providerEditorStore,
   workflowEditorStore,
 } from '../stores/index.js';
+import { IconButton } from '../components/IconButton.js';
 import { ColumnHeader } from './ColumnHeader.js';
-import { activeIcon, columnIcons, VIEW_KEYS, viewSlots, type ViewKey } from './derive.js';
+import { activeIcon, columnIcons, mobileView, VIEW_KEYS, viewSlots, type MobileView, type ViewKey } from './derive.js';
 import { MiddleHeader } from './MiddleHeader.js';
+import { MobileMenu } from './MobileMenu.js';
 import { ResizeHandle } from './ResizeHandle.js';
 import { LayoutActionsProvider } from './LayoutActions.js';
 import { DESIGN_KINDS, initialLayout, layoutReducer, type Column, type IconId, type ResourceId } from './state.js';
 import { parseLayoutUrl, urlTarget } from './url.js';
 import { useColumnWidths } from './useColumnWidths.js';
-import { useCompactMode } from './useCompactMode.js';
+import { useCompactMode, useMobileMode } from './useCompactMode.js';
 import { useDirtySync } from './useDirtySync.js';
 import { searchOf, useLayoutUrl } from './useLayoutUrl.js';
+import { VIEW_INFO } from './views.js';
 import { HANDLE_WIDTH } from './widths.js';
 import './shell.css';
 
 const BODY_AREA: Record<Column, string> = { L: 'lb', M: 'mb', R: 'rb' };
+// Phone mode shows one column at a time, in the single body area.
+const MOBILE_BODY_AREA: Record<Column, string> = { L: 'mb', M: 'mb', R: 'mb' };
 
 // Views that take no props are created once: the shell re-renders on every streamed chat token,
 // and a stable element lets React skip re-rendering these pages (the workflow canvas above all).
@@ -61,16 +67,25 @@ const DIRTY_SOURCES = {
 
 /** The three-column shell: top bar, L | M | R columns, and every view mounted exactly once. */
 export function Shell() {
-  const compact = useCompactMode();
+  const mobile = useMobileMode();
+  const compact = useCompactMode() || mobile;
   const location = useLocation();
   // The first layout comes straight from the URL, so a reload shows it without a flash of the default.
-  const [layout, dispatch] = useReducer(layoutReducer, compact, (isCompact) =>
-    layoutReducer(initialLayout(DESIGN_KINDS, isCompact), {
+  const [layout, dispatch] = useReducer(layoutReducer, { compact, mobile }, (viewport) =>
+    layoutReducer(initialLayout(DESIGN_KINDS, viewport.compact, viewport.mobile), {
       type: 'restore',
       target: urlTarget(parseLayoutUrl(searchOf(location.pathname, location.search))),
     }),
   );
-  useEffect(() => dispatch({ type: 'setCompact', compact }), [compact]);
+  useEffect(() => {
+    // Phone mode first: leaving it must not briefly show the compact layout as if it were still a phone.
+    dispatch({ type: 'setMobile', mobile });
+    dispatch({ type: 'setCompact', compact });
+  }, [mobile, compact]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => {
+    if (!mobile) setMenuOpen(false);
+  }, [mobile]);
 
   useDirtySync(DIRTY_SOURCES, dispatch);
   const actions = useMemo(
@@ -87,6 +102,8 @@ export function Shell() {
   useLayoutUrl(layout, dispatch, chat);
 
   const slots = viewSlots(layout);
+  // On a phone, a chat opened from the list replaces the list on screen (no-op elsewhere).
+  const showChat = () => dispatch({ type: 'showMiddle', chat: true });
   const views: Record<ViewKey, ReactNode> = {
     chat: <Chat chat={chat} />,
     'list:chats': (
@@ -95,8 +112,14 @@ export function Shell() {
         activeId={chat.session?.id}
         canCreate={!!chat.workflows.length}
         disabled={chat.busy || chat.mutating}
-        onOpen={chat.open}
-        onCreate={chat.create}
+        onOpen={(id) => {
+          showChat();
+          return chat.open(id);
+        }}
+        onCreate={() => {
+          showChat();
+          return chat.create();
+        }}
         onDelete={chat.remove}
       />
     ),
@@ -104,33 +127,48 @@ export function Shell() {
   };
 
   const select = (id: IconId) => dispatch({ type: 'selectTab', id });
-  const gridStyle: CSSProperties = {
-    gridTemplateColumns: compact
-      ? `${widths.left}px ${HANDLE_WIDTH}px minmax(0, 1fr)`
-      : `${widths.left}px ${HANDLE_WIDTH}px minmax(0, 1fr) ${HANDLE_WIDTH}px ${widths.right}px`,
-    gridTemplateAreas: compact ? '"lh lres mh" "lb lres mb"' : '"lh lres mh rres rh" "lb lres mb rres rb"',
-  };
+  const shown = mobileView(layout);
+  const selectMobile = (view: MobileView) =>
+    view === 'chat' || view === 'editor' ? dispatch({ type: 'showMiddle', chat: view === 'chat' }) : select(view);
+  const anyDirty = Object.values(layout.dirty).some(Boolean);
+  const gridStyle: CSSProperties = mobile
+    ? { gridTemplateColumns: 'minmax(0, 1fr)', gridTemplateAreas: '"mh" "mb"' }
+    : {
+        gridTemplateColumns: compact
+          ? `${widths.left}px ${HANDLE_WIDTH}px minmax(0, 1fr)`
+          : `${widths.left}px ${HANDLE_WIDTH}px minmax(0, 1fr) ${HANDLE_WIDTH}px ${widths.right}px`,
+        gridTemplateAreas: compact ? '"lh lres mh" "lb lres mb"' : '"lh lres mh rres rh" "lb lres mb rres rb"',
+      };
+  const bodyArea = mobile ? MOBILE_BODY_AREA : BODY_AREA;
   return (
     <LayoutActionsProvider value={actions}>
       <div className="app">
-        <header className="top-bar">
-          <strong>Serious Tavern</strong>
-        </header>
-        <div className="shell-grid" ref={gridRef} style={gridStyle} data-compact={compact}>
-          <ColumnHeader
-            area="lh"
-            label="Left column"
-            icons={columnIcons(layout, 'L')}
-            active={activeIcon(layout, 'L')}
-            dirty={layout.dirty}
-            onSelect={select}
-          />
+        {!mobile && (
+          <header className="top-bar">
+            <strong>Serious Tavern</strong>
+          </header>
+        )}
+        <div className="shell-grid" ref={gridRef} style={gridStyle} data-compact={compact} data-mobile={mobile}>
+          {!mobile && (
+            <ColumnHeader
+              area="lh"
+              label="Left column"
+              icons={columnIcons(layout, 'L')}
+              active={activeIcon(layout, 'L')}
+              dirty={layout.dirty}
+              onSelect={select}
+            />
+          )}
           <MiddleHeader
-            editor={layout.wide}
+            editor={mobile && layout.pane === 'L' ? undefined : layout.wide}
             compact={compact}
             chatShown={slots.chat === 'M'}
             onClose={(id) => dispatch({ type: 'closeEditor', id })}
             onToggleChat={() => dispatch({ type: 'toggleCompactChat' })}
+            menu={
+              mobile && <IconButton icon={Menu} label="Open menu" dot={anyDirty} onClick={() => setMenuOpen(true)} />
+            }
+            title={mobile ? VIEW_INFO[shown === 'editor' ? (layout.wide as ResourceId) : shown].label : undefined}
           />
           {!compact && (
             <ColumnHeader
@@ -142,13 +180,15 @@ export function Shell() {
               onSelect={select}
             />
           )}
-          <ResizeHandle
-            label="Resize left column"
-            area="lres"
-            value={widths.left}
-            direction={1}
-            onResize={(width) => resize('left', width)}
-          />
+          {!mobile && (
+            <ResizeHandle
+              label="Resize left column"
+              area="lres"
+              value={widths.left}
+              direction={1}
+              onResize={(width) => resize('left', width)}
+            />
+          )}
           {!compact && (
             <ResizeHandle
               label="Resize right column"
@@ -168,13 +208,23 @@ export function Shell() {
                 className="view"
                 data-view={key}
                 hidden={!slot}
-                style={slot ? { gridArea: BODY_AREA[slot] } : undefined}
+                style={slot ? { gridArea: bodyArea[slot] } : undefined}
               >
                 {views[key]}
               </section>
             );
           })}
         </div>
+        {mobile && (
+          <MobileMenu
+            open={menuOpen}
+            active={shown}
+            wide={layout.wide}
+            dirty={layout.dirty}
+            onSelect={selectMobile}
+            onClose={() => setMenuOpen(false)}
+          />
+        )}
       </div>
     </LayoutActionsProvider>
   );
