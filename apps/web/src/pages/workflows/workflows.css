@@ -19,3 +19,42 @@
     padding: 10px 12px;
   }
 }
+/* On a phone the palette becomes a scrolling strip over the canvas and the config panel covers the canvas. */
+@container editor (max-width: 560px) {
+  .workflow-layout .editor-body {
+    flex-direction: column;
+  }
+  .workflow-layout .palette {
+    width: auto;
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid #363b46;
+  }
+  .workflow-layout .palette button {
+    width: auto;
+    flex-shrink: 0;
+    gap: 6px;
+    margin: 0;
+    white-space: nowrap;
+  }
+  .workflow-layout .palette > h3,
+  .workflow-layout .palette > .hint,
+  .workflow-layout .palette > .port-legend {
+    display: none;
+  }
+  .workflow-layout .config-panel {
+    left: 0;
+    width: auto;
+  }
+  .workflow-layout .editor-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .workflow-layout .editor-toolbar input {
+    flex: 1 1 100%;
+  }
+}

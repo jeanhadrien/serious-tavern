@@ -61,3 +61,15 @@
     border-top: 1px solid #343844;
   }
 }
+/* On a phone the editor, the entry editor and the preview stack in one column. */
+@container editor (max-width: 640px) {
+  .view .presets-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .presets-layout .preset-editor-column {
+    border-right: 0;
+  }
+  .presets-layout .preset-detail-column {
+    border-top: 1px solid #343844;
+  }
+}
