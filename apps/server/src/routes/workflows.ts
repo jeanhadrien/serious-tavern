@@ -14,8 +14,8 @@ export function registerWorkflows(app: FastifyInstance, { workflows, sessions, p
     const workflow: ApiResponse<'createWorkflow'> = {
       id: randomUUID(),
       name: body.name,
-      nodes: [],
-      edges: [],
+      nodes: body.nodes ?? [],
+      edges: body.edges ?? [],
       createdAt: date,
       updatedAt: date,
     };

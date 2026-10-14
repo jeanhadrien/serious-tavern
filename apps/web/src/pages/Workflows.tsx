@@ -4,6 +4,8 @@ import { WorkflowToolbar } from './workflows/WorkflowToolbar.js';
 import { NodePalette } from './workflows/NodePalette.js';
 import { WorkflowCanvas } from './workflows/WorkflowCanvas.js';
 import { WorkflowConfigPanel } from './workflows/WorkflowConfigPanel.js';
+import { canvasToWorkflow } from './workflows/model.js';
+import { duplicateWorkflow } from './workflows/workflowActions.js';
 import './workflows/workflows.css';
 
 export function Workflows() {
@@ -25,6 +27,7 @@ function WorkflowEditor() {
             name={workflow.name}
             onNameChange={(name) => setWorkflow((prev) => prev && { ...prev, name })}
             onValidate={() => void validate()}
+            onDuplicate={() => void duplicateWorkflow(canvasToWorkflow(workflow, canvas.nodes, canvas.edges))}
             onSave={() => void save()}
           />
           <div className="editor-body">

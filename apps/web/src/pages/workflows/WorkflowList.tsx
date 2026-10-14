@@ -1,9 +1,10 @@
-import { Plus, Trash2 } from 'lucide-react';
+import { Copy, Plus, Trash2 } from 'lucide-react';
 import type { Workflow } from '@st/shared';
 import { workflowsApi } from '../../api.js';
 import { IconButton } from '../../components/IconButton.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
 import { useEditorState, useList, workflowEditorStore, workflowsStore } from '../../stores/index.js';
+import { duplicateWorkflow } from './workflowActions.js';
 
 /** The workflow list shown in L: picking a workflow opens it in the editor in M. */
 export function WorkflowList() {
@@ -61,6 +62,11 @@ export function WorkflowList() {
               </span>
             )}
           </button>
+          <IconButton
+            icon={Copy}
+            label={`Duplicate ${workflow.name}`}
+            onClick={() => void duplicateWorkflow(workflow).then((ok) => ok && openEditor('workflows'))}
+          />
           <IconButton icon={Trash2} label={`Delete ${workflow.name}`} onClick={() => void remove(workflow)} />
         </div>
       ))}
