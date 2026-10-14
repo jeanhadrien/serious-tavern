@@ -236,6 +236,8 @@ Seeding uses stable IDs so concurrent initializers do not create duplicate Defau
 
 ### Providers
 
+User guide with examples: [docs/PROVIDERS.md](docs/PROVIDERS.md).
+
 A **provider record** says how to reach one OpenAI-compatible backend (OpenRouter, OpenAI, DeepSeek, Ollama, LM Studio, vLLM, ...). Records are data, not code; the design is in PLAN.md ("user-defined LLM providers"). The LLM node's `provider` config holds a record id.
 
 | Field | Meaning |
