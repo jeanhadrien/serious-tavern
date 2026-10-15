@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import { NodeConfigPanel, type NodePanelContext } from '@st/node-ui';
-import type { Character, NodeInstance, Preset } from '@st/shared';
+import type { Character, NodeInstance, Preset, WorkflowSetting } from '@st/shared';
 import { providersApi } from '../../api.js';
 import { IconButton } from '../../components/IconButton.js';
 import type { CanvasNode } from './model.js';
@@ -16,6 +16,7 @@ export function WorkflowConfigPanel({
   presets,
   characters,
   providersList,
+  settings,
   updateConfig,
   onDelete,
   onClose,
@@ -24,6 +25,8 @@ export function WorkflowConfigPanel({
   presets: Preset[];
   characters: Character[];
   providersList: NodePanelContext['providers'];
+  /** The draft's chat settings, hinted in template fields. */
+  settings?: readonly WorkflowSetting[];
   updateConfig: (config: NodeInstance['config']) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
@@ -56,6 +59,7 @@ export function WorkflowConfigPanel({
             characters,
             providers: providersList,
             loadModels,
+            settings,
             renderLink: (to, label) => <Link to={to}>{label}</Link>,
           }}
         />

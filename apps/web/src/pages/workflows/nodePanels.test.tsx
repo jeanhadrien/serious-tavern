@@ -92,6 +92,23 @@ it('keeps generic template hints sourced from the macro registry', () => {
   expect(html).not.toContain('{{char.name}}');
 });
 
+it('hints the chat settings the host passes in template fields', () => {
+  const html = renderToStaticMarkup(
+    <NodeConfigPanel
+      descriptor={{
+        ...descriptor,
+        type: 'custom-template',
+        templateFields: ['template'],
+        configSchema: { properties: { template: { type: 'string' } } },
+      }}
+      config={{ template: '' }}
+      onChange={() => {}}
+      context={{ presets: [], characters: [], providers: [], settings: [{ key: 'volatility', type: 'number' }] }}
+    />,
+  );
+  expect(html).toContain('{{settings.volatility}}');
+});
+
 it('renders only key/value arrays as editable rows, preserving unsupported shapes as read-only JSON', () => {
   const html = renderToStaticMarkup(
     <NodeConfigPanel

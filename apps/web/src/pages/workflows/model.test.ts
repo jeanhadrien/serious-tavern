@@ -47,6 +47,15 @@ describe('workflow canvas model', () => {
     expect(canvasToWorkflow(workflow, model.nodes, model.edges)).toEqual(workflow);
   });
 
+  it('keeps the chat settings declarations through save conversion', () => {
+    const withSettings: Workflow = {
+      ...workflow,
+      settings: [{ key: 'mood', type: 'enum', options: ['calm'], future: true }],
+    };
+    const model = workflowToCanvas(withSettings, knownTypes);
+    expect(canvasToWorkflow(withSettings, model.nodes, model.edges).settings).toEqual(withSettings.settings);
+  });
+
   it('uses a late-loaded node type descriptor without changing its saved config or edges', () => {
     const descriptor: NodeTypeDescriptor = {
       type: 'plugin-node',

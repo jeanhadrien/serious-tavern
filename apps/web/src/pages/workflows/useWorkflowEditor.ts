@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Edge } from '@xyflow/react';
-import { workflowInvalidDetailsSchema, type Workflow, type NodeTypeDescriptor } from '@st/shared';
+import { workflowInvalidDetailsSchema, workflowSettings, type Workflow, type NodeTypeDescriptor } from '@st/shared';
 import { ApiError, workflowsApi, nodeTypesApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
 import {
@@ -43,7 +43,9 @@ export function useWorkflowEditor() {
       .finally(() => setTypesReady(true));
   }, []);
 
-  const load = (next: Workflow) => {
+  const load = (stored: Workflow) => {
+    // Older files have no `settings`; normalize first, so adding then removing a setting is not a change.
+    const next = { ...stored, settings: workflowSettings(stored) };
     setWorkflow(next);
     canvas.load(next);
     const loaded = workflowToCanvas(next, types);

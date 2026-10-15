@@ -1,0 +1,82 @@
+/* The workflow editor's chat settings panel: one compact card per declaration. */
+.config-panel.settings-panel {
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.settings-panel .hint,
+.settings-panel .error {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: none;
+}
+.settings-panel code {
+  font-size: 0.78rem;
+}
+.setting-row {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid #3a404d;
+  border-radius: 8px;
+  background: #262a34;
+  min-width: 0;
+}
+.setting-row label {
+  text-transform: none;
+  font-size: 0.8rem;
+  gap: 4px;
+  min-width: 0;
+}
+.setting-row input,
+.setting-row select,
+.setting-row textarea {
+  padding: 6px 8px;
+}
+.setting-row-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: end;
+}
+.setting-pair {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 6px;
+}
+.setting-row-actions {
+  display: flex;
+  gap: 2px;
+}
+.setting-row-actions .icon-button {
+  padding: 5px;
+}
+.setting-bounds {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.setting-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.editor-toolbar .toolbar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.editor-toolbar .toolbar-toggle[aria-pressed="true"] {
+  background: #3d4560;
+  border-color: #6f7fd8;
+}
+.toolbar-toggle .issue-count {
+  background: #7d4049;
+  color: #ffd6da;
+  border-radius: 9px;
+  padding: 0 6px;
+  font-size: 0.72rem;
+}

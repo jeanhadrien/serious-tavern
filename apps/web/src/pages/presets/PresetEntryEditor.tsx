@@ -1,11 +1,20 @@
 import { useRef } from 'react';
-import { macroHints, presetInputLabel, presetSchema, type Preset, type PresetEntry } from '@st/shared';
+import {
+  macroHints,
+  presetInputLabel,
+  presetSchema,
+  type Preset,
+  type PresetEntry,
+  type WorkflowSetting,
+} from '@st/shared';
 
 // A read-only editor disables its whole field block through one disabled fieldset.
 export function PresetEntryEditor(props: {
   preset: Preset;
   entry?: PresetEntry;
   readOnly: boolean;
+  /** Chat settings declared by any workflow, hinted as `{{settings.<key>}}`. */
+  settings?: readonly WorkflowSetting[];
   onChange(entry: PresetEntry): void;
 }) {
   const contentRef = useRef<HTMLTextAreaElement | null>(null);
@@ -131,7 +140,7 @@ export function PresetEntryEditor(props: {
             </label>
             <div className="template-hints">
               <small>Insert variable at cursor</small>
-              {macroHints(preset.inputs).map((variable) => (
+              {macroHints(preset.inputs, props.settings).map((variable) => (
                 <button
                   type="button"
                   key={variable.expression}

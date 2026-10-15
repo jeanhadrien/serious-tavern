@@ -6,7 +6,7 @@ import { LlmPanel } from './panels/llm.js';
 import { supportsKeyValueArray, isKeyValueRows, numberFieldValue, type Field } from './fields.js';
 export type { NodePanelContext, NodeConfigPanelProps } from './panels/types.js';
 
-function GenericPanel({ descriptor, config, onChange }: Props) {
+function GenericPanel({ descriptor, config, onChange, context }: Props) {
   const configRef = useRef(config);
   configRef.current = config;
   const focused = useRef<{
@@ -23,7 +23,10 @@ function GenericPanel({ descriptor, config, onChange }: Props) {
       rows.map((row, i) => (i === index ? { ...row, [property]: value } : row)),
     );
   };
-  const variables = macroHints(descriptor.inputs.map((port) => ({ key: port.name, dataType: port.dataType })));
+  const variables = macroHints(
+    descriptor.inputs.map((port) => ({ key: port.name, dataType: port.dataType })),
+    context?.settings,
+  );
   const insert = (field: string, expression: string) => {
     const target = focused.current;
     if (target?.field === field && target.element.isConnected) {
