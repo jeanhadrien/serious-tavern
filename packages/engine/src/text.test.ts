@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { coerceValue, stringify } from './text.js';
+import { coerceValue, describeValue, stringify } from './text.js';
 import { renderTemplate } from './template.js';
 
 it('keeps compact node output separate from pretty text coercion', () => {
@@ -35,4 +35,18 @@ it('uses the same role/content transcript for messages and ignores speaker names
   ).toBe('user: Hello\nassistant: Hi');
   expect(coerceValue([], 'messages-to-text')).toBe('');
   expect(coerceValue({ not: 'messages' }, 'messages-to-text')).toBe('{"not":"messages"}');
+});
+
+it.each([
+  ['hi', 'text'],
+  ['', 'text'],
+  [7, 'a number'],
+  [true, 'true'],
+  [false, 'false'],
+  [null, 'null'],
+  [undefined, 'nothing'],
+  [[1], 'an array'],
+  [{ a: 1 }, 'an object'],
+])('describes %j as %s in error messages', (value, expected) => {
+  expect(describeValue(value)).toBe(expected);
 });

@@ -64,6 +64,7 @@ function GenericPanel({ descriptor, config, onChange }: Props) {
       {Object.entries(fields).map(([key, field]) => {
         const value = config[key] ?? field.default ?? '';
         const label = key.replace(/([A-Z])/g, ' $1');
+        const help = field.description ? <small className="hint">{field.description}</small> : null;
         if (field.type === 'array') {
           const rows = config[key] === undefined ? (field.default ?? []) : config[key];
           if (!supportsKeyValueArray(field) || !isKeyValueRows(rows))
@@ -148,13 +149,20 @@ function GenericPanel({ descriptor, config, onChange }: Props) {
                   </option>
                 ))}
               </select>
+              {help}
             </label>
           );
         if (field.type === 'number' || field.type === 'integer')
           return (
             <label key={key}>
               {label}
-              <input type="number" value={String(value)} onChange={(e) => update(key, Number(e.target.value))} />
+              {/* Blank means unset, so an optional field falls back to the node's default. */}
+              <input
+                type="number"
+                value={String(value)}
+                onChange={(e) => update(key, e.target.value === '' ? undefined : Number(e.target.value))}
+              />
+              {help}
             </label>
           );
         const multiline = /template|prompt|body|system|left|right/i.test(key);
@@ -171,6 +179,7 @@ function GenericPanel({ descriptor, config, onChange }: Props) {
               ) : (
                 <input value={String(value)} onFocus={focus} onChange={input} />
               )}
+              {help}
             </label>
             {hints(key)}
           </div>

@@ -36,3 +36,15 @@ export function toText(value: unknown): string {
   if (!compatibility.ok) throw new Error(compatibility.reason);
   return coerceValue(value, compatibility.coerce ?? 'to-text');
 }
+
+/** Plain-language kind of a value for error messages: "text", "a number", "an object", "true", "null"... */
+export function describeValue(value: unknown): string {
+  if (value === null) return 'null';
+  if (value === undefined) return 'nothing';
+  if (Array.isArray(value)) return 'an array';
+  if (typeof value === 'string') return 'text';
+  if (typeof value === 'number') return 'a number';
+  if (typeof value === 'boolean') return String(value);
+  if (typeof value === 'object') return 'an object';
+  return typeof value;
+}

@@ -9,10 +9,14 @@ import { condition } from './nodes/condition/index.js';
 import { merge } from './nodes/merge/index.js';
 import { memory } from './nodes/memory/index.js';
 import { character } from './nodes/character/index.js';
+import { random } from './nodes/random/index.js';
 
 // Register a new backend node here; the UI uses its descriptor and generic editor automatically.
 export const registry = new Map<string, NodeDefinition>(
-  [chatInput, chatOutput, character, llm, httpRequest, condition, merge, memory].map((node) => [node.type, node]),
+  [chatInput, chatOutput, character, llm, httpRequest, condition, merge, memory, random].map((node) => [
+    node.type,
+    node,
+  ]),
 );
 export function descriptors(): NodeTypeDescriptor[] {
   return [...registry.values()].map(

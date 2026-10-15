@@ -178,3 +178,29 @@ it('renders the Model field as a combobox with a refresh button only when the ho
   expect(without).toContain('role="combobox"');
   expect(without).not.toContain('Refresh model list');
 });
+
+it('renders enum dropdowns, blank optional numbers and field descriptions in the generic form', () => {
+  const random = nodeTypeDescriptorSchema.parse({
+    type: 'random',
+    label: 'Random',
+    description: 'Roll',
+    category: 'Logic',
+    dynamicPorts: true,
+    inputs: [],
+    outputs: [],
+    configSchema: {
+      type: 'object',
+      properties: {
+        mode: { type: 'string', enum: ['number', 'integer', 'pick', 'chance'], default: 'number' },
+        min: { type: 'number', description: 'Blank: 0 in number mode, 1 in integer mode' },
+      },
+    },
+    defaultConfig: { mode: 'number' },
+  });
+  const html = renderToStaticMarkup(
+    <NodeConfigPanel descriptor={random} config={{ mode: 'integer' }} onChange={() => {}} />,
+  );
+  expect(html).toContain('<option value="integer" selected="">integer</option>');
+  expect(html).toContain('<input type="number" value=""/>');
+  expect(html).toContain('<small class="hint">Blank: 0 in number mode, 1 in integer mode</small>');
+});

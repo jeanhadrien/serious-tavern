@@ -114,6 +114,19 @@ Produced messages are ordered by dependency first. Output Y comes before output 
 
 The **LLM** has an optional `character` input in addition to preset inputs. A connected card replaces the session character only for that LLM's render context, including recursive `{{character.*}}` fields and aliases (`{{char}}`, `{{description}}`, `{{personality}}`, `{{scenario}}`). Without a connection, session behavior is unchanged. The preset input key `character` is reserved for this dedicated port; conflicting presets fail port resolution with an explicit error.
 
+### Random and Parse JSON nodes
+
+**Random** (category Logic) draws exactly once per run from `ctx.random()` (see the run seed under Data and secrets), so the same seed gives the same result. Every mode outputs `roll`, the raw draw in [0, 1), and the node's output (with `roll`) is stored in the execution log. Its `mode` decides its ports:
+
+| Mode | Inputs | Outputs | Result |
+| --- | --- | --- | --- |
+| `number` (default) | none | `value` (`number`), `roll` | Uniform number from `min` up to (not including) `max`; blank bounds mean 0 and 1. |
+| `integer` | none | `value` (`number`), `roll` | Whole number from `min` to `max`, both included; blank bounds mean 1 and 6 (a die). Bounds must be whole numbers. |
+| `pick` | `items` (`array`, required) | `value` (`any`, optional), `roll` | One item of the list, returned as is. An object item whose `weightField` (default `weight`; blank turns weights off) holds a number is weighted by it; any other item weighs 1, including a weight given as text. A weight that is 0, negative or not finite is never picked. When nothing can be picked (empty list, all weights 0), `value` is absent, so what it feeds is skipped. |
+| `chance` | `probability` (`number`), `value` (`any`) | `value` (`boolean`, shown as Result), `true`, `false` (`any`, optional), `roll` | True when the draw is below the probability: the `probability` input when connected (clamped to 0..1; a non-number is a node error), otherwise the `probability` config (default 0.5). Like Condition, the `value` input (or the result itself when nothing is connected) goes out of the `true` or `false` output and the other branch is skipped. |
+
+`min > max`, non-whole integer bounds and a configured probability outside 0..1 are config errors, reported before the run (bounds are only checked in the modes that use them). Ports that a mode doesn't have are dropped from the node's connections when the mode changes; `value` exists in every mode, so its connection survives.
+
 ### Message API and partial failures
 
 `POST /api/sessions/:id/messages` accepts `{ content }` and returns `{ userMessage?, assistantMessages: [...], execution }`. An empty `content` (or none) stores no user message: the turn runs on the session history as it is, `userMessage` is absent, and `trigger.message` is `''`. The array may be empty. Assistant messages may have `name` and `characterId`; the name is snapshotted when the message is created, so renaming a card does not rename old messages. Older stored sessions without these fields still work. Both user and assistant messages reference their execution, allowing the UI to display warnings/errors even when no output ran.

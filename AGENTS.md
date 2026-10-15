@@ -25,6 +25,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 - `packages/node-ui`: config forms generated from JSON Schema, custom panels (`src/panels/`), template-variable hints.
   - Panels get catalogs (presets, characters, providers) and `renderLink` through a typed `context` prop. node-ui never imports react-router or the web API clients.
   - Array fields in any shape other than `{key,value}[]` are shown as read-only JSON.
+  - The generic form shows a field's zod `.describe()` text as a hint, and a cleared number field is stored as unset (`undefined`), so optional numbers can fall back to a node's own default (Random's per-mode bounds).
 - **API contract:** `packages/shared/src/api/` holds zod schemas and types for the request and response of every endpoint. It is the only definition of the API.
   - To add or change an endpoint, update the contract first. The server parses its input with the contract and types its response from it; the web client uses the same types.
   - Server tests check that responses match the contract schemas.
