@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type {
   Character,
+  CollectionSummary,
   NodeTypeDescriptor,
   Preset,
   ProviderModelList,
@@ -17,6 +18,8 @@ export type NodePanelContext = {
    * never calls the API); it should reject with a readable message. Without it the Model field is plain text.
    */
   loadModels?(providerId: string, options?: { refresh?: boolean }): Promise<ProviderModelList>;
+  /** Authored collections for Recall and Draw; ids without a record show as unknown. */
+  collections?: readonly Pick<CollectionSummary, 'id' | 'name'>[];
   renderLink?(to: string, label: string): ReactNode;
   /** Chat settings the open workflow declares, hinted as `{{settings.<key>}}` in template fields. */
   settings?: readonly Pick<WorkflowSetting, 'key' | 'type' | 'description'>[];

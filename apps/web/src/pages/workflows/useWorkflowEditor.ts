@@ -5,6 +5,7 @@ import { ApiError, workflowsApi, nodeTypesApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
 import {
   charactersStore,
+  collectionsStore,
   presetsStore,
   providersStore,
   useEditorCommands,
@@ -32,6 +33,8 @@ export function useWorkflowEditor() {
   const [typesReady, setTypesReady] = useState(false);
   // The LLM node's provider dropdown; the store follows `providers.changed`.
   const providersList = useList(providersStore);
+  // The Recall and Draw panels' collection pickers; the store follows `collections.changed`.
+  const collectionsList = useList(collectionsStore);
   const [workflow, setWorkflow] = useState<Workflow>();
   const [saved, setSaved] = useState('');
   const canvas = useWorkflowCanvas(types, presets, characters);
@@ -118,5 +121,5 @@ export function useWorkflowEditor() {
       /* API errors are toasted. */
     }
   };
-  return { types, presets, characters, providersList, workflow, setWorkflow, canvas, save, validate };
+  return { types, presets, characters, providersList, collectionsList, workflow, setWorkflow, canvas, save, validate };
 }

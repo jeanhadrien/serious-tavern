@@ -1,10 +1,10 @@
-import { Link } from 'react-router-dom';
 import { Trash2 } from 'lucide-react';
 import { NodeConfigPanel, type NodePanelContext } from '@st/node-ui';
 import type { Character, NodeInstance, Preset, WorkflowSetting } from '@st/shared';
 import { providersApi } from '../../api.js';
 import { IconButton } from '../../components/IconButton.js';
 import type { CanvasNode } from './model.js';
+import { PanelLink } from './PanelLink.js';
 import './modelPicker.css';
 
 // The panel shows load errors inline, so the request must not toast. Module-level, so the panel's effect stays stable.
@@ -16,6 +16,7 @@ export function WorkflowConfigPanel({
   presets,
   characters,
   providersList,
+  collections,
   settings,
   updateConfig,
   onDelete,
@@ -25,6 +26,8 @@ export function WorkflowConfigPanel({
   presets: Preset[];
   characters: Character[];
   providersList: NodePanelContext['providers'];
+  /** Collection summaries for the Recall and Draw pickers. */
+  collections?: NodePanelContext['collections'];
   /** The draft's chat settings, hinted in template fields. */
   settings?: readonly WorkflowSetting[];
   updateConfig: (config: NodeInstance['config']) => void;
@@ -58,9 +61,10 @@ export function WorkflowConfigPanel({
             presets,
             characters,
             providers: providersList,
+            collections,
             loadModels,
             settings,
-            renderLink: (to, label) => <Link to={to}>{label}</Link>,
+            renderLink: (to, label) => <PanelLink to={to} label={label} />,
           }}
         />
       )}

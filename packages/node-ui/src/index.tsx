@@ -3,6 +3,8 @@ import { macroHints } from '@st/shared';
 import type { NodeConfigPanelProps as Props } from './panels/types.js';
 import { CharacterPanel } from './panels/character.js';
 import { LlmPanel } from './panels/llm.js';
+import { RecallPanel } from './panels/recall.js';
+import { DrawPanel } from './panels/draw.js';
 import { supportsKeyValueArray, isKeyValueRows, numberFieldValue, type Field } from './fields.js';
 export type { NodePanelContext, NodeConfigPanelProps } from './panels/types.js';
 
@@ -203,6 +205,8 @@ export const customPanels: Record<string, (props: Props) => React.JSX.Element> =
   condition: ConditionPanel,
   character: CharacterPanel,
   llm: LlmPanel,
+  recall: RecallPanel,
+  draw: DrawPanel,
 };
 export function NodeConfigPanel(props: Props) {
   const Panel = customPanels[props.descriptor.type] ?? GenericPanel;
