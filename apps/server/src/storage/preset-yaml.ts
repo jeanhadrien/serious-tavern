@@ -1,6 +1,6 @@
-import { isDeepStrictEqual } from 'node:util';
-import { Document, parse, stringify, visit } from 'yaml';
+import { parse } from 'yaml';
 import { presetSchema, upgradeLegacyPreset, type Preset } from '@st/shared';
+import { arrange, toReadableYaml } from './yaml-text.js';
 
 type Obj = Record<string, unknown>;
 
@@ -12,14 +12,6 @@ const PRESET_FIRST = ['name', 'description', 'inputs', 'entries'];
 const PRESET_LAST = ['id', 'createdAt', 'updatedAt', 'source'];
 const INPUT_FIRST = ['id', 'key', 'dataType'];
 const ENTRY_FIRST = ['id', 'displayName', 'name', 'kind', 'role', 'enabled', 'inputKey', 'placement', 'content'];
-
-function arrange(value: Obj, first: string[], last: string[] = []): Obj {
-  const result: Obj = {};
-  for (const key of first) if (key in value) result[key] = value[key];
-  for (const key of Object.keys(value)) if (!first.includes(key) && !last.includes(key)) result[key] = value[key];
-  for (const key of last) if (key in value) result[key] = value[key];
-  return result;
-}
 
 /** Readable unique label for a slot that depth placements point at. */
 function slotLabel(displayName: unknown, taken: Set<string>): string {
@@ -75,34 +67,7 @@ export function presetToYaml(preset: Preset): string {
 
   plain.inputs = inputs.map((input) => arrange(input, INPUT_FIRST));
   plain.entries = entries.map((entry) => arrange(entry, ENTRY_FIRST));
-  const arranged = arrange(plain, PRESET_FIRST, PRESET_LAST);
-  const text = render(arranged, canBeBlock);
-  // Safety net: the output must read back to exactly what was written, else quote every multi-line string.
-  if (isDeepStrictEqual(safeParse(text), arranged)) return text;
-  const quoted = render(arranged, () => false);
-  if (!isDeepStrictEqual(safeParse(quoted), arranged)) throw new Error('Preset cannot be represented as YAML');
-  return quoted;
-}
-
-const STRINGIFY = { lineWidth: 0, blockQuote: 'literal', indent: 2 } as const;
-const safeParse = (text: string): unknown => {
-  try {
-    return parse(text, { logLevel: 'error' });
-  } catch {
-    return undefined;
-  }
-};
-// Block scalars cannot carry some content (e.g. whitespace-only lines); those strings get double quotes.
-const canBeBlock = (value: string) => safeParse(stringify(value, STRINGIFY)) === value;
-
-function render(value: Obj, block: (text: string) => boolean): string {
-  const doc = new Document(value);
-  visit(doc, {
-    Scalar(_, node) {
-      if (typeof node.value === 'string' && node.value.includes('\n') && !block(node.value)) node.type = 'QUOTE_DOUBLE';
-    },
-  });
-  return doc.toString(STRINGIFY);
+  return toReadableYaml(arrange(plain, PRESET_FIRST, PRESET_LAST), 'Preset');
 }
 
 // Assigns position-derived ids to items without one, skipping ids that are already taken.
