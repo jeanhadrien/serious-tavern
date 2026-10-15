@@ -27,7 +27,9 @@ export function CollectionPicker({ ids, onChange, context, ordered = false }: Co
         <ul className="collection-picker-rows">
           {rows.map((row, index) => (
             <li key={row.id} className={row.known ? undefined : 'unknown'}>
-              <span className="collection-picker-name">{row.name}</span>
+              <span className="collection-picker-name" title={row.name}>
+                {row.name}
+              </span>
               {row.known && link(row.id)}
               {ordered && rows.length > 1 && (
                 <>
@@ -79,7 +81,7 @@ export function CollectionPicker({ ids, onChange, context, ordered = false }: Co
           </select>
         )
       ) : (
-        <small className="hint">Create a collection in the Collections list (right column) first.</small>
+        <small className="hint">Create a collection in the Collections list first.</small>
       )}
     </div>
   );

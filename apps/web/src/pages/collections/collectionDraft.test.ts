@@ -8,6 +8,7 @@ import {
   listFromText,
   moveEntry,
   newEntry,
+  storedForm,
   toDraft,
   toEntryDraft,
 } from './collectionDraft.js';
@@ -81,7 +82,7 @@ describe('collection drafts', () => {
   it('names the field of a schema problem', () => {
     expect(draftToBody({ name: ' ', description: '', entries: [] })).toMatchObject({
       ok: false,
-      errors: [expect.stringMatching(/^Name: /)],
+      errors: ['Name is required'],
     });
   });
 
@@ -152,6 +153,16 @@ describe('classifyCollectionChange', () => {
   it('treats its own save, seen before the response, as a reload', () => {
     const saved = collection({ name: 'Edited' });
     expect(classifyCollectionChange(edited, [saved])).toEqual({ kind: 'reload', item: saved });
+    // The server stores the name trimmed.
+    const padded = { collection: base, draft: { ...toDraft(base), name: ' Edited ' } };
+    expect(classifyCollectionChange(padded, [saved])).toEqual({ kind: 'reload', item: saved });
+  });
+
+  it('sends the name trimmed, so padding alone is not a change', () => {
+    const padded = { ...toDraft(base), name: 'Northern Wastes ' };
+    expect(bodyOf(padded).name).toBe('Northern Wastes');
+    expect(draftChanged(padded, base)).toBe(false);
+    expect(draftChanged(padded, base, storedForm(base))).toBe(false);
   });
 
   it('reports a removed collection, and ignores its own delete', () => {

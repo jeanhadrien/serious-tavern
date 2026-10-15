@@ -30,7 +30,7 @@ export function CollectionEditor(props: CollectionEditorProps) {
       <div className="collection-toolbar">
         <div className="collection-title">
           <IconButton icon={ArrowLeft} label="Back to collections" onClick={props.onBack} />
-          <h1>{draft.name || 'Collection'}</h1>
+          <h1>{draft.name.trim() || 'Collection'}</h1>
           {dirty && <span className="dirty-dot">Unsaved</span>}
         </div>
         <div className="toolbar">

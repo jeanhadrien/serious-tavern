@@ -5,6 +5,13 @@ import './collections.css';
 /** The collection editor view, shown in R in place of the collections list. */
 export function Collections() {
   const editor = useCollectionEditor();
+  if (editor.loading)
+    return (
+      <div className="empty-state">
+        <h1>Collections</h1>
+        <p>Loading the collection…</p>
+      </div>
+    );
   if (!editor.draft)
     return (
       <div className="empty-state">
@@ -25,7 +32,7 @@ export function Collections() {
       onRemoveEntry={editor.removeEntry}
       onMoveEntry={editor.moveEntry}
       onSave={() => void editor.save()}
-      onDiscard={editor.discard}
+      onDiscard={() => void editor.discard()}
       onDelete={() => void editor.remove()}
       onBack={editor.back}
     />

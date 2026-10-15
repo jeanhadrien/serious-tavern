@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Collection, CollectionSummary } from '@st/shared';
 import { ApiError, collectionsApi } from '../../api.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
@@ -11,15 +11,17 @@ import {
   draftToBody,
   moveEntry,
   newEntry,
+  storedForm,
   toDraft,
   type CollectionDraft,
   type EntryDraft,
 } from './collectionDraft.js';
+import { selectionAfterLoad, selectionAfterMove, selectionAfterRemove } from './entrySelection.js';
 
 const COLLECTIONS = {
   event: 'collections.changed',
   noun: 'collection',
-  removedHint: 'Saving will fail; create a new collection and copy your changes into it.',
+  removedHint: 'Saving will recreate it as a new collection.',
 } as const;
 
 /** The whole collection: the list only has summaries, and hand edits keep `updatedAt`, so it is always re-read. */
@@ -43,19 +45,24 @@ export function useCollectionEditor() {
   const [draft, setDraft] = useState<CollectionDraft>();
   const [selected, setSelected] = useState<number>();
   const [errors, setErrors] = useState<string[]>([]);
-  const dirty = !!collection && !!draft && draftChanged(draft, collection);
+  // True while a collection named by a summary (a URL) is being fetched: the previous one is not shown meanwhile.
+  const [loading, setLoading] = useState(false);
+  // Per load, not per keystroke: normalizing a large lorebook is not free.
+  const stored = useMemo(() => collection && storedForm(collection), [collection]);
+  const dirty = useMemo(
+    () => !!collection && !!draft && draftChanged(draft, collection, stored),
+    [draft, collection, stored],
+  );
 
   const load = (item: Collection, keepSelection = false) => {
+    setLoading(false);
     setCollection(item);
     setDraft(toDraft(item));
     setErrors([]);
-    setSelected((current) =>
-      keepSelection && current !== undefined && item.entries.length
-        ? Math.min(current, item.entries.length - 1)
-        : undefined,
-    );
+    setSelected((current) => selectionAfterLoad(current, item.entries.length, keepSelection));
   };
   const clear = () => {
+    setLoading(false);
     setCollection(undefined);
     setDraft(undefined);
     setSelected(undefined);
@@ -66,10 +73,13 @@ export function useCollectionEditor() {
   const open = (item: CollectionSummary | Collection) => {
     const current = ++request.current;
     if ('entries' in item) return load(item);
+    // A summary (a URL naming a collection): never show the previous collection while this one loads. The list
+    // and the node panels fetch first (`openCollection`), so only URL navigation takes this path.
+    setLoading(true);
     void collectionsApi
       .get(item.id)
       .then((full) => current === request.current && load(full))
-      .catch(() => {}); // toasted
+      .catch(() => current === request.current && clear()); // toasted
   };
 
   const openId = collection?.id;
@@ -115,30 +125,35 @@ export function useCollectionEditor() {
     setDraft(next);
     setErrors([]);
   };
-  const setEntries = (update: (entries: EntryDraft[]) => EntryDraft[]) => {
-    setDraft((current) => current && { ...current, entries: update(current.entries) });
-    setErrors([]);
-  };
-  const updateEntry = (index: number, patch: Partial<EntryDraft>) =>
-    setEntries((entries) => entries.map((entry, at) => (at === index ? { ...entry, ...patch } : entry)));
-  const addEntry = () => {
-    if (!draft) return;
-    setEntries((entries) => [...entries, newEntry()]);
-    setSelected(draft.entries.length);
-  };
-  const removeEntry = (index: number) => {
-    setEntries((entries) => entries.filter((_, at) => at !== index));
-    setSelected((current) =>
-      current === undefined || current === index ? undefined : current > index ? current - 1 : current,
-    );
-  };
-  const moveEntryBy = (index: number, offset: number) => {
-    if (!draft) return;
-    const to = index + offset;
-    if (to < 0 || to >= draft.entries.length) return;
-    setEntries((entries) => moveEntry(entries, index, to));
-    setSelected((current) => (current === index ? to : current === to ? index : current));
-  };
+  // Stable across renders (state setters and the `latest` ref only), so unchanged entry rows skip rendering.
+  const entryActions = useMemo(() => {
+    const setEntries = (update: (entries: EntryDraft[]) => EntryDraft[]) => {
+      setDraft((current) => current && { ...current, entries: update(current.entries) });
+      setErrors([]);
+    };
+    return {
+      select: (index: number | undefined) => setSelected(index),
+      updateEntry: (index: number, patch: Partial<EntryDraft>) =>
+        setEntries((entries) => entries.map((entry, at) => (at === index ? { ...entry, ...patch } : entry))),
+      removeEntry: (index: number) => {
+        setEntries((entries) => entries.filter((_, at) => at !== index));
+        setSelected((current) => selectionAfterRemove(current, index));
+      },
+      moveEntry: (index: number, offset: number) => {
+        const to = index + offset;
+        const length = latest.current.draft?.entries.length ?? 0;
+        if (to < 0 || to >= length) return;
+        setEntries((entries) => moveEntry(entries, index, to));
+        setSelected((current) => selectionAfterMove(current, index, to));
+      },
+      addEntry: () => {
+        const length = latest.current.draft?.entries.length;
+        if (length === undefined) return;
+        setEntries((entries) => [...entries, newEntry()]);
+        setSelected(length);
+      },
+    };
+  }, []);
 
   const save = async () => {
     if (!collection || !draft) return;
@@ -147,7 +162,17 @@ export function useCollectionEditor() {
     const saved = await saveCollection(collection.id, result.body);
     if (saved) load(saved, true);
   };
-  const discard = () => collection && load(collection, true);
+  // Re-read first: the disk may have moved on while the draft was dirty (the live sync only warned), and
+  // restoring the older baseline would let a later save overwrite that edit.
+  const discard = async () => {
+    if (!collection) return;
+    const id = collection.id;
+    const [fresh] = await readOpen(id).catch(() => [collection]);
+    if (latest.current.collection?.id !== id) return;
+    if (fresh) return load(fresh, true);
+    clear();
+    closeEditor('collections');
+  };
   const remove = async () => {
     if (!collection || !window.confirm(`Delete collection "${collection.name}"?`)) return;
     deleting.current = collection.id;
@@ -160,15 +185,12 @@ export function useCollectionEditor() {
   };
   return {
     draft,
+    loading,
     dirty,
     errors,
     selected,
-    select: (index: number | undefined) => setSelected(index),
     change,
-    updateEntry,
-    addEntry,
-    removeEntry,
-    moveEntry: moveEntryBy,
+    ...entryActions,
     save,
     discard,
     remove,

@@ -30,6 +30,18 @@
   border-bottom: 1px solid #343844;
   min-width: 0;
 }
+/* Side column headers can hold more icons than a narrow column fits (compact L, R at its minimum width): the row
+   scrolls inside its column instead of spilling over the next one or widening the page. */
+.column-header {
+  gap: 2px;
+  padding: 0 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.column-header .icon-button {
+  padding-inline: 4px;
+}
 .middle-header {
   justify-content: space-between;
   padding: 0 12px;

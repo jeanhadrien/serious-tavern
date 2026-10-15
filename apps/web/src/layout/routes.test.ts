@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { legacySearch } from './routes.js';
+import { collectionLinkId, legacySearch } from './routes.js';
 
 it('maps legacy item links to a wide editor, edge highlight included', () => {
   expect(legacySearch('/workflows', '?workflow=w1&edge=e1')).toBe('wide=workflow:w1&edge=e1');
@@ -21,4 +21,12 @@ it("maps the node panels' collection link to the collection editor in R", () => 
 
 it('sends unknown paths to the default layout', () => {
   expect(legacySearch('/nope', '?id=p1')).toBe('');
+});
+
+it('finds the collection a link opens in R', () => {
+  expect(collectionLinkId('/collections?id=k1')).toBe('k1');
+  expect(collectionLinkId('/collections?id=a%2Fb')).toBe('a/b');
+  expect(collectionLinkId('/?right=collection:k2')).toBe('k2');
+  expect(collectionLinkId('/collections')).toBeUndefined();
+  expect(collectionLinkId('/presets?id=x')).toBeUndefined();
 });

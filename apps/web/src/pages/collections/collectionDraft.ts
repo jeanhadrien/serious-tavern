@@ -1,4 +1,4 @@
-import { collectionFieldsSchema, type Collection, type CollectionEntry, type CollectionFields } from '@st/shared';
+import { collectionWriteSchema, type Collection, type CollectionEntry, type CollectionFields } from '@st/shared';
 import type { DiskChange } from '../fileLiveSync.js';
 
 export const LEVELS = ['1', '2', '3', '4', '5'] as const;
@@ -133,15 +133,20 @@ export function draftToBody(
   const errors: string[] = [];
   const description = draft.description.trim() ? draft.description : undefined;
   const body = {
-    name: draft.name,
+    // Trimmed like the server stores it, so the editor's own save is recognised when it comes back from disk.
+    name: draft.name.trim(),
     ...(description !== undefined && { description }),
     entries: draft.entries.map((entry, index) => entryBody(entry, index + 1, errors)),
   };
   if (errors.length) return { ok: false, errors };
-  const parsed = collectionFieldsSchema.safeParse(body);
+  const parsed = collectionWriteSchema.safeParse(body);
   // The body as built (not the parsed copy), so omitted defaults stay omitted; it passed the same schema.
   if (parsed.success) return { ok: true, body: body as CollectionFields };
-  return { ok: false, errors: parsed.error.issues.map((issue) => `${fieldName(issue.path)}: ${issue.message}`) };
+  const describe = (issue: (typeof parsed.error.issues)[number]) => {
+    const field = fieldName(issue.path);
+    return issue.message.startsWith(field) ? issue.message : `${field}: ${issue.message}`;
+  };
+  return { ok: false, errors: parsed.error.issues.map(describe) };
 }
 
 const sameDraft = (a: CollectionDraft, b: CollectionDraft) => JSON.stringify(a) === JSON.stringify(b);
@@ -154,11 +159,19 @@ function normalized(draft: CollectionDraft, collection: Collection): CollectionD
   return toDraft({ ...collection, description: undefined, ...result.body, entries });
 }
 
+/**
+ * The stored collection normalized like a draft, so a hand-written ` title ` or `description: ''` is not a change.
+ * It depends on the collection only: an editor computes it once per load, not per keystroke.
+ */
+export const storedForm = (collection: Collection) => normalized(toDraft(collection), collection);
+
 /** True when saving the draft would change the collection. */
-export function draftChanged(draft: CollectionDraft, collection: Collection): boolean {
+export function draftChanged(
+  draft: CollectionDraft,
+  collection: Collection,
+  stored: CollectionDraft | undefined = storedForm(collection),
+): boolean {
   const saved = normalized(draft, collection);
-  // The stored side is normalized too, so a hand-written ` title ` or `description: ''` is not a change.
-  const stored = normalized(toDraft(collection), collection);
   return !saved || !stored || !sameDraft(saved, stored);
 }
 

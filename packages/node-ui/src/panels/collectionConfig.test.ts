@@ -49,6 +49,8 @@ it('names picked collections in order and flags unknown ids', () => {
     { id: 'a', name: 'Alpha', known: true },
   ]);
   expect(pickerRows(undefined, catalog)).toEqual([]);
+  // A repeated id shows once (first wins), so rows keep unique keys.
+  expect(pickerRows(['a', 'b', 'a'], catalog).map((row) => row.id)).toEqual(['a', 'b']);
 });
 
 it('adds, removes and moves ids', () => {

@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import type { Collection, CollectionSummary } from '@st/shared';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
 import { collectionEditorStore, collectionsStore, useEditorState, useList } from '../../stores/index.js';
-import { createCollection } from './collectionActions.js';
+import { createCollection, openCollection, showCollection } from './collectionActions.js';
 import './collections.css';
 
 const entryCount = (count: number) => `${count} ${count === 1 ? 'entry' : 'entries'}`;
@@ -16,13 +15,10 @@ export function CollectionListView() {
   const query = search.trim().toLowerCase();
   const filtered = collections.filter((item) => item.name.toLowerCase().includes(query));
 
-  const open = (item: CollectionSummary | Collection) => {
-    collectionEditorStore.open(structuredClone(item));
-    openEditor('collections');
-  };
+  const show = () => openEditor('collections');
   const create = async () => {
     const created = await createCollection();
-    if (created) open(created);
+    if (created) showCollection(created, show);
   };
 
   return (
@@ -45,7 +41,7 @@ export function CollectionListView() {
           type="button"
           key={item.id}
           className={`collection-row ${currentId === item.id ? 'selected' : ''}`}
-          onClick={() => open(item)}
+          onClick={() => void openCollection(item.id, show)}
         >
           <span className="collection-row-name">
             {item.name}

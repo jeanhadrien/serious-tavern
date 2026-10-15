@@ -28,9 +28,12 @@ export function parseCount(text: string, min: number): number | undefined {
 
 export type PickerRow = { id: string; name: string; known: boolean };
 
-/** The picked collections in config order, named from the catalog; ids without a record show as unknown. */
+/**
+ * The picked collections in config order, named from the catalog; ids without a record show as unknown. A repeated
+ * id (hand-edited config) is shown once, first wins, as the nodes read it.
+ */
 export function pickerRows(ids: unknown, catalog: readonly { id: string; name: string }[]): PickerRow[] {
-  const list = Array.isArray(ids) ? ids.map(String) : [];
+  const list = Array.isArray(ids) ? [...new Set(ids.map(String))] : [];
   return list.map((id) => {
     const record = catalog.find((item) => item.id === id);
     return record ? { id, name: record.name, known: true } : { id, name: `Unknown collection (${id})`, known: false };

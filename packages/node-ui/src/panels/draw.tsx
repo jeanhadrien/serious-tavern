@@ -41,7 +41,8 @@ export function DrawPanel({ descriptor, config, onChange, context }: NodeConfigP
     <div className="config-fields">
       <CollectionPicker ids={value('collectionIds')} onChange={(ids) => set('collectionIds', ids)} context={context} />
       <p className="hint">
-        When nothing passes the filters, Entry and Text are absent, so what they feed is skipped; Reason says why.
+        When nothing passes the filters, Entry, Text and Level are absent: a node that requires them is skipped, others
+        run without them. Reason says why.
       </p>
       <DraftInput
         label="Count"

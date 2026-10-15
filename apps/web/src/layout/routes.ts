@@ -1,4 +1,4 @@
-import { layoutSearch, type LayoutUrl } from './url.js';
+import { layoutSearch, parseLayoutUrl, type LayoutUrl } from './url.js';
 
 // Older URLs name a resource page (`/presets?id=…`, `/workflows?workflow=…&edge=…`). Toast links from earlier
 // versions, bookmarks and node-ui's "Edit preset"/"Edit collection" links use them (node-ui knows nothing about
@@ -28,4 +28,14 @@ const PATH_LAYOUTS: Record<string, (params: URLSearchParams) => Partial<LayoutUr
 export function legacySearch(pathname: string, search: string): string {
   const layout = PATH_LAYOUTS[pathname];
   return layout ? layoutSearch(layout(new URLSearchParams(search))) : '';
+}
+
+/**
+ * The collection an in-app link opens in R (`/collections?id=…`, or the layout URL itself), if any. The workflow
+ * editor opens such links in place: following the URL would replace the whole layout and close the workflow.
+ */
+export function collectionLinkId(to: string): string | undefined {
+  const url = new URL(to, 'http://app');
+  const layout = parseLayoutUrl(url.pathname === '/' ? url.search : legacySearch(url.pathname, url.search));
+  return layout.right === 'collections' ? layout.rightId : undefined;
 }

@@ -66,6 +66,10 @@
 .delete-button:hover {
   background: #5c3740;
 }
+/* Links in node config panels ("Edit preset", "Edit" a collection): readable on the dark panel. */
+.config-panel a {
+  color: #9fb0ff;
+}
 .config-panel-actions {
   display: flex;
   gap: 6px;
