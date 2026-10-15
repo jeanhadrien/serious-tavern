@@ -21,6 +21,7 @@ chosen by the user"). Written October 2026 from web sources; see the caveats at 
 | [06-datasets.md](06-datasets.md) | ConceptNet, Wikipedia, motifs, tropes, museums, tables | Match source to intensity rung; mind ShareAlike/NonCommercial and the unresolved motif-index status |
 | [CREATIVITY.md](CREATIVITY.md) | Design notes from the brainstorm this research supports | Trigger → source → selection → integration, with an intensity dial; open questions |
 | [STATE-DESIGN-PROPOSAL-1.md](STATE-DESIGN-PROPOSAL-1.md) | Per-chat, per-character and shared state for workflows | Declared definitions, per-turn delta logs with provenance, rewind policies, typed read/write nodes |
+| [STATE-DESIGN-REVIEW-1.md](STATE-DESIGN-REVIEW-1.md) | Independent critical review of state proposal 1, checked against the code | Keep the nodes and snapshot/buffered semantics; store session state in the session (rewind computed from surviving turns), use an outbox for shared state and a post-turn run instead of `after-reply` |
 
 ## Legend: verification tags
 
