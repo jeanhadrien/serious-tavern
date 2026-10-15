@@ -23,16 +23,18 @@ export function WorkflowToolbar({
   return (
     <div className="editor-toolbar">
       <input aria-label="Workflow name" value={name} onChange={(e) => onNameChange(e.target.value)} />
+      {/* On a phone only the icon shows (settingsPanel.css), so the name comes from aria-label. */}
       <button
         className="toolbar-toggle"
         aria-pressed={settingsOpen}
-        title="Chat settings this workflow declares"
+        aria-label={settingsIssues > 0 ? `Chat settings (${settingsIssues} problem(s))` : 'Chat settings'}
+        title="Chat settings"
         onClick={onToggleSettings}
       >
         <SlidersHorizontal size={16} aria-hidden="true" />
-        Chat settings
+        <span className="toolbar-toggle-label">Chat settings</span>
         {settingsIssues > 0 && (
-          <span className="issue-count" title={`${settingsIssues} problem(s)`}>
+          <span className="issue-count" aria-hidden="true">
             {settingsIssues}
           </span>
         )}

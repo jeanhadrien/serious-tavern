@@ -1,17 +1,17 @@
 /* The workflow editor's chat settings panel: one compact card per declaration. */
-.config-panel.settings-panel {
+.config-panel.workflow-settings-panel {
   width: 340px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-.settings-panel .hint,
-.settings-panel .error {
+.workflow-settings-panel .hint,
+.workflow-settings-panel .error {
   margin: 0;
   font-size: 0.8rem;
   text-transform: none;
 }
-.settings-panel code {
+.workflow-settings-panel code {
   font-size: 0.78rem;
 }
 .setting-row {
@@ -79,4 +79,18 @@
   border-radius: 9px;
   padding: 0 6px;
   font-size: 0.72rem;
+}
+/* On a phone the toggle shows its icon only, so Save stays on the toolbar's second row. */
+@container editor (max-width: 560px) {
+  .toolbar-toggle .toolbar-toggle-label {
+    display: none;
+  }
+}
+.setting-row-invalid pre {
+  margin: 0;
+  max-height: 8em;
+  overflow: auto;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }

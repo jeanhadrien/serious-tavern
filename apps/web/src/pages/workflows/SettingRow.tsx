@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
 import {
   settingLabel,
@@ -8,9 +8,12 @@ import {
   type WorkflowSettingType,
 } from '@st/shared';
 import { IconButton } from '../../components/IconButton.js';
-import { optionalNumber, optionsText, parseOptions, withType } from './settingsDraft.js';
+import { DraftNumberInput } from './DraftNumberInput.js';
+import { optionsText, parseOptions, withType } from './settingsDraft.js';
 
 type Field = NonNullable<SettingDeclarationIssue['field']>;
+/** A field's problems next to it, and the `aria-describedby` that ties them to its control. */
+type Problems = { show(field: Field): ReactNode; describedBy(field: Field): string | undefined };
 
 /** One chat setting declaration in the workflow editor, with its problems next to the fields they concern. */
 export function SettingRow({
@@ -31,14 +34,21 @@ export function SettingRow({
   onRemove(): void;
 }) {
   const name = settingLabel(setting) || 'setting';
-  const problems = (field: Field) =>
-    issues
-      .filter((issue) => issue.field === field)
-      .map((issue) => (
-        <p key={issue.message} className="error" role="alert">
+  const base = useId();
+  // Not live regions: most messages name the key, so each keystroke would announce them again.
+  const ofField = (field: Field) => issues.filter((issue) => issue.field === field);
+  const problems: Problems = {
+    show: (field) =>
+      ofField(field).map((issue, i) => (
+        <p key={issue.message} id={`${base}-${field}-${i}`} className="error">
           {issue.message}
         </p>
-      ));
+      )),
+    describedBy: (field) =>
+      ofField(field)
+        .map((_, i) => `${base}-${field}-${i}`)
+        .join(' ') || undefined,
+  };
   const text = (field: 'label' | 'description', value: string) => {
     const next = { ...setting, [field]: value };
     if (!value) delete next[field];
@@ -52,6 +62,7 @@ export function SettingRow({
           <input
             value={setting.key}
             spellCheck={false}
+            aria-describedby={problems.describedBy('key')}
             onChange={(e) => onChange({ ...setting, key: e.target.value })}
           />
         </label>
@@ -61,8 +72,8 @@ export function SettingRow({
           <IconButton icon={Trash2} label={`Remove ${name}`} className="delete-button" onClick={onRemove} />
         </span>
       </div>
-      {problems('key')}
-      {problems('type')}
+      {problems.show('key')}
+      {problems.show('type')}
       <div className="setting-pair">
         <label>
           Type
@@ -102,36 +113,43 @@ function TypeFields({
 }: {
   setting: WorkflowSetting;
   onChange(setting: WorkflowSetting): void;
-  problems(field: Field): ReactNode;
+  problems: Problems;
 }) {
   switch (setting.type) {
     case 'number': {
-      const bound = (field: 'min' | 'max' | 'step', value: string) => {
-        const next = { ...setting, [field]: optionalNumber(value) };
-        if (next[field] === undefined) delete next[field];
+      const bound = (field: 'min' | 'max' | 'step', value: number | undefined) => {
+        const next = { ...setting, [field]: value };
+        if (value === undefined) delete next[field];
         onChange(next);
       };
+      // min > max is reported on min; it concerns max as well.
+      const boundProblem = { min: 'min', max: 'min', step: 'step' } as const;
       return (
         <>
           <label>
             Default
-            <input
-              type="number"
-              value={String(setting.default)}
-              onChange={(e) => onChange({ ...setting, default: Number(e.target.value) })}
+            <DraftNumberInput
+              value={setting.default}
+              aria-describedby={problems.describedBy('default')}
+              onChange={(value) => onChange({ ...setting, default: value ?? setting.default })}
             />
           </label>
-          {problems('default')}
+          {problems.show('default')}
           <div className="setting-bounds">
             {(['min', 'max', 'step'] as const).map((field) => (
               <label key={field}>
                 {field[0]!.toUpperCase() + field.slice(1)}
-                <input type="number" value={setting[field] ?? ''} onChange={(e) => bound(field, e.target.value)} />
+                <DraftNumberInput
+                  value={setting[field]}
+                  optional
+                  aria-describedby={problems.describedBy(boundProblem[field])}
+                  onChange={(value) => bound(field, value)}
+                />
               </label>
             ))}
           </div>
-          {problems('min')}
-          {problems('step')}
+          {problems.show('min')}
+          {problems.show('step')}
         </>
       );
     }
@@ -183,7 +201,7 @@ function EnumFields({
 }: {
   setting: Extract<WorkflowSetting, { type: 'enum' }>;
   onChange(setting: WorkflowSetting): void;
-  problems(field: Field): ReactNode;
+  problems: Problems;
 }) {
   // The textarea keeps what was typed (a trailing newline, a blank line) until the parsed options change.
   const [draft, setDraft] = useState(() => optionsText(setting.options));
@@ -196,17 +214,19 @@ function EnumFields({
         <textarea
           rows={3}
           value={shown}
+          aria-describedby={problems.describedBy('options')}
           onChange={(e) => {
             setDraft(e.target.value);
             onChange({ ...setting, options: parseOptions(e.target.value) });
           }}
         />
       </label>
-      {problems('options')}
+      {problems.show('options')}
       <label>
         Default
         <select
           value={setting.default ?? ''}
+          aria-describedby={problems.describedBy('default')}
           onChange={(e) => {
             const { default: _previous, ...rest } = setting;
             onChange(e.target.value ? { ...rest, default: e.target.value } : rest);
@@ -223,7 +243,7 @@ function EnumFields({
           ))}
         </select>
       </label>
-      {problems('default')}
+      {problems.show('default')}
     </>
   );
 }

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { workflowSettingIssues } from '@st/shared';
+import { workflowSettingIssues, workflowSettings, type Workflow } from '@st/shared';
 import { useWorkflowEditor } from './workflows/useWorkflowEditor.js';
 import { WorkflowToolbar } from './workflows/WorkflowToolbar.js';
 import { NodePalette } from './workflows/NodePalette.js';
@@ -8,6 +8,7 @@ import { WorkflowCanvas } from './workflows/WorkflowCanvas.js';
 import { WorkflowConfigPanel } from './workflows/WorkflowConfigPanel.js';
 import { WorkflowSettingsPanel } from './workflows/WorkflowSettingsPanel.js';
 import { canvasToWorkflow } from './workflows/model.js';
+import { toggleSettingsPanel } from './workflows/settingsDraft.js';
 import { duplicateWorkflow } from './workflows/workflowActions.js';
 import './workflows/workflows.css';
 
@@ -23,11 +24,15 @@ function WorkflowEditor() {
   const { types, presets, characters, providersList, workflow, setWorkflow, canvas, save, validate } =
     useWorkflowEditor();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const settings = workflow?.settings ?? [];
-  // A selected node's config wins; closing it shows the settings again while they are open.
+  // The draft's raw declarations (items that don't parse included); node panels hint the usable ones.
+  const settings = workflow?.settings;
+  const hinted = useMemo(() => workflowSettings({ settings }), [settings]);
+  // A selected node's config wins over the settings panel.
+  const settingsShown = settingsOpen && !canvas.current;
   const toggleSettings = () => {
-    if (!settingsOpen) canvas.setSelected(undefined);
-    setSettingsOpen(!settingsOpen || !!canvas.current);
+    const next = toggleSettingsPanel(settingsShown);
+    if (next.deselect) canvas.setSelected(undefined);
+    setSettingsOpen(next.open);
   };
   return (
     <div className="workflow-layout">
@@ -36,7 +41,7 @@ function WorkflowEditor() {
           <WorkflowToolbar
             name={workflow.name}
             onNameChange={(name) => setWorkflow((prev) => prev && { ...prev, name })}
-            settingsOpen={settingsOpen && !canvas.current}
+            settingsOpen={settingsShown}
             settingsIssues={workflowSettingIssues(settings).length}
             onToggleSettings={toggleSettings}
             onValidate={() => void validate()}
@@ -52,7 +57,7 @@ function WorkflowEditor() {
                 presets={presets}
                 characters={characters}
                 providersList={providersList}
-                settings={settings}
+                settings={hinted}
                 updateConfig={canvas.updateConfig}
                 onDelete={canvas.deleteNode}
                 onClose={() => canvas.setSelected(undefined)}
@@ -61,7 +66,10 @@ function WorkflowEditor() {
               settingsOpen && (
                 <WorkflowSettingsPanel
                   settings={settings}
-                  onChange={(next) => setWorkflow((prev) => prev && { ...prev, settings: next })}
+                  // Raw items are kept as they are; saving refuses the ones that don't parse.
+                  onChange={(next) =>
+                    setWorkflow((prev) => prev && { ...prev, settings: next as Workflow['settings'] })
+                  }
                   onClose={() => setSettingsOpen(false)}
                 />
               )

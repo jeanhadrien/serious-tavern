@@ -1,12 +1,46 @@
-import type { WorkflowSetting, WorkflowSettingType } from '@st/shared';
+import {
+  parseWorkflowSetting,
+  workflowSettingIssues,
+  type WorkflowSetting,
+  type WorkflowSettingType,
+} from '@st/shared';
 
 // Fields that belong to one setting type; changing the type drops them. Anything else (key, label,
 // description, fields from a newer version) is kept.
 const typeFields = ['default', 'min', 'max', 'step', 'options', 'multiline'] as const;
 
+/**
+ * The draft's declarations as a list. The draft keeps the stored value raw (items that don't parse
+ * included, so a save never drops them); a stored non-list counts as no rows.
+ */
+export const draftList = (settings: unknown): readonly unknown[] => (Array.isArray(settings) ? settings : []);
+
+/**
+ * Why the draft can't be saved: a declaration the API would refuse (an unknown type, a wrong field type)
+ * or a non-list. The user removes or fixes it on purpose; it is never dropped silently.
+ */
+export function unsavableSettings(settings: unknown): string | undefined {
+  if (settings !== undefined && !Array.isArray(settings)) return workflowSettingIssues(settings)[0]?.message;
+  for (const [index, item] of draftList(settings).entries()) {
+    const parsed = parseWorkflowSetting(item, index);
+    if ('problem' in parsed) return parsed.problem;
+  }
+  return undefined;
+}
+
+/**
+ * The workflow as the editor drafts it. Older files have no `settings`; only that is normalized, so adding
+ * then removing a setting is not a change. Items stay raw: one that doesn't parse is shown read-only and
+ * saved unchanged (or the save is refused), never dropped.
+ */
+export const withDraftSettings = <T extends { settings?: unknown }>(stored: T): T => ({
+  ...stored,
+  settings: stored.settings ?? [],
+});
+
 /** A new number setting with the first free `setting<N>` key. */
-export function newSetting(existing: readonly WorkflowSetting[]): WorkflowSetting {
-  const keys = new Set(existing.map((setting) => setting.key));
+export function newSetting(existing: readonly unknown[]): WorkflowSetting {
+  const keys = new Set(existing.map((item) => (item as { key?: unknown } | null)?.key));
   let n = 1;
   while (keys.has(`setting${n}`)) n++;
   return { key: `setting${n}`, type: 'number', default: 0 };
@@ -53,3 +87,9 @@ export function optionalNumber(text: string): number | undefined {
   const value = Number(text);
   return Number.isFinite(value) ? value : undefined;
 }
+
+/**
+ * The toolbar's Chat settings toggle. A selected node's config covers the settings panel, so the toggle acts
+ * on what is shown: while a node covers the open panel, it deselects the node and brings the settings back.
+ */
+export const toggleSettingsPanel = (shown: boolean) => ({ open: !shown, deselect: !shown });

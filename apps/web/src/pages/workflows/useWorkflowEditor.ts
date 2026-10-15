@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Edge } from '@xyflow/react';
-import { workflowInvalidDetailsSchema, workflowSettings, type Workflow, type NodeTypeDescriptor } from '@st/shared';
+import { workflowInvalidDetailsSchema, type Workflow, type NodeTypeDescriptor } from '@st/shared';
 import { ApiError, workflowsApi, nodeTypesApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
 import {
@@ -13,6 +13,7 @@ import {
   workflowsStore,
 } from '../../stores/index.js';
 import { canvasToWorkflow, workflowToCanvas, type CanvasNode } from './model.js';
+import { unsavableSettings, withDraftSettings } from './settingsDraft.js';
 import { useWorkflowCanvas } from './useWorkflowCanvas.js';
 
 /** Serialization of a workflow as the canvas would save it; the dirty check compares these. */
@@ -44,8 +45,7 @@ export function useWorkflowEditor() {
   }, []);
 
   const load = (stored: Workflow) => {
-    // Older files have no `settings`; normalize first, so adding then removing a setting is not a change.
-    const next = { ...stored, settings: workflowSettings(stored) };
+    const next = withDraftSettings(stored);
     setWorkflow(next);
     canvas.load(next);
     const loaded = workflowToCanvas(next, types);
@@ -82,6 +82,14 @@ export function useWorkflowEditor() {
 
   const save = async (showToast = true): Promise<boolean> => {
     if (!workflow) return false;
+    // The API would refuse it (400); say which declaration and leave the decision to the user.
+    const blocked = unsavableSettings(workflow.settings);
+    if (blocked) {
+      alerts.error(`${blocked} Remove it under Chat settings, or fix the workflow file, to save.`, {
+        title: 'Workflow not saved',
+      });
+      return false;
+    }
     const current = canvasToWorkflow(workflow, canvas.nodes, canvas.edges);
     try {
       const updated = await workflowsApi.update(workflow.id, current);

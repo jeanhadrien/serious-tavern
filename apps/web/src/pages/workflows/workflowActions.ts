@@ -2,6 +2,7 @@ import type { Workflow } from '@st/shared';
 import { workflowsApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
 import { workflowEditorStore, workflowsStore } from '../../stores/index.js';
+import { unsavableSettings } from './settingsDraft.js';
 
 /**
  * Creates "<name> copy" from a workflow's graph and chat settings and opens it in the editor. Shared by the list (saved version)
@@ -10,6 +11,14 @@ import { workflowEditorStore, workflowsStore } from '../../stores/index.js';
 export async function duplicateWorkflow(
   source: Pick<Workflow, 'name' | 'nodes' | 'edges' | 'settings'>,
 ): Promise<boolean> {
+  // The API would refuse a declaration that doesn't parse (400); say which one instead.
+  const blocked = unsavableSettings(source.settings);
+  if (blocked) {
+    alerts.error(`${blocked} Remove it under Chat settings, or fix the workflow file, to duplicate.`, {
+      title: 'Workflow not duplicated',
+    });
+    return false;
+  }
   try {
     const copy = await workflowsApi.create({
       name: `${source.name} copy`,
