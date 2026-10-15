@@ -35,7 +35,14 @@ export const recall: NodeDefinition = {
   description: 'Entries of collections whose keywords appear in the recent chat',
   category: 'Lore',
   inputs: [
-    { name: 'text', label: 'Text', dataType: 'text', description: 'Extra text to scan, besides the recent messages' },
+    {
+      name: 'text',
+      label: 'Text',
+      dataType: 'text',
+      // An extra: when its source is skipped, Recall still scans the messages.
+      neverSkips: true,
+      description: 'Extra text to scan, besides the recent messages',
+    },
   ],
   outputs: [
     {

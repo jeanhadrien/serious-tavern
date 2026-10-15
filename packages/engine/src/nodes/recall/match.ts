@@ -1,9 +1,15 @@
 export type MatchOptions = { caseSensitive: boolean; wholeWords: boolean };
 
-// Letters, marks and digits of any script, plus `_`: what a word is made of for whole-word matching.
-const WORD_CHAR = /[\p{L}\p{M}\p{N}_]/u;
-const BEFORE = '(?<![\\p{L}\\p{M}\\p{N}_])';
-const AFTER = '(?![\\p{L}\\p{M}\\p{N}_])';
+// Scripts written without spaces between words (Chinese, Japanese, Thai…): they have no word boundaries, so
+// a keyword edge in one of them needs none, and one of their letters next to a keyword never blocks it
+// (`東京` in `私は東京に行く`, `Tokyo` in `私はTokyoに行く`).
+const UNSPACED =
+  '\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Thai}\\p{Script=Lao}\\p{Script=Khmer}\\p{Script=Myanmar}';
+// Letters, marks and digits of any spaced script, plus `_`: what a word is made of for whole-word matching.
+const WORD = `(?![${UNSPACED}])[\\p{L}\\p{M}\\p{N}_]`;
+const WORD_CHAR = new RegExp(`^${WORD}$`, 'u');
+const BEFORE = `(?<!${WORD})`;
+const AFTER = `(?!${WORD})`;
 
 // Only syntax characters: the `u` flag rejects needless escapes such as `\-`.
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -12,7 +18,7 @@ const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&
  * A matcher for one keyword, or null for a blank one. Keywords are literal text (regex characters match
  * themselves). With `wholeWords`, a side of the keyword only needs a word boundary when its edge character
  * is a word character, so `C++` and `#tag` still match; boundaries understand every script (`Борин` does
- * not match inside `Борина`).
+ * not match inside `Борина`), and scripts written without spaces never count as word characters.
  */
 export function keywordMatcher(keyword: string, options: MatchOptions): RegExp | null {
   const literal = keyword.trim();

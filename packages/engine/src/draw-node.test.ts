@@ -188,9 +188,16 @@ describe('Draw node', () => {
         level: 2,
       },
       text: 'a boundary stone',
+      level: 2,
       entries: [expect.objectContaining({ entryId: 'entry-2' })],
       reason: 'drew 1 of 2 eligible (tags: forest; level ≤ 2)',
     });
+  });
+
+  it('leaves out the level when the drawn entry has none', async () => {
+    const { output } = await drawWith({ requireTags: ['forest'], excludeTags: ['object', 'sensory'] }, {}, [0]);
+    expect(output.text).toBe('no level');
+    expect(output).not.toHaveProperty('level');
   });
 
   it('joins the texts one per line when drawing several', async () => {
@@ -216,13 +223,34 @@ describe('Draw node', () => {
     ]);
   });
 
+  const drawnTexts = (output: Record<string, unknown>) =>
+    (output.entries as Array<{ text: string }>).map((item) => item.text).sort();
+
+  it.each([
+    [{ anyTags: ['sound', 'Sensory'] }, ['a bell somewhere', 'resin after rain']],
+    [{ excludeTags: ['object'] }, ['a bell somewhere', 'no level', 'resin after rain']],
+    [{ minLevel: 2 }, ['a bell somewhere', 'a boundary stone']],
+  ])('applies the %j config filter', async (filters, expected) => {
+    expect(drawnTexts((await drawWith({ count: 10, ...filters })).output)).toEqual(expected);
+  });
+
+  it('gives every eligible entry the same chance with weights off', async () => {
+    const config = { requireTags: ['forest'], maxLevel: 2 };
+    // Eligible: resin (weight 1), boundary stone (weight 2). 0.4 lands on resin only when weights are off.
+    expect((await drawWith({ ...config, useWeights: false }, {}, [0.4])).output).toMatchObject({
+      text: 'resin after rain',
+      reason: 'drew 1 of 2 eligible (tags: forest; level ≤ 2; weights off)',
+    });
+    expect((await drawWith(config, {}, [0.4])).output.text).toBe('a boundary stone');
+  });
+
   it.each([
     [1, ['resin after rain']],
     ['1', ['resin after rain']],
     [' 2 ', ['a bell somewhere', 'a boundary stone', 'resin after rain']],
+    [5, ['a bell somewhere', 'a boundary stone', 'resin after rain']],
   ])('takes Max level %j from its input, which also leaves out entries without a level', async (maxLevel, expected) => {
-    const { output } = await drawWith({ count: 10, maxLevel: 5 }, { maxLevel });
-    expect((output.entries as Array<{ text: string }>).map((item) => item.text).sort()).toEqual(expected);
+    expect(drawnTexts((await drawWith({ count: 10 }, { maxLevel })).output)).toEqual(expected);
   });
 
   it.each([
@@ -302,7 +330,29 @@ describe('Draw in a workflow', () => {
     expect(result.replies.map((reply) => reply.content)).toEqual(['no eligible entry among 4 (tags: sea)']);
   });
 
-  it('is skipped when a connected input comes from a branch that was not taken', async () => {
+  it('draws across several collections, in config order', async () => {
+    const workflow = graph(
+      [
+        node('input', 'chat-input'),
+        node('draw', 'draw', { collectionIds: ['deck', 'big'], count: 30 }),
+        node('out', 'chat-output'),
+      ],
+      [edge('draw', 'entries', 'out', 'value')],
+    );
+    const result = await executeWorkflow(workflow, { ...options, seed: 's' });
+    const drawn = JSON.parse(result.replies[0]!.content) as Array<{ collectionId: string; entryId: string }>;
+    expect(drawn).toHaveLength(24);
+    expect(new Set(drawn.map((item) => `${item.collectionId}/${item.entryId}`)).size).toBe(24);
+    expect(
+      drawn
+        .filter((item) => item.collectionId === 'deck')
+        .map((item) => item.entryId)
+        .sort(),
+    ).toEqual(['entry-1', 'entry-2', 'entry-3', 'entry-4']);
+    expect(drawn.some((item) => item.collectionId === 'big' && item.entryId === 'entry-20')).toBe(true);
+  });
+
+  it.each(['tags', 'maxLevel'])('is skipped when its %s input comes from a branch that was not taken', async (port) => {
     const workflow = graph(
       [
         node('input', 'chat-input'),
@@ -312,7 +362,7 @@ describe('Draw in a workflow', () => {
       ],
       [
         edge('input', 'message', 'combat', 'value'),
-        edge('combat', 'true', 'draw', 'tags'),
+        edge('combat', 'true', 'draw', port),
         edge('draw', 'reason', 'out', 'value'),
       ],
     );

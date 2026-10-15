@@ -80,6 +80,11 @@ describe('Recall scanning', () => {
     expect(await texts({}, { history })).toEqual([]);
   });
 
+  it('matches inside words when whole words are off', async () => {
+    expect(await texts({}, { message: 'the passage' })).toEqual([]);
+    expect(await texts({ wholeWords: false }, { message: 'the passage' })).toEqual(['Snow on the pass.']);
+  });
+
   it('ignores case unless asked', async () => {
     expect(await texts({}, { message: 'borin' })).toHaveLength(1);
     expect(await texts({ caseSensitive: true }, { message: 'borin' })).toEqual([]);
@@ -113,6 +118,11 @@ describe('Recall keyword matching', () => {
     ['east-west', 'the east-west road', true],
     ['42', 'room 421', false],
     ['42', 'room 42', true],
+    // Scripts written without spaces have no word boundaries.
+    ['東京', '私は東京に行く', true],
+    ['Tokyo', '私はTokyoに行く', true],
+    ['กรุงเทพ', 'ฉันไปกรุงเทพเมื่อวาน', true],
+    ['Tokyo', 'Tokyoite', false],
   ])('%s in %j: %s', (keyword, text, expected) => {
     expect(matches(keyword, text)).toBe(expected);
   });
@@ -231,6 +241,31 @@ describe('Recall errors and runs', () => {
     await expect(
       runNode(recall, { collectionIds: ['lore'] }, { resources: { presets: { get: async () => undefined } } }),
     ).rejects.toThrow('Collection lore not found');
+  });
+
+  it('still scans the messages when its text input comes from a skipped source', async () => {
+    const workflow = graph(
+      [
+        node('input', 'chat-input'),
+        node('combat', 'condition', { operator: 'equals', right: 'combat' }),
+        node('recall', 'recall', { collectionIds: ['lore'] }),
+        node('output', 'chat-output'),
+      ],
+      [
+        edge('input', 'message', 'combat', 'value'),
+        edge('combat', 'true', 'recall', 'text'),
+        edge('recall', 'text', 'output', 'value'),
+      ],
+    );
+    const result = await executeWorkflow(workflow, {
+      message: 'We reach the salt inn.',
+      sessionId: 's',
+      history: [],
+      secrets: { get: async () => undefined },
+      resources: resourcesWith(lore),
+    });
+    expect(result.execution.nodes.combat?.status).toBe('completed');
+    expect(result.replies.map((reply) => reply.content)).toEqual(['The Salt Inn sits by the river.']);
   });
 
   it('runs in a workflow, reading each collection once per run', async () => {

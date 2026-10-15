@@ -9,6 +9,9 @@ export type PortDef = {
   // Input only: when connected, a skipped source (or one that didn't produce the port) skips the node, as for a
   // required input; unlike `required`, the input may be left unconnected.
   requiredIfConnected?: boolean;
+  // Input only: never makes the node skip. An inactive edge into it (skipped source, port not produced) only
+  // leaves the input absent, even when it is the node's only connection (Recall's extra `text`).
+  neverSkips?: boolean;
   optional?: boolean;
 };
 export type CoercionKind = 'to-text' | 'messages-to-text';

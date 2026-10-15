@@ -128,6 +128,7 @@ export const portSchema = z.object({
   description: z.string().optional(),
   required: z.boolean().optional(),
   requiredIfConnected: z.boolean().optional(),
+  neverSkips: z.boolean().optional(),
   optional: z.boolean().optional(),
 });
 export const nodeTypeDescriptorSchema = z.object({

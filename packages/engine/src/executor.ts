@@ -150,7 +150,11 @@ export async function executeWorkflow(
                   edges.some((e) => e.targetHandle === p.name) &&
                   !Object.hasOwn(inputs, p.name),
               );
-            if ((edges.length > 0 && active.length === 0) || (node.type !== 'merge' && requiredSkipped)) {
+            // A node whose every gating connection is inactive is skipped; `neverSkips` inputs never gate.
+            const nodeInputs = ports.get(node.id)!.inputs;
+            const gates = (e: Edge) => !nodeInputs.find((p) => p.name === e.targetHandle)?.neverSkips;
+            const gating = edges.filter(gates);
+            if ((gating.length > 0 && !active.some(gates)) || (node.type !== 'merge' && requiredSkipped)) {
               const now = new Date().toISOString();
               execution.nodes[node.id] = { status: 'skipped', startedAt: now, finishedAt: now, durationMs: 0 };
               resolved.set(node.id, { output: {}, skipped: true });

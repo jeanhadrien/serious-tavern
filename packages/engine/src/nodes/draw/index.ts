@@ -65,6 +65,13 @@ export const draw: NodeDefinition = {
         "The drawn entry's text (all drawn texts, one per line, when Count > 1); absent when nothing is eligible",
     },
     {
+      name: 'level',
+      label: 'Level',
+      dataType: 'number',
+      optional: true,
+      description: "The first drawn entry's level; absent when nothing is drawn or it has no level",
+    },
+    {
       name: 'entries',
       label: 'Entries',
       dataType: 'array',
@@ -105,12 +112,15 @@ export const draw: NodeDefinition = {
     const options = { count: config.count, useWeights: config.useWeights };
     const result = drawEntries(candidates(collections), filters, options, ctx.random);
     const reason = describeDraw(result, filters, options);
-    // Nothing eligible: `entry` and `text` are absent, so whatever they feed is skipped.
+    // Nothing eligible: `entry`, `text` and `level` are absent (a node that requires them is skipped).
     if (!result.drawn.length) return { entries: [], reason };
     const entries = result.drawn.map(entryOutput);
+    const first = entries[0]!;
     return {
-      entry: entries[0],
+      entry: first,
       text: entries.map((entry) => entry.text).join('\n'),
+      // A number, so a preset can word the entry by level: `{{#if (eq input.level "1")}}`.
+      ...(first.level !== undefined && { level: first.level }),
       entries,
       reason,
     };
