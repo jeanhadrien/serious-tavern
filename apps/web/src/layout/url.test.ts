@@ -41,6 +41,10 @@ it('round-trips layouts through the URL and the reducer', () => {
       { providers: 'x', workflows: 'w1', personas: 'p' },
       's1',
     ],
+    ['right=collections', {}, undefined],
+    ['right=collection:k1', { collections: 'k1' }, undefined],
+    ['left=provider:x&right=collection:k', { providers: 'x', collections: 'k' }, undefined],
+    ['left=presets&wide=preset:p1&right=collection:k', { presets: 'p1', collections: 'k' }, undefined],
   ];
   for (const [search, ids, session] of cases) expect(reload(search, ids, session)).toBe(search);
 });
@@ -63,6 +67,7 @@ it('falls back to defaults on garbage', () => {
     'right=character&left=chat',
     'wide=preset:&right=persona:',
     'left=character:c1&right=provider:x',
+    'right=collection:&left=collection:k',
     '%E0%A4%A&&===',
   ]) {
     const url = parseLayoutUrl(garbage);
@@ -183,5 +188,8 @@ it('holds the URL while a phone shows an editor that is still loading', () => {
   const narrow = run(phone(), { type: 'selectTab', id: 'characters' }, { type: 'openEditor', id: 'characters' });
   expect(phoneEditorLoading(narrow, {})).toBe(true);
   expect(phoneEditorLoading(narrow, { characters: 'c1' })).toBe(false);
+  const lore = run(phone(), { type: 'selectTab', id: 'collections' }, { type: 'openEditor', id: 'collections' });
+  expect(phoneEditorLoading(lore, {})).toBe(true);
+  expect(phoneEditorLoading(lore, { collections: 'k1' })).toBe(false);
   expect(phoneEditorLoading(run(start(), { type: 'openEditor', id: 'workflows' }), {})).toBe(false);
 });

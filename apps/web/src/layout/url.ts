@@ -6,8 +6,8 @@
 //   left=workflows|presets|providers|settings
 //   left=provider:<id>        a narrow editor open in L
 //   wide=workflow|preset[:<id>]   the wide editor in M (the chat then moves to R)
-//   right=chats|characters|personas|chat   what R shows ('chat' is only meaningful with a wide editor)
-//   right=character:<id>|persona:<id>      a narrow editor open in R
+//   right=chats|characters|personas|collections|chat   what R shows ('chat' only counts with a wide editor)
+//   right=character:<id>|persona:<id>|collection:<id>  a narrow editor open in R
 //   view=<list>|chat|editor   phones only: what is on screen, when it is not what the rest opens
 //   edge=<id>                 one-shot: highlight this edge of the opened workflow
 import { mobileView } from './derive.js';
@@ -32,12 +32,13 @@ export interface LayoutUrl extends Omit<LayoutTarget, 'leftEditorOpen' | 'rightE
 }
 
 const LEFT_TABS: readonly ListId[] = ['workflows', 'presets', 'providers', 'settings'];
-const RIGHT_TABS: readonly (ListId | 'chat')[] = ['chats', 'characters', 'personas', 'chat'];
+const RIGHT_TABS: readonly (ListId | 'chat')[] = ['chats', 'characters', 'personas', 'collections', 'chat'];
 const WIDE_NAMES: Partial<Record<ResourceId, string>> = { workflows: 'workflow', presets: 'preset' };
 const NARROW_NAMES: Partial<Record<ResourceId, string>> = {
   providers: 'provider',
   characters: 'character',
   personas: 'persona',
+  collections: 'collection',
 };
 
 const MOBILE_VIEWS: readonly MobileView[] = [...LEFT_TABS, ...RIGHT_TABS, 'editor'];

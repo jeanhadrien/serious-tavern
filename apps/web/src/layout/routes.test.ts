@@ -12,6 +12,11 @@ it('maps legacy list paths to the column that holds them', () => {
   expect(legacySearch('/characters', '')).toBe('right=characters');
   expect(legacySearch('/personas', '?id=x')).toBe('right=personas');
   expect(legacySearch('/settings', '')).toBe('left=settings');
+  expect(legacySearch('/collections', '')).toBe('right=collections');
+});
+
+it("maps the node panels' collection link to the collection editor in R", () => {
+  expect(legacySearch('/collections', '?id=k1')).toBe('right=collection:k1');
 });
 
 it('sends unknown paths to the default layout', () => {

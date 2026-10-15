@@ -69,7 +69,7 @@ export function mobileView(state: LayoutState): MobileView {
 }
 
 const LEFT_ICONS: readonly IconId[] = ['workflows', 'presets', 'providers', 'settings'];
-const RIGHT_ICONS: readonly IconId[] = ['chats', 'characters', 'personas'];
+const RIGHT_ICONS: readonly IconId[] = ['chats', 'characters', 'personas', 'collections'];
 
 /** The icons a column header shows. M has none. */
 export function columnIcons(state: LayoutState, column: 'L' | 'R'): readonly IconId[] {

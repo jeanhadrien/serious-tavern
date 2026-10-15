@@ -2,7 +2,7 @@
 // Nothing here knows about React, the DOM or the URL: the shell renders whatever
 // `viewSlots`/`columnIcons` derive from this state, and `url.ts` serializes it.
 
-export type ResourceId = 'workflows' | 'presets' | 'providers' | 'settings' | 'characters' | 'personas';
+export type ResourceId = 'workflows' | 'presets' | 'providers' | 'settings' | 'characters' | 'personas' | 'collections';
 /** Something a column can list: a resource's list, or the chat history. */
 export type ListId = ResourceId | 'chats';
 /** Header icons also include the chat itself, which only appears while it sits in R. */
@@ -21,6 +21,7 @@ export const LIST_COLUMN: Record<ListId, 'L' | 'R'> = {
   chats: 'R',
   characters: 'R',
   personas: 'R',
+  collections: 'R',
 };
 
 /** Narrow editors with no list in front of them: their icon shows the editor itself. */
@@ -33,6 +34,7 @@ export const RESOURCE_IDS: readonly ResourceId[] = [
   'settings',
   'characters',
   'personas',
+  'collections',
 ];
 
 export interface LayoutState {
@@ -93,6 +95,7 @@ const noResources = (): Record<ResourceId, boolean> => ({
   settings: false,
   characters: false,
   personas: false,
+  collections: false,
 });
 
 /** The editor kinds the design calls for. */
@@ -103,6 +106,7 @@ export const DESIGN_KINDS: Record<ResourceId, EditorKind> = {
   settings: 'narrow',
   characters: 'narrow',
   personas: 'narrow',
+  collections: 'narrow',
 };
 
 export function initialLayout(kinds: Record<ResourceId, EditorKind>, compact = false, mobile = false): LayoutState {

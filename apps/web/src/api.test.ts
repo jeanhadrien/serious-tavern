@@ -1,6 +1,16 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { alerts } from './alerts/store.js';
-import { ApiError, api, json, sessionsApi, workflowsApi, charactersApi, nodeTypesApi, secretsApi } from './api.js';
+import {
+  ApiError,
+  api,
+  json,
+  sessionsApi,
+  workflowsApi,
+  charactersApi,
+  collectionsApi,
+  nodeTypesApi,
+  secretsApi,
+} from './api.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -101,4 +111,24 @@ it('uses PATCH with JSON for message edits and bodyless DELETE for message remov
   expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'DELETE' });
   expect(fetchMock.mock.calls[1]?.[1]?.body).toBeUndefined();
   expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).has('content-type')).toBe(false);
+});
+
+it('reads and writes collections by id', async () => {
+  const fetchMock = vi
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation(
+      async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+  await collectionsApi.list();
+  await collectionsApi.get('c/1');
+  await collectionsApi.create({ name: 'Lore' });
+  await collectionsApi.update('c1', { name: 'Lore', entries: [] });
+  await collectionsApi.delete('c1');
+  expect(fetchMock.mock.calls.map(([url, init]) => [url, (init as RequestInit | undefined)?.method ?? 'GET'])).toEqual([
+    ['/api/collections', 'GET'],
+    ['/api/collections/c%2F1', 'GET'],
+    ['/api/collections', 'POST'],
+    ['/api/collections/c1', 'PUT'],
+    ['/api/collections/c1', 'DELETE'],
+  ]);
 });

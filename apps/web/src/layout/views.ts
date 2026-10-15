@@ -1,5 +1,6 @@
 import {
   History,
+  Library,
   MessageSquare,
   ScrollText,
   Server,
@@ -21,6 +22,7 @@ export const VIEW_INFO: Record<IconId, { icon: LucideIcon; label: string }> = {
   settings: { icon: Settings, label: 'Settings' },
   characters: { icon: Users, label: 'Characters' },
   personas: { icon: UserRound, label: 'Personas' },
+  collections: { icon: Library, label: 'Collections' },
 };
 
 /** Names of the wide editors, for places that list them next to their lists (the phone menu). */

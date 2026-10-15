@@ -10,6 +10,7 @@ const clean: Record<ResourceId, boolean> = {
   settings: false,
   characters: false,
   personas: false,
+  collections: false,
 };
 
 const render = (props: Partial<Parameters<typeof MobileMenu>[0]>) =>
@@ -19,7 +20,17 @@ const render = (props: Partial<Parameters<typeof MobileMenu>[0]>) =>
 
 it('lists the chat and every list, marking what is on screen', () => {
   const html = render({ active: 'presets' });
-  for (const label of ['Chat', 'Chats', 'Characters', 'Personas', 'Workflows', 'Presets', 'Providers', 'Settings'])
+  for (const label of [
+    'Chat',
+    'Chats',
+    'Characters',
+    'Personas',
+    'Collections',
+    'Workflows',
+    'Presets',
+    'Providers',
+    'Settings',
+  ])
     expect(html).toContain(`<span>${label}</span>`);
   expect(html.match(/aria-current="page"/g)).toHaveLength(1);
   expect(html).toMatch(/aria-current="page"[^>]*>.*?<span>Presets<\/span>/);

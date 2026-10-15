@@ -1,0 +1,187 @@
+import { collectionFieldsSchema, type Collection, type CollectionEntry, type CollectionFields } from '@st/shared';
+import type { DiskChange } from '../fileLiveSync.js';
+
+export const LEVELS = ['1', '2', '3', '4', '5'] as const;
+
+/**
+ * One entry as the editor edits it: lists and numbers stay text while typing and are converted on save.
+ * Unknown fields travel in `rest` and are sent back unchanged.
+ */
+export interface EntryDraft {
+  text: string;
+  title: string;
+  /** Comma-separated. */
+  keywords: string;
+  /** Comma-separated. */
+  tags: string;
+  /** '' means no level. */
+  level: '' | (typeof LEVELS)[number];
+  /** '' means the default (1). */
+  weight: string;
+  enabled: boolean;
+  rest: Record<string, unknown>;
+  /** The stored lists, kept as they are while their text is unchanged (a stored keyword may hold a comma). */
+  original: { keywords?: string[]; tags?: string[] };
+}
+
+export interface CollectionDraft {
+  name: string;
+  description: string;
+  entries: EntryDraft[];
+}
+
+const KNOWN = ['text', 'title', 'keywords', 'tags', 'level', 'weight', 'enabled'];
+
+const joinList = (items?: readonly string[]) => (items ?? []).join(', ');
+
+/** A comma-separated list as stored: the original list while the text is unchanged, else trimmed items. */
+export function listFromText(text: string, original?: string[]): string[] | undefined {
+  if (original && text === joinList(original)) return original;
+  const items = text
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return items.length ? items : undefined;
+}
+
+export function toEntryDraft(entry: CollectionEntry): EntryDraft {
+  const rest = Object.fromEntries(Object.entries(entry).filter(([key]) => !KNOWN.includes(key)));
+  return {
+    text: entry.text,
+    title: entry.title ?? '',
+    keywords: joinList(entry.keywords),
+    tags: joinList(entry.tags),
+    level: entry.level === undefined ? '' : (String(entry.level) as EntryDraft['level']),
+    weight: String(entry.weight ?? 1),
+    enabled: entry.enabled !== false,
+    rest,
+    original: { keywords: entry.keywords, tags: entry.tags },
+  };
+}
+
+export const toDraft = (collection: Collection): CollectionDraft => ({
+  name: collection.name,
+  description: collection.description ?? '',
+  entries: collection.entries.map(toEntryDraft),
+});
+
+export const newEntry = (): EntryDraft => ({
+  text: '',
+  title: '',
+  keywords: '',
+  tags: '',
+  level: '',
+  weight: '1',
+  enabled: true,
+  rest: {},
+  original: {},
+});
+
+/** Moves one entry; out-of-range moves leave the list as it is. */
+export function moveEntry<T>(entries: readonly T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || from >= entries.length || to >= entries.length) return [...entries];
+  const next = [...entries];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved!);
+  return next;
+}
+
+/** A one-line label for an entry: its title, else the first line of its text. */
+export function entryPreview(entry: Pick<EntryDraft, 'title' | 'text'>): string {
+  const label =
+    entry.title.trim() ||
+    entry.text
+      .split('\n')
+      .find((line) => line.trim())
+      ?.trim() ||
+    '';
+  if (!label) return '(empty)';
+  return label.length > 80 ? `${label.slice(0, 79)}…` : label;
+}
+
+function entryBody(entry: EntryDraft, position: number, errors: string[]): Record<string, unknown> {
+  const title = entry.title.trim();
+  const keywords = listFromText(entry.keywords, entry.original.keywords);
+  const tags = listFromText(entry.tags, entry.original.tags);
+  const weightText = entry.weight.trim();
+  const weight = Number(weightText);
+  if (weightText && !(Number.isFinite(weight) && weight >= 0))
+    errors.push(`Entry ${position}: weight must be a number of 0 or more`);
+  return {
+    ...entry.rest,
+    text: entry.text,
+    ...(title && { title }),
+    ...(keywords && { keywords }),
+    ...(tags && { tags }),
+    ...(entry.level && { level: Number(entry.level) }),
+    ...(weightText && { weight }),
+    enabled: entry.enabled,
+  };
+}
+
+/** A field name for a schema problem: `Name`, `Entry 3 level`... */
+function fieldName(path: readonly PropertyKey[]): string {
+  const [head, index, field] = path.map(String);
+  if (head === 'entries' && index !== undefined) return [`Entry ${Number(index) + 1}`, field].filter(Boolean).join(' ');
+  return head ? head.charAt(0).toUpperCase() + head.slice(1) : 'Collection';
+}
+
+/** The request body for a draft, validated like the server does, or the problems found. */
+export function draftToBody(
+  draft: CollectionDraft,
+): { ok: true; body: CollectionFields } | { ok: false; errors: string[] } {
+  const errors: string[] = [];
+  const description = draft.description.trim() ? draft.description : undefined;
+  const body = {
+    name: draft.name,
+    ...(description !== undefined && { description }),
+    entries: draft.entries.map((entry, index) => entryBody(entry, index + 1, errors)),
+  };
+  if (errors.length) return { ok: false, errors };
+  const parsed = collectionFieldsSchema.safeParse(body);
+  // The body as built (not the parsed copy), so omitted defaults stay omitted; it passed the same schema.
+  if (parsed.success) return { ok: true, body: body as CollectionFields };
+  return { ok: false, errors: parsed.error.issues.map((issue) => `${fieldName(issue.path)}: ${issue.message}`) };
+}
+
+const sameDraft = (a: CollectionDraft, b: CollectionDraft) => JSON.stringify(a) === JSON.stringify(b);
+
+/** The draft as the server would store it, or undefined when it is invalid. */
+function normalized(draft: CollectionDraft, collection: Collection): CollectionDraft | undefined {
+  const result = draftToBody(draft);
+  if (!result.ok) return undefined;
+  const entries = (result.body.entries ?? []).map((entry) => ({ weight: 1, enabled: true, ...entry }));
+  return toDraft({ ...collection, description: undefined, ...result.body, entries });
+}
+
+/** True when saving the draft would change the collection. */
+export function draftChanged(draft: CollectionDraft, collection: Collection): boolean {
+  const saved = normalized(draft, collection);
+  // The stored side is normalized too, so a hand-written ` title ` or `description: ''` is not a change.
+  const stored = normalized(toDraft(collection), collection);
+  return !saved || !stored || !sameDraft(saved, stored);
+}
+
+/**
+ * What a fresh read of the open collection means for the editor (`fresh` holds it, or nothing when it is gone).
+ * Collections are compared through their drafts, so key order and timestamps never count as a change. A dirty
+ * draft that the disk already holds (its own save, announced before the response) is a reload, not a conflict.
+ */
+export function classifyCollectionChange(
+  editor: { draft?: CollectionDraft; collection?: Collection; deleting?: boolean },
+  fresh: readonly Collection[],
+): DiskChange<Collection> {
+  const { draft, collection } = editor;
+  // The editor's own delete is announced before its response: the item vanishing is expected, not news.
+  if (!draft || !collection || editor.deleting) return { kind: 'unchanged' };
+  const dirty = draftChanged(draft, collection);
+  const onDisk = fresh.find((item) => item.id === collection.id);
+  if (!onDisk) return dirty ? { kind: 'conflict', removed: true, version: 'removed' } : { kind: 'removed' };
+  const incoming = toDraft(onDisk);
+  if (sameDraft(incoming, toDraft(collection))) return { kind: 'unchanged' };
+  const saved = dirty ? normalized(draft, collection) : undefined;
+  if (saved && sameDraft(incoming, saved)) return { kind: 'reload', item: onDisk };
+  return dirty
+    ? { kind: 'conflict', removed: false, version: JSON.stringify(incoming) }
+    : { kind: 'reload', item: onDisk };
+}

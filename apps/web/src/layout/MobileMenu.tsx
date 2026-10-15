@@ -5,7 +5,7 @@ import type { IconId, MobileView, ResourceId } from './state.js';
 import { VIEW_INFO, WIDE_EDITOR_LABEL } from './views.js';
 
 const SECTIONS: readonly { title: string; items: readonly IconId[] }[] = [
-  { title: 'Content', items: ['chats', 'characters', 'personas'] },
+  { title: 'Content', items: ['chats', 'characters', 'personas', 'collections'] },
   { title: 'Setup', items: ['workflows', 'presets', 'providers', 'settings'] },
 ];
 

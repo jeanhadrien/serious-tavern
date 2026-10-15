@@ -4,6 +4,8 @@ import type { Session } from '@st/shared';
 import {
   charactersStore,
   characterEditorStore,
+  collectionEditorStore,
+  collectionsStore,
   personaEditorStore,
   personasStore,
   presetEditorStore,
@@ -38,6 +40,7 @@ const ITEM_SOURCES: Partial<Record<ResourceId, { list: ListStore<Item>; editor: 
   providers: { list: providersStore, editor: providerEditorStore },
   characters: { list: charactersStore, editor: characterEditorStore },
   personas: { list: personasStore, editor: personaEditorStore },
+  collections: { list: collectionsStore, editor: collectionEditorStore },
 };
 
 /** What the hook needs from the chat; `busy` turns must never be disturbed. */
@@ -158,12 +161,14 @@ export function useLayoutUrl(layout: LayoutState, dispatch: Dispatch<LayoutActio
   const characterId = useOpenId(characterEditorStore);
   const personaId = useOpenId(personaEditorStore);
   const providerId = useOpenId(providerEditorStore);
+  const collectionId = useOpenId(collectionEditorStore);
   const openIds = {
     workflows: workflowId,
     presets: presetId,
     providers: providerId,
     characters: characterId,
     personas: personaId,
+    collections: collectionId,
   };
   const next = formatLayoutUrl(layoutToUrl(layout, openIds, chat.session?.id));
   const loading = phoneEditorLoading(layout, openIds);

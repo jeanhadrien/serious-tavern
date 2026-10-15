@@ -2,8 +2,8 @@ import type { InvalidFile } from '@st/shared';
 import { subscribeToChanges } from '../api/events.js';
 import { alerts as defaultAlerts } from '../alerts/index.js';
 
-// Live sync for the editors of resources stored as hand-editable YAML files (presets, providers): the server
-// announces `<resource>.changed` with the files it could not load, and the open editor follows the disk.
+// Live sync for the editors of resources stored as hand-editable YAML files (presets, providers, collections):
+// the server announces `<resource>.changed` with the files it could not load, and the open editor follows the disk.
 
 /** What an on-disk change means for the item open in an editor. */
 export type DiskChange<T> =
@@ -31,7 +31,7 @@ export function planInvalidFileAlerts(
 
 /** The resource being synced and how messages name it. */
 export interface FileResource {
-  event: 'presets.changed' | 'providers.changed';
+  event: 'presets.changed' | 'providers.changed' | 'collections.changed';
   /** Lowercase singular noun, e.g. "preset". */
   noun: string;
   /** What to do when the open item was deleted on disk while it has unsaved changes. */

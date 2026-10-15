@@ -1,8 +1,8 @@
 import { layoutSearch, type LayoutUrl } from './url.js';
 
 // Older URLs name a resource page (`/presets?id=…`, `/workflows?workflow=…&edge=…`). Toast links from earlier
-// versions, bookmarks and node-ui's "Edit preset" link still use them, so they stay as inbound aliases:
-// the layout hook rewrites them to the layout URL on arrival.
+// versions, bookmarks and node-ui's "Edit preset"/"Edit collection" links use them (node-ui knows nothing about
+// the layout URL), so they stay as inbound aliases: the layout hook rewrites them to the layout URL on arrival.
 const PATH_LAYOUTS: Record<string, (params: URLSearchParams) => Partial<LayoutUrl>> = {
   '/workflows': (params) => {
     const wideId = params.get('workflow') || undefined;
@@ -17,6 +17,10 @@ const PATH_LAYOUTS: Record<string, (params: URLSearchParams) => Partial<LayoutUr
   },
   '/characters': () => ({ right: 'characters' }),
   '/personas': () => ({ right: 'personas' }),
+  '/collections': (params) => {
+    const rightId = params.get('id') || undefined;
+    return { right: 'collections', ...(rightId && { rightId }) };
+  },
   '/settings': () => ({ left: 'settings' }),
 };
 

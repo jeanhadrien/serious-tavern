@@ -21,7 +21,7 @@ it('starts with the chat in M and the chats list in R', () => {
   expect(slot(state, 'chat')).toBe('M');
   expect(slot(state, 'list:chats')).toBe('R');
   expect(slot(state, 'list:workflows')).toBe('L');
-  expect(columnIcons(state, 'R')).toEqual(['chats', 'characters', 'personas']);
+  expect(columnIcons(state, 'R')).toEqual(['chats', 'characters', 'personas', 'collections']);
 });
 
 it('moves the chat to R when a wide editor opens and back when it closes', () => {
@@ -29,7 +29,7 @@ it('moves the chat to R when a wide editor opens and back when it closes', () =>
   expect(slot(opened, 'editor:presets')).toBe('M');
   expect(slot(opened, 'chat')).toBe('R');
   expect(slot(opened, 'list:chats')).toBeNull();
-  expect(columnIcons(opened, 'R')).toEqual(['chat', 'chats', 'characters', 'personas']);
+  expect(columnIcons(opened, 'R')).toEqual(['chat', 'chats', 'characters', 'personas', 'collections']);
   expect(activeIcon(opened, 'R')).toBe('chat');
 
   const closed = run(opened, { type: 'closeEditor', id: 'presets' });
@@ -103,6 +103,29 @@ it('hides a narrow editor in R when a wide editor opens, keeping its state', () 
   expect(slot(closed, 'chat')).toBe('M');
 });
 
+it('opens collections as a narrow editor in R, in place of their list', () => {
+  const listed = run(start(), select('collections'));
+  expect(slot(listed, 'list:collections')).toBe('R');
+  const opened = run(listed, open('collections'));
+  expect(slot(opened, 'editor:collections')).toBe('R');
+  expect(slot(opened, 'list:collections')).toBeNull();
+  const back = run(opened, { type: 'closeEditor', id: 'collections' });
+  expect(back.narrowOpen.collections).toBe(false);
+  expect(slot(back, 'list:collections')).toBe('R');
+  // A wide editor sends the chat to R, hiding the collection editor; closing it brings the editor back.
+  const wide = run(opened, open('presets'));
+  expect(slot(wide, 'editor:collections')).toBeNull();
+  expect(slot(wide, 'chat')).toBe('R');
+  expect(slot(run(wide, { type: 'closeEditor', id: 'presets' }), 'editor:collections')).toBe('R');
+  // Compact mode shows it in L; a phone shows L's pane.
+  const compact = run(initialLayout(DESIGN_KINDS, true), select('collections'), open('collections'));
+  expect(slot(compact, 'editor:collections')).toBe('L');
+  const phoneOpened = run(initialLayout(DESIGN_KINDS, true, true), select('collections'), open('collections'));
+  expect(phoneOpened.pane).toBe('L');
+  expect(mobileView(phoneOpened)).toBe('collections');
+  expect(slot(phoneOpened, 'editor:collections')).toBe('L');
+});
+
 it('keeps unrelated views where they were when switching tabs', () => {
   const state = run(start(), select('presets'), select('characters'));
   expect(slot(state, 'list:presets')).toBe('L');
@@ -117,7 +140,7 @@ it('ignores selecting the chat icon when the chat is in M', () => {
 
 it('collapses to L | M in compact mode', () => {
   const compact = initialLayout(DESIGN_KINDS, true);
-  expect(columnIcons(compact, 'L')).toHaveLength(7);
+  expect(columnIcons(compact, 'L')).toHaveLength(8);
   expect(columnIcons(compact, 'R')).toEqual([]);
   expect(slot(compact, 'chat')).toBe('M');
   expect(slot(compact, 'list:chats')).toBe('L');
@@ -221,6 +244,7 @@ it('supports any mix of editor kinds', () => {
     settings: 'wide',
     characters: 'wide',
     personas: 'wide',
+    collections: 'wide',
   });
   const state = run(interim, select('characters'), open('characters'));
   expect(slot(state, 'editor:characters')).toBe('M');

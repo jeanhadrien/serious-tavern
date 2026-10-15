@@ -12,8 +12,11 @@ import { PresetListView } from '../pages/presets/PresetListView.js';
 import { ProviderListView } from '../pages/providers/ProviderListView.js';
 import { Providers } from '../pages/providers/Providers.js';
 import { WorkflowList } from '../pages/workflows/WorkflowList.js';
+import { CollectionListView } from '../pages/collections/CollectionListView.js';
+import { Collections } from '../pages/collections/Collections.js';
 import {
   characterEditorStore,
+  collectionEditorStore,
   personaEditorStore,
   presetEditorStore,
   providerEditorStore,
@@ -56,12 +59,14 @@ const STATIC_VIEWS = {
   'list:providers': <ProviderListView />,
   'list:characters': <CharacterList />,
   'list:personas': <PersonaList />,
+  'list:collections': <CollectionListView />,
   'editor:workflows': <Workflows />,
   'editor:presets': <Presets />,
   'editor:providers': <Providers />,
   'editor:settings': <Settings />,
   'editor:characters': <Characters />,
   'editor:personas': <Personas />,
+  'editor:collections': <Collections />,
 } satisfies Partial<Record<ViewKey, ReactNode>>;
 
 // Editors report their unsaved changes here; the shell shows them as a dot on the resource's icon.
@@ -71,6 +76,7 @@ const DIRTY_SOURCES = {
   providers: providerEditorStore,
   characters: characterEditorStore,
   personas: personaEditorStore,
+  collections: collectionEditorStore,
 };
 
 /** The three-column shell: top bar, L | M | R columns, and every view mounted exactly once. */

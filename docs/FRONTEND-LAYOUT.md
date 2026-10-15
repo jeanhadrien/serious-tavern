@@ -33,13 +33,13 @@ What was built, and where it refines the design below:
 |---|---|---|
 | **L** | Technical lists: workflows, presets, providers. Settings. | Providers and settings are narrow editors shown in L (settings has no list). |
 | **M** | The chat, by default. | Wide editors take M over. |
-| **R** | Content lists: chats (session history), characters, personas. | Browsing and editing only (see below). |
+| **R** | Content lists: chats (session history), characters, personas, collections. | Browsing and editing only (see below). |
 
 ## Editors
 
 Every editor is either **narrow** or **wide**.
 
-- **Narrow editors** (character, persona, provider, settings) open **inside their own column** and replace its list. A back arrow returns to the list. They are mostly text; the user resizes the column if they need room.
+- **Narrow editors** (character, persona, collection, provider, settings) open **inside their own column** and replace its list. A back arrow returns to the list. They are mostly text; the user resizes the column if they need room.
 - **Wide editors** (workflow, preset) open in **M**, and the **chat moves to R**. A close button on the editor returns the chat to M.
 
 Example: `preset list | chat | character list` becomes `preset list | preset editor | chat`.
@@ -65,7 +65,7 @@ Below a width breakpoint the layout collapses to **L | M**:
 
 Below 700px the two-column layout is shown **one column at a time**:
 
-- A menu button in the header opens a drawer listing the chat, the open wide editor (if any) and every list, grouped as Content (chats, characters, personas) and Setup (workflows, presets, providers, settings). Dirty dots show on the items and on the menu button.
+- A menu button in the header opens a drawer listing the chat, the open wide editor (if any) and every list, grouped as Content (chats, characters, personas, collections) and Setup (workflows, presets, providers, settings). Dirty dots show on the items and on the menu button.
 - Picking a list shows it full width. Opening an item follows it: a narrow editor replaces its list, a wide editor or a chat (from the chats list) takes the screen.
 - The header shows what is on screen. With a wide editor open it keeps the chat toggle and the close button.
 - Browser Back steps through the views the phone showed (the URL carries `view=` on phones).

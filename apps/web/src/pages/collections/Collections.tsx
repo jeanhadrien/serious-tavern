@@ -1,0 +1,33 @@
+import { CollectionEditor } from './CollectionEditor.js';
+import { useCollectionEditor } from './useCollectionEditor.js';
+import './collections.css';
+
+/** The collection editor view, shown in R in place of the collections list. */
+export function Collections() {
+  const editor = useCollectionEditor();
+  if (!editor.draft)
+    return (
+      <div className="empty-state">
+        <h1>Collections</h1>
+        <p>Select a collection, or create one.</p>
+      </div>
+    );
+  return (
+    <CollectionEditor
+      draft={editor.draft}
+      dirty={editor.dirty}
+      errors={editor.errors}
+      selected={editor.selected}
+      onChange={editor.change}
+      onSelect={editor.select}
+      onEntryChange={editor.updateEntry}
+      onAddEntry={editor.addEntry}
+      onRemoveEntry={editor.removeEntry}
+      onMoveEntry={editor.moveEntry}
+      onSave={() => void editor.save()}
+      onDiscard={editor.discard}
+      onDelete={() => void editor.remove()}
+      onBack={editor.back}
+    />
+  );
+}
