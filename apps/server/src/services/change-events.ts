@@ -2,6 +2,7 @@ import type { ApiResponse } from '@st/shared';
 import type { Repository } from '../storage/repository.js';
 import type { PresetRepository } from '../storage/preset-repository.js';
 import type { ProviderRepository } from '../storage/provider-repository.js';
+import type { CollectionRepository } from '../storage/collection-repository.js';
 import type { YamlRecord, YamlRepository } from '../storage/yaml-repository.js';
 import { watchDirectory, type DirectoryWatcher } from '../storage/directory-watcher.js';
 import { isYamlFile } from '../storage/yaml-filenames.js';
@@ -30,7 +31,7 @@ export class ChangeHub {
   }
 }
 
-/** Resources whose changes are announced by wrapping their repository (presets use the file watcher instead). */
+/** Resources whose changes are announced by wrapping their repository (YAML file resources use the file watcher instead). */
 export type RecordResource = 'workflows' | 'characters' | 'personas' | 'sessions';
 
 /**
@@ -70,19 +71,22 @@ export class NotifyingRepository<T extends { id: string }> implements Repository
 }
 
 /** Resources stored as YAML files that users may edit by hand; a directory watcher announces their changes. */
-type FileResource = 'presets' | 'providers';
+type FileResource = 'presets' | 'providers' | 'collections';
 
 /** The current state of every event type, sent to each new subscriber so it can resync. */
 export async function currentChangeEvents({
   presets,
   providers,
+  collections,
 }: {
   presets: PresetRepository;
   providers: ProviderRepository;
+  collections: CollectionRepository;
 }): Promise<ChangeEvent[]> {
   return [
     { type: 'presets.changed', invalidFiles: await presets.listInvalid() },
     { type: 'providers.changed', invalidFiles: await providers.listInvalid() },
+    { type: 'collections.changed', invalidFiles: await collections.listInvalid() },
     { type: 'workflows.changed' },
     { type: 'characters.changed' },
     { type: 'personas.changed' },

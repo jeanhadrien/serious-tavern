@@ -4,6 +4,7 @@ import { JsonRepository, type Repository } from './storage/repository.js';
 import { KeyedLock } from './storage/lock.js';
 import { PresetRepository } from './storage/preset-repository.js';
 import { ProviderRepository } from './storage/provider-repository.js';
+import { CollectionRepository } from './storage/collection-repository.js';
 import { migrateJsonPresets } from './storage/preset-migration.js';
 import { SecretStore } from './secrets/store.js';
 import { seed } from './seed.js';
@@ -16,6 +17,8 @@ export interface AppContext {
   presets: PresetRepository;
   /** User-defined LLM providers; the built-in ones live in code (see `services/providers.ts`). */
   providers: ProviderRepository;
+  /** Authored collections (lorebooks, decks): YAML files under `data/collections/`; read-only for workflows. */
+  collections: CollectionRepository;
   sessions: NotifyingRepository<Session>;
   executions: Repository<ExecutionLog>;
   characters: NotifyingRepository<Character>;
@@ -48,6 +51,7 @@ export async function createContext(dataDir: string, options: { seed?: boolean }
     workflows,
     presets,
     providers: new ProviderRepository(join(dataDir, 'providers')),
+    collections: new CollectionRepository(join(dataDir, 'collections')),
     sessions: notifying<Session>('sessions'),
     executions: new JsonRepository<ExecutionLog>(join(dataDir, 'executions')),
     characters: notifying<Character>('characters'),

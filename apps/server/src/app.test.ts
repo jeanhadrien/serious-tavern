@@ -81,6 +81,20 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     expect(copy).toMatchObject({ name: 'OpenRouter (copy)', builtIn: false, secret: 'openrouter' });
     await request('deleteProvider', { method: 'DELETE', url: `/api/providers/${copy.id}` });
     await request('deleteProvider', { method: 'DELETE', url: `/api/providers/${provider.id}` });
+    const collection = await request('createCollection', {
+      method: 'POST',
+      url: '/api/collections',
+      payload: { name: 'Contract lore', entries: [{ text: 'The Salt Inn', keywords: ['inn'] }] },
+    });
+    await request('getCollection', { method: 'GET', url: `/api/collections/${collection.id}` });
+    const summaries = await request('listCollections', { method: 'GET', url: '/api/collections' });
+    expect(summaries.map((summary) => summary.entryCount)).toEqual([1]);
+    await request('updateCollection', {
+      method: 'PUT',
+      url: `/api/collections/${collection.id}`,
+      payload: { name: 'Contract lore', entries: [] },
+    });
+    await request('deleteCollection', { method: 'DELETE', url: `/api/collections/${collection.id}` });
     const workflow = await request('createWorkflow', {
       method: 'POST',
       url: '/api/workflows',

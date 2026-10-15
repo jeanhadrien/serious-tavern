@@ -57,7 +57,7 @@ function readEvents(response: Response) {
   return { events, comments, done, cancel: () => reader.cancel() };
 }
 // The snapshot every new connection starts with: one event per type.
-const SNAPSHOT_SIZE = 6;
+const SNAPSHOT_SIZE = 7;
 type PresetsChanged = Extract<ChangeEvent, { type: 'presets.changed' }>;
 const last = (events: ChangeEvent[]) =>
   events.filter((event): event is PresetsChanged => event.type === 'presets.changed').at(-1);
@@ -73,6 +73,7 @@ it('streams the current state on connect, then a change event per edit with the 
     expect(stream.events.map((event) => event.type)).toEqual([
       'presets.changed',
       'providers.changed',
+      'collections.changed',
       'workflows.changed',
       'characters.changed',
       'personas.changed',
@@ -171,6 +172,7 @@ it('closes the watcher with the app, so no timers or handles are left behind', a
   // Writing after close must not throw or trigger a scan of the (possibly removed) directory.
   await writeFile(join(dataDir, 'presets', 'late.yaml'), presetYaml('Late'));
   await writeFile(join(dataDir, 'providers', 'late.yaml'), providerYaml('Late'));
+  await writeFile(join(dataDir, 'collections', 'late.yaml'), 'name: Late\n');
   await settle();
   expect(warn).not.toHaveBeenCalled();
 });
@@ -381,6 +383,81 @@ it('publishes one session event per settled streamed turn, and one per message e
     await stream.cancel();
   } finally {
     restoreAdapter();
+    await app.close();
+  }
+});
+
+type CollectionsChanged = Extract<ChangeEvent, { type: 'collections.changed' }>;
+const collectionEvents = (events: ChangeEvent[]) =>
+  events.filter((event): event is CollectionsChanged => event.type === 'collections.changed');
+
+it('announces collection files edited on disk, with the files it could not load', async () => {
+  const app = await createApp(dataDir, { seed: false, watch: true });
+  try {
+    const { stream, events } = await openStream(app);
+    expect(collectionEvents(stream.events)).toEqual([{ type: 'collections.changed', invalidFiles: [] }]);
+
+    const broken = join(dataDir, 'collections', 'broken.yaml');
+    await writeFile(broken, 'name: Lore\nentries:\n  - title: no text\n');
+    await vi.waitFor(() =>
+      expect(collectionEvents(events()).at(-1)?.invalidFiles).toEqual([
+        { file: 'broken.yaml', reason: expect.stringContaining('invalid collection: entries.0.text') },
+      ]),
+    );
+
+    // Fixing the file clears the warning, and the (stamped) collection is listed.
+    await writeFile(broken, 'name: Lore\nentries:\n  - text: fixed\n');
+    await vi.waitFor(() => expect(collectionEvents(events()).at(-1)?.invalidFiles).toEqual([]));
+    const list = apiContract.listCollections.response.parse((await app.inject({ url: '/api/collections' })).json());
+    expect(list.map((collection) => [collection.name, collection.entryCount])).toEqual([['Lore', 1]]);
+    await stream.cancel();
+  } finally {
+    await app.close();
+  }
+});
+
+it('announces collection writes made through the API, keeping invalid files listed', async () => {
+  // No watcher: the API itself must announce.
+  const app = await createApp(dataDir, { seed: false });
+  try {
+    await mkdir(join(dataDir, 'collections'), { recursive: true });
+    await writeFile(join(dataDir, 'collections', 'broken.yaml'), BROKEN_YAML);
+    const { stream, events } = await openStream(app);
+    const announced = () => collectionEvents(events());
+    const write = async (request: InjectOptions, status: number) => {
+      const before = announced().length;
+      const response = await app.inject(request);
+      expect(response.statusCode).toBe(status);
+      if (status < 300) await vi.waitFor(() => expect(announced().length).toBe(before + 1));
+      return response.body ? (response.json() as { id: string }) : undefined;
+    };
+    const body = { name: 'Lore', entries: [{ text: 'a' }] };
+    const collection = await write({ method: 'POST', url: '/api/collections', payload: body }, 201);
+    await write(
+      { method: 'PUT', url: `/api/collections/${collection!.id}`, payload: { ...body, name: 'Renamed' } },
+      200,
+    );
+    expect(announced()).toEqual([
+      { type: 'collections.changed', invalidFiles: [{ file: 'broken.yaml', reason: expect.any(String) }] },
+      { type: 'collections.changed', invalidFiles: [{ file: 'broken.yaml', reason: expect.any(String) }] },
+    ]);
+
+    // A refused delete (in use) announces nothing.
+    const workflow = await created(app, '/api/workflows', {
+      name: 'Reader',
+      nodes: [{ id: 'r', type: 'recall', position: { x: 0, y: 0 }, config: { collectionIds: [collection!.id] } }],
+      edges: [],
+    });
+    await write({ method: 'DELETE', url: `/api/collections/${collection!.id}` }, 409);
+    await settle();
+    expect(announced()).toHaveLength(2);
+
+    await app.inject({ method: 'DELETE', url: `/api/workflows/${workflow.id}` });
+    await write({ method: 'DELETE', url: `/api/collections/${collection!.id}` }, 204);
+    expect(announced()).toHaveLength(3);
+    expect(announced()[2]?.invalidFiles.map((file) => file.file)).toEqual(['broken.yaml']);
+    await stream.cancel();
+  } finally {
     await app.close();
   }
 });

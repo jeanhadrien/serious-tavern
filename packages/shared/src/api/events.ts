@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { endpoint } from './common.js';
 
-/** A YAML file (preset, provider) the server skipped, with the plain-language reason (bad YAML, schema error, duplicate id...). */
+/** A YAML file (preset, provider, collection) the server skipped, with the plain-language reason (bad YAML, schema error, duplicate id...). */
 export const invalidFileSchema = z.object({ file: z.string(), reason: z.string() });
 export type InvalidFile = z.infer<typeof invalidFileSchema>;
 
@@ -17,6 +17,8 @@ export const changeEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('presets.changed'), invalidFiles: z.array(invalidFileSchema) }),
   // The provider files changed on disk or through the API; same shape as presets.
   z.object({ type: z.literal('providers.changed'), invalidFiles: z.array(invalidFileSchema) }),
+  // The collection files changed on disk or through the API; same shape as presets.
+  z.object({ type: z.literal('collections.changed'), invalidFiles: z.array(invalidFileSchema) }),
   // Created, updated or deleted through the API (avatars and imports included). Sessions also change when a
   // turn settles and when a message is edited or deleted; streamed tokens never emit.
   resourceChanged('workflows.changed'),

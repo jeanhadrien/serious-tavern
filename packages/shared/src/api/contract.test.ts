@@ -95,6 +95,7 @@ it('describes the change event stream, one event per resource type', () => {
   expect(changeEventTypes).toEqual([
     'presets.changed',
     'providers.changed',
+    'collections.changed',
     'workflows.changed',
     'characters.changed',
     'personas.changed',
@@ -102,6 +103,22 @@ it('describes the change event stream, one event per resource type', () => {
   ]);
   for (const event of [{ type: 'sessions.changed' }, { type: 'workflows.changed', id: 'abc' }])
     expect(apiContract.streamChanges.response.parse(event)).toEqual(event);
+  const collections = { type: 'collections.changed', invalidFiles: [{ file: 'lore.yaml', reason: 'bad' }] };
+  expect(apiContract.streamChanges.response.parse(collections)).toEqual(collections);
+  expect(apiContract.streamChanges.response.safeParse({ type: 'collections.changed' }).success).toBe(false);
+});
+
+it('describes collections: full records to write, summaries to list', () => {
+  expect(apiContract.createCollection.body.parse({ name: 'Lore', entries: [{ text: 'a' }] })).toEqual({
+    name: 'Lore',
+    entries: [{ text: 'a', weight: 1, enabled: true }],
+  });
+  expect(apiContract.createCollection.body.parse({ name: 'Lore' }).entries).toEqual([]);
+  expect(apiContract.updateCollection.body.safeParse({ name: ' ', entries: [] }).success).toBe(false);
+  expect(apiContract.updateCollection.params.safeParse({ id: 'not-a-uuid' }).success).toBe(false);
+  const summary = { id: 'c', name: 'Lore', entryCount: 2, createdAt: 'a', updatedAt: 'b' };
+  expect(apiContract.listCollections.response.parse([summary])).toEqual([summary]);
+  expect(apiContract.listCollections.response.safeParse([{ ...summary, entryCount: -1 }]).success).toBe(false);
 });
 
 it('takes the model list refresh flag as the strings "true" or "false" only', () => {

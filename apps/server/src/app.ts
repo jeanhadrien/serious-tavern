@@ -7,6 +7,7 @@ import { registerCharacters } from './routes/characters.js';
 import { registerPersonas } from './routes/personas.js';
 import { registerPresets } from './routes/presets.js';
 import { registerProviders } from './routes/providers.js';
+import { registerCollections } from './routes/collections.js';
 import { registerWorkflows } from './routes/workflows.js';
 import { registerSessions } from './routes/sessions.js';
 import { registerMessages } from './routes/messages.js';
@@ -38,6 +39,7 @@ export async function createApp(
   registerPersonas(app, context);
   registerPresets(app, context);
   registerProviders(app, context);
+  registerCollections(app, context);
   registerWorkflows(app, context);
   registerSessions(app, context);
   registerMessages(app, context);
@@ -51,6 +53,7 @@ export async function createApp(
     const watchers = [
       await watchResourceFiles(context.changes, 'presets', context.presets),
       await watchResourceFiles(context.changes, 'providers', context.providers),
+      await watchResourceFiles(context.changes, 'collections', context.collections),
     ];
     app.addHook('onClose', async () => {
       for (const watcher of watchers) watcher.close();
