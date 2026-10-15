@@ -48,9 +48,16 @@ const ports: Record<Mode, { inputs: PortDef[]; outputs: PortDef[] }> = {
         name: 'probability',
         label: 'Probability',
         dataType: 'number',
+        requiredIfConnected: true,
         description: 'Chance of true, 0 to 1; overrides the configured probability',
       },
-      { name: 'value', label: 'Value', dataType: 'any', description: 'Passed to the branch that is taken' },
+      {
+        name: 'value',
+        label: 'Value',
+        dataType: 'any',
+        requiredIfConnected: true,
+        description: 'Passed to the branch that is taken',
+      },
     ],
     outputs: [
       { name: 'value', label: 'Result', dataType: 'boolean', description: 'Whether the chance came up' },
@@ -85,7 +92,7 @@ function pick(items: unknown[], weightField: string, draw: number): { value?: un
     cumulative += entry.weight;
     if (target < cumulative) return { value: entry.item };
   }
-  // Float rounding can leave the target just past the last sum.
+  // Guard only: the sums above add the same weights in the same order, and draws stay below 1.
   return { value: eligible.at(-1)!.item };
 }
 
@@ -149,6 +156,7 @@ export const random: NodeDefinition = {
         return { ...pick(items, config.weightField, draw), roll: draw };
       }
       case 'chance': {
+        // Both inputs are requiredIfConnected: present here means connected, so a skipped source skips the node.
         const probability = Object.hasOwn(ctx.inputs, 'probability') ? ctx.inputs.probability : config.probability;
         if (typeof probability !== 'number' || !Number.isFinite(probability))
           throw new Error(`Probability must be a number, got ${describeValue(probability)}`);

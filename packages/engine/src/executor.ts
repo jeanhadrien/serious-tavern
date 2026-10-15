@@ -140,7 +140,10 @@ export async function executeWorkflow(
             const requiredSkipped = ports
               .get(node.id)!
               .inputs.some(
-                (p) => p.required && edges.some((e) => e.targetHandle === p.name) && !Object.hasOwn(inputs, p.name),
+                (p) =>
+                  (p.required || p.requiredIfConnected) &&
+                  edges.some((e) => e.targetHandle === p.name) &&
+                  !Object.hasOwn(inputs, p.name),
               );
             if ((edges.length > 0 && active.length === 0) || (node.type !== 'merge' && requiredSkipped)) {
               const now = new Date().toISOString();

@@ -6,6 +6,9 @@ export type PortDef = {
   dataType: PortDataType;
   description?: string;
   required?: boolean;
+  // Input only: when connected, a skipped source (or one that didn't produce the port) skips the node, as for a
+  // required input; unlike `required`, the input may be left unconnected.
+  requiredIfConnected?: boolean;
   optional?: boolean;
 };
 export type CoercionKind = 'to-text' | 'messages-to-text';
