@@ -32,6 +32,7 @@ export type ExecutionContext = {
   secrets: { get(name: string): Promise<string | undefined> };
   resources: NodeResources;
   signal: AbortSignal;
+  // Appends a line to the node's `logs` in the execution log, e.g. the input behind a failure.
   log(message: string): void;
   // Next value in [0, 1) of this node's deterministic stream for this run, seeded by the run seed and the
   // node id. Never use `Math.random` in a node: a run's rolls must be reproducible from its seed.

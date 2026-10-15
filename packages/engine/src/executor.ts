@@ -167,7 +167,11 @@ export async function executeWorkflow(
                 secrets: options.secrets,
                 resources,
                 signal: nodeSignal,
-                log: () => {},
+                log: (message) => {
+                  if (!callbacksActive) return;
+                  const entry = execution.nodes[node.id]!;
+                  execution.nodes[node.id] = { ...entry, logs: [...(entry.logs ?? []), message] };
+                },
                 random: createNodeRandom(`${seed}:${node.id}`),
                 recordWire: (wire) => {
                   if (callbacksActive) execution.nodes[node.id] = { ...execution.nodes[node.id]!, wire };

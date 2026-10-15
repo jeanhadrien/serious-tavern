@@ -89,6 +89,8 @@ export const nodeExecutionSchema = z
     durationMs: z.number().optional(),
     output: z.unknown().optional(),
     error: z.string().optional(),
+    /** Lines the node logged with `ctx.log`, in order; absent when it logged nothing. */
+    logs: z.array(z.string()).optional(),
     /** The canonical LLM request; only in logs written before the wire log existed. */
     request: z.unknown().optional(),
     /** What an LLM node actually sent and received. */

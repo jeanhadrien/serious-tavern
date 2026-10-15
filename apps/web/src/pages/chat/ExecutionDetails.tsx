@@ -29,6 +29,9 @@ export function ExecutionDetails({ id, cached }: { id: string; cached?: Executio
             <div className="execution-node" key={nodeId}>
               <strong>{node.name ?? nodeId}</strong> · {node.status} · {node.durationMs ?? 0}ms
               {node.error && <p className="error">{node.error}</p>}
+              {node.logs?.map((line, index) => (
+                <pre key={index}>{line}</pre>
+              ))}
               {node.wire ? (
                 <WireDetails wire={node.wire} />
               ) : (
