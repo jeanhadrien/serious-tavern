@@ -95,3 +95,27 @@ it('renders a key declared twice once, with its first declaration, as the resolv
   expect(html).toContain('value="calm"');
   expect(html).not.toContain('type="checkbox"');
 });
+
+it('points to the workflow editor when declarations exist but none is usable', () => {
+  const html = render(
+    workflow([
+      { key: '', type: 'number', default: 0 },
+      { key: 'my key', type: 'text' },
+    ]),
+  );
+  expect(html).toContain('chat settings have problems; fix them in the workflow editor');
+  expect(html).toContain(`href="${layoutHref({ wide: 'workflows', wideId: 'w1' })}"`);
+  expect(html).not.toContain('declares no chat settings');
+  expect(html).not.toContain('class="chat-setting ');
+});
+
+it('flags declaration problems above the controls that still work', () => {
+  const html = render(
+    workflow([
+      { key: 'mood', type: 'text', default: 'calm' },
+      { key: '', type: 'boolean' },
+    ]),
+  );
+  expect(html).toContain('chat settings have problems');
+  expect(html.match(/class="chat-setting /g)).toHaveLength(1);
+});

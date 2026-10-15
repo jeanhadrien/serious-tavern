@@ -1,6 +1,12 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { resolveChatSettings, usableSettings, workflowSettings, type Workflow } from '@st/shared';
+import {
+  resolveChatSettings,
+  usableSettings,
+  workflowSettingIssues,
+  workflowSettings,
+  type Workflow,
+} from '@st/shared';
 import { layoutHref } from '../../../layout/url.js';
 import { SettingControl } from './SettingControl.js';
 import { displayedSetting } from './settingControls.js';
@@ -26,23 +32,34 @@ export function SettingsSection({
   const declarations = useMemo(() => workflowSettings(workflow ?? {}), [workflow]);
   const resolved = useMemo(() => resolveChatSettings(declarations, stored), [declarations, stored]);
   const saver = useSettingSaver(sessionId, onSave);
-  if (!declarations.length)
+  const usable = useMemo(() => usableSettings(declarations), [declarations]);
+  // Declaration problems make every turn fail as WORKFLOW_INVALID, so the panel says where to fix them.
+  const broken = useMemo(() => workflowSettingIssues(workflow?.settings).length > 0, [workflow]);
+  const editorLink = workflow && (
+    <>
+      : <Link to={layoutHref({ wide: 'workflows', wideId: workflow.id })}>open {workflow.name}</Link>
+    </>
+  );
+  const problemsHint = broken && (
+    <p className="hint">
+      This workflow's chat settings have problems; fix them in the workflow editor, under Chat settings in its toolbar
+      {editorLink}.
+    </p>
+  );
+  if (!usable.length)
     return (
-      <p className="hint">
-        This chat's workflow declares no chat settings. Add them in the workflow editor, under Chat settings in its
-        toolbar
-        {workflow && (
-          <>
-            : <Link to={layoutHref({ wide: 'workflows', wideId: workflow.id })}>open {workflow.name}</Link>
-          </>
-        )}
-        .
-      </p>
+      problemsHint || (
+        <p className="hint">
+          This chat's workflow declares no chat settings. Add them in the workflow editor, under Chat settings in its
+          toolbar{editorLink}.
+        </p>
+      )
     );
   return (
     <div className="chat-settings">
+      {problemsHint}
       {/* One control per usable key, the first declaration of each, like the resolver and the server. */}
-      {usableSettings(declarations).map((setting) => {
+      {usable.map((setting) => {
         const { key } = setting;
         return (
           <SettingControl
