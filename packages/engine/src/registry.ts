@@ -13,6 +13,7 @@ import { chatSettings } from './nodes/chat-settings/index.js';
 import { random } from './nodes/random/index.js';
 import { parseJson } from './nodes/parse-json/index.js';
 import { recall } from './nodes/recall/index.js';
+import { draw } from './nodes/draw/index.js';
 
 // Register a new backend node here; the UI uses its descriptor and generic editor automatically.
 export const registry = new Map<string, NodeDefinition>(
@@ -29,6 +30,7 @@ export const registry = new Map<string, NodeDefinition>(
     random,
     parseJson,
     recall,
+    draw,
   ].map((node) => [node.type, node]),
 );
 export function descriptors(): NodeTypeDescriptor[] {

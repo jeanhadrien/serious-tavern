@@ -46,3 +46,7 @@ export function entryOutput({ collectionId, index, entry }: Candidate): Collecti
     ...(entry.level !== undefined && { level: entry.level }),
   };
 }
+
+/** The tags of a list as compared by filters: trimmed, lower case, blanks dropped. */
+export const tagSet = (tags: readonly string[] | undefined) =>
+  new Set((tags ?? []).map((tag) => tag.trim().toLowerCase()).filter(Boolean));
