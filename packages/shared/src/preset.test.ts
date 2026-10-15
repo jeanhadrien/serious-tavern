@@ -376,3 +376,42 @@ describe('upgradeLegacyPreset', () => {
     expect(upgradeLegacyPreset('text')).toBe('text');
   });
 });
+
+describe('chat settings macros', () => {
+  it('knows settings paths and does not warn about them', () => {
+    expect(findMacro('settings.volatility')?.category).toBe('settings');
+    expect(findMacro('settings')?.dataType).toBe('object');
+    const parsed = presetSchema.parse({
+      ...base(),
+      inputs: [],
+      entries: [
+        {
+          id: 'note',
+          kind: 'message',
+          enabled: true,
+          displayName: 'Note',
+          role: 'system',
+          content:
+            '{{#if settings.authorsNote}}[{{settings.authorsNote}}]{{/if}} {{settings}} {{#if (gt settings.v 0.5)}}x{{/if}}',
+        },
+      ],
+    });
+    expect(presetWarnings(parsed)).toEqual([]);
+  });
+
+  it('hints one settings path per declared setting, typed by the setting', () => {
+    const hints = macroHints(
+      [{ key: 'message', dataType: 'text' }],
+      [
+        { key: 'volatility', type: 'number', description: 'How wild' },
+        { key: 'mood', type: 'enum' },
+      ],
+    );
+    expect(hints).toContainEqual({ expression: '{{settings.volatility}}', description: 'How wild', type: 'number' });
+    expect(hints).toContainEqual({ expression: '{{settings.mood}}', description: 'Chat setting', type: 'text' });
+    expect(hints).toContainEqual(expect.objectContaining({ expression: '{{settings}}' }));
+    expect(macroHints([]).some((hint) => hint.expression.startsWith('{{settings.'))).toBe(false);
+    const variables = hints.filter((hint) => !hint.expression.startsWith('{{#') && !hint.expression.startsWith('{{!'));
+    expect(variables.every((hint) => findMacro(hint.expression.slice(2, -2)) !== undefined)).toBe(true);
+  });
+});

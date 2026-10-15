@@ -31,6 +31,7 @@ const ctx = (config: Record<string, unknown>): ExecutionContext => ({
   config,
   inputs: { input: 'hi', prompt: 'What is up?' },
   trigger: { message: 'hello', sessionId: 's' },
+  settings: {},
   history: [],
   secrets: { get: async () => 'test-key' },
   signal: new AbortController().signal,

@@ -9,6 +9,8 @@ export type TemplateContext = {
   history?: unknown[];
   character?: Character;
   persona?: Persona;
+  // Resolved chat settings, `{{settings.<key>}}`.
+  settings?: Readonly<Record<string, unknown>>;
 };
 
 // `preset` renders inputs and bare `{{history}}` as message transcripts; `node` renders JSON.
@@ -46,6 +48,8 @@ function templateData(context: TemplateContext, style: TemplateStyle, active: Se
     inputs,
     trigger: presented(context.trigger, stringify),
     history: presented(context.history, formatInputs, stringify),
+    // `{{settings}}` renders compact JSON; paths, `#if` and helpers see the raw values.
+    settings: presented(context.settings ?? {}, stringify),
     // A bare character has no alias, so it renders as empty text like any unknown name.
     character: context.character ? withToString(cardScope(context, 'character', active), () => '') : undefined,
   };

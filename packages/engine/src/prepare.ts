@@ -1,4 +1,4 @@
-import { findBuiltInProvider, nodeDisplayName } from '@st/shared';
+import { findBuiltInProvider, nodeDisplayName, workflowSettingIssues } from '@st/shared';
 import { canConnect } from '@st/shared/ports';
 import type { Edge, PortDef, ValidationIssue, Workflow } from '@st/shared';
 import { registry } from './registry.js';
@@ -190,6 +190,7 @@ export async function prepareWorkflow(
   }
   if (visited !== workflow.nodes.length)
     errors.push({ message: 'The connections form a loop; a workflow cannot contain a cycle.' });
+  errors.push(...workflowSettingIssues(workflow.settings).map(({ message }) => ({ message })));
   if (errors.length) {
     const seen = new Set<string>();
     return {

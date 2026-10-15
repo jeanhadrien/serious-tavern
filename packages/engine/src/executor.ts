@@ -48,6 +48,9 @@ export async function executeWorkflow(
     executionId?: string;
     // Seeds every node's `ctx.random()`; generated when absent. Recorded as `execution.seed`.
     seed?: string;
+    // Chat settings, already resolved against the workflow (`resolveChatSettings`). Recorded as
+    // `execution.settings` and exposed as `ctx.settings`.
+    settings?: Record<string, unknown>;
   },
 ): Promise<{ replies: ChatReply[]; execution: ExecutionLog }> {
   // NB: Workflow is a passthrough (loose) object for forward compatibility, so `in`
@@ -61,11 +64,13 @@ export async function executeWorkflow(
     throw new Error(`Invalid workflow: ${preparation.errors.map((issue) => issue.message).join('; ')}`);
   const { workflow, resources, definitions, ports, incoming, upstream, reachable } = preparation.prepared;
   const seed = options.seed ?? randomUUID();
+  const settings = Object.freeze({ ...options.settings });
   const execution: ExecutionLog = {
     id: options.executionId ?? randomUUID(),
     workflowId: workflow.id,
     sessionId: options.sessionId,
     seed,
+    settings: { ...settings },
     status: 'running',
     startedAt: new Date().toISOString(),
     nodes: {},
@@ -167,6 +172,7 @@ export async function executeWorkflow(
                 history: options.history,
                 character: options.character,
                 persona: options.persona,
+                settings,
                 secrets: options.secrets,
                 resources,
                 signal: nodeSignal,

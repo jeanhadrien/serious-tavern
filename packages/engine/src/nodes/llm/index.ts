@@ -111,6 +111,7 @@ export const llm: NodeDefinition = {
         history: ctx.history,
         character: Object.hasOwn(ctx.inputs, 'character') ? characterSchema.parse(ctx.inputs.character) : ctx.character,
         persona: ctx.persona,
+        settings: ctx.settings,
       },
     });
     const messages = ctx.config.mergeSystemMessages === true ? mergeSystemMessages(rendered) : rendered;

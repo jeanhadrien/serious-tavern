@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { portDataTypes } from './ports.js';
+import { workflowSettingSchema } from './chat-settings.js';
 export const validationIssueSchema = z.object({
   message: z.string(),
   edgeId: z.string().optional(),
@@ -30,6 +31,9 @@ export const workflowSchema = z
     name: z.string().min(1),
     nodes: z.array(nodeSchema),
     edges: z.array(edgeSchema),
+    // Chat settings the workflow declares. Absent in older files (and stored records are not parsed on
+    // read), so read them through `workflowSettings()`, never as `workflow.settings` directly.
+    settings: z.array(workflowSettingSchema).optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -58,6 +62,9 @@ export const sessionSchema = z
     messages: z.array(messageSchema),
     characterId: z.string().optional(),
     personaId: z.string().optional(),
+    // The chat's own setting values, by key (user-owned, see chat-settings.ts). Absent in older files:
+    // read as `session.settings ?? {}`. Keys the workflow doesn't declare are kept, unused.
+    settings: z.record(z.string(), z.unknown()).optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -107,6 +114,8 @@ export const executionLogSchema = z
     finishedAt: z.string().optional(),
     /** Seed of every node's `ctx.random()` in this run; absent in older logs. */
     seed: z.string().optional(),
+    /** The resolved chat settings the run used; absent in older logs. */
+    settings: z.record(z.string(), z.unknown()).optional(),
     nodes: z.record(z.string(), nodeExecutionSchema),
     warnings: z.array(z.string()).default([]),
   })

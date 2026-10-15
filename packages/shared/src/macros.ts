@@ -1,11 +1,12 @@
+import type { WorkflowSetting } from './chat-settings.js';
 import type { PortDataType } from './ports.js';
 import { analyzeTemplate } from './template-analysis.js';
 
 export type MacroDefinition = {
   name: string;
   description: string;
-  category: 'character' | 'persona' | 'input' | 'trigger' | 'history' | 'alias';
-  source: 'character' | 'persona' | 'inputs' | 'trigger' | 'history';
+  category: 'character' | 'persona' | 'input' | 'trigger' | 'history' | 'settings' | 'alias';
+  source: 'character' | 'persona' | 'inputs' | 'trigger' | 'history' | 'settings';
   field?: string;
   defaultValue?: string;
   pattern?: RegExp;
@@ -134,6 +135,16 @@ export const macroRegistry: readonly MacroDefinition[] = [
     pattern: /^history\.[\w]+(?:\.[\w]+)*$/,
     dataType: 'any',
   },
+  { name: 'settings', description: 'All chat settings', category: 'settings', source: 'settings', dataType: 'object' },
+  {
+    // Keys come from the workflows' declarations (`settingsCatalog`), never from a hand-written list.
+    name: 'settings.<key>',
+    description: 'Chat setting value',
+    category: 'settings',
+    source: 'settings',
+    pattern: /^settings\.[\w]+(?:\.[\w]+)*$/,
+    dataType: 'any',
+  },
 ];
 
 // Names are case-sensitive, matching Handlebars path resolution.
@@ -169,9 +180,26 @@ const templateSnippets: { expression: string; description: string; type: PortDat
   { expression: '{{! Comment}}', description: 'Comment, removed from the output', type: 'any' },
 ];
 
-export function macroHints(inputs: readonly { key: string; dataType: PortDataType }[]) {
+const settingHintTypes: Record<WorkflowSetting['type'], PortDataType> = {
+  number: 'number',
+  boolean: 'boolean',
+  enum: 'text',
+  text: 'text',
+};
+
+// `settings` lists declared chat settings (a workflow's own, or `settingsCatalog` for presets).
+export function macroHints(
+  inputs: readonly { key: string; dataType: PortDataType }[],
+  settings: readonly Pick<WorkflowSetting, 'key' | 'type' | 'description'>[] = [],
+) {
   const hints = macroRegistry.flatMap((macro) => {
     if (macro.pattern) {
+      if (macro.source === 'settings')
+        return settings.map((setting) => ({
+          expression: `{{${macro.name.replace('<key>', setting.key)}}}`,
+          description: setting.description || 'Chat setting',
+          type: settingHintTypes[setting.type],
+        }));
       if (macro.source !== 'inputs') return [];
       return inputs.map((input) => ({
         expression: `{{${macro.name.replace('<key>', input.key)}}}`,

@@ -89,6 +89,34 @@ The situation is critical. Act with urgency.
 A missing or empty value fails the `#if`, so the block just disappears —
 and a fixed entry left empty is dropped from the prompt entirely.
 
+## Chat settings
+
+A workflow can declare **chat settings** (dials, toggles, notes the user sets
+per chat, see the README's "Chat settings"). Every template reads the chat's
+current values as `{{settings.<key>}}`, in presets and in node configs alike.
+A setting the user never changed has its declared default.
+
+An author's note the user writes in the chat panel, injected at depth 3 of the
+history slot (a message entry with depth placement):
+
+```hbs
+{{#if settings.authorsNote}}[Author's note: {{settings.authorsNote}}]{{/if}}
+```
+
+Numbers compare as numbers, enum options are always text:
+
+```hbs
+{{#if (gt settings.volatility 0.5)}}
+Introduce a surprising complication in this reply.
+{{/if}}
+{{#if (eq settings.maxLevel "2")}}
+Keep the intensity mild.
+{{/if}}
+```
+
+`{{settings}}` alone renders every value as compact JSON, handy while
+debugging. The values a turn used are recorded in its execution log.
+
 ## Organizing with comments
 
 ```hbs
@@ -117,4 +145,6 @@ Remember what you know about {{user}}: {{persona.description}}
 | `{{history.0.content}}` works but `{{history.0}}` doesn't | Trailing numeric segments aren't paths | `{{history.[0]}}` |
 | Literal `{{` needed | Backslash-escape it | `\{{` renders as `{{` |
 | Renamed an input, validation now errors | Rename rewrites `{{input.x}}` but not `{{#if input.x}}` refs | Update the block refs by hand |
+| `{{settings.x}}` renders empty | The chat's workflow doesn't declare `x` (or the key's case differs), or its value is empty text | Declare it in the workflow editor's Chat settings; keys are case-sensitive |
+| `(eq settings.level 2)` is never true | Enum options are text | Compare with a string: `(eq settings.level "2")` |
 | `"false"` behaves as true | Truthiness is Handlebars': only `false`, `0`, `""`, `null`, `undefined` and empty arrays are false | Compare explicitly: `(eq input.flag "false")` |

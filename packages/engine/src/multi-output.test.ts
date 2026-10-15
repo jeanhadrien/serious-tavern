@@ -415,6 +415,7 @@ describe('character nodes and history', () => {
       config: { lastN: 10, format: 'messages' },
       inputs: {},
       trigger: { message: '', sessionId: '' },
+      settings: {},
       resources: { presets: { get: async () => undefined } },
       signal: new AbortController().signal,
       log: () => {},

@@ -29,6 +29,9 @@ export type ExecutionContext = {
   history: ChatMessage[];
   character?: Character;
   persona?: Persona;
+  // The chat settings resolved for this run (`resolveChatSettings`), by declared key. Read-only; also the
+  // template namespace `settings`. Nodes never read a session's stored values themselves.
+  settings: Readonly<Record<string, unknown>>;
   secrets: { get(name: string): Promise<string | undefined> };
   resources: NodeResources;
   signal: AbortSignal;

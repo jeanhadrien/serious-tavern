@@ -36,6 +36,7 @@ export function renderPreset(
       history?: unknown[];
       character?: Character;
       persona?: Persona;
+      settings?: Readonly<Record<string, unknown>>;
     };
   },
 ): PromptMessage[] {
@@ -55,6 +56,7 @@ export function renderPreset(
     history,
     character: options.templateContext.character,
     persona: options.templateContext.persona,
+    settings: options.templateContext.settings,
   };
   for (const entry of valid.entries) {
     if (entry.kind !== 'message' || !entry.enabled) continue;

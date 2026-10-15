@@ -154,6 +154,7 @@ describe('Parse JSON node', () => {
       inputs: { text },
       config: parseJson.configSchema.parse({ expect: type }),
       trigger: { message: '', sessionId: 's' },
+      settings: {},
       history: [],
       secrets: { get: async () => undefined },
       resources: { presets: { get: async () => undefined } },
