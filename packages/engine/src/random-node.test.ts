@@ -4,7 +4,7 @@ import type { ChatMessage, Edge, Workflow } from '@st/shared';
 import { executeWorkflow, validateWorkflow } from './executor.js';
 import { pruneInvalidEdges } from './prune.js';
 import { random } from './nodes/random/index.js';
-import { createRandom } from './random.js';
+import { createRandom } from './seeded-random.js';
 import type { ExecutionContext } from './types.js';
 
 // Runs the node directly on a parsed config, with scripted draws.

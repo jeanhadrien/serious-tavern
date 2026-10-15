@@ -1,15 +1,19 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { ChatMessage, Edge, Workflow } from '@st/shared';
 import { ExecutionFailure, executeWorkflow } from './executor.js';
-import { createRandom, hashSeed } from './random.js';
+import { createRandom, hashSeed } from './seeded-random.js';
 import { registry } from './registry.js';
 
 const draws = (next: () => number, count: number) => Array.from({ length: count }, () => next());
 
 describe('createRandom', () => {
-  it('is pinned to cyrb128 + sfc32 (old runs must stay reproducible from their seed)', () => {
-    expect(draws(createRandom('seed:node'), 3)).toEqual([0.9055328760296106, 0.15645638247951865, 0.3667779923416674]);
+  it('is pinned to cyrb128 + canonical sfc32 (old runs must stay reproducible from their seed)', () => {
+    // Same values as the reference sfc32 over cyrb128, so a run can be replayed with any stock implementation.
+    expect(draws(createRandom('seed:node'), 3)).toEqual([0.90553287579678, 0.156456382246688, 0.366777990013361]);
   });
   it('gives the same sequence for the same seed', () => {
     expect(draws(createRandom('turn-1:random'), 20)).toEqual(draws(createRandom('turn-1:random'), 20));
@@ -28,6 +32,15 @@ describe('createRandom', () => {
     for (const count of buckets) expect(Math.abs(count - 1000)).toBeLessThanOrEqual(150);
     const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
     expect(Math.abs(mean - 0.5)).toBeLessThanOrEqual(0.02);
+  });
+  it('is used by nodes instead of Math.random', () => {
+    const nodesDir = fileURLToPath(new URL('./nodes/', import.meta.url));
+    const sources = readdirSync(nodesDir, { recursive: true, encoding: 'utf8' }).filter(
+      (file) => file.endsWith('.ts') && !file.endsWith('.test.ts'),
+    );
+    expect(sources.length).toBeGreaterThan(0);
+    const offenders = sources.filter((file) => readFileSync(join(nodesDir, file), 'utf8').includes('Math.random'));
+    expect(offenders).toEqual([]);
   });
   it('hashes any text, including the empty string, to four unsigned 32-bit words', () => {
     for (const text of ['', 'a', '🎲 unicode', 'x'.repeat(1000)]) {

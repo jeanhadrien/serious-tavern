@@ -25,16 +25,15 @@ export function hashSeed(text: string): [number, number, number, number] {
   return [h1 >>> 0, h2 >>> 0, h3 >>> 0, h4 >>> 0];
 }
 
-/** sfc32 seeded from `seed`: each call returns the next value in [0, 1). */
+/** Canonical sfc32 seeded from `seed`: each call returns the next value in [0, 1). */
 export function createRandom(seed: string): () => number {
   let [a, b, c, d] = hashSeed(seed);
   return () => {
-    const sum = (a + b) | 0;
+    const t = (((a + b) | 0) + d) | 0;
+    d = (d + 1) | 0;
     a = b ^ (b >>> 9);
     b = (c + (c << 3)) | 0;
     c = (c << 21) | (c >>> 11);
-    d = (d + 1) | 0;
-    const t = (sum + d) | 0;
     c = (c + t) | 0;
     return (t >>> 0) / 4294967296;
   };

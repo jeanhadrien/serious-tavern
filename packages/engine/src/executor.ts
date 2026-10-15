@@ -7,7 +7,7 @@ export { validateWorkflow } from './prepare.js';
 import type { ChatReply, EngineEvent, ExecutionContext, NodeResources } from './types.js';
 import { stringify, coerceValue } from './text.js';
 import { orderReplies } from './replies.js';
-import { createRandom } from './random.js';
+import { createRandom } from './seeded-random.js';
 
 class NodeExecutionError extends Error {
   constructor(
