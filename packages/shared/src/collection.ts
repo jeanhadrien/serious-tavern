@@ -24,15 +24,23 @@ export const collectionEntrySchema = z
   .passthrough();
 export type CollectionEntry = z.infer<typeof collectionEntrySchema>;
 
-/** What a client writes: everything but identity and timestamps. */
+/** The editable fields of a stored record: a hand-written file may leave out `entries`. */
 export const collectionFieldsSchema = z
   .object({
-    name: z.string().trim().min(1),
+    name: z.string().trim().min(1, 'Name is required'),
     description: z.string().optional(),
     entries: z.array(collectionEntrySchema).default([]),
   })
   .passthrough();
-export type CollectionFields = z.input<typeof collectionFieldsSchema>;
+
+/**
+ * What a client writes: everything but identity and timestamps. `entries` is required here, because a write
+ * replaces them and a body that left them out would silently erase every entry.
+ */
+export const collectionWriteSchema = collectionFieldsSchema
+  .extend({ entries: z.array(collectionEntrySchema) })
+  .passthrough();
+export type CollectionFields = z.input<typeof collectionWriteSchema>;
 
 /** A stored collection (`data/collections/*.yaml`). */
 export const collectionSchema = collectionFieldsSchema

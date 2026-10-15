@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Fastify, { type InjectOptions } from 'fastify';
@@ -173,8 +173,11 @@ it('closes the watcher with the app, so no timers or handles are left behind', a
   await writeFile(join(dataDir, 'presets', 'late.yaml'), presetYaml('Late'));
   await writeFile(join(dataDir, 'providers', 'late.yaml'), providerYaml('Late'));
   await writeFile(join(dataDir, 'collections', 'late.yaml'), 'name: Late\n');
-  await settle();
+  // Longer than the watchers' debounce: a watcher left open would scan and stamp these id-less files.
+  await new Promise((resolve) => setTimeout(resolve, 400));
   expect(warn).not.toHaveBeenCalled();
+  expect(await readFile(join(dataDir, 'providers', 'late.yaml'), 'utf8')).toBe(providerYaml('Late'));
+  expect(await readFile(join(dataDir, 'collections', 'late.yaml'), 'utf8')).toBe('name: Late\n');
 });
 
 const providerYaml = (name: string) => `name: ${name}\nbaseUrl: http://localhost:1234/v1\n`;

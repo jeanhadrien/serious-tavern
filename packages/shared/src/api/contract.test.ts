@@ -113,7 +113,7 @@ it('describes collections: full records to write, summaries to list', () => {
     name: 'Lore',
     entries: [{ text: 'a', weight: 1, enabled: true }],
   });
-  expect(apiContract.createCollection.body.parse({ name: 'Lore' }).entries).toEqual([]);
+  expect(apiContract.createCollection.body.safeParse({ name: 'Lore' }).success).toBe(false);
   expect(apiContract.updateCollection.body.safeParse({ name: ' ', entries: [] }).success).toBe(false);
   expect(apiContract.updateCollection.params.safeParse({ id: 'not-a-uuid' }).success).toBe(false);
   const summary = { id: 'c', name: 'Lore', entryCount: 2, createdAt: 'a', updatedAt: 'b' };

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { collectionEntryId, collectionEntrySchema, collectionFieldsSchema, collectionSchema } from './collection.js';
+import {
+  collectionEntryId,
+  collectionEntrySchema,
+  collectionFieldsSchema,
+  collectionSchema,
+  collectionWriteSchema,
+} from './collection.js';
 
 const stored = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -14,8 +20,14 @@ describe('collection schema', () => {
     expect(parsed).not.toHaveProperty('description');
   });
 
-  it('defaults entries to an empty list', () => {
+  it('defaults entries to an empty list in a stored record, but requires them in a write', () => {
     expect(collectionFieldsSchema.parse({ name: 'Lore' }).entries).toEqual([]);
+    expect(collectionWriteSchema.safeParse({ name: 'Lore' }).success).toBe(false);
+    expect(collectionWriteSchema.parse({ name: ' Lore ', entries: [], extra: 1 })).toEqual({
+      name: 'Lore',
+      entries: [],
+      extra: 1,
+    });
   });
 
   it('keeps unknown fields on the record and on entries', () => {
@@ -47,7 +59,8 @@ describe('collection schema', () => {
   });
 
   it('rejects a blank name and a non-UUID id', () => {
-    expect(collectionFieldsSchema.safeParse({ name: '  ' }).success).toBe(false);
+    const blank = collectionFieldsSchema.safeParse({ name: '  ' });
+    expect(blank.error?.issues[0]?.message).toBe('Name is required');
     expect(collectionSchema.safeParse({ ...stored, id: 'lore', name: 'Lore' }).success).toBe(false);
   });
 

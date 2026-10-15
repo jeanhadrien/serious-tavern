@@ -121,7 +121,7 @@ it('reads and writes collections by id', async () => {
     );
   await collectionsApi.list();
   await collectionsApi.get('c/1');
-  await collectionsApi.create({ name: 'Lore' });
+  await collectionsApi.create({ name: 'Lore', entries: [] });
   await collectionsApi.update('c1', { name: 'Lore', entries: [] });
   await collectionsApi.delete('c1');
   expect(fetchMock.mock.calls.map(([url, init]) => [url, (init as RequestInit | undefined)?.method ?? 'GET'])).toEqual([

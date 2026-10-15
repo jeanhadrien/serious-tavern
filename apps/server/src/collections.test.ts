@@ -79,6 +79,9 @@ describe('collection repository', () => {
       'no-text.yaml': `name: T\nentries:\n  - title: x\n${stamps()}`,
       'null-title.yaml': `name: N\nentries:\n  - text: a\n    title:\n${stamps()}`,
       'readable-id.yaml': 'name: R\nid: lore\n',
+      // Blank values other than the stamped keys keep a file without stamps invalid, so it is never stamped.
+      'null-description.yaml': 'name: D\ndescription:\nentries:\n  - text: a\n',
+      'null-entries.yaml': 'name: E\nentries:\n',
       'list.yaml': '- a\n- b\n',
     };
     for (const [file, text] of Object.entries(files)) await writeFile(join(directory, file), text);
@@ -158,9 +161,24 @@ describe('collections API', () => {
       expect(updated.statusCode).toBe(200);
       const after = apiContract.updateCollection.response.parse(updated.json());
       expect(after).toMatchObject({ name: 'Renamed', future: 'field', createdAt: collection.createdAt });
+      expect(after.updatedAt).not.toBe(collection.updatedAt);
       expect(after).not.toHaveProperty('description');
       expect(after.entries.map((entry) => entry.text)).toEqual(['b', 'c']);
       expect(await readdir(join(directory, 'collections'))).toEqual(['renamed.yaml']);
+
+      // A body echoing a summary or record never writes its bookkeeping.
+      const echoed = await call(app, 'PUT', `/api/collections/${collection.id}`, {
+        ...after,
+        id: randomUUID(),
+        entryCount: 9,
+        createdAt: 'client',
+      });
+      expect(echoed.statusCode).toBe(200);
+      expect(echoed.json()).toMatchObject({ id: collection.id, createdAt: collection.createdAt });
+      expect(echoed.json()).not.toHaveProperty('entryCount');
+      const stored = await readFile(join(directory, 'collections', 'renamed.yaml'), 'utf8');
+      expect(stored).not.toContain('entryCount');
+      expect(stored).toContain(`id: ${collection.id}`);
 
       expect((await call(app, 'DELETE', `/api/collections/${collection.id}`)).statusCode).toBe(204);
       expect(await readdir(join(directory, 'collections'))).toEqual([]);
@@ -181,9 +199,14 @@ describe('collections API', () => {
         expect(response.statusCode).toBe(404);
         expect(errorCode(response)).toBe('NOT_FOUND');
       }
-      const response = await call(app, 'GET', '/api/collections/lore');
-      expect(response.statusCode).toBe(400);
-      expect(errorCode(response)).toBe('VALIDATION_ERROR');
+      for (const response of [
+        await call(app, 'GET', '/api/collections/lore'),
+        await call(app, 'PUT', '/api/collections/lore', lore),
+        await call(app, 'DELETE', '/api/collections/lore'),
+      ]) {
+        expect(response.statusCode).toBe(400);
+        expect(errorCode(response)).toBe('VALIDATION_ERROR');
+      }
     } finally {
       await app.close();
     }
@@ -194,6 +217,8 @@ describe('collections API', () => {
     ['a level out of range', { name: 'L', entries: [{ text: 'x', level: 9 }] }],
     ['an entry without text', { name: 'L', entries: [{}] }],
     ['a negative weight', { name: 'L', entries: [{ text: 'x', weight: -1 }] }],
+    // A write replaces the entries, so leaving them out must not erase them.
+    ['no entries', { name: 'L' }],
   ])('rejects %s with 400 and writes nothing', async (_, payload) => {
     const app = await open();
     try {
@@ -201,6 +226,14 @@ describe('collections API', () => {
       expect(response.statusCode).toBe(400);
       expect(errorCode(response)).toBe('VALIDATION_ERROR');
       expect((await call(app, 'GET', '/api/collections')).json()).toEqual([]);
+
+      const { id } = (await call(app, 'POST', '/api/collections', lore)).json() as Collection;
+      const file = join(directory, 'collections', 'northern-wastes.yaml');
+      const before = await readFile(file, 'utf8');
+      const put = await call(app, 'PUT', `/api/collections/${id}`, payload);
+      expect(put.statusCode).toBe(400);
+      expect(errorCode(put)).toBe('VALIDATION_ERROR');
+      expect(await readFile(file, 'utf8')).toBe(before);
     } finally {
       await app.close();
     }

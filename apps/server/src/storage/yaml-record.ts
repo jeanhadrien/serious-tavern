@@ -26,7 +26,8 @@ export function parseYamlRecord<T>(text: string, schema: z.ZodType<T>, label: st
   const stamped = schema.safeParse({
     createdAt: 'x',
     updatedAt: 'x',
-    ...Object.fromEntries(Object.entries(candidate).filter(([, value]) => value != null)),
+    // Only a blank stamped key counts as missing: any other blank value keeps the file invalid (and untouched).
+    ...Object.fromEntries(Object.entries(candidate).filter(([key, value]) => value != null || !STAMPED.includes(key))),
     ...(candidate.id == null ? { id: PLACEHOLDER_ID } : {}),
   });
   if (stamped.success && STAMPED.some((key) => candidate[key] == null))
