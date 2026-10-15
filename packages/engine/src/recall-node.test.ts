@@ -123,6 +123,10 @@ describe('Recall keyword matching', () => {
     ['Tokyo', '私はTokyoに行く', true],
     ['กรุงเทพ', 'ฉันไปกรุงเทพเมื่อวาน', true],
     ['Tokyo', 'Tokyoite', false],
+    // Korean particles attach to nouns.
+    ['서울', '서울에 가고 싶어', true],
+    ['서울', '서울 가고 싶어', true],
+    ['Seoul', 'Seoul에 가요', true],
   ])('%s in %j: %s', (keyword, text, expected) => {
     expect(matches(keyword, text)).toBe(expected);
   });

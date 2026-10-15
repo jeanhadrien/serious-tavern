@@ -2,9 +2,10 @@ export type MatchOptions = { caseSensitive: boolean; wholeWords: boolean };
 
 // Scripts written without spaces between words (Chinese, Japanese, Thai…): they have no word boundaries, so
 // a keyword edge in one of them needs none, and one of their letters next to a keyword never blocks it
-// (`東京` in `私は東京に行く`, `Tokyo` in `私はTokyoに行く`).
+// (`東京` in `私は東京に行く`, `Tokyo` in `私はTokyoに行く`). Korean (Hangul) is spaced, but particles attach
+// directly to nouns (`서울에`, `서울은`), so a noun is almost never a whole word: it is treated the same way.
 const UNSPACED =
-  '\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Thai}\\p{Script=Lao}\\p{Script=Khmer}\\p{Script=Myanmar}';
+  '\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Hangul}\\p{Script=Thai}\\p{Script=Lao}\\p{Script=Khmer}\\p{Script=Myanmar}';
 // Letters, marks and digits of any spaced script, plus `_`: what a word is made of for whole-word matching.
 const WORD = `(?![${UNSPACED}])[\\p{L}\\p{M}\\p{N}_]`;
 const WORD_CHAR = new RegExp(`^${WORD}$`, 'u');

@@ -44,6 +44,10 @@ export function RecallPanel({ descriptor, config, onChange, context }: NodeConfi
         />
         Whole words only
       </label>
+      <p className="hint">
+        Turn this off for languages that attach endings to words (Turkish, Finnish, Hungarian…). Chinese, Japanese,
+        Korean and Thai already match inside words.
+      </p>
       <DraftInput
         label="Separator"
         value={String(value('separator') ?? '\n\n')}

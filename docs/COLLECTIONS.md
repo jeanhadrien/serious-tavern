@@ -97,7 +97,9 @@ Recall adds the entries whose keywords appear in the recent chat.
 - **Whole words only** (on by default): `inn` does not match `innkeeper`, and `Борин` does not match `Борина`
   (any alphabet). A keyword that starts or ends with a symbol, like `C++` or `#quest`, still matches.
   Languages written without spaces (Chinese, Japanese, Thai…) have no word edges to check: `東京` matches in
-  `私は東京に行く`.
+  `私は東京に行く`. Korean is treated the same way, because particles attach to nouns: `서울` matches in
+  `서울에 가요`. Other languages that attach endings to words (Turkish, Finnish, Hungarian…) do get word
+  edges, so the Turkish `kale` (castle) misses `kaleye`: turn *Whole words only* off for them.
 - **Order:** collections in the order you picked them, then entries in file order.
 - **Limits:** *Max entries* (default 5) and *Max characters* (default 0, no limit; the separators count). The
   list stops at the first entry that doesn't fit: a shorter entry further down is not taken instead. When

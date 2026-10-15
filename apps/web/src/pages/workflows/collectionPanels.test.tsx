@@ -74,6 +74,7 @@ it('renders the Recall panel with the picked collections in order, unknown ids a
   expect(html).toContain('value="5"');
   expect(html).toContain('value="\\n\\n"');
   expect(html).toMatch(/<input type="checkbox" checked=""\/>Whole words only/);
+  expect(html).toContain('Turn this off for languages that attach endings to words');
 });
 
 it('renders the Draw panel with tag lists, level filters and weights', () => {
