@@ -96,6 +96,13 @@ describe('resolveChatSettings', () => {
     expect(stored).toEqual({ v: 'bad', ghost: 1 });
   });
 
+  it('skips keys templates cannot read, so a reserved key never reaches the prototype', () => {
+    const declarations = workflowSettings({ settings: [{ key: '__proto__', type: 'text', default: 'x' }] });
+    const result = resolveChatSettings(declarations, JSON.parse('{"__proto__": "y"}'));
+    expect(result.values).toEqual({});
+    expect(Object.getPrototypeOf(result.values)).toBe(Object.prototype);
+  });
+
   it('lets the first declaration of a duplicated key win', () => {
     expect(resolveChatSettings([number({ default: 1 }), number({ default: 2 })], {}).values).toEqual({ v: 1 });
   });
@@ -200,6 +207,11 @@ describe('workflowSettingIssues', () => {
         message:
           'Chat setting #2 has the key "1st", which can\'t be used in templates: use letters, digits and _, not starting with a digit.',
       },
+    ],
+    [
+      'a reserved key',
+      { key: '__proto__', type: 'text' },
+      { field: 'key', message: 'Chat setting #2 has the reserved key "__proto__"; pick another.' },
     ],
     [
       'a duplicate key',

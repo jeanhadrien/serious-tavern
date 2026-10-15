@@ -16,6 +16,7 @@ export function registerWorkflows(app: FastifyInstance, { workflows, sessions, p
       name: body.name,
       nodes: body.nodes ?? [],
       edges: body.edges ?? [],
+      ...(body.settings ? { settings: body.settings } : {}),
       createdAt: date,
       updatedAt: date,
     };

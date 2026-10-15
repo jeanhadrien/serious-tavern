@@ -7,6 +7,10 @@ import { z } from 'zod';
  */
 export const settingKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const workflowSettingTypes = ['number', 'boolean', 'enum', 'text'] as const;
+// Names that would reach an object's prototype; never usable as keys (templates can't read them either).
+const reservedKeys = new Set(['__proto__', 'constructor', 'prototype']);
+/** A key templates can read: an identifier that is not reserved. */
+export const isSettingKey = (key: string) => settingKeyPattern.test(key) && !reservedKeys.has(key);
 
 // The schema only checks shapes, so a half-edited draft still saves; `workflowSettingIssues` reports the rest.
 const base = { key: z.string(), label: z.string().optional(), description: z.string().optional() };
@@ -115,10 +119,12 @@ export function workflowSettingIssues(settings: readonly unknown[] | undefined):
         'key',
         `${number} has the key "${setting.key}", which can't be used in templates: use letters, digits and _, not starting with a digit.`,
       );
+    else if (reservedKeys.has(setting.key))
+      add('key', `${number} has the reserved key "${setting.key}"; pick another.`);
     else if (seen.has(setting.key))
       add('key', `More than one chat setting uses the key "${setting.key}"; keys must be unique.`);
     seen.add(setting.key);
-    const name = setting.key && settingKeyPattern.test(setting.key) ? `Chat setting "${setting.key}"` : number;
+    const name = isSettingKey(setting.key) ? `Chat setting "${setting.key}"` : number;
     if (setting.type === 'number') {
       const { min, max, step } = setting;
       if (min !== undefined && max !== undefined && min > max)
@@ -151,7 +157,7 @@ export function resolveChatSettings(
   const values: Record<string, unknown> = {};
   const issues: ChatSettingIssue[] = [];
   for (const setting of declarations) {
-    if (Object.hasOwn(values, setting.key)) continue;
+    if (!isSettingKey(setting.key) || Object.hasOwn(values, setting.key)) continue;
     const fallback = settingDefault(setting);
     if (!stored || !Object.hasOwn(stored, setting.key)) {
       values[setting.key] = fallback;
@@ -174,6 +180,6 @@ export function settingsCatalog(workflows: readonly { settings?: readonly unknow
   const byKey = new Map<string, WorkflowSetting>();
   for (const workflow of workflows)
     for (const setting of workflowSettings(workflow))
-      if (settingKeyPattern.test(setting.key) && !byKey.has(setting.key)) byKey.set(setting.key, setting);
+      if (isSettingKey(setting.key) && !byKey.has(setting.key)) byKey.set(setting.key, setting);
   return [...byKey.values()].sort((a, b) => a.key.localeCompare(b.key));
 }

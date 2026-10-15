@@ -146,6 +146,43 @@ The engine returns `{ replies: Array<{ nodeId, content, name?, characterId? }>, 
 
 Error `details` uses the same shared schema as a successful message result. The chat client displays kept replies plus the error notification and execution details; named speakers show their snapshotted name and an available character avatar. Retrying sends a new user message, rather than rolling back the failed turn.
 
+## Chat settings
+
+**Chat settings** are knobs a workflow declares and each chat sets: a volatility dial, an "allow violence" toggle, a max-intensity choice, an author's note. They belong to the user: turns only read them, and editing, deleting or regenerating messages never changes them. Changing one is not a turn and adds no message; the next turn uses the new value.
+
+A workflow declares them in its record (`settings`, absent in older files; read through `workflowSettings()`), edited in the workflow editor:
+
+```yaml
+settings:
+  - key: volatility        # letters, digits and _, not starting with a digit; unique
+    label: Volatility      # optional; the UI falls back to the key
+    type: number           # number | boolean | enum | text
+    default: 0.3           # number default 0, boolean false, text '', enum: the first option
+    min: 0                 # number only, optional
+    max: 1
+    step: 0.05             # UI granularity only, never enforced on stored values
+    description: How often fresh material is injected
+  - key: maxLevel
+    type: enum
+    options: ['1', '2', '3']   # strings; compare with (eq settings.maxLevel "2")
+    default: '2'
+  - key: authorsNote
+    type: text
+    multiline: true
+```
+
+- **Validation:** a missing or unusable key, a duplicate key, `min` above `max`, a number default outside `min`..`max`, a `step` that is not positive, an enum without options and an enum default that is not an option are workflow issues (`workflowSettingIssues` in `@st/shared`, reported by `prepareWorkflow` in plain language), so a turn on such a workflow fails with `WORKFLOW_INVALID` like any other workflow problem. A declaration of an unknown `type` is rejected when the workflow is saved (`400`).
+- **Values** live on the session (`settings: { [key]: value }`, `{}` for new chats, absent in older files). A key the user never set is not stored, so its declared default applies and a changed default reaches every chat that hasn't overridden it.
+- **Resolving** (`resolveChatSettings` in `@st/shared`, the only place that decides): a stored value is used when it fits its declaration (right type, a finite number within `min`/`max`, one of the enum's options); otherwise the default runs and an issue is reported (`Stored value 12 is above max 10; using default 3`), shown in the chat panel and added to the turn's execution `warnings`. Stored values are never rewritten. Keys the workflow doesn't declare are kept on the session but unused, so switching a chat to another workflow and back keeps its values.
+- **In a turn:** the server resolves the session's values when the turn starts (`startTurn`) and passes them to `executeWorkflow` (both the streaming and the plain endpoint). A change made while a turn streams applies from the next turn. The values the run used are recorded in `execution.settings`. Templates read them as `{{settings.<key>}}` (see `docs/TEMPLATING.md`); the **Chat Settings** node outputs them as ports.
+- **Preset preview** with a `sessionId` renders that chat's resolved settings (what its next turn would see); without a session, `{{settings.*}}` renders empty.
+
+| Method and path | Request | Success |
+| --- | --- | --- |
+| `PATCH /api/sessions/:id` | JSON with any of `title`, `workflowId`, `characterId`/`personaId` (`null` clears), and `settings`: a partial map merged into the stored values, where `null` removes a key (back to its default; accepted for any key) | `200` the session. A value that doesn't fit its declaration, or a non-null value for a key the chat's workflow (after the patch's `workflowId`, if any) doesn't declare, is `400 CHAT_SETTING_INVALID` with a plain message and `details.issues: { key, message }[]`, and nothing is written. Like every metadata patch, it never advances the session's `updatedAt`. |
+
+Workflow `settings` travel in the workflow record: `PUT /api/workflows/:id` replaces them when the body has `settings` and keeps the stored list when it doesn't; `POST /api/workflows` accepts them so a duplicate keeps its declarations.
+
 ## Presets and LLM providers
 
 A **preset** defines the final, ordered message list sent to an LLM. It has declared **inputs** (the values a workflow supplies) and an ordered list of discriminated **entries** (`message` or `slot`) that assembles those values with fixed prompts. Each input has an `id`, unique key, optional label and description, and type (`messages` or `text`). Every input becomes one correspondingly typed LLM input port named by its key; the port label defaults to the key. A `messages` input expands to its message list. A `text` input becomes one message using the slot's role (default `user`) and is skipped when empty. The same input may be placed by multiple slots.

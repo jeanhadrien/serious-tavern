@@ -110,3 +110,16 @@ it('takes the model list refresh flag as the strings "true" or "false" only', ()
   expect(query.parse({ refresh: 'true' })).toEqual({ refresh: 'true' });
   expect(query.safeParse({ refresh: '1' }).success).toBe(false);
 });
+
+it('takes chat settings as a partial map with null resets, and keeps workflow declarations optional', () => {
+  expect(apiContract.updateSession.body.parse({ settings: { a: 1, b: null } })).toEqual({
+    settings: { a: 1, b: null },
+  });
+  expect(apiContract.updateSession.body.safeParse({ settings: 'x' }).success).toBe(false);
+  const graph = { name: 'W', nodes: [], edges: [] };
+  expect(apiContract.updateWorkflow.body.parse(graph)).not.toHaveProperty('settings');
+  expect(apiContract.updateWorkflow.body.parse({ ...graph, settings: [{ key: 'a', type: 'text' }] }).settings).toEqual([
+    { key: 'a', type: 'text', default: '' },
+  ]);
+  expect(apiContract.createWorkflow.body.parse({ name: 'W', settings: [] })).toEqual({ name: 'W', settings: [] });
+});

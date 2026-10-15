@@ -2,10 +2,12 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { apiContract, type ApiResponse } from '@st/shared';
 import { now, type AppContext } from '../context.js';
-import { notFound, requireEntity } from '../errors.js';
+import { requireEntity } from '../errors.js';
+import { updateSession } from '../services/sessions.js';
 import type { ApiRoute } from './types.js';
 
-export function registerSessions(app: FastifyInstance, { workflows, characters, personas, sessions }: AppContext) {
+export function registerSessions(app: FastifyInstance, context: AppContext) {
+  const { workflows, characters, personas, sessions } = context;
   app.get<ApiRoute<'listSessions'>>('/api/sessions', async () =>
     (await sessions.list()).map(({ messages, ...session }) => ({ ...session, messageCount: messages.length })),
   );
@@ -21,6 +23,7 @@ export function registerSessions(app: FastifyInstance, { workflows, characters, 
       workflowId: body.workflowId,
       characterId: body.characterId,
       personaId: body.personaId,
+      settings: {},
       messages: [],
       createdAt: date,
       updatedAt: date,
@@ -33,18 +36,7 @@ export function registerSessions(app: FastifyInstance, { workflows, characters, 
   );
   app.patch<ApiRoute<'updateSession'>>('/api/sessions/:id', async (request) => {
     const { id } = apiContract.updateSession.params.parse(request.params);
-    const body = apiContract.updateSession.body.parse(request.body);
-    const session = await sessions.update(id, async (current) => {
-      if (body.workflowId) await requireEntity(workflows, body.workflowId, 'Workflow');
-      if (body.characterId) await requireEntity(characters, body.characterId, 'Character');
-      if (body.personaId) await requireEntity(personas, body.personaId, 'Persona');
-      if (body.characterId === null) delete current.characterId;
-      if (body.personaId === null) delete current.personaId;
-      Object.assign(current, Object.fromEntries(Object.entries(body).filter(([, value]) => value !== null)));
-      return current;
-    });
-    if (!session) throw notFound('Session');
-    return session;
+    return updateSession(context, id, apiContract.updateSession.body.parse(request.body));
   });
   app.delete<ApiRoute<'deleteSession'>>('/api/sessions/:id', async (request, reply) => {
     await sessions.delete(apiContract.deleteSession.params.parse(request.params).id);

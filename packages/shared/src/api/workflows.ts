@@ -13,13 +13,16 @@ export const workflowEndpoints = {
   listWorkflows: endpoint(z.array(workflowSchema)),
   createWorkflow: endpoint(
     workflowSchema,
-    // `nodes`/`edges` let a client create a copy of an existing graph in one write.
-    z.object({ name: z.string().trim().min(1) }).and(workflowSchema.pick({ nodes: true, edges: true }).partial()),
+    // `nodes`/`edges`/`settings` let a client create a copy of an existing workflow in one write.
+    z
+      .object({ name: z.string().trim().min(1) })
+      .and(workflowSchema.pick({ nodes: true, edges: true, settings: true }).partial()),
   ),
   getWorkflow: endpoint(workflowSchema, undefined, idParamsSchema),
   updateWorkflow: endpoint(
     workflowSchema,
-    workflowSchema.pick({ name: true, nodes: true, edges: true }),
+    // An omitted `settings` keeps the stored declarations.
+    workflowSchema.pick({ name: true, nodes: true, edges: true, settings: true }),
     idParamsSchema,
   ),
   deleteWorkflow: endpoint(noContentSchema, undefined, idParamsSchema),

@@ -14,6 +14,9 @@ export const updateSessionSchema = z.object({
   workflowId: z.string().uuid().optional(),
   characterId: z.string().uuid().nullable().optional(),
   personaId: z.string().uuid().nullable().optional(),
+  // Chat settings: a partial map merged into the stored values; `null` removes a key (back to its default).
+  // Values are checked against the workflow's declarations on the server. Never advances `updatedAt`.
+  settings: z.record(z.string(), z.unknown().nullable()).optional(),
 });
 // An empty `content` sends no user message: the turn runs on the session's history as it is.
 export const sendMessageSchema = z.object({ content: z.string().trim().default('') });

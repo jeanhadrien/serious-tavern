@@ -8,6 +8,7 @@ import type {
   Session,
   WorkflowInvalidDetails,
 } from '@st/shared';
+import { resolveChatSettings, workflowSettings } from '@st/shared';
 import { executeWorkflow, ExecutionFailure, registry, prepareWorkflow } from '@st/engine';
 import type { ChatReply, PreparedWorkflow } from '@st/engine';
 import { now, type AppContext } from '../context.js';
@@ -71,6 +72,8 @@ async function startTurn(
       history: ChatMessage[];
       character?: Character;
       persona?: Persona;
+      settings: Record<string, unknown>;
+      settingIssues: string[];
     };
   } = {};
   const session = await sessions.silent.update(sessionId, async (current) => {
@@ -88,7 +91,17 @@ async function startTurn(
     const userMessage: ChatMessage | undefined = content.trim()
       ? { id: randomUUID(), role: 'user', content, createdAt: now() }
       : undefined;
-    started.value = { prepared, userMessage, history: historyMessages(current.messages), character, persona };
+    // The values are snapshotted here: a settings change during the run applies from the next turn.
+    const settings = resolveChatSettings(workflowSettings(workflow), current.settings);
+    started.value = {
+      prepared,
+      userMessage,
+      history: historyMessages(current.messages),
+      character,
+      persona,
+      settings: settings.values,
+      settingIssues: settings.issues.map(({ key, message }) => `Chat setting "${key}": ${message}.`),
+    };
     if (userMessage) current.messages.push(userMessage);
     current.updatedAt = now();
     return current;
@@ -105,7 +118,11 @@ async function executeTurn(
   options: TurnOptions,
 ): Promise<ApiResponse<'sendMessage'>> {
   const { sessions, executions, secrets } = context;
-  const { prepared, userMessage, history, character, persona } = await startTurn(context, sessionId, content);
+  const { prepared, userMessage, history, character, persona, settings, settingIssues } = await startTurn(
+    context,
+    sessionId,
+    content,
+  );
   const executionId = randomUUID();
   const stream = options.emit
     ? new TurnStream({ sessions: sessions.silent, sessionId, executionId, prepared, emit: options.emit })
@@ -121,6 +138,7 @@ async function executeTurn(
       secrets,
       character,
       persona,
+      settings,
       signal: turn.controller.signal,
       executionId,
       onEvent: stream?.onEvent,
@@ -131,6 +149,8 @@ async function executeTurn(
   const streamed = (await stream?.finish()) ?? [];
   const execution = outcome?.execution ?? (failure instanceof ExecutionFailure ? failure.execution : undefined);
   const replies = outcome?.replies ?? (failure instanceof ExecutionFailure ? failure.replies : []);
+  // A stored value that no longer fits its declaration is ignored (the default runs); say so in the log.
+  execution?.warnings.push(...settingIssues);
   if (!outcome && turn.stoppedBy && execution) execution.warnings.push(stopWarnings[turn.stoppedBy]);
   if (execution) await executions.save(execution);
   const settled: { value?: { userMessage?: ChatMessage; assistantMessages: ChatMessage[] } } = {};
