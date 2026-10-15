@@ -200,6 +200,10 @@ pre {
   font-size: 0.88rem;
   text-transform: capitalize;
 }
+/* Field labels are capitalized; their description hints are sentences. */
+.config-fields .hint {
+  text-transform: none;
+}
 .template-hints {
   display: flex;
   flex-wrap: wrap;
