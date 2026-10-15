@@ -1,5 +1,5 @@
 import type { ApiParsedBody, ApiResponse } from '@st/shared';
-import { presetWarnings, resolveChatSettings, workflowSettings } from '@st/shared';
+import { presetWarnings, resolveChatSettings, settingsCatalog, workflowSettings } from '@st/shared';
 import { renderPreset } from '@st/engine';
 import type { AppContext } from '../context.js';
 import { errorMessage, HttpError, notFound } from '../errors.js';
@@ -12,9 +12,12 @@ export async function previewPreset(
   if (sessionId && !session) throw notFound('Session');
   const character = session?.characterId ? await characters.get(session.characterId) : undefined;
   const persona = session?.personaId ? await personas.get(session.personaId) : undefined;
-  // With a session, what its next turn would see; without one there are no declarations, so `{}`.
-  const workflow = session ? await workflows.get(session.workflowId) : undefined;
-  const settings = session ? resolveChatSettings(workflowSettings(workflow ?? {}), session.settings).values : {};
+  // With a session, what its next turn would see; without one, what a new chat would see: the default of
+  // every key any workflow declares (its first declaration, as in the preset editor's hints).
+  const declarations = session
+    ? workflowSettings((await workflows.get(session.workflowId)) ?? {})
+    : settingsCatalog(await workflows.list());
+  const settings = resolveChatSettings(declarations, session?.settings).values;
   const values: Record<string, unknown> = { ...inputs };
   const sample = [
     { role: 'user', content: 'Hello!' },

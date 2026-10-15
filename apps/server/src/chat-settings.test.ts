@@ -197,7 +197,7 @@ describe('chat settings on sessions', () => {
     expect((await read(app, session.id)).messages).toEqual([]);
   });
 
-  it('renders the session settings in a preset preview, and nothing without a session', async () => {
+  it('renders the session settings in a preset preview, and the declared defaults without a session', async () => {
     const { app, session } = await setup();
     await patch(app, session.id, { settings: { mood: 'tense' } });
     const preset = {
@@ -221,7 +221,7 @@ describe('chat settings on sessions', () => {
       (await app.inject({ method: 'POST', url: '/api/presets/preview', payload: { preset, sessionId } })).json()
         .messages;
     expect(await preview(session.id)).toEqual([{ role: 'system', content: 'mood=tense' }]);
-    expect(await preview()).toEqual([{ role: 'system', content: 'mood=' }]);
+    expect(await preview()).toEqual([{ role: 'system', content: 'mood=calm' }]);
   });
 });
 

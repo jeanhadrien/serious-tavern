@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { presetSchema, type ChatMessage, type Edge, type Workflow } from '@st/shared';
 import { executeWorkflow } from './executor.js';
 import { prepareWorkflow, validateWorkflow } from './prepare.js';
@@ -18,7 +19,7 @@ const edge = (source: string, sourceHandle: string, target: string, targetHandle
   target,
   targetHandle,
 });
-const workflow = (nodes: Workflow['nodes'], edges: Edge[], settings?: unknown[]): Workflow => ({
+const workflow = (nodes: Workflow['nodes'], edges: Edge[], settings?: unknown): Workflow => ({
   id: 'workflow',
   name: 'Test',
   nodes,
@@ -78,12 +79,45 @@ describe('settings in templates', () => {
     expect(result.replies.map((reply) => reply.content)).toEqual([branch === 'true' ? 'yes' : 'no']);
   });
 
-  it('gives nodes a frozen copy, so a node cannot change what the log records', async () => {
+  it("records a copy, so a later change to the caller's object does not reach the log", async () => {
     const given = { v: 1 };
     const graph = templated('{{settings.v}}');
     const result = await executeWorkflow(graph, { ...options, settings: given });
     given.v = 2;
     expect(result.execution.settings).toEqual({ v: 1 });
+  });
+
+  describe('as seen by nodes', () => {
+    afterEach(() => registry.delete('settings-writer-test'));
+
+    it('gives nodes a frozen object, so a node cannot change what the log records', async () => {
+      registry.set('settings-writer-test', {
+        type: 'settings-writer-test',
+        label: 'Writer',
+        description: '',
+        category: '',
+        inputs: [],
+        outputs: [{ name: 'out', label: 'Out', dataType: 'text' }],
+        configSchema: z.object({}),
+        defaultConfig: {},
+        async execute(ctx) {
+          let threw = false;
+          try {
+            (ctx.settings as Record<string, unknown>).v = 2;
+          } catch {
+            threw = true;
+          }
+          return { out: `${Object.isFrozen(ctx.settings)} ${threw}` };
+        },
+      });
+      const graph = workflow(
+        [node('input', 'chat-input'), node('writer', 'settings-writer-test'), node('output', 'chat-output')],
+        [edge('writer', 'out', 'output', 'value')],
+      );
+      const result = await executeWorkflow(graph, { ...options, settings: { v: 1 } });
+      expect(result.replies.map((reply) => reply.content)).toEqual(['true true']);
+      expect(result.execution.settings).toEqual({ v: 1 });
+    });
   });
 
   it('renders settings in preset entries and drops an entry whose setting is empty', () => {
@@ -145,6 +179,13 @@ describe('Chat Settings node', () => {
     expect(result.execution.nodes.settings?.logs).toBeUndefined();
   });
 
+  it('outputs a falsy value too, so what it feeds still runs', async () => {
+    const result = await executeWorkflow(graph('on', 'value'), { ...options, settings: { on: false } });
+    expect(result.execution.nodes.settings?.output).toEqual({ settings: { on: false }, value: false });
+    expect(result.execution.nodes.output?.status).toBe('completed');
+    expect(result.replies.map((reply) => reply.content)).toEqual(['anchor', 'false']);
+  });
+
   it('logs a key the workflow does not declare and outputs no value', async () => {
     const result = await executeWorkflow(graph('nope', 'value'), { ...options, settings: values });
     expect(result.execution.nodes.output?.status).toBe('skipped');
@@ -179,11 +220,12 @@ describe('declaration validation', () => {
       'Chat setting #1 has the key "my key", which can\'t be used in templates: use letters, digits and _, not starting with a digit.',
     ],
     [[{ key: 'v', type: 'number', min: 2, max: 1, default: 1 }], 'Chat setting "v": min 2 is greater than max 1.'],
+    [{}, 'Chat settings must be a list, not {}.'],
     [
       [{ key: 'm', type: 'enum', options: ['a'], default: 'b' }],
       'Chat setting "m": the default "b" is not one of its options.',
     ],
-  ])('reports bad declarations in plain language: %j', async (settings, message) => {
+  ])('reports bad declarations in plain language: %j', async (settings: unknown, message) => {
     const result = await prepareWorkflow(workflow(base.nodes, base.edges, settings));
     expect(result.prepared).toBeUndefined();
     expect(result.errors).toEqual([{ message }]);

@@ -414,4 +414,17 @@ describe('chat settings macros', () => {
     const variables = hints.filter((hint) => !hint.expression.startsWith('{{#') && !hint.expression.startsWith('{{!'));
     expect(variables.every((hint) => findMacro(hint.expression.slice(2, -2)) !== undefined)).toBe(true);
   });
+
+  it('hints only usable keys, once each, so half-typed draft declarations give no bogus hints', () => {
+    const hints = macroHints(
+      [],
+      [
+        { key: '', type: 'text' },
+        { key: '1st', type: 'text' },
+        { key: 'mood', type: 'enum' },
+        { key: 'mood', type: 'number' },
+      ],
+    ).filter((hint) => hint.expression.startsWith('{{settings.'));
+    expect(hints).toEqual([{ expression: '{{settings.mood}}', description: 'Chat setting', type: 'text' }]);
+  });
 });

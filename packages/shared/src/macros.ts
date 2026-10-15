@@ -1,4 +1,4 @@
-import type { WorkflowSetting } from './chat-settings.js';
+import { usableSettings, type WorkflowSetting } from './chat-settings.js';
 import type { PortDataType } from './ports.js';
 import { analyzeTemplate } from './template-analysis.js';
 
@@ -195,7 +195,7 @@ export function macroHints(
   const hints = macroRegistry.flatMap((macro) => {
     if (macro.pattern) {
       if (macro.source === 'settings')
-        return settings.map((setting) => ({
+        return usableSettings(settings).map((setting) => ({
           expression: `{{${macro.name.replace('<key>', setting.key)}}}`,
           description: setting.description || 'Chat setting',
           type: settingHintTypes[setting.type],

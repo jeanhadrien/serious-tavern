@@ -1,7 +1,7 @@
 import {
   describeSettingValue,
-  isSettingKey,
   settingValueProblem,
+  usableSettings,
   workflowSettings,
   type ApiParsedBody,
   type ApiResponse,
@@ -53,9 +53,7 @@ export function mergeSettings(
   patch: Readonly<Record<string, unknown>>,
   workflow: Workflow,
 ): Record<string, unknown> {
-  const declarations = new Map<string, ReturnType<typeof workflowSettings>[number]>();
-  for (const setting of workflowSettings(workflow))
-    if (isSettingKey(setting.key) && !declarations.has(setting.key)) declarations.set(setting.key, setting);
+  const declarations = new Map(usableSettings(workflowSettings(workflow)).map((setting) => [setting.key, setting]));
   const next: Record<string, unknown> = { ...stored };
   const issues: ChatSettingIssue[] = [];
   for (const [key, value] of Object.entries(patch)) {

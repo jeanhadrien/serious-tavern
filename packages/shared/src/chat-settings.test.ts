@@ -6,6 +6,8 @@ import {
   settingLabel,
   settingsCatalog,
   settingValueProblem,
+  parseWorkflowSetting,
+  usableSettings,
   workflowSettingIssues,
   workflowSettings,
   type WorkflowSetting,
@@ -55,7 +57,7 @@ describe('resolveChatSettings', () => {
       'Stored value -1 is below min 0; using default 0.3',
     ],
     ['accepts a number on the bounds', number({ min: 0, max: 1 }), { v: 1 }, 1, undefined],
-    ['rejects a non-finite number', number(), { v: null }, 0.3, 'Stored value null is not a number; using default 0.3'],
+    ['rejects a null number', number(), { v: null }, 0.3, 'Stored value null is not a number; using default 0.3'],
     ['uses a stored boolean', boolean, { on: true }, true, undefined],
     [
       'rejects a boolean stored as text',
@@ -213,6 +215,13 @@ describe('workflowSettingIssues', () => {
       { key: '__proto__', type: 'text' },
       { field: 'key', message: 'Chat setting #2 has the reserved key "__proto__"; pick another.' },
     ],
+    ...['this', 'true', 'null', 'undefined', 'toString', 'constructor'].map(
+      (key): [string, unknown, Omit<ReturnType<typeof workflowSettingIssues>[number], 'index'>] => [
+        `the reserved key ${key}`,
+        { key, type: 'text' },
+        { field: 'key', message: `Chat setting #2 has the reserved key "${key}"; pick another.` },
+      ],
+    ),
     [
       'a duplicate key',
       { key: 'ok', type: 'boolean' },
@@ -263,6 +272,31 @@ describe('workflowSettingIssues', () => {
     ).toEqual([]);
     expect(workflowSettingIssues(undefined)).toEqual([]);
     expect(workflowSettingIssues([])).toEqual([]);
+  });
+
+  it('reports settings that are not a list, which readers treat as none', () => {
+    expect(workflowSettingIssues({})).toEqual([{ index: -1, message: 'Chat settings must be a list, not {}.' }]);
+    expect(workflowSettingIssues('x')).toEqual([{ index: -1, message: 'Chat settings must be a list, not "x".' }]);
+    expect(workflowSettings({ settings: {} as never })).toEqual([]);
+    expect(settingsCatalog([{ settings: 'x' as never }])).toEqual([]);
+  });
+});
+
+describe('parseWorkflowSetting', () => {
+  it('parses a declaration, or says why it cannot be read', () => {
+    expect(parseWorkflowSetting({ key: 'a', type: 'boolean' }, 0)).toEqual({
+      setting: { key: 'a', type: 'boolean', default: false },
+    });
+    expect(parseWorkflowSetting({ key: 'a', type: 'number', default: '5' }, 2)).toEqual({
+      problem: 'Chat setting #3 is not valid: default: Invalid input: expected number, received string.',
+    });
+  });
+});
+
+describe('usableSettings', () => {
+  it('keeps the first declaration of each key templates can read', () => {
+    const list = [{ key: 'a' }, { key: '' }, { key: '1x' }, { key: 'this' }, { key: 'b' }, { key: 'a', n: 2 }];
+    expect(usableSettings(list)).toEqual([{ key: 'a' }, { key: 'b' }]);
   });
 });
 

@@ -7,8 +7,20 @@ import { z } from 'zod';
  */
 export const settingKeyPattern = /^[A-Za-z_][A-Za-z0-9_]*$/;
 export const workflowSettingTypes = ['number', 'boolean', 'enum', 'text'] as const;
-// Names that would reach an object's prototype; never usable as keys (templates can't read them either).
-const reservedKeys = new Set(['__proto__', 'constructor', 'prototype']);
+// Never usable as keys: names that reach an object's prototype, words Handlebars reads as literals or as
+// the current context (`{{settings.this}}` fails to compile), and `toString`, which the template data
+// defines on the `settings` object itself.
+const reservedKeys = new Set([
+  '__proto__',
+  'constructor',
+  'prototype',
+  'this',
+  'true',
+  'false',
+  'null',
+  'undefined',
+  'toString',
+]);
 /** A key templates can read: an identifier that is not reserved. */
 export const isSettingKey = (key: string) => settingKeyPattern.test(key) && !reservedKeys.has(key);
 
@@ -81,37 +93,53 @@ export function describeSettingValue(value: unknown): string {
   return text.length > 40 ? `${text.slice(0, 39)}…` : text;
 }
 
+// Stored records are not parsed on read, so a hand-edited file may hold anything here.
+const rawList = (settings: unknown): readonly unknown[] => (Array.isArray(settings) ? settings : []);
+
 /** Declarations a stored workflow carries, with defaults applied; items that don't parse are dropped. */
 export function workflowSettings(workflow: { settings?: readonly unknown[] }): WorkflowSetting[] {
-  return (workflow.settings ?? []).flatMap((item) => {
+  return rawList(workflow.settings).flatMap((item) => {
     const parsed = workflowSettingSchema.safeParse(item);
     return parsed.success ? [parsed.data] : [];
   });
 }
 
 export type SettingDeclarationIssue = {
+  /** The declaration's position; -1 when `settings` is not a list at all. */
   index: number;
   field?: 'key' | 'type' | 'min' | 'max' | 'step' | 'default' | 'options';
   message: string;
 };
 
+/**
+ * Whether one stored declaration can be read: its parsed form, or why not (the message prepare reports).
+ * Raw items are accepted.
+ */
+export function parseWorkflowSetting(item: unknown, index: number): { setting: WorkflowSetting } | { problem: string } {
+  const parsed = workflowSettingSchema.safeParse(item);
+  if (parsed.success) return { setting: parsed.data };
+  const type = (item as { type?: unknown } | null)?.type;
+  const first = parsed.error.issues[0];
+  const reason = !(workflowSettingTypes as readonly unknown[]).includes(type)
+    ? `its type ${describeSettingValue(type)} is not one of: ${workflowSettingTypes.join(', ')}`
+    : `${first?.path.join('.') || 'value'}: ${first?.message}`;
+  return { problem: `Chat setting #${index + 1} is not valid: ${reason}.` };
+}
+
 /** Plain-language problems in a workflow's declarations. Raw (unparsed) items are accepted. */
-export function workflowSettingIssues(settings: readonly unknown[] | undefined): SettingDeclarationIssue[] {
+export function workflowSettingIssues(settings: unknown): SettingDeclarationIssue[] {
+  if (settings !== undefined && !Array.isArray(settings))
+    return [{ index: -1, message: `Chat settings must be a list, not ${describeSettingValue(settings)}.` }];
   const issues: SettingDeclarationIssue[] = [];
   const seen = new Set<string>();
-  (settings ?? []).forEach((item, index) => {
+  rawList(settings).forEach((item, index) => {
     const number = `Chat setting #${index + 1}`;
-    const parsed = workflowSettingSchema.safeParse(item);
-    if (!parsed.success) {
-      const type = (item as { type?: unknown } | null)?.type;
-      const first = parsed.error.issues[0];
-      const reason = !(workflowSettingTypes as readonly unknown[]).includes(type)
-        ? `its type ${describeSettingValue(type)} is not one of: ${workflowSettingTypes.join(', ')}`
-        : `${first?.path.join('.') || 'value'}: ${first?.message}`;
-      issues.push({ index, field: 'type', message: `${number} is not valid: ${reason}.` });
+    const parsed = parseWorkflowSetting(item, index);
+    if ('problem' in parsed) {
+      issues.push({ index, field: 'type', message: parsed.problem });
       return;
     }
-    const setting = parsed.data;
+    const { setting } = parsed;
     const add = (field: SettingDeclarationIssue['field'], message: string) => issues.push({ index, field, message });
     if (!setting.key) add('key', `${number} needs a key.`);
     else if (!settingKeyPattern.test(setting.key))
@@ -156,8 +184,7 @@ export function resolveChatSettings(
 ): { values: Record<string, unknown>; issues: ChatSettingIssue[] } {
   const values: Record<string, unknown> = {};
   const issues: ChatSettingIssue[] = [];
-  for (const setting of declarations) {
-    if (!isSettingKey(setting.key) || Object.hasOwn(values, setting.key)) continue;
+  for (const setting of usableSettings(declarations)) {
     const fallback = settingDefault(setting);
     if (!stored || !Object.hasOwn(stored, setting.key)) {
       values[setting.key] = fallback;
@@ -175,11 +202,20 @@ export function resolveChatSettings(
   return { values, issues };
 }
 
+/**
+ * The declarations that count: those whose key templates can read, the first one per key. Every reader
+ * (resolver, PATCH validation, hints, the chat panel) goes through this, so they agree on duplicates.
+ */
+export function usableSettings<T extends { key: string }>(declarations: readonly T[]): T[] {
+  const seen = new Set<string>();
+  return declarations.filter((setting) => {
+    if (!isSettingKey(setting.key) || seen.has(setting.key)) return false;
+    seen.add(setting.key);
+    return true;
+  });
+}
+
 /** Every key declared across workflows, for template hints: first declaration wins, sorted by key. */
 export function settingsCatalog(workflows: readonly { settings?: readonly unknown[] }[]): WorkflowSetting[] {
-  const byKey = new Map<string, WorkflowSetting>();
-  for (const workflow of workflows)
-    for (const setting of workflowSettings(workflow))
-      if (isSettingKey(setting.key) && !byKey.has(setting.key)) byKey.set(setting.key, setting);
-  return [...byKey.values()].sort((a, b) => a.key.localeCompare(b.key));
+  return usableSettings(workflows.flatMap(workflowSettings)).sort((a, b) => a.key.localeCompare(b.key));
 }
