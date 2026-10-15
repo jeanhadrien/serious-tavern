@@ -62,6 +62,20 @@ describe('extractJson', () => {
     ['See {"a":1}, then [2]', 'array', [2]],
     ['Ranges like [0, 1) are fine: {"a":1}', 'object', { a: 1 }],
     ['[sic then {"a":1}', 'object', { a: 1 }],
+    // A bracket of prose that never closes is skipped, whatever follows it
+    ['Use { carefully. {"a":1}', 'object', { a: 1 }],
+    ['It starts with {. Here: {"a":1}', 'any', { a: 1 }],
+    ['Mood: :{ sad. {"mood":"sad"}', 'object', { mood: 'sad' }],
+    ['<think>Format is {score: n</think>\n{"score": 3}', 'object', { score: 3 }],
+    ['He said "use {" then {"a":1}', 'object', { a: 1 }],
+    ['Note: the "{" key. {"a":1}', 'object', { a: 1 }],
+    ['See [1 for details: {"a":1}', 'object', { a: 1 }],
+    // A prefilled ```json leaves only the closing fence after the value
+    [`{"a":1}\n${fence}`, 'object', { a: 1 }],
+    [`Sure: {"a":1}\n${fence}\n`, 'any', { a: 1 }],
+    [`7\n${fence}`, 'number', 7],
+    // Known limit: a value both malformed and cut off reads as prose, so the complete value inside it is found
+    ['{mood: "happy", stats: {"hp": 3}', 'object', { hp: 3 }],
     // Numbers and booleans must be the whole text
     ['7', 'number', 7],
     [' -3.5e2 ', 'number', -350],
@@ -112,6 +126,15 @@ describe('extractJson', () => {
     ['{"name": "Bob", "stats": {"hp": 3}, "inv', 'object', notFound],
     [`${fence}json\n{"mood": {"score": 3}, "reply": "Hel`, 'object', notFound],
     ['[{"t":"a"},{"t":"b"', 'any', notFound],
+    ['["x", {"a":1}, {"b":', 'any', notFound],
+    ['["first", {"mood": 3}, {"mood"', 'object', notFound],
+    ['[\n  "a",\n  {"x": 1},\n  {"x"', 'object', notFound],
+    ['[1, 2, {"a": 1}, ', 'object', notFound],
+    ['Results: [3, {"a": 1}', 'any', notFound],
+    ['Sure: [ "a", {"hp": 3}, ', 'any', notFound],
+    ['[null, true, {"a": 1}, -2.5', 'object', notFound],
+    ['{"a": "x", "b": {"c": 1}, "d": tr', 'object', notFound],
+    [`${fence}`, 'any', notFound],
     [`${fence}python\nprint(1)\n${fence}\n{"a":1}`, 'object', notFound],
   ])('rejects %j as %s', (text, type, { error }) => {
     expect(() => extractJson(text, type)).toThrow(error);

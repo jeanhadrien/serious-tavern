@@ -64,10 +64,79 @@ function scanSpan(text: string, start: number): { end?: number; mismatch?: numbe
   return {};
 }
 
+const outOfText = Symbol('out of text');
+const notJson = Symbol('not JSON');
+
+/**
+ * True when the text from `start` on is the beginning of a JSON value that the end of the text cuts off
+ * (`["x", {"a": 1}, {"b":`), false when it stops being JSON before then (prose such as `[sic` or `Use { here`).
+ */
+function isCutOffJson(text: string, start: number): boolean {
+  let i = start;
+  const peek = () => {
+    while (i < text.length && ' \t\n\r'.includes(text[i]!)) i++;
+    if (i >= text.length) throw outOfText;
+    return text[i]!;
+  };
+  const take = (char: string) => {
+    if (peek() !== char) throw notJson;
+    i++;
+  };
+  const string = () => {
+    take('"');
+    for (; i < text.length; i++) {
+      if (text[i] === '\\') i++;
+      else if (text[i] === '"') {
+        i++;
+        return;
+      } else if (text[i]! < ' ') throw notJson;
+    }
+    throw outOfText;
+  };
+  // Runs `item` for each entry up to and including the closer, starting on the opening bracket.
+  const items = (close: string, item: () => void) => {
+    i++;
+    while (peek() !== close) {
+      item();
+      if (peek() !== close) take(',');
+    }
+    i++;
+  };
+  const value = (): void => {
+    const char = peek();
+    if (char === '{')
+      items('}', () => {
+        string();
+        take(':');
+        value();
+      });
+    else if (char === '[') items(']', value);
+    else if (char === '"') string();
+    else {
+      const token = /[\w.+-]+/y;
+      token.lastIndex = i;
+      const scalar = token.exec(text)?.[0] ?? '';
+      i += scalar.length;
+      if (i >= text.length) throw outOfText;
+      // The token is letters, digits and signs only, so whatever parses is a number, true, false or null.
+      if (!tryParse(scalar)) throw notJson;
+    }
+  };
+  try {
+    value();
+    return true;
+  } catch (error) {
+    // Nesting too deep for the stack is not prose: stop there.
+    return error === outOfText || error instanceof RangeError;
+  }
+}
+
 /**
  * First top-level `{…}` or `[…]` span that parses with the expected type, otherwise the first one that parses
  * (so the caller reports the type mismatch). Brackets nested in a span are never tried on their own: when the
  * outer value is malformed (trailing comma, single quotes) or cut off, an inner fragment is not the answer.
+ * A bracket that never closes ends the search when it opens JSON cut off by the end of the text, and is skipped
+ * as prose otherwise.
  */
 function findBalanced(text: string, expect: JsonExpect): { value: unknown } | undefined {
   let mismatched: { value: unknown } | undefined;
@@ -82,8 +151,8 @@ function findBalanced(text: string, expect: JsonExpect): { value: unknown } | un
       i = span.end - 1;
     } else if (span.mismatch !== undefined) {
       i = span.mismatch;
-    } else if (text[i] === '{' || /^\[\s*[[{]/.test(text.slice(i, i + 64))) {
-      // Never closes: the rest of the text is inside this value. A lone `[` of prose ("[sic") is skipped.
+    } else if (isCutOffJson(text, i)) {
+      // The rest of the text is inside this value, so anything found further on would be a fragment of it.
       break;
     }
   }
@@ -103,7 +172,8 @@ export function extractJson(text: string, expect: JsonExpect): unknown {
   let candidate = trimmed;
   // The info string (```json) only counts when a line break follows it, so ```7``` keeps its 7.
   const fence = /```(?:[\w+-]*[^\S\n]*\n)?([\s\S]*?)(?:```|$)/.exec(candidate);
-  if (fence) candidate = fence[1]!.trim();
+  // An empty fence is the closing half of a prefilled ```json: the value comes before it.
+  if (fence) candidate = fence[1]!.trim() || candidate.slice(0, fence.index).trim() || candidate;
   if (expect === 'number' || expect === 'boolean') {
     const parsed = tryParse(candidate);
     if (!parsed)
