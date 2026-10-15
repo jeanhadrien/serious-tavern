@@ -1,4 +1,4 @@
-import type { Character, ChatMessage, Persona, PortDef, Preset, Provider, WireExchange } from '@st/shared';
+import type { Character, ChatMessage, Collection, Persona, PortDef, Preset, Provider, WireExchange } from '@st/shared';
 import type { z } from 'zod';
 
 export type EngineEvent = {
@@ -19,6 +19,8 @@ export type NodeResources = {
   characters?: { get(id: string): Promise<Character | undefined> };
   // Provider records by id. Built-in providers always resolve, with or without this.
   providers?: { get(id: string): Promise<Provider | undefined> };
+  // Authored collections by id (Recall, Draw). Read-only for workflows: no node writes them.
+  collections?: { get(id: string): Promise<Collection | undefined> };
 };
 export type ChatReply = { nodeId: string; content: string; name?: string; characterId?: string };
 export type ExecutionContext = {

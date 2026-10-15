@@ -114,6 +114,29 @@ it('snapshots provider records once and always resolves the built-in OpenRouter'
   expect(await (await prepareWorkflow(graph())).prepared!.resources.providers!.get('openrouter')).toBeDefined();
 });
 
+it('snapshots collections once per run and clones them', async () => {
+  const collection = {
+    id: '22222222-2222-4222-8222-222222222222',
+    name: 'Lore',
+    entries: [{ text: 'a', weight: 1, enabled: true }],
+    createdAt: '',
+    updatedAt: '',
+  };
+  const get = vi.fn(async (id: string) => (id === collection.id ? collection : undefined));
+  const { prepared } = await prepareWorkflow(graph(), {
+    presets: { get: async () => undefined },
+    collections: { get },
+  });
+  const collections = prepared!.resources.collections!;
+  const [first, second] = await Promise.all([collections.get(collection.id), collections.get(collection.id)]);
+  expect(first).toEqual(collection);
+  expect(first).not.toBe(collection);
+  expect(second).toBe(first);
+  expect(get).toHaveBeenCalledTimes(1);
+  expect(await collections.get('missing')).toBeUndefined();
+  expect(await (await prepareWorkflow(graph())).prepared!.resources.collections!.get('x')).toBeUndefined();
+});
+
 it('fails an LLM node that names an unknown provider, naming the id', async () => {
   const preset: Preset = {
     id: '2b041793-416b-4c94-a541-99ab866230b7',

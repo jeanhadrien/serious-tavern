@@ -237,3 +237,48 @@ describe('collections API', () => {
     }
   });
 });
+
+describe('Recall in a turn', () => {
+  it('recalls an entry from a collection on disk, and fails plainly once the file is gone', async () => {
+    const app = await createApp(directory, { seed: false });
+    try {
+      const inject = async (method: 'POST' | 'PUT', url: string, payload: object) =>
+        (await app.inject({ method, url, payload })).json() as { id: string };
+      const lore = await inject('POST', '/api/collections', {
+        name: 'Northern Wastes',
+        entries: [{ text: 'The Salt Inn sits by the river.', keywords: ['salt inn'] }, { text: 'Unrelated.' }],
+      });
+      const position = { x: 0, y: 0 };
+      const workflow = await inject('POST', '/api/workflows', {
+        name: 'Lore echo',
+        nodes: [
+          { id: 'input', type: 'chat-input', position, config: {} },
+          { id: 'recall', type: 'recall', position, config: { collectionIds: [lore.id] } },
+          { id: 'output', type: 'chat-output', position, config: {} },
+        ],
+        edges: [{ id: 'e', source: 'recall', sourceHandle: 'text', target: 'output', targetHandle: 'value' }],
+      });
+      const session = await inject('POST', '/api/sessions', { workflowId: workflow.id });
+      const send = () =>
+        app.inject({
+          method: 'POST',
+          url: `/api/sessions/${session.id}/messages`,
+          payload: { content: 'I enter the salt inn' },
+        });
+      const sent = await send();
+      expect(sent.statusCode).toBe(200);
+      expect(
+        apiContract.sendMessage.response.parse(sent.json()).assistantMessages.map((reply) => reply.content),
+      ).toEqual(['The Salt Inn sits by the river.']);
+
+      await rm(join(directory, 'collections', 'northern-wastes.yaml'));
+      const failed = await send();
+      expect(failed.statusCode).toBe(500);
+      const { error } = errorEnvelopeSchema.parse(failed.json());
+      expect(error.code).toBe('WORKFLOW_EXECUTION_FAILED');
+      expect(error.message).toContain(`Collection ${lore.id} not found`);
+    } finally {
+      await app.close();
+    }
+  });
+});
