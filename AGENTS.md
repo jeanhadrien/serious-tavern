@@ -86,7 +86,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
   - Repository writes are atomic: they write a temp file, then rename it. The rename retries transient Windows `EPERM`/`EACCES`/`EBUSY` errors.
 - **Recency ordering:** the preset, workflow and chat lists are ordered most-recent-first with the shared `compareRecent` comparator (`apps/web/src/pages/recentOrder.ts`: `updatedAt` desc, then `createdAt` desc, then name). Session `updatedAt` means last message activity: only sending a message advances it; message edit/delete and session metadata patches leave it unchanged.
 - **Execution semantics:**
-  - A workflow has exactly one Chat Input and **one or more** Chat Outputs. Only nodes that some Chat Output depends on run; the rest are logged as `skipped`.
+  - A workflow has exactly one Chat Input and **one or more** Chat Outputs. Only **sinks** (definitions with `sink: true`; Chat Output is the only one so far, State Write and Save Summary will be) and the nodes they depend on run; the rest are logged as `skipped` ('not needed by any output'). A sink alone doesn't make a workflow valid (at least one Chat Output is still required), and replies still come only from Chat Outputs. Descriptors carry `sink`.
   - Each Chat Output that runs appends one assistant message. Message order is deterministic: dependency first (output Y precedes X when Y's transitive upstream node set is a strict subset of X's, which covers outputs fed by a shared upstream node), then the `order` config only as a priority among outputs with no remaining predecessor, then node id. It never depends on which output finishes first.
   - The speaker name is taken from the connected `character` input if there is one, otherwise from the `name` config, otherwise the message has no name. Messages store a snapshot of `name` plus `characterId`.
   - If no output runs, the turn has no reply and the execution records a warning. On failure, the replies already completed are kept and returned in the error details.
@@ -148,6 +148,7 @@ A chatbot web app. Each chat reply comes from a user-built workflow of nodes, ed
 
 ## Adding a node type
 1. Create `packages/engine/src/nodes/<type>/index.ts` exporting a `NodeDefinition`: `type`, `label`, `category`, typed `inputs`/`outputs` with `dataType` and `description`, zod `configSchema`, `defaultConfig`, and `execute(ctx)`, which returns one key per output port.
+   - Set `sink: true` only for nodes that must run even when no Chat Output depends on them (they write somewhere).
 2. Register it in `registry.ts`.
 3. Add tests in `nodes.test.ts`.
 4. The UI picks it up automatically through `/api/node-types`. Add a custom panel in `node-ui` only if the generated form isn't enough.

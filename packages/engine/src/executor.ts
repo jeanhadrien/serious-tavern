@@ -85,7 +85,7 @@ export async function executeWorkflow(
     const timestamp = new Date().toISOString();
     execution.nodes[node.id] = { status: 'skipped', startedAt: timestamp, finishedAt: timestamp, durationMs: 0 };
     resolved.set(node.id, { output: {}, skipped: true });
-    emit({ type: 'node:skipped', nodeId: node.id, detail: 'unreachable from chat output' });
+    emit({ type: 'node:skipped', nodeId: node.id, detail: 'not needed by any output' });
   }
   try {
     while (pending.size) {

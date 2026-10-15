@@ -11,6 +11,7 @@ export type PreparedWorkflow = {
   ports: Map<string, { inputs: PortDef[]; outputs: PortDef[] }>;
   incoming: Map<string, Edge[]>;
   upstream: Map<string, string[]>;
+  // Nodes some sink depends on, sinks included: the only nodes that run.
   reachable: Set<string>;
 };
 
@@ -201,7 +202,8 @@ export async function prepareWorkflow(
     };
   }
   const reachable = new Set<string>();
-  const visit = workflow.nodes.filter((node) => node.type === 'chat-output').map((node) => node.id);
+  // Sinks (Chat Output, later state and summary writers) decide what runs: they and their upstream nodes.
+  const visit = workflow.nodes.filter((node) => definitions.get(node.id)?.sink).map((node) => node.id);
   while (visit.length) {
     const id = visit.pop()!;
     if (reachable.has(id)) continue;

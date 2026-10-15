@@ -8,6 +8,7 @@ export const chatOutput: NodeDefinition = {
   label: 'Chat Output',
   description: 'Reply to the conversation',
   category: 'Chat',
+  sink: true,
   inputs: [
     { name: 'value', label: 'Value', dataType: 'text', required: true },
     { name: 'character', label: 'Character', dataType: 'character' },

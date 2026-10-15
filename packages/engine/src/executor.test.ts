@@ -311,7 +311,7 @@ describe('executor', () => {
     );
     expect((await executeWorkflow(json, options)).replies[0]!.content).toBe('{\n  "hello": [\n    "world"\n  ]\n}');
   });
-  it('does not execute nodes disconnected from Chat Output', async () => {
+  it('does not execute nodes no sink depends on', async () => {
     const run = vi.fn(async () => {
       throw new Error('unreachable node ran');
     });

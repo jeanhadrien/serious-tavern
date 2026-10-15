@@ -122,6 +122,8 @@ export const nodeTypeDescriptorSchema = z.object({
   description: z.string(),
   category: z.string(),
   dynamicPorts: z.boolean(),
+  /** Runs, with its upstream, even when no Chat Output needs it. Always sent by the server. */
+  sink: z.boolean().optional(),
   inputs: z.array(portSchema),
   outputs: z.array(portSchema),
   configSchema: z.record(z.string(), z.unknown()),

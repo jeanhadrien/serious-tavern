@@ -50,8 +50,11 @@ it('returns payloads conforming to every shared endpoint response contract', asy
         .map((descriptor) => descriptor.type)
         .sort(),
     ).toEqual(['character', 'llm']);
-    for (const descriptor of nodeTypes)
+    for (const descriptor of nodeTypes) {
       expect(descriptor.dynamicPorts).toBe(!!registry.get(descriptor.type)?.resolvePorts);
+      expect(descriptor.sink).toBe(!!registry.get(descriptor.type)?.sink);
+    }
+    expect(nodeTypes.find((descriptor) => descriptor.type === 'chat-output')?.sink).toBe(true);
     const builtIn = await request('listProviders', { method: 'GET', url: '/api/providers' });
     expect(builtIn.map((provider) => [provider.id, provider.builtIn])).toEqual([
       ['openrouter', true],

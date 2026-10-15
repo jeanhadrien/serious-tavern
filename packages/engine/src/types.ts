@@ -52,5 +52,8 @@ export type NodeDefinition = {
   configSchema: z.ZodType<Record<string, unknown>>;
   defaultConfig: Record<string, unknown>;
   timeoutMs?: number;
+  // A sink always runs (once its inputs are ready), and so does everything it depends on, even when no Chat
+  // Output needs it: nodes that write somewhere. Chat Output is a sink.
+  sink?: boolean;
   execute(ctx: ExecutionContext): Promise<Record<string, unknown>>;
 };
