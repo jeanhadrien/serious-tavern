@@ -18,6 +18,7 @@ export interface EditorStore<T> {
   /**
    * List side: ask the editor to open an item. Does nothing when it is already the open one (keeps its draft),
    * unless a `focus` is given: a hint about where to look inside the item (e.g. an edge id to highlight).
+   * `currentId` names the requested item at once (clean), before the editor has applied the request.
    */
   open(item: T, focus?: string): void;
   /** List side: tell the editor an item was deleted, so it drops that draft. */
@@ -38,8 +39,8 @@ export function createEditorStore<T extends { id: string }>(): EditorStore<T> {
     state = next;
     for (const listener of [...listeners]) listener();
   };
-  const send = (command: Omit<EditorCommand<T>, 'seq'>) =>
-    set({ ...state, command: { ...command, seq: (state.command?.seq ?? 0) + 1 } as EditorCommand<T> });
+  const send = (command: Omit<EditorCommand<T>, 'seq'>, next: Partial<EditorState<T>> = {}) =>
+    set({ ...state, ...next, command: { ...command, seq: (state.command?.seq ?? 0) + 1 } as EditorCommand<T> });
   return {
     getSnapshot: () => state,
     subscribe: (listener) => {
@@ -47,7 +48,14 @@ export function createEditorStore<T extends { id: string }>(): EditorStore<T> {
       return () => void listeners.delete(listener);
     },
     open: (item, focus) => {
-      if (state.currentId !== item.id || focus !== undefined) send({ open: item, focus });
+      if (state.currentId === item.id) {
+        if (focus !== undefined) send({ open: item, focus });
+        return;
+      }
+      // The editor applies the request in an effect, after the render that shows it. Naming the new item now
+      // keeps that render from writing the previous item into the layout URL (a stray history entry); the
+      // editor's next report confirms it.
+      send({ open: item, focus }, { currentId: item.id, dirty: false });
     },
     discard: (id) => send({ close: id }),
     report: (currentId, dirty) => {

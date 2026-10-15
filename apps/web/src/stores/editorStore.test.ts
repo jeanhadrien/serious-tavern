@@ -19,6 +19,22 @@ it('does not reopen the item the editor already shows, so its draft survives', (
   store.report('a', true);
   store.open(item('a'));
   expect(store.getSnapshot().command).toBeUndefined();
+  // A focus on the open item is sent, and keeps its dirty flag.
+  store.open(item('a'), 'edge-1');
+  expect(store.getSnapshot()).toMatchObject({ currentId: 'a', dirty: true, command: { open: { id: 'a' } } });
+});
+
+it('names the requested item at once, so the layout never records the previous one meanwhile', () => {
+  const store = createEditorStore<{ id: string }>();
+  const listener = vi.fn();
+  store.report('a', true);
+  store.subscribe(listener);
+  store.open(item('b'));
+  expect(store.getSnapshot()).toMatchObject({ currentId: 'b', dirty: false });
+  expect(listener).toHaveBeenCalledTimes(1);
+  // The editor's report after applying it changes nothing.
+  store.report('b', false);
+  expect(listener).toHaveBeenCalledTimes(1);
 });
 
 it('reports selection and dirtiness, staying quiet when nothing changed', () => {
