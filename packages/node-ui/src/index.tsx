@@ -3,7 +3,7 @@ import { macroHints } from '@st/shared';
 import type { NodeConfigPanelProps as Props } from './panels/types.js';
 import { CharacterPanel } from './panels/character.js';
 import { LlmPanel } from './panels/llm.js';
-import { supportsKeyValueArray, isKeyValueRows, type Field } from './fields.js';
+import { supportsKeyValueArray, isKeyValueRows, numberFieldValue, type Field } from './fields.js';
 export type { NodePanelContext, NodeConfigPanelProps } from './panels/types.js';
 
 function GenericPanel({ descriptor, config, onChange }: Props) {
@@ -156,11 +156,10 @@ function GenericPanel({ descriptor, config, onChange }: Props) {
           return (
             <label key={key}>
               {label}
-              {/* Blank means unset, so an optional field falls back to the node's default. */}
               <input
                 type="number"
                 value={String(value)}
-                onChange={(e) => update(key, e.target.value === '' ? undefined : Number(e.target.value))}
+                onChange={(e) => update(key, numberFieldValue(e.target.value, field))}
               />
               {help}
             </label>

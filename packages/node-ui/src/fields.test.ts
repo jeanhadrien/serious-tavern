@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { supportsKeyValueArray, isKeyValueRows, type Field } from './fields.js';
+import { supportsKeyValueArray, isKeyValueRows, numberFieldValue, type Field } from './fields.js';
 
 const schema: Field = {
   type: 'array',
@@ -61,4 +61,16 @@ describe('key/value array support', () => {
       expect(isKeyValueRows(value)).toBe(false);
     },
   );
+});
+
+describe('generic number inputs', () => {
+  it.each<[string, Field, number | undefined]>([
+    ['', { type: 'number' }, undefined],
+    ['0', { type: 'number' }, 0],
+    ['-1.5', { type: 'number' }, -1.5],
+    ['', { type: 'number', default: 10 }, 0],
+    ['5', { type: 'number', default: 10 }, 5],
+  ])('stores %j of %j as %j', (text, field, value) => {
+    expect(numberFieldValue(text, field)).toBe(value);
+  });
 });

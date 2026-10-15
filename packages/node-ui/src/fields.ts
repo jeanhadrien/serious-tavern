@@ -36,3 +36,12 @@ export function isKeyValueRows(value: unknown): value is { key: string; value: s
     )
   );
 }
+
+/**
+ * Config value of a generic number input. A field without a default is unset when cleared, so the node can
+ * apply its own fallback (Random's per-mode bounds). A field with a default keeps the old `Number('') = 0`:
+ * storing unset there would redisplay the default while the user is still typing.
+ */
+export function numberFieldValue(text: string, field: Field): number | undefined {
+  return text === '' && field.default === undefined ? undefined : Number(text);
+}
