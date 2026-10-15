@@ -7,6 +7,7 @@ export { validateWorkflow } from './prepare.js';
 import type { ChatReply, EngineEvent, ExecutionContext, NodeResources } from './types.js';
 import { stringify, coerceValue } from './text.js';
 import { orderReplies } from './replies.js';
+import { createRandom } from './random.js';
 
 class NodeExecutionError extends Error {
   constructor(
@@ -45,6 +46,8 @@ export async function executeWorkflow(
     nodeTimeoutMs?: number;
     // Lets the caller know the execution id before the run starts (streaming announces it up front).
     executionId?: string;
+    // Seeds every node's `ctx.random()`; generated when absent. Recorded as `execution.seed`.
+    seed?: string;
   },
 ): Promise<{ replies: ChatReply[]; execution: ExecutionLog }> {
   // NB: Workflow is a passthrough (loose) object for forward compatibility, so `in`
@@ -57,10 +60,12 @@ export async function executeWorkflow(
   if (!preparation.prepared)
     throw new Error(`Invalid workflow: ${preparation.errors.map((issue) => issue.message).join('; ')}`);
   const { workflow, resources, definitions, ports, incoming, upstream, reachable } = preparation.prepared;
+  const seed = options.seed ?? randomUUID();
   const execution: ExecutionLog = {
     id: options.executionId ?? randomUUID(),
     workflowId: workflow.id,
     sessionId: options.sessionId,
+    seed,
     status: 'running',
     startedAt: new Date().toISOString(),
     nodes: {},
@@ -77,6 +82,14 @@ export async function executeWorkflow(
     } catch {
       // Observer exceptions must not disrupt execution or cancellation cleanup.
     }
+  };
+  // One stream per node and run (a node executes at most once), created on its first draw.
+  const createNodeRandom = (streamSeed: string) => {
+    let next: (() => number) | undefined;
+    return () => {
+      next ??= createRandom(streamSeed);
+      return next();
+    };
   };
   const resolved = new Map<string, { output: Record<string, unknown>; skipped: boolean }>();
   const replies = new Map<string, ChatReply>();
@@ -155,6 +168,7 @@ export async function executeWorkflow(
                 resources,
                 signal: nodeSignal,
                 log: () => {},
+                random: createNodeRandom(`${seed}:${node.id}`),
                 recordWire: (wire) => {
                   if (callbacksActive) execution.nodes[node.id] = { ...execution.nodes[node.id]!, wire };
                 },

@@ -418,6 +418,7 @@ describe('character nodes and history', () => {
       resources: { presets: { get: async () => undefined } },
       signal: new AbortController().signal,
       log: () => {},
+      random: () => 0.5,
       emit: () => {},
       recordWire: () => {},
     } satisfies ExecutionContext;

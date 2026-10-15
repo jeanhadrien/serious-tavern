@@ -37,6 +37,7 @@ const ctx = (config: Record<string, unknown>): ExecutionContext => ({
   resources: { presets: { get: async () => preset }, providers: providerResources(providerRecord('fake')) },
   recordWire: () => {},
   log: () => {},
+  random: () => 0.5,
   emit: () => {},
 });
 afterEach(() => {

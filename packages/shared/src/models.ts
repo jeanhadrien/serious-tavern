@@ -103,6 +103,8 @@ export const executionLogSchema = z
     status: z.enum(['running', 'completed', 'error']),
     startedAt: z.string(),
     finishedAt: z.string().optional(),
+    /** Seed of every node's `ctx.random()` in this run; absent in older logs. */
+    seed: z.string().optional(),
     nodes: z.record(z.string(), nodeExecutionSchema),
     warnings: z.array(z.string()).default([]),
   })

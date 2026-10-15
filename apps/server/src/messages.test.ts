@@ -72,6 +72,8 @@ it('edits either role without changing metadata or executing, then deletes only 
     expect(remaining.updatedAt).toBe(edited.updatedAt);
     const execution = await app.inject({ method: 'GET', url: `/api/executions/${result.execution.id}` });
     expect(execution.json()).toEqual(result.execution);
+    // The engine seeds every run and the stored log keeps the seed.
+    expect(execution.json().seed).toEqual(expect.any(String));
   } finally {
     await app.close();
   }

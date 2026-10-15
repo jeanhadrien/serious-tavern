@@ -33,6 +33,9 @@ export type ExecutionContext = {
   resources: NodeResources;
   signal: AbortSignal;
   log(message: string): void;
+  // Next value in [0, 1) of this node's deterministic stream for this run, seeded by the run seed and the
+  // node id. Never use `Math.random` in a node: a run's rolls must be reproducible from its seed.
+  random(): number;
   // Stores the node's HTTP exchange in the execution log (`wire`); each call replaces the previous one.
   recordWire(exchange: WireExchange): void;
   emit(event: EngineEvent): void;
