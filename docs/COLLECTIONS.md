@@ -22,7 +22,7 @@ A collection can be both: entries with keywords are lore, entries with tags and 
 
 ## Quick start
 
-1. Click the **Collections** icon (books, right column), then **+ New**.
+1. Click the **Collections** icon (a row of books), then **+ New**.
 2. Rename it, click **+ Add entry**, write the entry's text, and add keywords (for Recall) or tags and a level
    (for Draw). **Save**.
 3. In a workflow, add a **Recall** or **Draw** node (category **Lore**), pick the collection in its settings, and
@@ -90,11 +90,14 @@ Recall adds the entries whose keywords appear in the recent chat.
 
 - **What it reads:** the last *Scan messages* messages of the history (default 4), the message just sent, and
   its optional `text` input (for example a scene summary). Each message is searched on its own, so a keyword
-  never matches across two messages.
+  never matches across two messages. When what feeds `text` was skipped or produced nothing, Recall still
+  scans the messages.
 - **Keywords** are plain text: `a.b` or `(x)` match those exact characters. Matching ignores case unless *Case
   sensitive* is on.
 - **Whole words only** (on by default): `inn` does not match `innkeeper`, and `Борин` does not match `Борина`
   (any alphabet). A keyword that starts or ends with a symbol, like `C++` or `#quest`, still matches.
+  Languages written without spaces (Chinese, Japanese, Thai…) have no word edges to check: `東京` matches in
+  `私は東京に行く`.
 - **Order:** collections in the order you picked them, then entries in file order.
 - **Limits:** *Max entries* (default 5) and *Max characters* (default 0, no limit; the separators count). The
   list stops at the first entry that doesn't fit: a shorter entry further down is not taken instead. When
@@ -116,8 +119,9 @@ Draw picks entries at random among those that pass its filters.
   setting such as `"2"` works); a connected `tags` replaces *Require tags* (a list, or comma-separated text).
   If what feeds an input was skipped (a branch not taken), Draw is skipped too.
 - **Outputs:** `entry` (the first drawn entry), `text` (its text, or every drawn text one per line when Count
-  is more than 1), `entries` (all drawn) and `reason`. When nothing is eligible, `entry` and `text` are
-  absent, so whatever they feed is skipped, and `entries` is empty.
+  is more than 1), `level` (the first drawn entry's level, absent when it has none), `entries` (all drawn) and
+  `reason`. When nothing is eligible, `entry`, `text` and `level` are absent and `entries` is empty: a node
+  that requires them (a Chat Output) is skipped, others (an LLM through a preset input) run without them.
 - **Reason** explains the result, for example `drew 1 of 14 eligible (tags: forest; level ≤ 2)`,
   `drew 2 of 2 eligible (asked for 3; tags: forest)` or `no eligible entry among 20 (tags: forest; level ≤ 2)`.
 - **Reproducible:** draws come from the turn's random seed, recorded in the execution details, so the same
@@ -146,9 +150,16 @@ The user turns the dial in the chat panel.
 as `{{#if input.seed}}If it fits naturally, let this colour the scene: {{input.seed}}{{/if}}`. When nothing is
 eligible, the input is absent and the entry disappears.
 
-**Different wording by level.** Preset inputs carry text, not objects, so a preset can't read
-`input.seed.level`. Use one Draw node per wording (say *Max level* 1 and *Min level* 2), each feeding its own
-preset input with its own entry text.
+**Different wording by level.** Connect Draw's `level` output to a second preset input, `seedLevel`, and branch
+on it in the entry (inputs arrive as text, so compare with a quoted number):
+
+```handlebars
+{{#if input.seed}}
+{{#if (eq input.seedLevel "1")}}A small detail you may use: {{input.seed}}{{else}}Let this shape the scene: {{input.seed}}{{/if}}
+{{/if}}
+```
+
+One draw, worded by its own level. (Two Draw nodes with different level ranges would draw twice per turn.)
 
 ## Limits
 

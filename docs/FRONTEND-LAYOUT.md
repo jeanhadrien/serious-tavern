@@ -25,7 +25,7 @@ What was built, and where it refines the design below:
 
 - **Top bar:** thin. Reserved for contextual UI later; it is an empty skeleton for now. All navigation lives in the column headers.
 - **Three columns, L | M | R**, all resizable. Widths are remembered locally (per browser).
-- **Column headers** hold icons that switch what the column shows. An icon shows a **dirty dot** when its editor has unsaved changes.
+- **Column headers** hold icons that switch what the column shows. An icon shows a **dirty dot** when its editor has unsaved changes. When a column is too narrow for all its icons (compact L, R at its minimum width), the icon row scrolls sideways inside the column; it never spills over the next column or widens the page.
 
 ## What lives where
 
