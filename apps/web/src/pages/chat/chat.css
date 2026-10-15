@@ -43,6 +43,7 @@
 }
 .chat-header input {
   flex: 1;
+  min-width: 8rem;
   font-weight: 600;
 }
 .chat-header select {
@@ -301,6 +302,10 @@ button.stop-generation:hover {
   border-top: 1px solid #414652;
   padding-top: 8px;
   font-size: 0.85rem;
+}
+.execution-settings {
+  display: block;
+  overflow-wrap: anywhere;
 }
 .execution-node {
   border-top: 1px solid #3a4050;

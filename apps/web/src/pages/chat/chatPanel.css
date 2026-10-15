@@ -1,0 +1,118 @@
+/* The chat side panel lives inside the chat view; the view is a container so the panel follows its width. */
+.view[data-view="chat"] {
+  container: chat / inline-size;
+}
+.chat-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  position: relative;
+}
+.chat-conversation {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chat-panel {
+  width: 320px;
+  flex-shrink: 0;
+  overflow: auto;
+  padding: 14px 16px;
+  background: #22252e;
+  border-left: 1px solid #363b46;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.chat-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.chat-panel h2,
+.chat-panel h3 {
+  margin: 0;
+}
+.chat-panel h3 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #a7adbd;
+  margin-bottom: 10px;
+}
+.chat-panel .hint,
+.chat-panel .error {
+  margin: 0;
+  font-size: 0.8rem;
+}
+.chat-panel a {
+  color: #9fb0ff;
+}
+.chat-panel .hint.warning {
+  color: #f2c98b;
+}
+.chat-settings {
+  display: grid;
+  gap: 16px;
+}
+.chat-setting {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.chat-setting-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 30px;
+}
+.chat-setting-head label {
+  text-transform: none;
+  font-weight: 600;
+}
+.chat-setting-head .icon-button {
+  padding: 4px;
+}
+.chat-setting input,
+.chat-setting select,
+.chat-setting textarea {
+  padding: 7px 9px;
+  width: 100%;
+}
+.chat-setting-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 10px;
+  align-items: center;
+}
+.chat-setting-range input[type="range"] {
+  padding: 0;
+  border: 0;
+  background: none;
+  accent-color: #6f7ddf;
+}
+.chat-setting input.chat-setting-toggle {
+  width: 20px;
+  height: 20px;
+  accent-color: #6f7ddf;
+}
+.chat-setting-problem {
+  grid-column: 1 / -1;
+}
+.chat-header .chat-panel-toggle[aria-pressed="true"] {
+  background: #3d4560;
+  border-color: #6f7fd8;
+}
+/* In a narrow chat column the panel covers the messages instead of squeezing them. */
+@container chat (max-width: 760px) {
+  .chat-panel {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: min(360px, 100%);
+    z-index: 5;
+    box-shadow: -6px 0 16px rgba(0, 0, 0, 0.35);
+  }
+}

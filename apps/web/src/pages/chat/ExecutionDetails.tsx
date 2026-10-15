@@ -20,6 +20,14 @@ export function ExecutionDetails({ id, cached }: { id: string; cached?: Executio
           <small>
             {execution.status} · {execution.id}
           </small>
+          {execution.settings && Object.keys(execution.settings).length > 0 && (
+            <small className="execution-settings">
+              Chat settings:{' '}
+              {Object.entries(execution.settings)
+                .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+                .join(', ')}
+            </small>
+          )}
           {execution.warnings?.map((warning) => (
             <p className="hint" key={warning}>
               {warning}

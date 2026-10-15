@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { SlidersHorizontal } from 'lucide-react';
 import type { ApiBody, Character, Persona, Session, Workflow } from '@st/shared';
 import { charactersApi, personasApi } from '../../api.js';
+import { IconButton } from '../../components/IconButton.js';
 
 interface ContextSelectorProps {
   label: string;
@@ -44,6 +46,9 @@ interface ChatHeaderProps {
   personas: Persona[];
   disabled: boolean;
   onUpdate: (changes: ApiBody<'updateSession'>) => Promise<void>;
+  /** The chat panel (settings); usable while a turn runs, unlike the rest of the header. */
+  panelOpen: boolean;
+  onTogglePanel: () => void;
 }
 
 export function ChatHeader({
@@ -56,6 +61,8 @@ export function ChatHeader({
   personas,
   disabled,
   onUpdate,
+  panelOpen,
+  onTogglePanel,
 }: ChatHeaderProps) {
   const [draft, setDraft] = useState(title);
   useEffect(() => {
@@ -85,6 +92,13 @@ export function ChatHeader({
             </option>
           ))}
         </select>
+        <IconButton
+          icon={SlidersHorizontal}
+          label="Chat settings"
+          className="chat-panel-toggle"
+          aria-pressed={panelOpen}
+          onClick={onTogglePanel}
+        />
       </header>
       <div className="session-context-selectors">
         <ContextSelector

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   turnFailureDetailsSchema,
   type TurnFailureDetails,
@@ -84,6 +84,26 @@ export function useChat() {
       /* API errors are toasted. */
     }
   };
+  // Chat settings save while a turn streams too (the turn already took its values). Only `settings` is taken
+  // from the response: it is the stored session, whose streaming rows must not replace the local ones.
+  // Responses can arrive out of order; only the latest request's answer (the server's merge of all) is applied.
+  const settingsRequest = useRef(0);
+  const updateSettings = useCallback(async (sessionId: string, patch: Record<string, unknown>) => {
+    const request = ++settingsRequest.current;
+    const apply = (next: Session) => {
+      if (request !== settingsRequest.current) return;
+      setSession((current) => (current?.id === sessionId ? { ...current, settings: next.settings } : current));
+    };
+    try {
+      apply(await sessionsApi.update(sessionId, { settings: patch }));
+    } catch {
+      // The error is toasted; show what the server holds.
+      await sessionsApi
+        .get(sessionId, { silent: true })
+        .then(apply)
+        .catch(() => {});
+    }
+  }, []);
   const remove = async (id: string) => {
     if (busyRef.current || messageActions.isPending()) return;
     ++opening.current;
@@ -174,6 +194,7 @@ export function useChat() {
     close,
     create,
     update,
+    updateSettings,
     remove,
     send,
     stop,
