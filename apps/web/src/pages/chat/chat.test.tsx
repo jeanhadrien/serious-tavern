@@ -7,6 +7,7 @@ import { ChatMessageView } from './ChatMessageView.js';
 import { Composer } from './Composer.js';
 import { MessageEditor } from './MessageEditor.js';
 import { MessageList } from './MessageList.js';
+import { ExecutionDetails } from './ExecutionDetails.js';
 
 const key = { key: 'Enter', shiftKey: false, ctrlKey: false, metaKey: false, isComposing: false };
 it.each([
@@ -157,4 +158,23 @@ it('shows reasoning, a stopped note, and no pending indicator once a reply row i
     />,
   );
   expect(list).not.toContain('typing-dots');
+});
+
+it("shows a node's log lines in the execution details", () => {
+  const html = renderToStaticMarkup(
+    <ExecutionDetails
+      id="x"
+      cached={{
+        id: 'x',
+        workflowId: 'w',
+        sessionId: 's',
+        status: 'error',
+        startedAt: '',
+        warnings: [],
+        nodes: { parse: { status: 'error', error: 'No JSON value found in the text', logs: ['Input: <nope>'] } },
+      }}
+    />,
+  );
+  expect(html).toContain('<p class="error">No JSON value found in the text</p>');
+  expect(html).toContain('<pre>Input: &lt;nope&gt;</pre>');
 });
