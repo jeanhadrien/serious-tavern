@@ -34,7 +34,10 @@ export interface FileResource {
   event: 'presets.changed' | 'providers.changed' | 'collections.changed';
   /** Lowercase singular noun, e.g. "preset". */
   noun: string;
-  /** What to do when the open item was deleted on disk while it has unsaved changes. */
+  /**
+   * What to do when the open item is gone while it has unsaved changes: deleted on disk, or its file no longer
+   * parses (the server skips invalid files, so both look the same).
+   */
   removedHint: string;
 }
 
@@ -105,7 +108,9 @@ export function startFileLiveSync<T>(
         editor.onReload(change.item);
         break;
       case 'removed':
-        alerts.info(`"${editor.openName()}" was removed from disk.`, { title: `${Noun} removed` });
+        alerts.info(`"${editor.openName()}" was removed from disk or can no longer be read.`, {
+          title: `${Noun} removed`,
+        });
         editor.onClose();
         break;
       case 'conflict': {
@@ -114,7 +119,7 @@ export function startFileLiveSync<T>(
         warnedConflict = key;
         alerts.warning(
           change.removed
-            ? `"${editor.openName()}" was removed from disk while you have unsaved changes. ${resource.removedHint}`
+            ? `"${editor.openName()}" was removed from disk or can no longer be read while you have unsaved changes. ${resource.removedHint}`
             : `"${editor.openName()}" changed on disk while you have unsaved changes. Saving will overwrite the file.`,
           { title: `${Noun} file changed`, timeoutMs: 10_000 },
         );

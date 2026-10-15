@@ -23,6 +23,7 @@ export function Collections() {
     <CollectionEditor
       draft={editor.draft}
       dirty={editor.dirty}
+      saving={editor.saving}
       errors={editor.errors}
       selected={editor.selected}
       onChange={editor.change}

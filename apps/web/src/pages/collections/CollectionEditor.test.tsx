@@ -12,11 +12,12 @@ const draft: CollectionDraft = {
   ],
 };
 const noop = () => {};
-const render = (props: { dirty?: boolean; errors?: string[]; selected?: number }) =>
+const render = (props: { dirty?: boolean; saving?: boolean; errors?: string[]; selected?: number }) =>
   renderToStaticMarkup(
     <CollectionEditor
       draft={draft}
       dirty={props.dirty ?? false}
+      saving={props.saving}
       errors={props.errors ?? []}
       selected={props.selected}
       onChange={noop}
@@ -60,6 +61,10 @@ it('saves only when dirty and offers Discard then', () => {
   expect(dirty).toMatch(/<button type="button" class="primary">Save<\/button>/);
   expect(dirty).toContain('>Discard<');
   expect(dirty).toContain('Unsaved');
+  // A save in flight: a second click must not send another.
+  expect(render({ dirty: true, saving: true })).toMatch(
+    /<button type="button" class="primary" disabled="">Save<\/button>/,
+  );
 });
 
 it('labels its icon buttons and shows problems found on save', () => {

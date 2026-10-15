@@ -22,17 +22,29 @@ async function write<T>(request: () => Promise<T>, done?: string): Promise<T | u
 export const createCollection = () => write(() => collectionsApi.create({ name: 'New collection', entries: [] }));
 
 /**
- * Saves the editor's draft. When the collection was deleted (on disk) while the draft was open, the save
- * recreates it as a new collection instead of losing the edits; the result then has a new id.
+ * Asks before a save recreates a collection the server no longer finds. A 404 does not mean it was deleted: the
+ * server skips a file that no longer parses, so a hand edit gone wrong answers 404 too, and a new collection
+ * would leave the nodes reading the old file without these edits.
  */
-export const saveCollection = (id: string, body: CollectionFields) =>
+const confirmRecreate = (name: string) =>
+  window.confirm(
+    `"${name}" can't be found on disk: it was deleted, or its file can no longer be read (see any invalid ` +
+      'collection file warning).\n\nSave your edits as a new collection? Recall and Draw nodes using the old ' +
+      'one will not use the new one.\n\nCancel to keep editing: fix the file, then save again.',
+  );
+
+/**
+ * Saves the editor's draft. When the server no longer finds the collection, it is recreated as a new one (the
+ * result then has a new id) only when the user agrees (`confirm`); otherwise the save resolves undefined.
+ */
+export const saveCollection = (id: string, body: CollectionFields, confirm = confirmRecreate) =>
   write(async () => {
     try {
       return await collectionsApi.update(id, body, { silent: true });
     } catch (error) {
       if (!(error instanceof ApiError)) throw error;
-      if (error.status === 404) return collectionsApi.create(body);
-      notifyError(error);
+      if (error.status !== 404) notifyError(error);
+      else if (confirm(body.name)) return collectionsApi.create(body);
       throw error;
     }
   }, 'Collection saved');

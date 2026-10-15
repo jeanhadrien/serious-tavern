@@ -21,7 +21,7 @@ import { selectionAfterLoad, selectionAfterMove, selectionAfterRemove } from './
 const COLLECTIONS = {
   event: 'collections.changed',
   noun: 'collection',
-  removedHint: 'Saving will recreate it as a new collection.',
+  removedHint: 'Saving will ask whether to create it as a new collection.',
 } as const;
 
 /** The whole collection: the list only has summaries, and hand edits keep `updatedAt`, so it is always re-read. */
@@ -47,6 +47,9 @@ export function useCollectionEditor() {
   const [errors, setErrors] = useState<string[]>([]);
   // True while a collection named by a summary (a URL) is being fetched: the previous one is not shown meanwhile.
   const [loading, setLoading] = useState(false);
+  // True while a save is in flight: a second click must not send another (after a 404, it would create twice).
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   // Per load, not per keystroke: normalizing a large lorebook is not free.
   const stored = useMemo(() => collection && storedForm(collection), [collection]);
   const dirty = useMemo(
@@ -156,11 +159,18 @@ export function useCollectionEditor() {
   }, []);
 
   const save = async () => {
-    if (!collection || !draft) return;
+    if (!collection || !draft || savingRef.current) return;
     const result = draftToBody(draft);
     if (!result.ok) return setErrors(result.errors);
-    const saved = await saveCollection(collection.id, result.body);
-    if (saved) load(saved, true);
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      const saved = await saveCollection(collection.id, result.body);
+      if (saved) load(saved, true);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   };
   // Re-read first: the disk may have moved on while the draft was dirty (the live sync only warned), and
   // restoring the older baseline would let a later save overwrite that edit.
@@ -186,6 +196,7 @@ export function useCollectionEditor() {
   return {
     draft,
     loading,
+    saving,
     dirty,
     errors,
     selected,

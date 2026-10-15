@@ -6,6 +6,8 @@ import { CollectionEntryList } from './CollectionEntryList.js';
 interface CollectionEditorProps {
   draft: CollectionDraft;
   dirty: boolean;
+  /** A save is in flight: Save is disabled, so a second click never sends another. */
+  saving?: boolean;
   /** Problems found when saving, shown above the form. */
   errors: readonly string[];
   /** The expanded entry. */
@@ -42,7 +44,7 @@ export function CollectionEditor(props: CollectionEditorProps) {
           <button type="button" onClick={props.onDelete}>
             Delete
           </button>
-          <button type="button" className="primary" disabled={!dirty} onClick={props.onSave}>
+          <button type="button" className="primary" disabled={!dirty || props.saving} onClick={props.onSave}>
             Save
           </button>
         </div>
