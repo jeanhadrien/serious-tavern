@@ -89,6 +89,9 @@ The situation is critical. Act with urgency.
 A missing or empty value fails the `#if`, so the block just disappears —
 and a fixed entry left empty is dropped from the prompt entirely.
 
+Recall and Draw (authored collections) hand their text to presets this way; see
+[COLLECTIONS.md](COLLECTIONS.md#wiring-examples) for examples.
+
 ## Chat settings
 
 A workflow can declare **chat settings** (dials, toggles, notes the user sets
