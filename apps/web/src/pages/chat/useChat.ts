@@ -12,6 +12,8 @@ import { ApiError, notifyError } from '../../api/transport.js';
 import type { TurnResult } from '../../api/turnStream.js';
 import { alerts } from '../../alerts/index.js';
 import { charactersStore, personasStore, sessionsStore, useList, workflowsStore } from '../../stores/index.js';
+import { withStoredMetadata, withStoredSettings } from './openSession.js';
+import type { SaveOptions } from './panel/useSettingSaver.js';
 import { applyDelta, settleTurn } from './turnMessages.js';
 import { useMessageActions } from './useMessageActions.js';
 
@@ -78,32 +80,30 @@ export function useChat() {
     if (!session || busyRef.current || messageActions.isPending()) return;
     try {
       const next = await sessionsApi.update(session.id, changes);
-      setSession((current) => (current?.id === next.id ? { ...next, messages: current.messages } : current));
+      setSession((current) => withStoredMetadata(current, next));
       await refresh();
     } catch {
       /* API errors are toasted. */
     }
   };
-  // Chat settings save while a turn streams too (the turn already took its values). Only `settings` is taken
-  // from the response: it is the stored session, whose streaming rows must not replace the local ones.
-  // Responses can arrive out of order; only the latest request's answer (the server's merge of all) is applied.
-  const settingsRequest = useRef(0);
-  const updateSettings = useCallback(async (sessionId: string, patch: Record<string, unknown>) => {
-    const request = ++settingsRequest.current;
-    const apply = (next: Session) => {
-      if (request !== settingsRequest.current) return;
-      setSession((current) => (current?.id === sessionId ? { ...current, settings: next.settings } : current));
-    };
-    try {
-      apply(await sessionsApi.update(sessionId, { settings: patch }));
-    } catch {
-      // The error is toasted; show what the server holds.
-      await sessionsApi
-        .get(sessionId, { silent: true })
-        .then(apply)
-        .catch(() => {});
-    }
-  }, []);
+  // Chat settings save while a turn streams too (the turn already took its values); only `settings` is taken
+  // from the answer (`withStoredSettings`). The panel's saver sends one request at a time, so answers come
+  // in order and each holds every earlier write.
+  const updateSettings = useCallback(
+    async (sessionId: string, patch: Record<string, unknown>, options?: SaveOptions) => {
+      const apply = (next: Session) => setSession((current) => withStoredSettings(current, next));
+      try {
+        apply(await sessionsApi.update(sessionId, { settings: patch }, options));
+      } catch {
+        // The error is toasted; show what the server holds.
+        await sessionsApi
+          .get(sessionId, { silent: true })
+          .then(apply)
+          .catch(() => {});
+      }
+    },
+    [],
+  );
   const remove = async (id: string) => {
     if (busyRef.current || messageActions.isPending()) return;
     ++opening.current;

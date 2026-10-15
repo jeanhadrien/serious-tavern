@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createSettingSaver } from './useSettingSaver.js';
+import { createSettingSaver, type SaveOptions } from './useSettingSaver.js';
 
 describe('chat setting saver', () => {
   let pending: Record<string, unknown>;
-  let saves: { patch: Record<string, unknown>; resolve(): void }[];
+  let saves: { patch: Record<string, unknown>; options?: SaveOptions; resolve(): void }[];
   const setPending = (update: (current: Record<string, unknown>) => Record<string, unknown>) => {
     pending = update(pending);
   };
   const make = () =>
     createSettingSaver(
-      (patch) =>
+      (patch, options) =>
         new Promise<void>((resolve) => {
-          saves.push({ patch, resolve });
+          saves.push({ patch, ...(options ? { options } : {}), resolve });
         }),
       setPending,
       500,
@@ -88,12 +88,74 @@ describe('chat setting saver', () => {
     expect(pending).toEqual({});
   });
 
-  it('sends every waiting value on flushAll', () => {
+  it('sends every waiting value on flushAll, one request at a time', async () => {
     const saver = make();
     saver.change('a', 1, 'debounced');
     saver.change('b', 'x', 'debounced');
     saver.flushAll();
+    expect(saves.map((save) => save.patch)).toEqual([{ a: 1 }]);
+    await settle(0);
     expect(saves.map((save) => save.patch)).toEqual([{ a: 1 }, { b: 'x' }]);
+  });
+
+  it('keeps one request in flight and sends what came due meanwhile together, so answers stay in order', async () => {
+    const saver = make();
+    saver.change('flag', true, 'now');
+    saver.change('mood', 'tense', 'now');
+    saver.change('level', 2, 'debounced');
+    saver.flush('level');
+    expect(saves.map((save) => save.patch)).toEqual([{ flag: true }]);
+    await settle(0);
+    expect(saves.map((save) => save.patch)).toEqual([{ flag: true }, { mood: 'tense', level: 2 }]);
+    expect(pending).toEqual({ flag: true, mood: 'tense', level: 2 });
+    await settle(1);
+    expect(pending).toEqual({});
+  });
+
+  it('cancels a value not sent yet, so a valid prefix of invalid input is never saved', async () => {
+    const saver = make();
+    saver.change('level', 1, 'debounced');
+    saver.cancel('level');
+    expect(pending).toEqual({});
+    await vi.advanceTimersByTimeAsync(1000);
+    saver.flush('level');
+    saver.flushAll();
+    expect(saves).toHaveLength(0);
+  });
+
+  it('cancels a value queued behind the request in flight', async () => {
+    const saver = make();
+    saver.change('on', true, 'now');
+    saver.change('level', 1, 'debounced');
+    await vi.advanceTimersByTimeAsync(500);
+    saver.cancel('level');
+    await settle(0);
+    expect(saves.map((save) => save.patch)).toEqual([{ on: true }]);
+    expect(pending).toEqual({});
+  });
+
+  it('sends everything not sent yet at once with keepalive when the page goes away', async () => {
+    const saver = make();
+    saver.change('on', true, 'now');
+    saver.change('mood', 'calm', 'now');
+    saver.change('note', 'Rain', 'debounced');
+    saver.flushNow();
+    expect(saves.map(({ patch, options }) => ({ patch, options }))).toEqual([
+      { patch: { on: true }, options: undefined },
+      { patch: { mood: 'calm', note: 'Rain' }, options: { keepalive: true } },
+    ]);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(saves).toHaveLength(2);
+  });
+
+  it('sends the newest value of a key on flushNow', async () => {
+    const saver = make();
+    saver.change('on', true, 'now');
+    saver.change('v', 1, 'debounced');
+    await vi.advanceTimersByTimeAsync(500);
+    saver.change('v', 2, 'debounced');
+    saver.flushNow();
+    expect(saves[1]?.patch).toEqual({ v: 2 });
   });
 
   it('drops pending values after a failed save too', async () => {

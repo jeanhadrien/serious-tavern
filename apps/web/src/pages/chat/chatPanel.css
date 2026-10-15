@@ -1,7 +1,4 @@
-/* The chat side panel lives inside the chat view; the view is a container so the panel follows its width. */
-.view[data-view="chat"] {
-  container: chat / inline-size;
-}
+/* The chat side panel lives inside the chat view; the view is the `chat` container (layout/shell.css). */
 .chat-body {
   flex: 1;
   min-height: 0;

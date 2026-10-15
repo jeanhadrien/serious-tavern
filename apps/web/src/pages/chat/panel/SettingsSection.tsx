@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { resolveChatSettings, settingDefault, workflowSettings, type Workflow } from '@st/shared';
+import { resolveChatSettings, usableSettings, workflowSettings, type Workflow } from '@st/shared';
 import { layoutHref } from '../../../layout/url.js';
 import { SettingControl } from './SettingControl.js';
-import { useSettingSaver } from './useSettingSaver.js';
+import { displayedSetting } from './settingControls.js';
+import { useSettingSaver, type SaveOptions } from './useSettingSaver.js';
 
-export type SaveSettings = (sessionId: string, patch: Record<string, unknown>) => Promise<void>;
+export type SaveSettings = (sessionId: string, patch: Record<string, unknown>, options?: SaveOptions) => Promise<void>;
 
 /**
  * The chat's settings: one control per setting its workflow declares, showing the stored value or the
@@ -40,22 +41,18 @@ export function SettingsSection({
     );
   return (
     <div className="chat-settings">
-      {declarations.map((setting) => {
+      {/* One control per usable key, the first declaration of each, like the resolver and the server. */}
+      {usableSettings(declarations).map((setting) => {
         const { key } = setting;
-        if (!Object.hasOwn(resolved.values, key)) return null;
-        const pending = Object.hasOwn(saver.pending, key);
-        const value = pending ? (saver.pending[key] ?? settingDefault(setting)) : resolved.values[key];
-        const isStored = pending ? saver.pending[key] !== null : !!stored && Object.hasOwn(stored, key);
         return (
           <SettingControl
             key={key}
             setting={setting}
-            value={value}
-            resettable={isStored}
-            issue={pending ? undefined : resolved.issues.find((issue) => issue.key === key)?.message}
+            {...displayedSetting(setting, resolved, stored, saver.pending)}
             onChange={(next, mode) => saver.change(key, next, mode)}
             onFlush={() => saver.flush(key)}
             onReset={() => saver.reset(key)}
+            onCancel={() => saver.cancel(key)}
           />
         );
       })}

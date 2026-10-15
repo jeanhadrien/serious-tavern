@@ -79,6 +79,10 @@
 .view[data-view^="editor:"] {
   container: editor / inline-size;
 }
+/* So does the chat, whose side panel overlays the messages when narrow (pages/chat/chatPanel.css). */
+.view[data-view="chat"] {
+  container: chat / inline-size;
+}
 
 .middle-title {
   display: flex;

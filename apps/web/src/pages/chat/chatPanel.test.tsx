@@ -82,3 +82,16 @@ it('shows the panel toggle in the chat header, usable while the chat is busy', (
   expect(toggle).toContain('title="Chat settings"');
   expect(toggle).not.toContain('disabled');
 });
+
+it('renders a key declared twice once, with its first declaration, as the resolver and server read it', () => {
+  const html = render(
+    workflow([
+      { key: 'mood', type: 'text', default: 'calm' },
+      { key: 'mood', type: 'boolean' },
+      { key: 'this', type: 'text' },
+    ]),
+  );
+  expect(html.match(/class="chat-setting /g)).toHaveLength(1);
+  expect(html).toContain('value="calm"');
+  expect(html).not.toContain('type="checkbox"');
+});
