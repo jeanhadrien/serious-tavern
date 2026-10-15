@@ -43,7 +43,8 @@ export function describeValue(value: unknown): string {
   if (value === undefined) return 'nothing';
   if (Array.isArray(value)) return 'an array';
   if (typeof value === 'string') return 'text';
-  if (typeof value === 'number') return 'a number';
+  if (typeof value === 'number')
+    return Number.isNaN(value) ? 'NaN (not a number)' : Number.isFinite(value) ? 'a number' : 'an infinite number';
   if (typeof value === 'boolean') return String(value);
   if (typeof value === 'object') return 'an object';
   return typeof value;

@@ -1,17 +1,11 @@
 import { z } from 'zod';
 import type { NodeDefinition } from '../../types.js';
 import { stringify } from '../../text.js';
-import { checkType, extractJson, type JsonExpect, jsonExpectTypes } from './extract.js';
+import { checkType, expectedLabel, extractJson, type JsonExpect, jsonExpectTypes } from './extract.js';
 
 const LOGGED_CHARACTERS = 500;
-const valueDescription: Record<JsonExpect, string> = {
-  any: 'The parsed JSON value',
-  object: 'The parsed value (an object)',
-  array: 'The parsed value (an array)',
-  number: 'The parsed value (a number)',
-  boolean: 'The parsed value (true or false)',
-  text: 'The parsed value (text)',
-};
+const valueDescription = (expect: JsonExpect) =>
+  expect === 'any' ? 'The parsed JSON value' : `The parsed value (${expectedLabel[expect]})`;
 
 const preview = (text: string) =>
   text.length > LOGGED_CHARACTERS
@@ -32,7 +26,7 @@ export const parseJson: NodeDefinition = {
       description: 'Text holding one JSON value; code fences and surrounding prose are fine',
     },
   ],
-  outputs: [{ name: 'value', label: 'Value', dataType: 'any', description: valueDescription.any }],
+  outputs: [{ name: 'value', label: 'Value', dataType: 'any', description: valueDescription('any') }],
   configSchema: z.object({
     expect: z.enum(jsonExpectTypes).default('any').describe('The type the value must have; anything else fails'),
   }),
@@ -48,7 +42,7 @@ export const parseJson: NodeDefinition = {
           name: 'value',
           label: 'Value',
           dataType: expect as JsonExpect,
-          description: valueDescription[expect as JsonExpect],
+          description: valueDescription(expect as JsonExpect),
         },
       ],
     };

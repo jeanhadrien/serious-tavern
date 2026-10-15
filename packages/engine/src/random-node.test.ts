@@ -41,9 +41,16 @@ describe('Random node config', () => {
   it('defaults to number mode and offers the modes as a dropdown', () => {
     expect(random.configSchema.parse({})).toEqual(random.defaultConfig);
     const schema = z.toJSONSchema(random.configSchema) as {
-      properties: Record<string, { enum?: string[]; default?: unknown }>;
+      properties: Record<string, { type?: string; enum?: string[]; default?: unknown }>;
+      required?: string[];
     };
     expect(schema.properties.mode).toMatchObject({ enum: ['number', 'integer', 'pick', 'chance'], default: 'number' });
+    // Plain optional numbers, so the generic form shows them blank and a blank one falls back per mode.
+    for (const bound of ['min', 'max']) {
+      expect(schema.properties[bound]).toMatchObject({ type: 'number' });
+      expect(schema.properties[bound]).not.toHaveProperty('default');
+      expect(schema.required ?? []).not.toContain(bound);
+    }
   });
 
   const wrap = (config: Record<string, unknown>): Workflow => ({
@@ -203,7 +210,7 @@ describe('Random node modes', () => {
     },
   );
 
-  it('picks the last eligible item when rounding overshoots', async () => {
+  it('picks the last eligible item at the top of the range', async () => {
     expect(await run({ mode: 'pick' }, { items: ['a', 'b', { weight: 0 }] }, 0.9999999999999999)).toMatchObject({
       value: 'b',
     });
@@ -255,7 +262,8 @@ describe('Random node modes', () => {
   it.each([
     ['text', '0.3'],
     ['null', null],
-    ['a number', Number.NaN],
+    ['NaN (not a number)', Number.NaN],
+    ['an infinite number', Number.POSITIVE_INFINITY],
   ])('fails on a probability input that is %s', async (kind, probability) => {
     await expect(run({ mode: 'chance' }, { probability }, 0.1)).rejects.toThrow(
       `Probability must be a number, got ${kind}`,

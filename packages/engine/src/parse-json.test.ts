@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatMessage, Edge, Workflow } from '@st/shared';
 import { ExecutionFailure, executeWorkflow } from './executor.js';
-import { extractJson, type JsonExpect } from './nodes/parse-json/extract.js';
+import { z } from 'zod';
+import { extractJson, type JsonExpect, jsonExpectTypes } from './nodes/parse-json/extract.js';
 import { parseJson } from './nodes/parse-json/index.js';
 import type { ExecutionContext } from './types.js';
 
@@ -19,6 +20,20 @@ describe('extractJson', () => {
     ['"hello"', 'any', 'hello'],
     ['null', 'any', null],
     ['42', 'any', 42],
+    // Valid JSON is taken as it is, even with a code fence inside one of its strings
+    [
+      `{"reply": "Use ${fence}js\\nlet x\\n${fence} to declare", "mood": "calm"}`,
+      'object',
+      {
+        reply: `Use ${fence}js\nlet x\n${fence} to declare`,
+        mood: 'calm',
+      },
+    ],
+    [
+      `{"reply": "Here:\\n${fence}js\\ncode()\\n${fence}\\nDone"}`,
+      'any',
+      { reply: `Here:\n${fence}js\ncode()\n${fence}\nDone` },
+    ],
     // Code fences
     [`${fence}json\n{"a":1}\n${fence}`, 'object', { a: 1 }],
     [`${fence}JSON\r\n{"a":1}\r\n${fence}`, 'object', { a: 1 }],
@@ -33,12 +48,20 @@ describe('extractJson', () => {
     ['Here you go: {"a": {"b": [1, 2]}} done', 'object', { a: { b: [1, 2] } }],
     ['Answer: {"t": "a } brace, a \\" quote and a {"} end', 'object', { t: 'a } brace, a " quote and a {' }],
     ['{"t": "]"} trailing', 'object', { t: ']' }],
+    ['Path: {"p": "C:\\\\"} done', 'object', { p: 'C:\\' }],
+    ['{"p": "a\\\\", "q": "]"} done', 'object', { p: 'a\\', q: ']' }],
     ['[note] then {"a":1}', 'object', { a: 1 }],
     ['[note] then {"a":1}', 'any', { a: 1 }],
     ['list: [1, 2, 3].', 'array', [1, 2, 3]],
     ['{"a":1} and {"b":2}', 'object', { a: 1 }],
     ['Mismatched } then {"a": [1]}', 'object', { a: [1] }],
     ['{"a": [1}, then {"b": 2}', 'object', { b: 2 }],
+    // The first top-level value of the expected type: a bracketed reference or range before it is passed over
+    ['According to [1], the answer is {"a":1}', 'object', { a: 1 }],
+    ['Scores are in [0, 1]. Here: {"score": 0.3}', 'object', { score: 0.3 }],
+    ['See {"a":1}, then [2]', 'array', [2]],
+    ['Ranges like [0, 1) are fine: {"a":1}', 'object', { a: 1 }],
+    ['[sic then {"a":1}', 'object', { a: 1 }],
     // Numbers and booleans must be the whole text
     ['7', 'number', 7],
     [' -3.5e2 ', 'number', -350],
@@ -58,6 +81,8 @@ describe('extractJson', () => {
     ['', 'number', plainNumber],
     ['"7"', 'number', { error: 'Expected a number, got text' }],
     ['{"rating": 7}', 'number', { error: 'Expected a number, got an object' }],
+    ['1e999', 'number', { error: 'Expected a number, got an infinite number' }],
+    [`${fence}\n-1e999\n${fence}`, 'number', { error: 'Expected a number, got an infinite number' }],
     ['Yes, true', 'boolean', plainBoolean],
     ['True', 'boolean', plainBoolean],
     ['"true"', 'boolean', { error: 'Expected true or false, got text' }],
@@ -73,6 +98,20 @@ describe('extractJson', () => {
     ['no json here', 'any', notFound],
     ['{"a": 1', 'any', notFound],
     ["{'a': 1}", 'object', notFound],
+    ['According to [1], nothing else', 'object', { error: 'Expected an object, got an array' }],
+    ['Here: [{"a": 1}]', 'object', { error: 'Expected an object, got an array' }],
+    // A malformed or cut-off top-level value fails instead of handing on a fragment nested inside it
+    ['{"a": 1, "b": {"c": 2},}', 'object', notFound],
+    ['{"mood": 3, "tags": ["a"],}', 'any', notFound],
+    ['{"mood": 3, "tags": ["a"],}', 'array', notFound],
+    ['Here: {"scores": [1, 2], "note": "x", }', 'array', notFound],
+    ['[{"t":"a"},{"t":"b"},]', 'any', notFound],
+    ["{'mood': 3, 'inner': {\"a\": 1}}", 'any', notFound],
+    ['{mood: "happy", stats: {"hp": 3}}', 'object', notFound],
+    ['{"a": [1, 2]', 'any', notFound],
+    ['{"name": "Bob", "stats": {"hp": 3}, "inv', 'object', notFound],
+    [`${fence}json\n{"mood": {"score": 3}, "reply": "Hel`, 'object', notFound],
+    ['[{"t":"a"},{"t":"b"', 'any', notFound],
     [`${fence}python\nprint(1)\n${fence}\n{"a":1}`, 'object', notFound],
   ])('rejects %j as %s', (text, type, { error }) => {
     expect(() => extractJson(text, type)).toThrow(error);
@@ -107,6 +146,8 @@ describe('Parse JSON node', () => {
   it('defaults to any and offers the types as a dropdown', () => {
     expect(parseJson.configSchema.parse({})).toEqual(parseJson.defaultConfig);
     expect(parseJson.configSchema.safeParse({ expect: 'date' }).success).toBe(false);
+    const schema = z.toJSONSchema(parseJson.configSchema) as { properties: Record<string, unknown> };
+    expect(schema.properties.expect).toMatchObject({ enum: [...jsonExpectTypes], default: 'any' });
   });
 
   it.each(['any', 'object', 'array', 'number', 'boolean', 'text'])('types its value output as %s', async (type) => {
