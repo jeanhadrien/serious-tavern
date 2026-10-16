@@ -125,4 +125,13 @@
 .state-picker a {
   justify-self: start;
   font-size: 0.85rem;
+  text-transform: none;
+}
+/* Declared item fields are named by the definition and keep their spelling (`entryId`). */
+.state-item-fields {
+  display: grid;
+  gap: 15px;
+}
+.state-item-fields label {
+  text-transform: none;
 }

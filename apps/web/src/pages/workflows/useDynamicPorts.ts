@@ -1,10 +1,10 @@
-import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { Edge } from '@xyflow/react';
 import type { Character, NodeTypeDescriptor, Preset, StateDefinition } from '@st/shared';
 import { nodeTypesApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
 import type { CanvasNode } from './model.js';
-import { applyResolvedPorts, portRequests, resolvePortRequests } from './dynamicPorts.js';
+import { applyResolvedPorts, createPortErrors, portRequests, resolvePortRequests } from './dynamicPorts.js';
 
 export function useDynamicPorts(
   nodes: CanvasNode[],
@@ -17,6 +17,7 @@ export function useDynamicPorts(
   stateDefinitions: StateDefinition[],
   canvasVersion: number,
 ) {
+  const [portErrors] = useState(() => createPortErrors(alerts));
   const requests = portRequests(nodes);
   const requestKey = JSON.stringify(requests);
   const requestsRef = useRef(requests);
@@ -25,20 +26,25 @@ export function useDynamicPorts(
   nodesRef.current = nodes;
   const edgesRef = useRef(edges);
   edgesRef.current = edges;
+  // Errors of nodes that are gone, or of a workflow that was closed, do not stay on screen.
+  useEffect(() => () => portErrors.keepOnly(new Set()), [portErrors]);
   useEffect(() => {
     let active = true;
+    portErrors.keepOnly(new Set(requestsRef.current.map((request) => request.id)));
     void resolvePortRequests(
       requestsRef.current,
       async (request) => {
         try {
           return await nodeTypesApi.resolvePorts(request.type, request.config, { silent: true });
         } catch (error) {
-          if (active) alerts.error(error instanceof Error ? error.message : 'Could not resolve node ports');
+          if (active)
+            portErrors.failed(request.id, error instanceof Error ? error.message : 'Could not resolve node ports');
           return undefined;
         }
       },
       (request, ports) => {
         if (!active) return;
+        portErrors.resolved(request.id);
         const result = applyResolvedPorts(nodesRef.current, edgesRef.current, request, ports);
         nodesRef.current = result.nodes;
         edgesRef.current = result.edges;
@@ -50,5 +56,5 @@ export function useDynamicPorts(
     return () => {
       active = false;
     };
-  }, [requestKey, types, presets, characters, stateDefinitions, canvasVersion, setNodes, setEdges]);
+  }, [requestKey, types, presets, characters, stateDefinitions, canvasVersion, setNodes, setEdges, portErrors]);
 }

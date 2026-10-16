@@ -68,3 +68,30 @@ export async function resolvePortRequests(
     }),
   );
 }
+
+/**
+ * The error toasts of nodes whose ports could not be resolved: one per node and message (a re-run that fails the
+ * same way adds nothing), dismissed as soon as the node resolves, is deleted, or fails differently. Without it a
+ * node added with an empty config (State Read before a definition is picked) would leave its error on screen.
+ */
+export function createPortErrors(alerts: { error(message: string): string; dismiss(id: string): void }) {
+  const shown = new Map<string, { message: string; alertId: string }>();
+  const resolved = (nodeId: string) => {
+    const current = shown.get(nodeId);
+    if (!current) return;
+    alerts.dismiss(current.alertId);
+    shown.delete(nodeId);
+  };
+  return {
+    failed(nodeId: string, message: string) {
+      if (shown.get(nodeId)?.message === message) return;
+      resolved(nodeId);
+      shown.set(nodeId, { message, alertId: alerts.error(message) });
+    },
+    resolved,
+    /** Drops the errors of nodes that are no longer on the canvas. */
+    keepOnly(nodeIds: ReadonlySet<string>) {
+      for (const nodeId of [...shown.keys()]) if (!nodeIds.has(nodeId)) resolved(nodeId);
+    },
+  };
+}

@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ApiResponse } from '@st/shared';
 import type { CanvasNode } from './model.js';
 import { checkConnection } from '../../connection.js';
-import { applyResolvedPorts, portRequests, portsEqual, resolvePortRequests } from './dynamicPorts.js';
+import { applyResolvedPorts, createPortErrors, portRequests, portsEqual, resolvePortRequests } from './dynamicPorts.js';
 
 const base: ApiResponse<'resolvePorts'> = {
   inputs: [{ name: 'input', label: 'Input', dataType: 'text' }],
@@ -124,5 +124,49 @@ describe('dynamic ports', () => {
     finishOld(base);
     await oldBatch;
     expect(nodes[0]?.data.descriptor.outputs).toEqual([]);
+  });
+});
+
+describe('port error toasts', () => {
+  const setup = () => {
+    let next = 0;
+    const alerts = { error: vi.fn(() => `alert-${++next}`), dismiss: vi.fn() };
+    return { alerts, errors: createPortErrors(alerts) };
+  };
+
+  it('shows a node’s error once, however often the same failure repeats', () => {
+    const { alerts, errors } = setup();
+    errors.failed('a', 'Select a state definition');
+    errors.failed('a', 'Select a state definition');
+    expect(alerts.error).toHaveBeenCalledTimes(1);
+    // Another node's failure is its own toast.
+    errors.failed('b', 'Select a state definition');
+    expect(alerts.error).toHaveBeenCalledTimes(2);
+  });
+
+  it('replaces the toast when the failure changes and dismisses it when the node resolves', () => {
+    const { alerts, errors } = setup();
+    errors.failed('a', 'Select a state definition');
+    errors.failed('a', 'Select a key');
+    expect(alerts.dismiss).toHaveBeenCalledWith('alert-1');
+    expect(alerts.error).toHaveBeenLastCalledWith('Select a key');
+    errors.resolved('a');
+    expect(alerts.dismiss).toHaveBeenLastCalledWith('alert-2');
+    // Nothing left to dismiss, and a later failure shows again.
+    errors.resolved('a');
+    expect(alerts.dismiss).toHaveBeenCalledTimes(2);
+    errors.failed('a', 'Select a key');
+    expect(alerts.error).toHaveBeenCalledTimes(3);
+  });
+
+  it('drops the errors of nodes that left the canvas', () => {
+    const { alerts, errors } = setup();
+    errors.failed('a', 'x');
+    errors.failed('b', 'y');
+    errors.keepOnly(new Set(['b']));
+    expect(alerts.dismiss).toHaveBeenCalledTimes(1);
+    expect(alerts.dismiss).toHaveBeenCalledWith('alert-1');
+    errors.keepOnly(new Set());
+    expect(alerts.dismiss).toHaveBeenCalledTimes(2);
   });
 });
