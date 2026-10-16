@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { apiContract, WRITE_PREVIEW_LIMIT } from '@st/shared';
+import { apiContract, NODE_ITEMS_LIMIT, WRITE_PREVIEW_LIMIT } from '@st/shared';
 import {
   assistantRows,
   define,
@@ -146,6 +146,56 @@ describe('the shape of the state view', () => {
       expect(turns.map((item) => item.at)).toEqual(entriesOf(saved).map((entry) => entry.at));
       for (const { at } of turns) expect(Date.parse(at)).toBeGreaterThanOrEqual(before);
       for (const { at } of turns) expect(Date.parse(at)).toBeLessThanOrEqual(after);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('sends the newest items of a node collection and says how many it left out', async () => {
+    const { app, directory } = await apps.open();
+    try {
+      const chatWithDraws = (count: number) => {
+        const turns = Array.from({ length: count }, (_, index) => `x${index + 1}`);
+        return stored(directory, {
+          messages: turns.map((executionId) => ({
+            id: randomUUID(),
+            role: 'assistant',
+            content: 'hi',
+            createdAt: DATE,
+            executionId,
+          })),
+          state: {
+            turns: turns.map((executionId) => ({
+              executionId,
+              at: DATE,
+              completed: true,
+              replies: 1,
+              writes: [
+                {
+                  op: 'add',
+                  target: { kind: 'node', nodeId: 'draw-1', key: 'draws' },
+                  nodeId: 'draw-1',
+                  item: { id: `${executionId}:draw-1:1`, text: `card ${executionId}`, entryKey: `k-${executionId}` },
+                },
+              ],
+            })),
+          },
+        });
+      };
+
+      const long = (await view(app, await chatWithDraws(NODE_ITEMS_LIMIT + 10))).nodes[0]!;
+      const items = long.values.draws as Array<{ id: string }>;
+      expect(items).toHaveLength(NODE_ITEMS_LIMIT);
+      // Newest first: the last turn's draw leads, and the oldest ten are the ones left out.
+      expect(items[0]!.id).toBe(`x${NODE_ITEMS_LIMIT + 10}:draw-1:1`);
+      expect(items.at(-1)!.id).toBe('x11:draw-1:1');
+      expect(long.omitted).toEqual({ draws: 10 });
+      expect(long.meta.draws!.count).toBe(NODE_ITEMS_LIMIT + 10);
+
+      // At the limit nothing is cut and nothing is reported.
+      const exact = (await view(app, await chatWithDraws(NODE_ITEMS_LIMIT))).nodes[0]!;
+      expect(exact.values.draws).toHaveLength(NODE_ITEMS_LIMIT);
+      expect(exact.omitted).toEqual({});
     } finally {
       await app.close();
     }

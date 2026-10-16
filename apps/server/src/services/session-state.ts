@@ -1,5 +1,5 @@
 import { registry } from '@st/engine';
-import { nodeDisplayName, type ApiResponse, type FoldedKey, type StateWrite } from '@st/shared';
+import { NODE_ITEMS_LIMIT, nodeDisplayName, type ApiResponse, type FoldedKey, type StateWrite } from '@st/shared';
 import type { AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
 import { loadStoryState } from './story-state.js';
@@ -15,6 +15,22 @@ function keyViews(keys: Record<string, FoldedKey>) {
     meta: Object.fromEntries(entries.map(([key, folded]) => [key, folded.meta])),
     history: Object.fromEntries(entries.map(([key, folded]) => [key, folded.history])),
   };
+}
+
+/**
+ * A node's keys: a collection grows with every write and has no cap, so only its newest `NODE_ITEMS_LIMIT` items
+ * are sent, with the number left out (the fold itself keeps them all: Draw's window needs what it needs).
+ */
+function nodeKeyViews(keys: Record<string, FoldedKey>) {
+  const views = keyViews(keys);
+  const omitted: Record<string, number> = {};
+  for (const [key, folded] of Object.entries(keys)) {
+    if (folded.meta.count === undefined || !Array.isArray(folded.value) || folded.value.length <= NODE_ITEMS_LIMIT)
+      continue;
+    views.values[key] = folded.value.slice(0, NODE_ITEMS_LIMIT);
+    omitted[key] = folded.value.length - NODE_ITEMS_LIMIT;
+  }
+  return { ...views, omitted };
 }
 
 /**
@@ -52,7 +68,7 @@ export async function sessionStateView(context: AppContext, sessionId: string): 
     })),
     nodes: story.nodes.map((folded) => {
       const label = nodeLabel(folded.nodeId);
-      return { nodeId: folded.nodeId, ...(label !== undefined && { label }), ...keyViews(folded.keys) };
+      return { nodeId: folded.nodeId, ...(label !== undefined && { label }), ...nodeKeyViews(folded.keys) };
     }),
     turns: story.turns.map(({ entry, turn }) => ({
       executionId: entry.executionId,

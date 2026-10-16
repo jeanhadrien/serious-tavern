@@ -12,6 +12,18 @@ export function entryKey({ collectionId, entry }: Candidate): string {
   return `${collectionId}:${fingerprint}`;
 }
 
+/** How many characters of a drawn entry Draw keeps in its memory: a reminder for people, never read back. */
+const MEMORY_TEXT_LENGTH = 80;
+
+/**
+ * The text Draw stores with a remembered draw: the entry's first 80 characters (whole characters, never half
+ * of an emoji). Only `entryKey` is read when excluding, so the full text would only make the chat's state grow
+ * by an entry per draw.
+ */
+export function memoryText(text: string): string {
+  return [...text.trim().slice(0, MEMORY_TEXT_LENGTH * 2)].slice(0, MEMORY_TEXT_LENGTH).join('');
+}
+
 /**
  * The entry keys drawn within the last `avoidRecent` turns, from Draw's own `draws` key (items newest first,
  * with the turn that added each). An item added in present turn `t` while turn `turn` runs is recent when

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Collection, StateKeyView } from '@st/shared';
 import type { Candidate } from './collections.js';
 import { draw } from './nodes/draw/index.js';
-import { entryKey, recentEntryKeys } from './nodes/draw/recent.js';
+import { entryKey, memoryText, recentEntryKeys } from './nodes/draw/recent.js';
 import { collection, edge, graph, node, resourcesWith, runNode } from './test-collections.js';
 import { deleteReplies, newChat, playTurn, snapshotOf } from './test-state.js';
 
@@ -33,6 +33,25 @@ describe('entryKey', () => {
     expect(entryKey(candidate('other', 'A storm'))).not.toBe(base);
     expect(entryKey(candidate('c', 'A storm!'))).not.toBe(base);
     expect(entryKey(candidate('c', 'a storm'))).not.toBe(base);
+  });
+});
+
+describe('memoryText', () => {
+  it('keeps short text, trimmed, and the first 80 characters of long text', () => {
+    expect(memoryText('  A storm \n')).toBe('A storm');
+    expect(memoryText('')).toBe('');
+    expect(memoryText('x'.repeat(80))).toBe('x'.repeat(80));
+    expect(memoryText('x'.repeat(81))).toBe('x'.repeat(80));
+    expect(memoryText(`${'ab'.repeat(300)}`)).toBe('ab'.repeat(40));
+  });
+
+  it('cuts whole characters, never half of an emoji', () => {
+    const cut = memoryText('😀'.repeat(200));
+    expect([...cut]).toHaveLength(80);
+    expect(cut).toBe('😀'.repeat(80));
+    // An emoji straddling the cut-off in UTF-16 units: 79 plain characters, then one emoji.
+    expect(memoryText(`${'x'.repeat(79)}😀tail`)).toBe(`${'x'.repeat(79)}😀`);
+    expect(memoryText(`${'x'.repeat(80)}😀tail`)).toBe('x'.repeat(80));
   });
 });
 
@@ -119,6 +138,19 @@ describe('Draw avoidRecent in a node', () => {
         item: { id: 'run:draw:1', text: 'storm', entryKey: keyOf('storm') },
       },
     ]);
+  });
+
+  it('remembers only the start of a long entry, under the key of its whole text', async () => {
+    const long = `${'The storm rolls in over the harbour. '.repeat(20)}`.trim();
+    const longDeck = resourcesWith(collection('deck', [{ text: long }]));
+    const result = await runNode(draw, config(), { resources: longDeck, state: remembering(5), draws: [0] });
+    const write = result.writes[0]!;
+    if (write.op !== 'add') throw new Error('expected an add');
+    expect(write.item.text).toBe(long.slice(0, 80));
+    expect((write.item.text as string).length).toBe(80);
+    expect(write.item.entryKey).toBe(keyOf(long));
+    // The output is the whole entry: only the memory is short.
+    expect(result.output.text).toBe(long);
   });
 
   it('draws nothing when every eligible entry is recent', async () => {
@@ -243,6 +275,17 @@ describe('Draw avoidRecent across turns', () => {
     const texts = rows.map(([text]) => text!);
     for (let turn = 1; turn < texts.length; turn++) expect(texts[turn]).not.toBe(texts[turn - 1]);
     expect(new Set(texts)).toEqual(new Set(['storm', 'fog']));
+  });
+
+  it('skips a long entry although only its start is remembered', async () => {
+    const long = 'The storm rolls in over the harbour. '.repeat(20).trim();
+    const chat = chatOf(() => entries(long));
+    const wf = drawing();
+    const first = await playTurn(chat, wf, 'e1');
+    expect(reply(first)).toBe('drew 1 of 1 eligible');
+    const remembered = first.writes[0]!;
+    expect(remembered.op === 'add' && (remembered.item.text as string).length).toBe(80);
+    expect(reply(await playTurn(chat, wf, 'e2'))).toBe('no eligible entry among 1 (1 recent excluded)');
   });
 
   it('identifies an entry by its text, so editing it makes it eligible again', async () => {

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { NodeDefinition } from '../../types.js';
 import { candidates, entryOutput, loadCollections, type Candidate } from '../../collections.js';
 import { describeValue } from '../../text.js';
-import { entryKey, recentEntryKeys } from './recent.js';
+import { entryKey, memoryText, recentEntryKeys } from './recent.js';
 import { describeDraw, drawEntries, type DrawFilters } from './select.js';
 
 type DrawConfig = DrawFilters & {
@@ -147,7 +147,7 @@ export const draw: NodeDefinition = {
         ctx.writeState({
           target: { kind: 'node', key: 'draws' },
           op: 'add',
-          item: { text: candidate.entry.text, entryKey: entryKey(candidate) },
+          item: { text: memoryText(candidate.entry.text), entryKey: entryKey(candidate) },
         });
     const entries = result.drawn.map(entryOutput);
     const first = entries[0]!;

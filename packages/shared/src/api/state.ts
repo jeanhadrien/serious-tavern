@@ -31,12 +31,20 @@ export const definitionStateSchema = z.object({
   // Stored values that don't fit the current definition (read as the default; the data is never touched).
   warnings: z.array(stateWarningSchema),
 });
+/**
+ * A node's collection (Draw's `draws`) has no cap, so the view sends only its newest items: this many.
+ * `omitted` says how many were left out, `meta.count` is the total.
+ */
+export const NODE_ITEMS_LIMIT = 50;
 // What a node stored under its own implicit keys (Draw's `draws`): only keys that were written.
 export const nodeStateSchema = z.object({
   nodeId: z.string(),
   // The node's name in the chat's workflow (`Draw #1 (draw)`); absent when the node no longer exists.
   label: z.string().optional(),
   ...keyViews,
+  // For each collection key with more than `NODE_ITEMS_LIMIT` items: how many of the oldest items `values`
+  // leaves out (so `meta.count` is the length of `values` plus this). Keys that were not cut are absent.
+  omitted: z.record(z.string(), z.number()),
 });
 /** Text in a turn's write summaries is cut to this many characters (see `truncated` on `stateWriteViewSchema`). */
 export const WRITE_PREVIEW_LIMIT = 200;

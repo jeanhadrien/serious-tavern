@@ -151,7 +151,14 @@ it("describes a chat's computed story state: keys by name, turns with their writ
       },
     ],
     nodes: [
-      { nodeId: 'pick', label: 'Draw #1 (draw)', values: { draws: [] }, meta: { draws: meta }, history: { draws: [] } },
+      {
+        nodeId: 'pick',
+        label: 'Draw #1 (draw)',
+        values: { draws: [] },
+        meta: { draws: meta },
+        history: { draws: [] },
+        omitted: { draws: 3 },
+      },
     ],
     turns: [
       {
@@ -183,6 +190,12 @@ it("describes a chat's computed story state: keys by name, turns with their writ
   expect(apiContract.getSessionState.response.safeParse({ ...view, turns: [unnumbered] }).success).toBe(false);
   const { label: _label, ...nameless } = view.nodes[0]!;
   expect(apiContract.getSessionState.response.safeParse({ ...view, nodes: [nameless] }).success).toBe(true);
+  // `omitted` counts the items a node collection's `values` leave out; it is always there, `{}` when none.
+  const { omitted: _omitted, ...uncounted } = view.nodes[0]!;
+  expect(apiContract.getSessionState.response.safeParse({ ...view, nodes: [uncounted] }).success).toBe(false);
+  expect(
+    apiContract.getSessionState.response.safeParse({ ...view, nodes: [{ ...uncounted, omitted: {} }] }).success,
+  ).toBe(true);
 });
 
 it('describes collections: full records to write, summaries to list', () => {
