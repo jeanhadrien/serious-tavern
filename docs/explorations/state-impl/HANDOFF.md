@@ -26,10 +26,12 @@ the user:
 | Branch | Content |
 | --- | --- |
 | `main` | The design docs (proposals 1–3, reviews 1–2). Do not push implementation work here unless the user asks. |
-| `claude/state-impl` | Working branch: all phases so far, plus this handoff. Continue here. |
+| `claude/state-impl` | Working branch for phases 1–3 and the first version of this handoff. |
+| `ccr-b85e38c4-41l3eu` | Working branch from phase 4a on (the second session's designated branch): all phases so far. Continue here. |
 | `claude/state-impl-phase-1` | Checkpoint after phase 1 (`b3fd32b`) |
 | `claude/state-impl-phase-2` | Checkpoint after phase 2 (`4465609`) |
 | `claude/state-impl-phase-3` | Checkpoint after phase 3 (`9d852a9`) |
+| `claude/state-impl-phase-4a` | Checkpoint after phase 4a |
 
 After each phase, push the working branch and create the next checkpoint:
 `git push origin HEAD:refs/heads/claude/state-impl-phase-<N>`.
@@ -46,6 +48,7 @@ with every new contract; read its sections on sinks, randomness, chat settings a
 | 1. Engine foundations | Sink nodes (run even when no Chat Output needs them); a seed per run and `ctx.random()`; `ctx.log` → `nodes[id].logs`; the `requiredIfConnected` port flag; the **Random** node (number, integer, weighted pick, chance gate) and the **Parse JSON** node | 833 |
 | 2. Chat settings | `workflow.settings` declarations and a "Chat settings" panel in the workflow editor; `session.settings` and `PATCH /api/sessions/:id` (`400 CHAT_SETTING_INVALID`, never moves `updatedAt`); `resolveChatSettings`; `{{settings.*}}` with hints; the **Chat Settings** node; the chat side panel `ChatPanel` (button in the chat header) | 1004 |
 | 3. Authored collections | YAML records under `data/collections/`, API and `collections.changed`; list and editor in the right column; the **Recall** and **Draw** nodes with custom config panels; `docs/COLLECTIONS.md` | 1206 |
+| 4a. Story state, backend | State definitions (YAML records under `data/state/definitions/`, API, `stateDefinitions.changed`, 409 rules, seeded `scene`); `session.state.turns` and the pure fold in `packages/shared/src/state/`; **State Read** and **State Write** (a sink; `when` gate input; fixed config `value`); buffered writes; `{{state.*}}`, `{{trigger.turn}}`; Draw `avoidRecent`; `GET /api/sessions/:id/state`; `editedAt`; definition edits prune workflow edges | 1894 |
 
 How to try each one, written for the user: [howto/](howto/).
 
@@ -57,7 +60,7 @@ earlier phases actually built (read their AGENTS.md sections and code).
 
 | Phase | Spec | UI | Notes |
 | --- | --- | --- | --- |
-| 4a. Story state, backend | [phase-4a.md](specs/phase-4a.md) | no | State definitions (YAML records), `session.state.turns`, the fold in `shared`, State Read / State Write, buffered writes, `{{state.*}}`, `trigger.turn`, Draw's `avoidRecent`, `GET /api/sessions/:id/state`, `editedAt` on edits, seeded `scene` definition |
+| 4a. Story state, backend (**done**) | [phase-4a.md](specs/phase-4a.md) | no | State definitions (YAML records), `session.state.turns`, the fold in `shared`, State Read / State Write, buffered writes, `{{state.*}}`, `trigger.turn`, Draw's `avoidRecent`, `GET /api/sessions/:id/state`, `editedAt` on edits, seeded `scene` definition |
 | 4b. Story state, web | [phase-4b.md](specs/phase-4b.md) | yes | Definitions editor in L; "Story state" section in `ChatPanel` with sparklines; per-message chip; delete confirmation listing what is undone |
 | 5. Post-turn runs | [phase-5.md](specs/phase-5.md) | yes | After Reply node, second run on the session's turn queue (derived seed `${seed}:post`, see AGENTS.md "Randomness"), post status on the turn, UI status and failure toast |
 | 6. History summaries | [phase-6.md](specs/phase-6.md) | yes | `session.summaries` per set, fingerprint validity, Next Chunk / Save Summary, Memory `summarySet`, panel section |
