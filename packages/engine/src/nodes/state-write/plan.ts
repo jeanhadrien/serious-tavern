@@ -1,0 +1,158 @@
+import {
+  clampToKey,
+  keyDefault,
+  keyValueProblem,
+  type CollectionKeyDef,
+  type NumberKeyDef,
+  type ScalarKeyDef,
+  type StateNodeOp,
+} from '@st/shared';
+import { describeValue } from '../../text.js';
+import type { StateWriteRequest } from '../../types.js';
+import { shown, type LocatedKey } from '../state-key.js';
+import { checkOp } from './ports.js';
+
+/** What a State Write node will do: the request to buffer, what it outputs, and lines for the node log. */
+export type WritePlan = {
+  /** Absent when there is nothing to store (removing an id the key doesn't hold). */
+  request?: StateWriteRequest;
+  /** The `value` output. An `add` outputs the stored item (with its id) instead, which only the buffer knows. */
+  output?: unknown;
+  logs: string[];
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const quoted = (value: unknown) => (typeof value === 'string' ? `"${value.slice(0, 40)}"` : describeValue(value));
+
+/** The new value of a number key; numbers outside min..max are clamped, not refused. */
+function planNumber(found: LocatedKey & { def: NumberKeyDef }, op: StateNodeOp, ctx: Inputs): WritePlan {
+  const { label, def } = found;
+  const given = op === 'increment' && !ctx.connected ? 1 : ctx.value;
+  if (op === 'delete') return planDelete(found, ctx);
+  if (typeof given !== 'number' || !Number.isFinite(given))
+    throw new Error(`${label} needs a number, got ${describeValue(given)}`);
+  const key = { kind: 'definition' as const, definitionId: found.definition.id, key: found.key };
+  if (op === 'increment') {
+    const base = typeof ctx.current === 'number' ? ctx.current : (keyDefault(def) as number);
+    const next = clampToKey(def, base + given);
+    return {
+      request: { target: key, op: 'increment', by: given },
+      output: next,
+      logs: [`${label}: ${shown(base)} -> ${shown(next)}`],
+    };
+  }
+  const next = clampToKey(def, given);
+  return {
+    request: { target: key, op: 'set', value: next },
+    output: next,
+    logs: [
+      `${label}: ${shown(ctx.current)} -> ${shown(next)}${next === given ? '' : ` (${given} clamped to the key's bounds)`}`,
+    ],
+  };
+}
+
+function planScalar(found: LocatedKey & { def: ScalarKeyDef }, ctx: Inputs): WritePlan {
+  const { label, def } = found;
+  const problem = keyValueProblem(def, ctx.value);
+  if (problem) {
+    const got = ctx.value;
+    switch (def.type) {
+      case 'boolean':
+        throw new Error(`${label} needs true or false, got ${describeValue(got)}`);
+      case 'enum':
+        throw new Error(`${label} must be one of: ${def.options.join(', ')}; got ${quoted(got)}`);
+      case 'text':
+        throw new Error(`${label} needs text, got ${describeValue(got)}`);
+      default:
+        throw new Error(`${label} needs an object, got ${describeValue(got)}`);
+    }
+  }
+  const value = structuredClone(ctx.value);
+  return {
+    request: { target: keyOf(found), op: 'set', value },
+    output: structuredClone(value),
+    logs: [`${label}: ${shown(ctx.current)} -> ${shown(value)}`],
+  };
+}
+
+const keyOf = (found: LocatedKey) => ({
+  kind: 'definition' as const,
+  definitionId: found.definition.id,
+  key: found.key,
+});
+
+function planDelete(found: LocatedKey, ctx: Inputs): WritePlan {
+  const output = keyDefault(found.def);
+  return {
+    request: { target: keyOf(found), op: 'delete' },
+    output,
+    logs: [`${found.label}: ${shown(ctx.current)} -> reset to ${shown(output)}`],
+  };
+}
+
+type Inputs = { connected: boolean; value: unknown; current: unknown };
+
+/** The item an `add` stores: only the key's declared fields survive, each of the declared type. */
+function itemOf({ label, def }: LocatedKey & { def: CollectionKeyDef }, value: unknown) {
+  if (typeof value === 'string') return { item: { text: value }, ignored: [] as string[] };
+  if (!isPlainObject(value) || typeof value.text !== 'string')
+    throw new Error(`${label} can only add text or an object with a text field, got ${describeValue(value)}`);
+  const fields = def.fields ?? {};
+  const item: { text: string } & Record<string, unknown> = { text: value.text };
+  for (const [name, type] of Object.entries(fields)) {
+    const field = Object.hasOwn(value, name) ? value[name] : undefined;
+    if (field === undefined) continue;
+    const fits =
+      type === 'text'
+        ? typeof field === 'string'
+        : type === 'number'
+          ? typeof field === 'number' && Number.isFinite(field)
+          : typeof field === 'boolean';
+    if (!fits)
+      throw new Error(
+        `${label}: field "${name}" must be ${type === 'boolean' ? 'true or false' : type === 'number' ? 'a number' : 'text'}, got ${describeValue(field)}`,
+      );
+    item[name] = field;
+  }
+  const ignored = Object.keys(value).filter((name) => name !== 'text' && !Object.hasOwn(fields, name));
+  return { item, ignored };
+}
+
+function planCollection(found: LocatedKey & { def: CollectionKeyDef }, op: StateNodeOp, ctx: Inputs): WritePlan {
+  const { label } = found;
+  if (op === 'delete') return planDelete(found, ctx);
+  if (op === 'add') {
+    const { item, ignored } = itemOf(found, ctx.value);
+    return {
+      request: { target: keyOf(found), op: 'add', item },
+      logs: [
+        `${label}: adding ${shown(item.text, 80)}`,
+        ...(ignored.length ? [`Left out fields the key doesn't declare: ${ignored.join(', ')}`] : []),
+      ],
+    };
+  }
+  const id = ctx.value;
+  if (typeof id !== 'string' || !id.trim())
+    throw new Error(`${label} needs the id of the item to remove, got ${describeValue(id)}`);
+  const held = Array.isArray(ctx.current) ? ctx.current : [];
+  const removed = held.find((item) => isPlainObject(item) && item.id === id);
+  if (!removed) return { logs: [`${label}: no item has the id ${shown(id, 80)}; nothing removed`] };
+  return {
+    request: { target: keyOf(found), op: 'remove', itemId: id },
+    output: structuredClone(removed),
+    logs: [`${label}: removing ${shown(id, 80)}`],
+  };
+}
+
+/**
+ * Decides what a State Write does with its input, from the key's definition and the value it had when the
+ * turn started. Pure. Throws plain errors that name the key and what was received.
+ */
+export function planWrite(found: LocatedKey, op: StateNodeOp, inputs: Inputs): WritePlan {
+  checkOp(found.def, op);
+  if (found.def.type === 'collection') return planCollection({ ...found, def: found.def }, op, inputs);
+  if (found.def.type === 'number') return planNumber({ ...found, def: found.def }, op, inputs);
+  return op === 'delete' ? planDelete(found, inputs) : planScalar({ ...found, def: found.def }, inputs);
+}

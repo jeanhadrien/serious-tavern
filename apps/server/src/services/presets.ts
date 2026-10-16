@@ -1,5 +1,6 @@
 import { pruneInvalidEdges } from '@st/engine';
 import { now, type AppContext } from '../context.js';
+import { nodeResources } from './node-resources.js';
 
 /** Drops the server-owned `source` from a client preset body, so no write can set or change it. */
 export function withoutSource<T extends object>(fields: T): Omit<T, 'source'> {
@@ -9,12 +10,13 @@ export function withoutSource<T extends object>(fields: T): Omit<T, 'source'> {
 
 /** Drops workflow edges into preset inputs that no longer exist, for every workflow whose LLM nodes use the preset. */
 export async function pruneWorkflowsUsingPreset(
-  { workflows, presets, characters }: Pick<AppContext, 'workflows' | 'presets' | 'characters'>,
+  context: Pick<AppContext, 'workflows' | 'presets' | 'characters' | 'providers' | 'collections' | 'stateDefinitions'>,
   presetId: string,
 ): Promise<void> {
+  const { workflows } = context;
   for (const workflow of await workflows.list()) {
     if (!workflow.nodes.some((node) => node.type === 'llm' && node.config.presetId === presetId)) continue;
-    const pruned = await pruneInvalidEdges(workflow, { presets, characters });
+    const pruned = await pruneInvalidEdges(workflow, nodeResources(context));
     if (pruned.edges.length !== workflow.edges.length)
       await workflows.update(workflow.id, (old) => ({ ...old, edges: pruned.edges, updatedAt: now() }));
   }

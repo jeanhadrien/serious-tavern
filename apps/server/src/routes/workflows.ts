@@ -4,9 +4,11 @@ import { apiContract, type ApiResponse, type WorkflowInvalidDetails } from '@st/
 import { pruneInvalidEdges, validateWorkflow } from '@st/engine';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
+import { nodeResources } from '../services/node-resources.js';
 import type { ApiRoute } from './types.js';
 
-export function registerWorkflows(app: FastifyInstance, { workflows, sessions, presets, characters }: AppContext) {
+export function registerWorkflows(app: FastifyInstance, context: AppContext) {
+  const { workflows, sessions } = context;
   app.get<ApiRoute<'listWorkflows'>>('/api/workflows', async () => workflows.list());
   app.post<ApiRoute<'createWorkflow'>>('/api/workflows', async (request, reply) => {
     const body = apiContract.createWorkflow.body.parse(request.body);
@@ -30,7 +32,7 @@ export function registerWorkflows(app: FastifyInstance, { workflows, sessions, p
     const { id } = apiContract.updateWorkflow.params.parse(request.params);
     const body = apiContract.updateWorkflow.body.parse(request.body);
     const existing = await requireEntity(workflows, id, 'Workflow');
-    const pruned = await pruneInvalidEdges({ ...existing, ...body }, { presets, characters });
+    const pruned = await pruneInvalidEdges({ ...existing, ...body }, nodeResources(context));
     const workflow = await workflows.update(id, (old) => ({ ...old, ...body, edges: pruned.edges, updatedAt: now() }));
     if (!workflow) throw notFound('Workflow');
     return workflow;
@@ -45,7 +47,7 @@ export function registerWorkflows(app: FastifyInstance, { workflows, sessions, p
   app.post<ApiRoute<'validateWorkflow'>>('/api/workflows/:id/validate', async (request) => {
     const { id } = apiContract.validateWorkflow.params.parse(request.params);
     const workflow = await requireEntity(workflows, id, 'Workflow');
-    const errors = await validateWorkflow(workflow, { presets, characters });
+    const errors = await validateWorkflow(workflow, nodeResources(context));
     if (errors.length)
       throw new HttpError(422, 'WORKFLOW_INVALID', `Workflow "${workflow.name}" is invalid`, {
         workflowId: workflow.id,

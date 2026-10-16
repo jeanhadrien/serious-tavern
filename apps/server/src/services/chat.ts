@@ -13,6 +13,7 @@ import { executeWorkflow, ExecutionFailure, registry, prepareWorkflow } from '@s
 import type { ChatReply, PreparedWorkflow } from '@st/engine';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
+import { nodeResources } from './node-resources.js';
 import { TurnStream, type StreamedRow, type TurnFrame } from './turn-stream.js';
 import type { RunningTurn, TurnStop } from './turns.js';
 
@@ -60,11 +61,8 @@ export function runTurn(
   });
 }
 
-async function startTurn(
-  { workflows, presets, providers, collections, sessions, characters, personas }: AppContext,
-  sessionId: string,
-  content: string,
-) {
+async function startTurn(context: AppContext, sessionId: string, content: string) {
+  const { workflows, sessions, personas } = context;
   const started: {
     value?: {
       prepared: PreparedWorkflow;
@@ -78,7 +76,7 @@ async function startTurn(
   } = {};
   const session = await sessions.silent.update(sessionId, async (current) => {
     const workflow = await requireEntity(workflows, current.workflowId, 'Workflow');
-    const { errors, prepared } = await prepareWorkflow(workflow, { presets, characters, providers, collections });
+    const { errors, prepared } = await prepareWorkflow(workflow, nodeResources(context));
     if (!prepared)
       throw new HttpError(400, 'WORKFLOW_INVALID', `Workflow "${workflow.name}" is invalid`, {
         workflowId: workflow.id,
