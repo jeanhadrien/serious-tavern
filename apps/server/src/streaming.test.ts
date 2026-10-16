@@ -14,7 +14,7 @@ import {
   type Workflow,
 } from '@st/shared';
 import { createApp } from './app.js';
-import { historyMessages, settleTurn } from './services/chat.js';
+import { historyMessages, settleTurn } from './services/settle-turn.js';
 import { restoreAdapter, useAdapter } from './test-support/adapter.js';
 import { parseEventStream } from './test-support/event-stream.js';
 

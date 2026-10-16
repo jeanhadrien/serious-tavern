@@ -1,5 +1,5 @@
 import type { ApiBody, ApiResponse } from '@st/shared';
-import type { AppContext } from '../context.js';
+import { now, type AppContext } from '../context.js';
 import { notFound } from '../errors.js';
 
 export async function updateMessage(
@@ -11,6 +11,8 @@ export async function updateMessage(
   const session = await sessions.update(id, (current) => {
     const message = current.messages.find((item) => item.id === messageId);
     if (!message) throw notFound('Message');
+    // Display only: the edit never recomputes the chat's story state. A whitespace-only change isn't an edit.
+    if (content.trim() !== message.content.trim()) message.editedAt = now();
     message.content = content;
     return current;
   });

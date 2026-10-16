@@ -9,7 +9,11 @@ import type { ApiRoute } from './types.js';
 export function registerSessions(app: FastifyInstance, context: AppContext) {
   const { workflows, characters, personas, sessions } = context;
   app.get<ApiRoute<'listSessions'>>('/api/sessions', async () =>
-    (await sessions.list()).map(({ messages, ...session }) => ({ ...session, messageCount: messages.length })),
+    // The turn entries are the session's own business: a list carries neither messages nor state.
+    (await sessions.list()).map(({ messages, state: _state, ...session }) => ({
+      ...session,
+      messageCount: messages.length,
+    })),
   );
   app.post<ApiRoute<'createSession'>>('/api/sessions', async (request, reply) => {
     const body = apiContract.createSession.body.parse(request.body);
@@ -24,6 +28,7 @@ export function registerSessions(app: FastifyInstance, context: AppContext) {
       characterId: body.characterId,
       personaId: body.personaId,
       settings: {},
+      state: { turns: [] },
       messages: [],
       createdAt: date,
       updatedAt: date,

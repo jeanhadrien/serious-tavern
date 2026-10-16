@@ -56,6 +56,7 @@ it('edits either role without changing metadata or executing, then deletes only 
       expect(apiContract.updateMessage.response.parse(response.json())).toEqual({
         ...message,
         content: 'Edited\ncontent',
+        editedAt: expect.any(String),
       });
     }
     const edited = (await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json();

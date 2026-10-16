@@ -1,11 +1,19 @@
 import type { ApiParsedBody, ApiResponse } from '@st/shared';
-import { presetWarnings, resolveChatSettings, settingsCatalog, workflowSettings } from '@st/shared';
+import {
+  emptyStateSnapshot,
+  presetWarnings,
+  resolveChatSettings,
+  settingsCatalog,
+  stateTemplateValues,
+  workflowSettings,
+} from '@st/shared';
 import { renderPreset } from '@st/engine';
 import type { AppContext } from '../context.js';
 import { errorMessage, HttpError, notFound } from '../errors.js';
+import { foldSession, listDefinitions } from './story-state.js';
 
 export async function previewPreset(
-  { sessions, workflows, characters, personas }: AppContext,
+  { sessions, workflows, characters, personas, stateDefinitions }: AppContext,
   { preset, inputs = {}, sessionId }: ApiParsedBody<'previewPreset'>,
 ): Promise<ApiResponse<'previewPreset'>> {
   const session = sessionId ? await sessions.get(sessionId) : undefined;
@@ -18,6 +26,9 @@ export async function previewPreset(
     ? workflowSettings((await workflows.get(session.workflowId)) ?? {})
     : settingsCatalog(await workflows.list());
   const settings = resolveChatSettings(declarations, session?.settings).values;
+  // The story state the session's next turn would see; a new chat sees every key at its default, turn 1.
+  const definitions = await listDefinitions(stateDefinitions);
+  const state = session ? foldSession(definitions, session).snapshot : emptyStateSnapshot(definitions);
   const values: Record<string, unknown> = { ...inputs };
   const sample = [
     { role: 'user', content: 'Hello!' },
@@ -33,11 +44,12 @@ export async function previewPreset(
       messages: renderPreset(preset, {
         inputs: values,
         templateContext: {
-          trigger: { message: 'Sample message', sessionId: sessionId ?? 'sample-session' },
+          trigger: { message: 'Sample message', sessionId: sessionId ?? 'sample-session', turn: state.turn },
           history: session?.messages,
           character,
           persona,
           settings,
+          state: { values: stateTemplateValues(state) },
         },
       }),
       warnings: presetWarnings(preset),

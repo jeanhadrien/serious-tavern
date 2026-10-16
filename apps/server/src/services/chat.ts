@@ -5,7 +5,8 @@ import type {
   ChatMessage,
   ExecutionLog,
   Persona,
-  Session,
+  StateSnapshot,
+  StateWrite,
   WorkflowInvalidDetails,
 } from '@st/shared';
 import { resolveChatSettings, workflowSettings } from '@st/shared';
@@ -14,7 +15,9 @@ import type { ChatReply, PreparedWorkflow } from '@st/engine';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
 import { nodeResources } from './node-resources.js';
-import { TurnStream, type StreamedRow, type TurnFrame } from './turn-stream.js';
+import { historyMessages, settleTurn } from './settle-turn.js';
+import { foldSession, listDefinitions } from './story-state.js';
+import { TurnStream, type TurnFrame } from './turn-stream.js';
 import type { RunningTurn, TurnStop } from './turns.js';
 
 export type TurnOptions = {
@@ -28,11 +31,6 @@ const stopWarnings: Record<TurnStop, string> = {
   user: 'The turn was stopped by the user before it finished.',
   disconnect: 'The turn ended because the client disconnected before it finished.',
 };
-
-/** Messages a turn may read as history. Streaming and partial rows never enter it. */
-export function historyMessages(messages: ChatMessage[]): ChatMessage[] {
-  return messages.filter((message) => message.status === undefined || message.status === 'final');
-}
 
 export function sendMessage(
   context: AppContext,
@@ -62,7 +60,7 @@ export function runTurn(
 }
 
 async function startTurn(context: AppContext, sessionId: string, content: string) {
-  const { workflows, sessions, personas } = context;
+  const { workflows, sessions, personas, stateDefinitions } = context;
   const started: {
     value?: {
       prepared: PreparedWorkflow;
@@ -72,11 +70,18 @@ async function startTurn(context: AppContext, sessionId: string, content: string
       persona?: Persona;
       settings: Record<string, unknown>;
       settingIssues: string[];
+      state: StateSnapshot;
+      stateIssues: string[];
     };
   } = {};
   const session = await sessions.silent.update(sessionId, async (current) => {
     const workflow = await requireEntity(workflows, current.workflowId, 'Workflow');
-    const { errors, prepared } = await prepareWorkflow(workflow, nodeResources(context));
+    // One listing serves the node ports and the fold, so a definition edited mid-turn cannot split them.
+    const definitions = await listDefinitions(stateDefinitions);
+    const { errors, prepared } = await prepareWorkflow(workflow, {
+      ...nodeResources(context),
+      stateDefinitions: { get: async (id) => definitions.find((definition) => definition.id === id) },
+    });
     if (!prepared)
       throw new HttpError(400, 'WORKFLOW_INVALID', `Workflow "${workflow.name}" is invalid`, {
         workflowId: workflow.id,
@@ -91,6 +96,8 @@ async function startTurn(context: AppContext, sessionId: string, content: string
       : undefined;
     // The values are snapshotted here: a settings change during the run applies from the next turn.
     const settings = resolveChatSettings(workflowSettings(workflow), current.settings);
+    // The state the turn starts from: the turns still present, folded against the definitions as they are now.
+    const story = foldSession(definitions, current);
     started.value = {
       prepared,
       userMessage,
@@ -99,6 +106,8 @@ async function startTurn(context: AppContext, sessionId: string, content: string
       persona,
       settings: settings.values,
       settingIssues: settings.issues.map(({ key, message }) => `Chat setting "${key}": ${message}.`),
+      state: story.snapshot,
+      stateIssues: story.issues,
     };
     if (userMessage) current.messages.push(userMessage);
     current.updatedAt = now();
@@ -116,17 +125,14 @@ async function executeTurn(
   options: TurnOptions,
 ): Promise<ApiResponse<'sendMessage'>> {
   const { sessions, executions, secrets } = context;
-  const { prepared, userMessage, history, character, persona, settings, settingIssues } = await startTurn(
-    context,
-    sessionId,
-    content,
-  );
+  const { prepared, userMessage, history, character, persona, settings, settingIssues, state, stateIssues } =
+    await startTurn(context, sessionId, content);
   const executionId = randomUUID();
   const stream = options.emit
     ? new TurnStream({ sessions: sessions.silent, sessionId, executionId, prepared, emit: options.emit })
     : undefined;
   options.emit?.({ type: 'turn.start', executionId });
-  let outcome: { replies: ChatReply[]; execution: ExecutionLog } | undefined;
+  let outcome: { replies: ChatReply[]; execution: ExecutionLog; writes: StateWrite[] } | undefined;
   let failure: unknown;
   try {
     outcome = await executeWorkflow(prepared, {
@@ -137,6 +143,7 @@ async function executeTurn(
       character,
       persona,
       settings,
+      state,
       signal: turn.controller.signal,
       executionId,
       onEvent: stream?.onEvent,
@@ -147,14 +154,23 @@ async function executeTurn(
   const streamed = (await stream?.finish()) ?? [];
   const execution = outcome?.execution ?? (failure instanceof ExecutionFailure ? failure.execution : undefined);
   const replies = outcome?.replies ?? (failure instanceof ExecutionFailure ? failure.replies : []);
+  // The writes of every node that completed, even when the turn failed or was stopped.
+  const writes = outcome?.writes ?? (failure instanceof ExecutionFailure ? failure.writes : []);
   // A stored value that no longer fits its declaration is ignored (the default runs); say so in the log.
-  execution?.warnings.push(...settingIssues);
+  execution?.warnings.push(...settingIssues, ...stateIssues);
   if (!outcome && turn.stoppedBy && execution) execution.warnings.push(stopWarnings[turn.stoppedBy]);
   if (execution) await executions.save(execution);
   const settled: { value?: { userMessage?: ChatMessage; assistantMessages: ChatMessage[] } } = {};
   // Everything a turn writes is silent; the settled turn announces itself once (success, failure or stop).
   const session = await sessions.silent.update(sessionId, (current) => {
-    settled.value = settleTurn(current, { executionId, userMessage, replies, streamed, interrupted: !outcome });
+    settled.value = settleTurn(current, {
+      executionId,
+      userMessage,
+      replies,
+      streamed,
+      interrupted: !outcome,
+      writes,
+    });
     return current;
   });
   if (!session) throw notFound('Session');
@@ -175,62 +191,4 @@ async function executeTurn(
       ? `${label} (${failedId}): ${failure.execution.nodes[failedId]?.error ?? failure.message}`
       : failure.message;
   throw new HttpError(500, 'WORKFLOW_EXECUTION_FAILED', message, details);
-}
-
-export type Settlement = {
-  executionId: string;
-  userMessage?: ChatMessage;
-  replies: ChatReply[];
-  streamed: StreamedRow[];
-  interrupted: boolean;
-};
-
-/**
- * Writes the turn's assistant rows in one place. Replies are kept in engine order; a streamed row
- * that has a reply is promoted in place (same id). A streamed row without a reply is dropped when the
- * turn completed (the output was skipped), and kept as `partial` when the turn was interrupted.
- */
-export function settleTurn(current: Session, { executionId, userMessage, replies, streamed, interrupted }: Settlement) {
-  const streamedIds = new Set(streamed.map((row) => row.id));
-  const streamedByOutput = new Map(streamed.map((row) => [row.outputId, row]));
-  const repliedOutputs = new Set(replies.map((reply) => reply.nodeId));
-  const replied = replies.map((reply): ChatMessage => {
-    const live = streamedByOutput.get(reply.nodeId);
-    return {
-      id: live?.id ?? randomUUID(),
-      role: 'assistant',
-      content: reply.content,
-      ...(reply.name === undefined ? {} : { name: reply.name }),
-      ...(reply.characterId === undefined ? {} : { characterId: reply.characterId }),
-      createdAt: live?.createdAt ?? now(),
-      executionId,
-      ...(live ? { nodeId: live.outputId, status: 'final' as const } : {}),
-      ...(live?.reasoning ? { reasoning: live.reasoning } : {}),
-    };
-  });
-  const partial = interrupted
-    ? streamed
-        .filter((row) => !repliedOutputs.has(row.outputId))
-        .map(
-          (row): ChatMessage => ({
-            id: row.id,
-            role: 'assistant',
-            content: row.content,
-            ...(row.name === undefined ? {} : { name: row.name }),
-            ...(row.characterId === undefined ? {} : { characterId: row.characterId }),
-            createdAt: row.createdAt,
-            executionId,
-            nodeId: row.outputId,
-            status: 'partial',
-            ...(row.reasoning ? { reasoning: row.reasoning } : {}),
-          }),
-        )
-    : [];
-  const assistantMessages = [...replied, ...partial];
-  current.messages = current.messages.filter((message) => !streamedIds.has(message.id));
-  const saved = userMessage && (current.messages.find((message) => message.id === userMessage.id) ?? userMessage);
-  if (saved) saved.executionId = executionId;
-  current.messages.push(...assistantMessages);
-  current.updatedAt = now();
-  return { userMessage: saved, assistantMessages };
 }

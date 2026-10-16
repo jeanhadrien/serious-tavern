@@ -1,0 +1,49 @@
+import {
+  duplicateNameIssues,
+  foldStoryState,
+  oldestFirst,
+  stateSnapshot,
+  type Session,
+  type StateDefinition,
+  type StateSnapshot,
+  type StoryState,
+} from '@st/shared';
+import type { StateDefinitionRepository } from '../storage/state-definition-repository.js';
+
+export type SessionStory = {
+  /** Oldest first, as the fold and the templates want them. */
+  definitions: StateDefinition[];
+  story: StoryState;
+  /** What a run starts from: the folded values and meta, the definitions and the turn being run. */
+  snapshot: StateSnapshot;
+  /** Plain-language notes for the execution log: stored values that no longer fit, repeated names. */
+  issues: string[];
+};
+
+/** Every state definition, oldest first. */
+export async function listDefinitions(repository: Pick<StateDefinitionRepository, 'list'>): Promise<StateDefinition[]> {
+  return oldestFirst(await repository.list());
+}
+
+/**
+ * Folds a session's stored turns against `definitions`: what its state is right now, and the snapshot its
+ * next turn runs on. Never throws and writes nothing; a stored value that doesn't fit its definition reads as
+ * the default and shows up in `issues`.
+ */
+export function foldSession(
+  definitions: StateDefinition[],
+  session: Pick<Session, 'messages' | 'state'>,
+): SessionStory {
+  const story = foldStoryState({ definitions, messages: session.messages, state: session.state });
+  return {
+    definitions,
+    story,
+    snapshot: stateSnapshot(story, definitions),
+    issues: [
+      ...story.definitions.flatMap(({ warnings }) =>
+        warnings.map(({ definition, key, message }) => `State "${definition}.${key}": ${message}.`),
+      ),
+      ...duplicateNameIssues(definitions),
+    ],
+  };
+}
