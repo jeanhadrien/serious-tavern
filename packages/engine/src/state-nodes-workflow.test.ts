@@ -92,6 +92,24 @@ describe('State Write in a workflow', () => {
     expect(yes.writes).toEqual([write_]);
   });
 
+  it.each([
+    [1, 'completed', 1],
+    [0, 'skipped', 0],
+  ])('is gated by a Random chance output: probability %s is %s', async (probability, status, writes) => {
+    const wf = graph(
+      [
+        node('input', 'chat-input'),
+        node('output', 'chat-output'),
+        node('roll', 'random', { mode: 'chance', probability }),
+        node('mark', 'state-write', write('tension', 'delete')),
+      ],
+      [edge('input', 'message', 'output', 'value'), edge('roll', 'true', 'mark', 'when')],
+    );
+    const result = await playTurn(newChat([scene]), wf, 'e1');
+    expect(result.execution.nodes.mark?.status).toBe(status);
+    expect(result.writes).toHaveLength(writes);
+  });
+
   it('runs an ungated delete every turn, as before', async () => {
     const wf = gated('tension', 'delete', false);
     const chat = newChat([scene]);
