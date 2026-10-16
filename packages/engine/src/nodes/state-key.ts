@@ -10,7 +10,8 @@ export type LocatedKey = { definition: StateDefinition; key: string; def: StateK
 export function locateKey(definition: StateDefinition | undefined, definitionId: unknown, key: unknown): LocatedKey {
   const id = typeof definitionId === 'string' ? definitionId : '';
   if (!id) throw new Error('Select a state definition');
-  if (!definition) throw new Error(`State definition ${id} not found`);
+  if (!definition)
+    throw new Error(`State definition ${id} not found. Pick another state definition in the node's settings.`);
   const name = typeof key === 'string' ? key : '';
   if (!name) throw new Error('Select a key');
   if (!Object.hasOwn(definition.keys, name))

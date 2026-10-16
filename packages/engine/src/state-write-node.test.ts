@@ -15,17 +15,17 @@ const mark = (port: PortDef) =>
 describe('State Write ports', () => {
   // `!` required, `~` required only when connected, `?` optional output.
   it.each([
-    ['tension', 'set', ['value:number!'], ['value:number']],
-    ['tension', 'increment', ['value:number~'], ['value:number']],
-    ['tension', 'delete', [], ['value:number']],
-    ['mood', 'set', ['value:text!'], ['value:text']],
-    ['alarm', 'set', ['value:boolean!'], ['value:boolean']],
-    ['note', 'set', ['value:text!'], ['value:text']],
-    ['note', 'delete', [], ['value:text']],
-    ['data', 'set', ['value:object!'], ['value:object']],
-    ['injected', 'add', ['value:any!'], ['value:object']],
-    ['injected', 'remove', ['value:text!'], ['value:object?']],
-    ['injected', 'delete', [], ['value:array']],
+    ['tension', 'set', ['value:number!', 'when:any~'], ['value:number']],
+    ['tension', 'increment', ['value:number~', 'when:any~'], ['value:number']],
+    ['tension', 'delete', ['when:any~'], ['value:number']],
+    ['mood', 'set', ['value:text!', 'when:any~'], ['value:text']],
+    ['alarm', 'set', ['value:boolean!', 'when:any~'], ['value:boolean']],
+    ['note', 'set', ['value:text!', 'when:any~'], ['value:text']],
+    ['note', 'delete', ['when:any~'], ['value:text']],
+    ['data', 'set', ['value:object!', 'when:any~'], ['value:object']],
+    ['injected', 'add', ['value:any!', 'when:any~'], ['value:object']],
+    ['injected', 'remove', ['value:text!', 'when:any~'], ['value:object?']],
+    ['injected', 'delete', ['when:any~'], ['value:array']],
   ])('%s %s takes %j and gives %j', async (key, op, inputs, outputs) => {
     const ports = await stateWrite.resolvePorts!(config(key, op), resources);
     expect(ports.inputs.map(mark)).toEqual(inputs);
@@ -34,7 +34,7 @@ describe('State Write ports', () => {
 
   it('defaults to set', async () => {
     const ports = await stateWrite.resolvePorts!({ definitionId: SCENE_ID, key: 'note' }, resources);
-    expect(ports.inputs.map(mark)).toEqual(['value:text!']);
+    expect(ports.inputs.map(mark)).toEqual(['value:text!', 'when:any~']);
   });
 
   it.each([

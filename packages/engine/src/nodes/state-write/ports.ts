@@ -16,6 +16,17 @@ export function checkOp(def: StateKeyDef, op: string): StateNodeOp {
   throw new Error(`Operation "${op}" can't be used on ${article} ${def.type} key; use ${list}`);
 }
 
+// Every operation takes this optional gate, so a branch can decide whether any write runs: `requiredIfConnected`
+// skips the node when the connected branch isn't taken. Its value is ignored; unconnected, the node runs every turn.
+const gate: PortDef = {
+  name: 'when',
+  label: 'Run when',
+  dataType: 'any',
+  requiredIfConnected: true,
+  description:
+    'Optional. Connect a branch (for example a Condition output) and the write only runs when that branch does. Not connected, it runs every turn.',
+};
+
 /** The `value` input an operation takes; none for `delete`. */
 function valueInput(def: StateKeyDef, op: StateNodeOp): PortDef[] {
   switch (op) {
@@ -78,7 +89,7 @@ const OUTPUT_DESCRIPTION: Record<StateNodeOp, string> = {
 /** Ports of a State Write node for a key and operation. */
 export function writePorts(def: StateKeyDef, op: StateNodeOp): { inputs: PortDef[]; outputs: PortDef[] } {
   return {
-    inputs: valueInput(def, op),
+    inputs: [...valueInput(def, op), gate],
     outputs: [
       {
         name: 'value',

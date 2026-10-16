@@ -51,7 +51,10 @@ describe('State Read and State Write through the API', () => {
     expect(names(meta.json().outputs)).toEqual(['written', 'turnsSinceWrite', 'writtenAtTurn', 'count']);
     const write = await ports(app, 'state-write', { definitionId: definition.id, key: 'tension', op: 'increment' });
     expect(write.json()).toMatchObject({
-      inputs: [{ name: 'value', dataType: 'number', requiredIfConnected: true }],
+      inputs: [
+        { name: 'value', dataType: 'number', requiredIfConnected: true },
+        { name: 'when', dataType: 'any', requiredIfConnected: true },
+      ],
       outputs: [{ name: 'value', dataType: 'number' }],
     });
     await app.close();

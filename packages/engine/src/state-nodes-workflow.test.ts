@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { StateDefinition } from '@st/shared';
 import { validateWorkflow } from './executor.js';
+import { pruneInvalidEdges } from './prune.js';
 import { edge, graph, node } from './test-collections.js';
 import { SCENE_ID, deleteReplies, newChat, playTurn, sceneDefinition } from './test-state.js';
 
@@ -57,6 +58,60 @@ describe('State Write in a workflow', () => {
     expect(no.writes).toEqual([]);
     const yes = await playTurn(chat, wf, 'e2', 'yes');
     expect(yes.writes).toEqual([{ op: 'set', target: key('note'), nodeId: 'mark', value: 'yes' }]);
+  });
+
+  // input -> output (the message) and input -> condition ("yes"?) -> `when` of a State Write on scene.<key>.
+  const gated = (key_: string, op: string, wire = true) =>
+    graph(
+      [
+        node('input', 'chat-input'),
+        node('output', 'chat-output'),
+        node('gate', 'condition', { left: '{{input.value}}', operator: 'equals', right: 'yes' }),
+        node('mark', 'state-write', write(key_, op)),
+      ],
+      [
+        edge('input', 'message', 'output', 'value'),
+        edge('input', 'message', 'gate', 'value'),
+        ...(wire ? [edge('gate', 'true', 'mark', 'when')] : []),
+      ],
+    );
+
+  it.each([
+    ['delete', 'tension', { op: 'delete', target: key('tension'), nodeId: 'mark' }],
+    ['increment', 'tension', { op: 'set', target: key('tension'), nodeId: 'mark', value: 4 }],
+    ['delete', 'injected', { op: 'delete', target: key('injected'), nodeId: 'mark' }],
+  ])('%s of %s runs only when the branch wired to `when` is taken, whatever it carries', async (op, name, write_) => {
+    const wf = gated(name, op);
+    expect(await validateWorkflow(wf, newChat([scene]).resources)).toEqual([]);
+    const chat = newChat([scene]);
+    const no = await playTurn(chat, wf, 'e1', 'no');
+    expect(no.execution.nodes.mark?.status).toBe('skipped');
+    expect(no.writes).toEqual([]);
+    const yes = await playTurn(chat, wf, 'e2', 'yes');
+    expect(yes.execution.nodes.mark?.status).toBe('completed');
+    expect(yes.writes).toEqual([write_]);
+  });
+
+  it('runs an ungated delete every turn, as before', async () => {
+    const wf = gated('tension', 'delete', false);
+    const chat = newChat([scene]);
+    for (const [index, message] of ['no', 'yes', 'no'].entries()) {
+      const result = await playTurn(chat, wf, `e${index}`, message);
+      expect(result.writes).toEqual([{ op: 'delete', target: key('tension'), nodeId: 'mark' }]);
+    }
+  });
+
+  it('keeps the gate when the operation changes, and drops only the edges to ports that vanish', async () => {
+    const wf = gated('mood', 'set');
+    const withValue = { ...wf, edges: [...wf.edges, edge('input', 'message', 'mark', 'value')] };
+    const retargeted = {
+      ...withValue,
+      nodes: withValue.nodes.map((item) =>
+        item.id === 'mark' ? node('mark', 'state-write', write('mood', 'delete')) : item,
+      ),
+    };
+    const pruned = await pruneInvalidEdges(retargeted, newChat([scene]).resources);
+    expect(pruned.edges.filter((item) => item.target === 'mark').map((item) => item.targetHandle)).toEqual(['when']);
   });
 
   it('reads the start-of-turn value in its own run, and the next turn sees what was written', async () => {
@@ -162,7 +217,7 @@ describe('State Write in a workflow', () => {
     );
     const issues = await validateWorkflow(wf, newChat([scene]).resources);
     expect(issues.map((issue) => issue.message)).toEqual([
-      '"State Write #1 (state-write)" could not resolve its ports: State definition gone not found',
+      '"State Write #1 (state-write)" could not resolve its ports: State definition gone not found. Pick another state definition in the node\'s settings.',
     ]);
   });
 });

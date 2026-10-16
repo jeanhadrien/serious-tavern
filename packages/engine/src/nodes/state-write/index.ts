@@ -12,6 +12,7 @@ export const stateWrite: NodeDefinition = {
   description: "Store a value in the chat's story state; it applies when this turn's reply stays in the chat",
   category: 'State',
   // Like Chat Output, it runs every turn once its inputs are ready, whether or not a reply depends on it.
+  // The optional `when` input (every operation) lets a branch decide whether the write runs at all.
   sink: true,
   inputs: [],
   outputs: [],
