@@ -32,6 +32,8 @@ export function parseYamlRecord<T>(text: string, schema: z.ZodType<T>, label: st
   });
   if (stamped.success && STAMPED.some((key) => candidate[key] == null))
     return { ok: false, reason: 'missing id or timestamps', needsStamp: true };
-  const issue = parsed.error.issues[0];
+  // Report the stamped parse's problem: a hand-written file has no id by design, and zod skips object-level
+  // refinements (state definitions' key checks) while the id is missing, so the first parse only names the id.
+  const issue = (stamped.success ? parsed : stamped).error.issues[0];
   return { ok: false, reason: `invalid ${label}: ${issue?.path.join('.') || '(root)'}: ${issue?.message}` };
 }

@@ -101,6 +101,19 @@ describe('state definition repository', () => {
         /^invalid state definition: keys\.x\.cap: /,
       ],
       'readable-id.yaml': ['name: h\nid: scene\n', /^invalid state definition: id: /],
+      // Hand-written files have no id: the reason must still name the real mistake, not the id to be stamped.
+      'idless-range.yaml': [
+        'name: j\nkeys:\n  x:\n    type: number\n    min: 5\n    max: 1\n',
+        /^invalid state definition: keys\.x\.max: /,
+      ],
+      'idless-default.yaml': [
+        'name: k\nkeys:\n  x:\n    type: number\n    max: 5\n    default: 6\n',
+        /^invalid state definition: keys\.x\.default: /,
+      ],
+      'idless-enum-default.yaml': [
+        'name: l\nkeys:\n  x:\n    type: enum\n    options: [a, b]\n    default: c\n',
+        /^invalid state definition: keys\.x\.default: /,
+      ],
       // A blank `keys:` is null, which keeps a file without stamps invalid (and so never stamped).
       'null-keys.yaml': ['name: i\nkeys:\n', /^invalid state definition: keys: /],
       'list.yaml': ['- a\n- b\n', 'top level must be a mapping'],
