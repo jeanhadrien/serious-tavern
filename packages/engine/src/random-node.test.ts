@@ -6,12 +6,14 @@ import { pruneInvalidEdges } from './prune.js';
 import { random } from './nodes/random/index.js';
 import { createRandom } from './seeded-random.js';
 import type { ExecutionContext } from './types.js';
+import { stateless } from './test-state.js';
 
 // Runs the node directly on a parsed config, with scripted draws.
 const run = (config: Record<string, unknown>, inputs: Record<string, unknown> = {}, ...draws: number[]) => {
   const queue = [...draws];
   const ctx: ExecutionContext = {
     nodeId: 'random',
+    ...stateless('random'),
     inputs,
     config: random.configSchema.parse(config),
     trigger: { message: '', sessionId: 's' },

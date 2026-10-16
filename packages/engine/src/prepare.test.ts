@@ -137,6 +137,29 @@ it('snapshots collections once per run and clones them', async () => {
   expect(await (await prepareWorkflow(graph())).prepared!.resources.collections!.get('x')).toBeUndefined();
 });
 
+it('snapshots state definitions once per run and clones them', async () => {
+  const definition = {
+    id: '33333333-3333-4333-8333-333333333333',
+    name: 'scene',
+    keys: { tension: { type: 'number' as const } },
+    createdAt: '',
+    updatedAt: '',
+  };
+  const get = vi.fn(async (id: string) => (id === definition.id ? definition : undefined));
+  const { prepared } = await prepareWorkflow(graph(), {
+    presets: { get: async () => undefined },
+    stateDefinitions: { get },
+  });
+  const definitions = prepared!.resources.stateDefinitions!;
+  const [first, second] = await Promise.all([definitions.get(definition.id), definitions.get(definition.id)]);
+  expect(first).toEqual(definition);
+  expect(first).not.toBe(definition);
+  expect(second).toBe(first);
+  expect(get).toHaveBeenCalledTimes(1);
+  expect(await definitions.get('missing')).toBeUndefined();
+  expect(await (await prepareWorkflow(graph())).prepared!.resources.stateDefinitions!.get('x')).toBeUndefined();
+});
+
 it('fails an LLM node that names an unknown provider, naming the id', async () => {
   const preset: Preset = {
     id: '2b041793-416b-4c94-a541-99ab866230b7',

@@ -1,13 +1,24 @@
 import { randomUUID } from 'node:crypto';
 import { canConnect } from '@st/shared/ports';
 import { nodeDisplayName } from '@st/shared';
-import type { Character, Workflow, ChatMessage, ExecutionLog, Edge, Persona } from '@st/shared';
+import type {
+  Character,
+  Workflow,
+  ChatMessage,
+  ExecutionLog,
+  Edge,
+  Persona,
+  StateSnapshot,
+  StateWrite,
+} from '@st/shared';
 import { labelOf, prepareWorkflow, type PreparedWorkflow } from './prepare.js';
 export { validateWorkflow } from './prepare.js';
 import type { ChatReply, EngineEvent, ExecutionContext, NodeResources } from './types.js';
 import { stringify, coerceValue } from './text.js';
 import { orderReplies } from './replies.js';
 import { createRandom } from './seeded-random.js';
+import { createStateAccess, frozenStateValues } from './state-access.js';
+import { StateWriteBuffer } from './state-writes.js';
 
 class NodeExecutionError extends Error {
   constructor(
@@ -26,6 +37,8 @@ export class ExecutionFailure extends Error {
     public readonly replies: ChatReply[] = [],
     public readonly nodeId?: string,
     public readonly nodeType?: string,
+    // The state writes of the nodes that completed before the run failed or was stopped.
+    public readonly writes: StateWrite[] = [],
   ) {
     super(message);
   }
@@ -51,8 +64,11 @@ export async function executeWorkflow(
     // Chat settings, already resolved against the workflow (`resolveChatSettings`). Recorded as
     // `execution.settings` and exposed as `ctx.settings`.
     settings?: Record<string, unknown>;
+    // The story state the turn starts from (`foldStoryState` + `stateSnapshot`): what `ctx.state` reads and
+    // `trigger.turn` reports. Writes nodes ask for are returned as `writes`, never visible during the run.
+    state?: StateSnapshot;
   },
-): Promise<{ replies: ChatReply[]; execution: ExecutionLog }> {
+): Promise<{ replies: ChatReply[]; execution: ExecutionLog; writes: StateWrite[] }> {
   // NB: Workflow is a passthrough (loose) object for forward compatibility, so `in`
   // narrowing does not discriminate it from PreparedWorkflow; check the prepared marker instead.
   const isPrepared = (value: Workflow | PreparedWorkflow): value is PreparedWorkflow =>
@@ -96,6 +112,15 @@ export async function executeWorkflow(
       return next();
     };
   };
+  const stateWrites = new StateWriteBuffer(options.state, execution.id);
+  const stateValues = frozenStateValues(options.state);
+  let wave = 0;
+  // Resolves the buffered writes once, at the end of the run; its warnings join the execution's.
+  const finishWrites = () => {
+    const { writes, warnings } = stateWrites.resolve();
+    execution.warnings.push(...warnings);
+    return writes;
+  };
   const resolved = new Map<string, { output: Record<string, unknown>; skipped: boolean }>();
   const replies = new Map<string, ChatReply>();
   const pending = new Set(workflow.nodes.filter((node) => reachable.has(node.id)).map((node) => node.id));
@@ -107,6 +132,7 @@ export async function executeWorkflow(
   }
   try {
     while (pending.size) {
+      wave++;
       if (controller.signal.aborted) throw new Error('Execution aborted');
       const ready = workflow.nodes.filter(
         (n) => pending.has(n.id) && incoming.get(n.id)!.every((e) => resolved.has(e.source)),
@@ -115,6 +141,7 @@ export async function executeWorkflow(
       let firstFailure: Error | undefined;
       const results = await Promise.allSettled(
         ready.map(async (node) => {
+          const nodeWave = wave;
           const start = Date.now();
           let timeoutMs = options.nodeTimeoutMs ?? 30000;
           let timer: AbortSignal | undefined;
@@ -129,6 +156,7 @@ export async function executeWorkflow(
               return !source.skipped && Object.hasOwn(source.output, e.sourceHandle);
             });
             const definition = definitions.get(node.id)!;
+            const writeNodeState = stateWrites.writer(node.id);
             const inputs = Object.fromEntries(
               active.map((e) => {
                 const source = workflow.nodes.find((item) => item.id === e.source)!;
@@ -172,7 +200,11 @@ export async function executeWorkflow(
                 nodeId: node.id,
                 inputs,
                 config: node.config,
-                trigger: { message: options.message, sessionId: options.sessionId },
+                trigger: {
+                  message: options.message,
+                  sessionId: options.sessionId,
+                  ...(options.state && { turn: options.state.turn }),
+                },
                 history: options.history,
                 character: options.character,
                 persona: options.persona,
@@ -186,6 +218,8 @@ export async function executeWorkflow(
                   execution.nodes[node.id] = { ...entry, logs: [...(entry.logs ?? []), message] };
                 },
                 random: createNodeRandom(`${seed}:${node.id}`),
+                state: createStateAccess(options.state, node.id, stateValues),
+                writeState: (request) => (callbacksActive ? writeNodeState(request) : {}),
                 recordWire: (wire) => {
                   if (callbacksActive) execution.nodes[node.id] = { ...execution.nodes[node.id]!, wire };
                 },
@@ -244,6 +278,8 @@ export async function executeWorkflow(
                 ...(character ? { characterId: character.id } : {}),
               });
             }
+            // Only now do the node's state writes count: an error or a cancellation above drops them.
+            stateWrites.commit(node.id, nodeWave);
             resolved.set(node.id, { output, skipped: false });
             emit({ type: 'node:complete', nodeId: node.id, detail: output });
           } catch (cause) {
@@ -306,7 +342,7 @@ export async function executeWorkflow(
       });
     }
     execution.status = 'completed';
-    return { replies: orderReplies(workflow, replies, upstream), execution };
+    return { replies: orderReplies(workflow, replies, upstream), execution, writes: finishWrites() };
   } catch (cause) {
     execution.status = 'error';
     throw new ExecutionFailure(
@@ -315,6 +351,7 @@ export async function executeWorkflow(
       orderReplies(workflow, replies, upstream),
       cause instanceof NodeExecutionError ? cause.nodeId : undefined,
       cause instanceof NodeExecutionError ? cause.nodeType : undefined,
+      finishWrites(),
     );
   } finally {
     if (!replies.size) execution.warnings.push('No Chat Output nodes ran; this turn produced no assistant messages.');

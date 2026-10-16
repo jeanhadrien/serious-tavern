@@ -6,6 +6,7 @@ import { llm, mergeSystemMessages } from './nodes/llm/index.js';
 import { openaiCompatible } from './providers/openai-compatible.js';
 import { openrouterProvider, providerRecord, providerResources, restoreAdapter, useAdapter } from './test-providers.js';
 import type { EngineEvent, ExecutionContext } from './types.js';
+import { stateless } from './test-state.js';
 
 const preset: Preset = {
   id: '8f1fe1a9-3480-4e52-834c-f25d90684d71',
@@ -28,6 +29,7 @@ const preset: Preset = {
 };
 const ctx = (config: Record<string, unknown>): ExecutionContext => ({
   nodeId: 'node',
+  ...stateless('node'),
   config,
   inputs: { input: 'hi', prompt: 'What is up?' },
   trigger: { message: 'hello', sessionId: 's' },

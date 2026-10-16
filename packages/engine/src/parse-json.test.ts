@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { extractJson, type JsonExpect, jsonExpectTypes } from './nodes/parse-json/extract.js';
 import { parseJson } from './nodes/parse-json/index.js';
 import type { ExecutionContext } from './types.js';
+import { stateless } from './test-state.js';
 
 const fence = '```';
 const plainNumber = { error: 'Expected a number, but the text is not a plain number' };
@@ -151,6 +152,7 @@ describe('Parse JSON node', () => {
     const logs: string[] = [];
     const ctx: ExecutionContext = {
       nodeId: 'parse',
+      ...stateless('parse'),
       inputs: { text },
       config: parseJson.configSchema.parse({ expect: type }),
       trigger: { message: '', sessionId: 's' },

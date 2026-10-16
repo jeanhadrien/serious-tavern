@@ -1,4 +1,13 @@
-import { collectionEntrySchema, type Collection, type CollectionEntry, type Edge, type Workflow } from '@st/shared';
+import {
+  collectionEntrySchema,
+  type Collection,
+  type CollectionEntry,
+  type Edge,
+  type StateSnapshot,
+  type Workflow,
+} from '@st/shared';
+import { createStateAccess } from './state-access.js';
+import { StateWriteBuffer } from './state-writes.js';
 import type { ExecutionContext, NodeDefinition, NodeResources } from './types.js';
 
 // Fixtures shared by the Recall and Draw tests.
@@ -30,11 +39,14 @@ export async function runNode(
     message?: string;
     history?: ExecutionContext['history'];
     draws?: number[];
+    // The story state the node runs against; its writes come back resolved, as the executor would store them.
+    state?: StateSnapshot;
   },
 ) {
   const logs: string[] = [];
   const queue = options.draws ? [...options.draws] : undefined;
   let drawn = 0;
+  const writes = new StateWriteBuffer(options.state, 'run');
   const ctx: ExecutionContext = {
     nodeId: definition.type,
     inputs: options.inputs ?? {},
@@ -46,6 +58,8 @@ export async function runNode(
     resources: options.resources,
     signal: new AbortController().signal,
     log: (line) => logs.push(line),
+    state: createStateAccess(options.state, definition.type),
+    writeState: writes.writer(definition.type),
     random: () => {
       drawn++;
       if (!queue) return 0;
@@ -56,7 +70,8 @@ export async function runNode(
     emit: () => {},
   };
   const output = await definition.execute(ctx);
-  return { output, logs, drawn };
+  writes.commit(definition.type, 1);
+  return { output, logs, drawn, ...writes.resolve() };
 }
 
 export const node = (id: string, type: string, config: Record<string, unknown> = {}) => ({

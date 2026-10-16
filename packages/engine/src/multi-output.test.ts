@@ -7,6 +7,7 @@ import { providerRecord, providerResources, restoreAdapter, useAdapter } from '.
 import { memory } from './nodes/memory/index.js';
 import { renderPreset } from './preset.js';
 import type { ExecutionContext } from './types.js';
+import { stateless } from './test-state.js';
 import type { ChatRequest } from './providers/index.js';
 
 const node = (id: string, type = 'chat-output', config: Record<string, unknown> = {}) => ({
@@ -410,6 +411,7 @@ describe('character nodes and history', () => {
     ];
     const context = {
       ...options,
+      ...stateless('memory'),
       nodeId: 'memory',
       history,
       config: { lastN: 10, format: 'messages' },

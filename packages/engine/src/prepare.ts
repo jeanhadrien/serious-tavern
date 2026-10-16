@@ -47,6 +47,7 @@ export async function prepareWorkflow(
       get: cachedGet(async (id) => findBuiltInProvider(id) ?? (await sourceResources.providers?.get(id))),
     },
     collections: { get: cachedGet(async (id) => sourceResources.collections?.get(id)) },
+    stateDefinitions: { get: cachedGet(async (id) => sourceResources.stateDefinitions?.get(id)) },
   };
   const errors: ValidationIssue[] = [];
   const nameOf = (id: string) => nodeDisplayName(workflow.nodes, labelOf, id);

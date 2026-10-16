@@ -1,4 +1,16 @@
-import type { Character, ChatMessage, Collection, Persona, PortDef, Preset, Provider, WireExchange } from '@st/shared';
+import type {
+  Character,
+  ChatMessage,
+  Collection,
+  CollectionItem,
+  Persona,
+  PortDef,
+  Preset,
+  Provider,
+  StateDefinition,
+  StateKeyView,
+  WireExchange,
+} from '@st/shared';
 import type { z } from 'zod';
 
 export type EngineEvent = {
@@ -21,13 +33,43 @@ export type NodeResources = {
   providers?: { get(id: string): Promise<Provider | undefined> };
   // Authored collections by id (Recall, Draw). Read-only for workflows: no node writes them.
   collections?: { get(id: string): Promise<Collection | undefined> };
+  // State definitions by id (State Read and State Write resolve their ports from them).
+  stateDefinitions?: { get(id: string): Promise<StateDefinition | undefined> };
+};
+// Where a write goes: a definition's key, or the writing node's own implicit key (Draw's `draws`).
+export type StateWriteTarget =
+  | { kind: 'definition'; definitionId: string; key: string }
+  | { kind: 'node'; key: string };
+// What a node asks to store. Requests are buffered and resolved into stored `StateWrite`s when the run ends:
+// `increment` becomes a `set` with the post-value, and `add` gets the item id the buffer mints for it.
+export type StateWriteRequest =
+  | { target: StateWriteTarget; op: 'set'; value: unknown }
+  | { target: StateWriteTarget; op: 'add'; item: { text: string } & Record<string, unknown> }
+  | { target: StateWriteTarget; op: 'remove'; itemId: string }
+  | { target: StateWriteTarget; op: 'delete' }
+  | { target: Extract<StateWriteTarget, { kind: 'definition' }>; op: 'increment'; by: number };
+// Read access to the story state as it was when the turn started. Writes made during the run are never
+// visible here.
+export type StateAccess = {
+  // The turn being run (1-based; 1 when the run has no state snapshot).
+  readonly turn: number;
+  // The `state` namespace of templates: `{ <definition name>: { <key>: value } }`. Frozen. It is a plain
+  // property (no methods) because nodes pass the whole context to `renderTemplate`.
+  readonly values: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  // A copy of the definition; undefined when it doesn't exist.
+  definition(id: string): StateDefinition | undefined;
+  // A copy of the key's value and meta at the start of the turn; undefined for an unknown definition or key.
+  read(definitionId: string, key: string): StateKeyView | undefined;
+  // This node's own implicit key; undefined when it was never written.
+  own(key: string): StateKeyView | undefined;
 };
 export type ChatReply = { nodeId: string; content: string; name?: string; characterId?: string };
 export type ExecutionContext = {
   nodeId: string;
   inputs: Record<string, unknown>;
   config: Record<string, unknown>;
-  trigger: { message: string; sessionId: string };
+  // `turn` is the turn being run; present only when the run was given a state snapshot.
+  trigger: { message: string; sessionId: string; turn?: number };
   history: ChatMessage[];
   character?: Character;
   persona?: Persona;
@@ -42,6 +84,12 @@ export type ExecutionContext = {
   // Next value in [0, 1) of this node's deterministic stream for this run, seeded by the run seed and the
   // node id. Never use `Math.random` in a node: a run's rolls must be reproducible from its seed.
   random(): number;
+  // Story state as it was when the turn started: read-only, never shows this run's writes.
+  state: StateAccess;
+  // Asks to store story state. Buffered: nothing is stored unless this node completes, and the run's
+  // stored writes are returned with its result (and with `ExecutionFailure`). `add` returns the item with
+  // the id it will be stored under.
+  writeState(request: StateWriteRequest): { item?: CollectionItem };
   // Stores the node's HTTP exchange in the execution log (`wire`); each call replaces the previous one.
   recordWire(exchange: WireExchange): void;
   emit(event: EngineEvent): void;
