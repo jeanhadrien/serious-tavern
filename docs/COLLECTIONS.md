@@ -128,6 +128,16 @@ Draw picks entries at random among those that pass its filters.
   `drew 2 of 2 eligible (asked for 3; tags: forest)` or `no eligible entry among 20 (tags: forest; level ≤ 2)`.
 - **Reproducible:** draws come from the turn's random seed, recorded in the execution details, so the same
   seed draws the same entries.
+- **Avoid recent draws** (a number of turns, default `0` = off): with `N` above 0, Draw leaves out the entries
+  it drew in the last `N` turns of this chat. With `1` it never repeats what it drew in the previous turn; with
+  `3` an entry has to wait three turns. It is remembered per chat and per Draw node (two Draw nodes on one deck
+  don't share a memory), and it is part of the chat's story state: **deleting a reply forgets what that turn
+  drew**, so regenerating a reply can draw the same entry again. Turns whose replies were deleted don't count
+  towards the `N`. If every eligible entry was drawn recently, nothing is drawn: `entry`, `text` and `level` are
+  absent, and the reason says `no eligible entry among 3 (2 recent excluded)`. An entry is recognised by its
+  text, not its position, so moving an entry within the collection changes nothing, while **editing its text
+  makes it a new entry** that is eligible again. Entries left out because they were recent are counted in the
+  reason: `drew 1 of 2 eligible (1 recent excluded)`. See the README's Story state.
 
 ## Wiring examples
 
@@ -166,5 +176,5 @@ One draw, worded by its own level. (Two Draw nodes with different level ranges w
 ## Limits
 
 - Template macros inside entries (`{{char}}`) are not expanded: entries reach the prompt as written.
-- Draw cannot avoid recently drawn entries yet; that needs story state and comes later.
+- Draw's memory of recent draws is per chat and per Draw node; it is not shared between chats or nodes.
 - SillyTavern World Info and a card's embedded lorebook can't be imported yet.

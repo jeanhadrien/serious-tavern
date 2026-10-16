@@ -120,7 +120,43 @@ Keep the intensity mild.
 `{{settings}}` alone renders every value as compact JSON, handy while
 debugging. The values a turn used are recorded in its execution log.
 
+## Story state
+
+A workflow can keep **story state** per chat (numbers, moods, lists that State Write nodes store, see the README's
+"Story state"). Every template reads it as `{{state.<definition>.<key>}}`, with the definition's name and the key's
+name as the state definition declares them, and the turn being run as `{{trigger.turn}}` (1 for the first message
+of a chat):
+
+```hbs
+{{#if (gt state.scene.tension 7)}}
+The scene is at a breaking point. Resolve something in this reply.
+{{/if}}
+{{#if (eq state.scene.mood "tense")}}Short sentences. No jokes.{{/if}}
+Turn {{trigger.turn}}.
+```
+
+Numbers compare as numbers; **enum values are text**, so quote them: `(eq state.scene.mood "tense")`. A key nobody has
+written reads as its default, so `state.scene.tension` is `3` (the declared default) in a new chat. A collection
+renders as a list: iterate it with `#each` (newest item first) and use `{{else}}` for the empty case:
+
+```hbs
+{{#each state.scene.injected}}
+- {{this.text}} (level {{this.level}})
+{{else}}
+(Nothing injected yet.)
+{{/each}}
+```
+
+`{{state}}` alone (or `{{state.scene}}`) renders the values as compact JSON, handy while debugging.
+
+**Reads are the values at the start of the turn.** What a State Write node stores in this turn is not visible to
+any template or State Read node until the next turn. To use a value you just wrote in the same turn, connect the
+State Write node's `value` output where you need it. Because state belongs to the replies that stored it,
+deleting a reply rewinds what its turn wrote (the next turn starts from the previous values), while editing a
+message changes nothing.
+
 ## Organizing with comments
+
 
 ```hbs
 {{! Only used by the tavern workflow; the debug workflow has no weather input. }}
@@ -151,3 +187,5 @@ Remember what you know about {{user}}: {{persona.description}}
 | `{{settings.x}}` renders empty | The chat's workflow doesn't declare `x` (or the key's case differs), or its value is empty text | Declare it in the workflow editor's Chat settings; keys are case-sensitive |
 | `(eq settings.level 2)` is never true | Enum options are text | Compare with a string: `(eq settings.level "2")` |
 | `"false"` behaves as true | Truthiness is Handlebars': only `false`, `0`, `""`, `null`, `undefined` and empty arrays are false | Compare explicitly: `(eq input.flag "false")` |
+| `{{state.x.y}}` renders empty | The state definition `x` or its key `y` doesn't exist (a typo, or a different case), the definition was deleted, or the value was only written earlier in this same turn (reads show the start of the turn) | Check the definition's name and key in its file under `data/state/definitions/`; names are case-sensitive; wire a State Write's output for same-turn values |
+| `(eq state.scene.mood calm)` never matches | Without quotes `calm` is a path, not text | Quote it: `(eq state.scene.mood "calm")` |
