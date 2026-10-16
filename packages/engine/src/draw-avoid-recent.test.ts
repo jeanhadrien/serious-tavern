@@ -227,12 +227,20 @@ describe('Draw avoidRecent across turns', () => {
       [
         node('input', 'chat-input'),
         node('pick', 'draw', { collectionIds: ['deck'], avoidRecent: 1 }),
-        node('output', 'chat-output'),
+        node('output', 'chat-output', { order: 0 }),
+        node('why', 'chat-output', { order: 1 }),
       ],
-      [edge('pick', 'text', 'output', 'value')],
+      [edge('pick', 'text', 'output', 'value'), edge('pick', 'reason', 'why', 'value')],
     );
-    const texts: string[] = [];
-    for (let turn = 1; turn <= 6; turn++) texts.push(reply(await playTurn(chat, wf, `e${turn}`)));
+    const rows: string[][] = [];
+    for (let turn = 1; turn <= 6; turn++)
+      rows.push((await playTurn(chat, wf, `e${turn}`)).replies.map((item) => item.content));
+    // Whatever the seed: the first turn has both entries to choose from, every later one only the other.
+    expect(rows.map(([, why]) => why)).toEqual([
+      'drew 1 of 2 eligible',
+      ...Array(5).fill('drew 1 of 1 eligible (1 recent excluded)'),
+    ]);
+    const texts = rows.map(([text]) => text!);
     for (let turn = 1; turn < texts.length; turn++) expect(texts[turn]).not.toBe(texts[turn - 1]);
     expect(new Set(texts)).toEqual(new Set(['storm', 'fog']));
   });

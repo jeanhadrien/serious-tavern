@@ -1,5 +1,8 @@
+import { randomUUID } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { errorEnvelopeSchema, workflowInvalidDetailsSchema, type Workflow } from '@st/shared';
+import { apiContract, errorEnvelopeSchema, workflowInvalidDetailsSchema, type Workflow } from '@st/shared';
 import {
   counting,
   define,
@@ -7,6 +10,7 @@ import {
   makeSession,
   makeWorkflow,
   node,
+  readExecution,
   readSession,
   send,
   tempApps,
@@ -14,7 +18,7 @@ import {
   type App,
 } from './test-support/story.js';
 
-// What editing a definition does to the workflows whose State nodes use it.
+// What editing a definition, in the API or by hand, does to the workflows whose State nodes use it.
 
 const apps = tempApps('state-definition-edits');
 afterEach(() => apps.cleanup());
@@ -99,6 +103,36 @@ describe('editing a definition used by workflows', () => {
       await edit(app, definition.id, { n: { type: 'number', min: 0, max: 5 } });
       expect((await validate(app, workflow.id)).statusCode).toBe(200);
       expect(await turn(app, session.id)).toEqual(['n=1 turn=2']);
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe('definitions edited by hand', () => {
+  it('lets the oldest definition keep a repeated name, and says so in the execution log', async () => {
+    const { app, directory } = await apps.open();
+    try {
+      const oldest = await define(app);
+      const folder = join(directory, 'state', 'definitions');
+      await mkdir(folder, { recursive: true });
+      await writeFile(
+        join(folder, 'counter-copy.yaml'),
+        `name: counter\nkeys:\n  n:\n    type: number\n    default: 4\nid: ${randomUUID()}\ncreatedAt: 2999-01-01T00:00:00.000Z\nupdatedAt: 2999-01-01T00:00:00.000Z\n`,
+      );
+      const { nodes, edges } = counting(oldest.id, false);
+      const session = await makeSession(app, (await makeWorkflow(app, nodes, edges)).id);
+      const result = await app.inject({
+        method: 'POST',
+        url: `/api/sessions/${session.id}/messages`,
+        payload: { content: 'go' },
+      });
+      const body = apiContract.sendMessage.response.parse(result.json());
+      // The oldest keeps the name: its default is 0, not the copy's 4.
+      expect(body.assistantMessages[0]!.content).toBe('n=0 turn=1');
+      expect((await readExecution(app, body.execution.id)).warnings).toEqual([
+        'State definition name "counter" is used twice; only the oldest is available to templates.',
+      ]);
     } finally {
       await app.close();
     }

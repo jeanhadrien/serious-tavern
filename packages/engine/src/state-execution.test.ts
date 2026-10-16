@@ -61,6 +61,8 @@ type Plan = {
   fail?: boolean;
   late?: StateWriteRequest[];
   ignoreAbort?: boolean;
+  // Returned instead of `seen`, to break the output contract after having asked for writes.
+  output?: Record<string, unknown>;
 };
 const writer = (): NodeDefinition => ({
   type: 'writer-test',
@@ -86,6 +88,7 @@ const writer = (): NodeDefinition => ({
     }
     for (const request of plan.late ?? []) ctx.writeState(request);
     if (plan.fail) throw new Error('boom');
+    if (plan.output) return plan.output;
     return { seen: String(ctx.state.read(DEF, 'tension')?.value) };
   },
 });
@@ -115,13 +118,19 @@ const reader = (): NodeDefinition => ({
   }),
 });
 
-const TYPES = ['writer-test', 'gate-test', 'reader-test', 'short-test'];
+const TYPES = ['writer-test', 'gate-test', 'reader-test', 'short-test', 'strict-test'];
 const register = () => {
   registry.set('writer-test', writer());
   registry.set('gate-test', gate());
   registry.set('reader-test', reader());
   // Gives up after 40ms (the executor's deadline), whatever the node is still doing.
   registry.set('short-test', { ...writer(), type: 'short-test', timeoutMs: 40 });
+  // Like the writer, but its `seen` output is required once connected.
+  registry.set('strict-test', {
+    ...writer(),
+    type: 'strict-test',
+    outputs: [{ name: 'seen', label: 'Seen', dataType: 'text' }],
+  });
 };
 afterEach(() => {
   for (const type of TYPES) registry.delete(type);
@@ -186,17 +195,20 @@ describe('state writes in a run', () => {
     expect(result.writes).toEqual([{ op: 'set', target: key('tension'), nodeId: 'w', value: 9 }]);
   });
 
-  it('applies the writes of nodes that ran in different waves in wave order', async () => {
+  it('applies the writes of nodes that ran in different waves in wave order, whatever their ids', async () => {
     register();
+    // The later wave has the smaller id, so ordering by id alone would put it first.
     const wf = withWriters(
-      { early: { requests: [increment(1)] }, late: { requests: [increment(1)] } },
+      { 'z-first': { requests: [increment(1)] }, 'a-second': { requests: [increment(2)] } },
       [],
-      [edge('early', 'seen', 'late', 'value')],
+      [edge('z-first', 'seen', 'a-second', 'value')],
     );
     const result = await executeWorkflow(wf, options);
+    const { nodes } = result.execution;
+    expect(Date.parse(nodes['a-second']!.startedAt!)).toBeGreaterThanOrEqual(Date.parse(nodes['z-first']!.finishedAt!));
     expect(result.writes.map((write) => [write.nodeId, write.op === 'set' && write.value])).toEqual([
-      ['early', 4],
-      ['late', 5],
+      ['z-first', 4],
+      ['a-second', 6],
     ]);
   });
 
@@ -227,6 +239,28 @@ describe('state writes in a run', () => {
     expect(failure).toBeInstanceOf(ExecutionFailure);
     expect(failure.nodeId).toBe('bad');
     // Same wave: `ok` finished before `bad` failed.
+    expect(failure.writes).toEqual([{ op: 'set', target: key('tension'), nodeId: 'ok', value: 7 }]);
+  });
+
+  it.each([
+    [
+      'returns a port it does not have',
+      { requests: [set(9)], output: { nope: 1 } },
+      'Node returned invalid output ports',
+    ],
+    ['omits a connected required output', { requests: [set(9)], output: {} }, 'Node did not produce output "seen"'],
+  ])('writes nothing for a node that asks and then %s', async (_, plan, error) => {
+    register();
+    // `ok` completes in the same wave and keeps its write; `bad` fails the contract after asking for one.
+    const wf = withWriters(
+      { ok: { requests: [set(7)] }, tail: {} },
+      [node('bad', 'strict-test', plan)],
+      [edge('input', 'message', 'output', 'value'), edge('bad', 'seen', 'tail', 'value')],
+    );
+    const failure = await executeWorkflow(wf, options).catch((cause) => cause);
+    expect(failure).toBeInstanceOf(ExecutionFailure);
+    expect(failure.nodeId).toBe('bad');
+    expect(failure.execution.nodes.bad).toMatchObject({ status: 'error', error });
     expect(failure.writes).toEqual([{ op: 'set', target: key('tension'), nodeId: 'ok', value: 7 }]);
   });
 
