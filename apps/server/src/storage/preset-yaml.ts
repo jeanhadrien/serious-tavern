@@ -1,11 +1,10 @@
 import { parse } from 'yaml';
 import { presetSchema, upgradeLegacyPreset, type Preset } from '@st/shared';
-import { arrange, toReadableYaml } from './yaml-text.js';
+import { arrange, toReadableYaml, isObj } from './yaml-text.js';
 
 type Obj = Record<string, unknown>;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const isObj = (value: unknown): value is Obj => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 // Human-meaningful keys come first, bookkeeping last; unknown passthrough fields sit in between.
 const PRESET_FIRST = ['name', 'description', 'inputs', 'entries'];

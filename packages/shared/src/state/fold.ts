@@ -1,13 +1,11 @@
 import type { StateDefinition } from './definition.js';
 import { foldDefinitionKey, foldNodeKey, removedKeyProblem, type SlotWrite } from './fold-slots.js';
+import { byText } from './helpers.js';
 import type { FoldedDefinition, FoldedKey, FoldedNode, StateWarning, StoryState } from './fold-types.js';
 import { turnPresence, type PresenceMessage, type TurnPresence } from './turns.js';
 import { readTurnEntries } from './writes.js';
 
 type Slots = Map<string, SlotWrite[]>;
-
-// Plain code-unit order, so the result never depends on the locale.
-const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 // The writes of present turns grouped by definition id and by node id, then by key, in stored order.
 function collectWrites(turns: readonly TurnPresence[]) {

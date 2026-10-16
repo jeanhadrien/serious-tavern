@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { describeSettingValue, isSettingKey } from '../chat-settings.js';
 import type { PortDataType } from '../ports.js';
+import { isPlainObject } from './helpers.js';
 
 /**
  * State definitions: the names and typed keys a chat remembers between turns (`data/state/definitions/`).
@@ -130,9 +131,6 @@ export function keyDefault(def: StateKeyDef): unknown {
   }
 }
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 /** Why `value` doesn't fit a scalar key (e.g. "is above max 10"); undefined when it fits. */
 export function keyValueProblem(def: ScalarKeyDef, value: unknown): string | undefined {
   switch (def.type) {
@@ -160,7 +158,16 @@ export function clampToKey(def: NumberKeyDef, value: number): number {
   return def.max === undefined ? atLeast : Math.min(def.max, atLeast);
 }
 
-export type StateNodeOp = 'set' | 'increment' | 'add' | 'remove' | 'delete';
+/**
+ * A number key after adding `by` to its current value (the key's default when `current` isn't a number),
+ * kept inside min and max. The one formula behind State Write's output and the stored `set`.
+ */
+export function incrementedValue(def: NumberKeyDef, current: unknown, by: number): number {
+  return clampToKey(def, (typeof current === 'number' ? current : (keyDefault(def) as number)) + by);
+}
+
+export const stateNodeOps = ['set', 'increment', 'add', 'remove', 'delete'] as const;
+export type StateNodeOp = (typeof stateNodeOps)[number];
 
 /** The operations a State Write node offers for a key type, in the order the editor lists them. */
 export function stateOpsFor(type: StateKeyType): StateNodeOp[] {

@@ -1,11 +1,9 @@
-import type { CollectionItem, StateSnapshot, StateWrite } from '@st/shared';
+import { byText, type CollectionItem, type ExecutionLog, type StateSnapshot, type StateWrite } from '@st/shared';
+import { createStateAccess, frozenStateValues } from './state-access.js';
 import { resolveWrites, type BufferedRequest, type Committed } from './state-resolve.js';
-import type { StateWriteRequest } from './types.js';
+import type { ExecutionContext, StateAccess, StateWriteRequest } from './types.js';
 
 type NodeRequests = { requests: BufferedRequest[]; adds: number; wave?: number };
-
-// Plain code-unit order, like `orderOutputs`, so the result never depends on the locale.
-const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 /**
  * Collects the state writes nodes ask for during a run. Nothing is visible to reads (the run reads its
@@ -64,5 +62,48 @@ export class StateWriteBuffer {
     const found = this.nodes.get(nodeId) ?? { requests: [], adds: 0 };
     this.nodes.set(nodeId, found);
     return found;
+  }
+}
+
+/**
+ * The story state of one run: the frozen template values, the write buffer, and the state members each node's
+ * context gets. Keeps `executeWorkflow` free of state plumbing.
+ */
+export class StateRun {
+  private readonly buffer: StateWriteBuffer;
+  private readonly values: StateAccess['values'];
+
+  constructor(
+    private readonly snapshot: StateSnapshot | undefined,
+    private readonly execution: Pick<ExecutionLog, 'id' | 'warnings'>,
+  ) {
+    this.buffer = new StateWriteBuffer(snapshot, execution.id);
+    this.values = frozenStateValues(snapshot);
+  }
+
+  /** What `trigger.turn` adds to the context's trigger: only when the caller tracks story state. */
+  get trigger(): { turn?: number } {
+    return this.snapshot ? { turn: this.snapshot.turn } : {};
+  }
+
+  /** `state` and `writeState` for one node. `isActive` tells whether it is still running: later calls are ignored. */
+  context(nodeId: string, isActive: () => boolean): Pick<ExecutionContext, 'state' | 'writeState'> {
+    const write = this.buffer.writer(nodeId);
+    return {
+      state: createStateAccess(this.snapshot, nodeId, this.values),
+      writeState: (request) => (isActive() ? write(request) : {}),
+    };
+  }
+
+  /** The node completed in `wave`: only now do its writes count. */
+  commit(nodeId: string, wave: number): void {
+    this.buffer.commit(nodeId, wave);
+  }
+
+  /** The stored writes of the nodes that completed; resolver warnings join the execution's. Call once per outcome. */
+  finish(): StateWrite[] {
+    const { writes, warnings } = this.buffer.resolve();
+    this.execution.warnings.push(...warnings);
+    return writes;
   }
 }

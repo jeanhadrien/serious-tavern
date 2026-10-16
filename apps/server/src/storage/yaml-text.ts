@@ -3,6 +3,10 @@ import { Document, parse, stringify, visit } from 'yaml';
 
 type Obj = Record<string, unknown>;
 
+/** A plain object (not null, not an array): what a YAML mapping parses to. */
+export const isObj = (value: unknown): value is Obj =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 /** Copy of `value` with the `first` keys first, the `last` keys last and every other key in between. */
 export function arrange(value: Obj, first: readonly string[], last: readonly string[] = []): Obj {
   const result: Obj = {};

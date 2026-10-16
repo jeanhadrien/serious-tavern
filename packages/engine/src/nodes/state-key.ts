@@ -7,7 +7,7 @@ export type LocatedKey = { definition: StateDefinition; key: string; def: StateK
  * Finds the configured key. The config may be unparsed (editor port requests, edge pruning), so ids are read
  * defensively. Throws plain errors that name what to fix; `resolvePorts` and `execute` share them.
  */
-export function locateKey(definition: StateDefinition | undefined, definitionId: unknown, key: unknown): LocatedKey {
+function locateKey(definition: StateDefinition | undefined, definitionId: unknown, key: unknown): LocatedKey {
   const id = typeof definitionId === 'string' ? definitionId : '';
   if (!id) throw new Error('Select a state definition');
   if (!definition)
@@ -17,6 +17,18 @@ export function locateKey(definition: StateDefinition | undefined, definitionId:
   if (!Object.hasOwn(definition.keys, name))
     throw new Error(`State definition "${definition.name}" has no key "${name}"`);
   return { definition, key: name, def: definition.keys[name]!, label: `${definition.name}.${name}` };
+}
+
+/**
+ * `locateKey` for a node's config. `lookup` finds a definition by id: the run's resources while resolving
+ * ports, the turn's snapshot while executing.
+ */
+export async function locateConfigured(
+  config: Record<string, unknown>,
+  lookup: (id: string) => StateDefinition | undefined | Promise<StateDefinition | undefined>,
+): Promise<LocatedKey> {
+  const id = typeof config.definitionId === 'string' ? config.definitionId : '';
+  return locateKey(id ? await lookup(id) : undefined, id, config.key);
 }
 
 /** A value for a log line: compact JSON, cut to `max` characters. */

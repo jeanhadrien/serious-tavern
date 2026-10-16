@@ -1,7 +1,7 @@
 import { stateDefinitionSchema, type StateDefinition } from '@st/shared';
 import { parseYamlRecord } from './yaml-record.js';
 import { YamlRepository, type YamlCodec } from './yaml-repository.js';
-import { arrange, toReadableYaml } from './yaml-text.js';
+import { arrange, toReadableYaml, isObj } from './yaml-text.js';
 
 type Obj = Record<string, unknown>;
 
@@ -9,8 +9,6 @@ type Obj = Record<string, unknown>;
 const FIRST = ['name', 'description', 'keys'];
 const LAST = ['id', 'createdAt', 'updatedAt'];
 const KEY_FIRST = ['type', 'default', 'min', 'max', 'options', 'cap', 'fields'];
-
-const isObj = (value: unknown): value is Obj => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** Serializes a definition to readable YAML: the name first, each key's `type` first, ids last. */
 function serialize(definition: StateDefinition): string {

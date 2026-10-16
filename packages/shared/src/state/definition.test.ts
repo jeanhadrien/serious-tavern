@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   clampToKey,
+  incrementedValue,
   keyDefault,
   keyValueProblem,
   stateDefinitionSchema,
@@ -241,6 +242,23 @@ describe('clampToKey', () => {
     [undefined, undefined, 42, 42],
   ])('min %s max %s: %s becomes %s', (min, max, value, expected) => {
     expect(clampToKey({ type: 'number', min, max }, value)).toBe(expected);
+  });
+});
+
+describe('incrementedValue', () => {
+  const tension: Extract<StateKeyDef, { type: 'number' }> = { type: 'number', default: 3, min: 0, max: 10 };
+
+  it.each<[unknown, number, number]>([
+    [4, 2, 6],
+    [4, -2, 2],
+    [9, 5, 10],
+    [1, -5, 0],
+    // Anything that is not a number starts from the key's default.
+    [undefined, 2, 5],
+    ['7', 2, 5],
+    [null, -9, 0],
+  ])('%j plus %s is %s', (current, by, expected) => {
+    expect(incrementedValue(tension, current, by)).toBe(expected);
   });
 });
 

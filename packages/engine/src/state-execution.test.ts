@@ -83,7 +83,14 @@ const writer = (): NodeDefinition => ({
       else
         await new Promise<void>((resolve, reject) => {
           const timer = setTimeout(resolve, plan.delayMs);
-          ctx.signal.addEventListener('abort', () => (clearTimeout(timer), reject(ctx.signal.reason)), { once: true });
+          ctx.signal.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer);
+              reject(ctx.signal.reason);
+            },
+            { once: true },
+          );
         });
     }
     for (const request of plan.late ?? []) ctx.writeState(request);

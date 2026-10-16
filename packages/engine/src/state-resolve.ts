@@ -1,5 +1,5 @@
 import {
-  clampToKey,
+  incrementedValue,
   keyDefault,
   type CollectionItem,
   type StateDefinition,
@@ -74,8 +74,7 @@ export function resolveWrites(
           warnings.push(`A state write to "${label(found)}" was skipped: it can only increment a number key.`);
           break;
         }
-        const base = current(found);
-        const next = clampToKey(def, (typeof base === 'number' ? base : (keyDefault(def) as number)) + request.by);
+        const next = incrementedValue(def, current(found), request.by);
         running.set(slot(found), next);
         writes.push({ op: 'set', target: to, nodeId, value: next });
         break;

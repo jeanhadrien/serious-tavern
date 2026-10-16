@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { stateKeyPortType, type PortDef } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
-import { locateKey, shown, type LocatedKey } from '../state-key.js';
+import { locateConfigured, shown, type LocatedKey } from '../state-key.js';
 
 const reads = ['value', 'meta'] as const;
 type Read = (typeof reads)[number];
@@ -63,13 +63,11 @@ export const stateRead: NodeDefinition = {
   }),
   defaultConfig: { definitionId: '', key: '', read: 'value' },
   async resolvePorts(config, resources) {
-    const id = typeof config.definitionId === 'string' ? config.definitionId : '';
-    const found = locateKey(id ? await resources.stateDefinitions?.get(id) : undefined, id, config.key);
+    const found = await locateConfigured(config, (id) => resources.stateDefinitions?.get(id));
     return { inputs: [], outputs: outputsFor(found, readOf(config)) };
   },
   async execute(ctx) {
-    const id = String(ctx.config.definitionId);
-    const found = locateKey(ctx.state.definition(id), id, ctx.config.key);
+    const found = await locateConfigured(ctx.config, (id) => ctx.state.definition(id));
     const view = ctx.state.read(found.definition.id, found.key);
     if (!view) throw new Error(`State definition "${found.definition.name}" has no key "${found.key}"`);
     if (readOf(ctx.config) === 'value') {

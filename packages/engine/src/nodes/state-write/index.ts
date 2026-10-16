@@ -1,10 +1,9 @@
 import { z } from 'zod';
+import { stateNodeOps } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
-import { locateKey } from '../state-key.js';
+import { locateConfigured } from '../state-key.js';
 import { planWrite } from './plan.js';
 import { checkOp, writePorts } from './ports.js';
-
-const ops = ['set', 'increment', 'add', 'remove', 'delete'] as const;
 
 export const stateWrite: NodeDefinition = {
   type: 'state-write',
@@ -19,17 +18,15 @@ export const stateWrite: NodeDefinition = {
   configSchema: z.object({
     definitionId: z.string().min(1, 'Select a state definition'),
     key: z.string().min(1, 'Select a key'),
-    op: z.enum(ops).default('set').describe('What to do; the choices depend on the key type'),
+    op: z.enum(stateNodeOps).default('set').describe('What to do; the choices depend on the key type'),
   }),
   defaultConfig: { definitionId: '', key: '', op: 'set' },
   async resolvePorts(config, resources) {
-    const id = typeof config.definitionId === 'string' ? config.definitionId : '';
-    const found = locateKey(id ? await resources.stateDefinitions?.get(id) : undefined, id, config.key);
+    const found = await locateConfigured(config, (id) => resources.stateDefinitions?.get(id));
     return writePorts(found.def, checkOp(found.def, String(config.op ?? 'set')));
   },
   async execute(ctx) {
-    const id = String(ctx.config.definitionId);
-    const found = locateKey(ctx.state.definition(id), id, ctx.config.key);
+    const found = await locateConfigured(ctx.config, (id) => ctx.state.definition(id));
     const op = checkOp(found.def, String(ctx.config.op));
     // The start-of-turn value: reads never see this run's writes, however many nodes wrote the key.
     const current = ctx.state.read(found.definition.id, found.key)?.value;

@@ -2,6 +2,7 @@ import type { PortDataType } from '../ports.js';
 import { keyDefault, stateKeyPortType, type StateDefinition, type StateKeyDef } from './definition.js';
 import { foldStoryState } from './fold.js';
 import type { FoldedKey, KeyMeta, StoryState } from './fold-types.js';
+import { byText } from './helpers.js';
 
 /** What a run can read of one key: its value as the turn started, and its meta. */
 export type StateKeyView = {
@@ -22,8 +23,6 @@ export type StateSnapshot = {
   keys: Record<string, Record<string, StateKeyView>>;
   nodes: Record<string, Record<string, StateKeyView>>;
 };
-
-const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 const views = (keys: Record<string, FoldedKey>): Record<string, StateKeyView> =>
   Object.fromEntries(

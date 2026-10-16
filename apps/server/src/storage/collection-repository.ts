@@ -1,7 +1,7 @@
 import { collectionSchema, type Collection } from '@st/shared';
 import { parseYamlRecord } from './yaml-record.js';
 import { YamlRepository, type YamlCodec } from './yaml-repository.js';
-import { arrange, toReadableYaml } from './yaml-text.js';
+import { arrange, toReadableYaml, isObj } from './yaml-text.js';
 
 type Obj = Record<string, unknown>;
 
@@ -9,8 +9,6 @@ type Obj = Record<string, unknown>;
 const FIRST = ['name', 'description', 'entries'];
 const LAST = ['id', 'createdAt', 'updatedAt'];
 const ENTRY_FIRST = ['title', 'text', 'keywords', 'tags', 'level', 'weight', 'enabled'];
-
-const isObj = (value: unknown): value is Obj => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
  * Serializes a collection to readable YAML (multi-line text as literal blocks). Default entry values

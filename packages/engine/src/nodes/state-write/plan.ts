@@ -1,5 +1,7 @@
 import {
   clampToKey,
+  incrementedValue,
+  isPlainObject,
   keyDefault,
   keyValueProblem,
   type CollectionKeyDef,
@@ -21,9 +23,6 @@ export type WritePlan = {
   logs: string[];
 };
 
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
 const quoted = (value: unknown) => (typeof value === 'string' ? `"${value.slice(0, 40)}"` : describeValue(value));
 
 /** The new value of a number key; numbers outside min..max are clamped, not refused. */
@@ -35,12 +34,11 @@ function planNumber(found: LocatedKey & { def: NumberKeyDef }, op: StateNodeOp, 
     throw new Error(`${label} needs a number, got ${describeValue(given)}`);
   const key = { kind: 'definition' as const, definitionId: found.definition.id, key: found.key };
   if (op === 'increment') {
-    const base = typeof ctx.current === 'number' ? ctx.current : (keyDefault(def) as number);
-    const next = clampToKey(def, base + given);
+    const next = incrementedValue(def, ctx.current, given);
     return {
       request: { target: key, op: 'increment', by: given },
       output: next,
-      logs: [`${label}: ${shown(base)} -> ${shown(next)}`],
+      logs: [`${label}: ${shown(typeof ctx.current === 'number' ? ctx.current : keyDefault(def))} -> ${shown(next)}`],
     };
   }
   const next = clampToKey(def, given);
