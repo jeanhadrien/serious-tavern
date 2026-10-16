@@ -14,7 +14,7 @@ export type Expected = {
   count?: number;
   droppedByCap?: number;
   itemTurns?: number[];
-  history: { turn: number; value: unknown }[];
+  history: { turn: number; value?: unknown }[];
   /** How many warnings this key should have. */
   warnings: number;
 };
@@ -74,10 +74,11 @@ function expectScalar(def: StateKeyDef, writes: Accepted[], turn: number): Expec
     written: last !== undefined,
     turnsSinceWrite: last ? turn - last.turn : turn,
     writtenAtTurn: last?.turn ?? null,
-    history: turnsOf(writes).map((t) => ({
-      turn: t,
-      value: effective(writes.filter((w) => w.turn === t).at(-1)!.write).value,
-    })),
+    history: turnsOf(writes).map((t) =>
+      def.type === 'text' || def.type === 'object'
+        ? { turn: t }
+        : { turn: t, value: effective(writes.filter((w) => w.turn === t).at(-1)!.write).value },
+    ),
     warnings: lastEffective?.bad ? 1 : 0,
   };
 }
@@ -154,7 +155,10 @@ export function oracleFold(
       writtenAtTurn: last.turn,
       history: turnsOf(mine).map((t) => {
         const final = mine.filter((a) => a.turn === t).at(-1)!.write;
-        return { turn: t, value: final.op === 'set' ? final.value : null };
+        const value = final.op === 'set' ? final.value : null;
+        return value === null || typeof value === 'number' || typeof value === 'boolean'
+          ? { turn: t, value }
+          : { turn: t };
       }),
       warnings: 0,
     };

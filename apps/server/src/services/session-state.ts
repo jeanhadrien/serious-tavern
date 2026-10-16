@@ -3,6 +3,7 @@ import { nodeDisplayName, type ApiResponse, type FoldedKey, type StateWrite } fr
 import type { AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
 import { loadStoryState } from './story-state.js';
+import { previewWrite } from './write-preview.js';
 
 type View = ApiResponse<'getSessionState'>;
 
@@ -33,8 +34,10 @@ export async function sessionStateView(context: AppContext, sessionId: string): 
   const view = (write: StateWrite) => {
     const definitionName = write.target.kind === 'definition' ? names.get(write.target.definitionId) : undefined;
     const label = nodeLabel(write.nodeId);
+    const preview = previewWrite(write);
     return {
-      write,
+      write: preview.write,
+      ...(preview.truncated && { truncated: true }),
       ...(definitionName !== undefined && { definitionName }),
       ...(label !== undefined && { nodeLabel: label }),
     };

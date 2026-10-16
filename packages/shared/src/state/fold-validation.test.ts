@@ -7,6 +7,8 @@ import {
   foldTurns,
   item,
   keyOf,
+  nodeDeleteWrite,
+  nodeSetWrite,
   OTHER_DEF,
   removeWrite,
   reply,
@@ -180,6 +182,39 @@ describe('history', () => {
       { turn: 2, value: 3 },
       { turn: 3, value: 3 },
     ]);
+  });
+
+  it('keeps the value for number, boolean and enum keys, and only the turn for text and object keys', () => {
+    const story = foldTurns([
+      turnEntry('a', [setWrite('armed', true), setWrite('mood', 'tense'), setWrite('note', 'x'.repeat(5000))]),
+      turnEntry('b', [
+        setWrite('armed', false),
+        setWrite('note', 'short'),
+        setWrite('extra', { big: 'y'.repeat(5000) }),
+      ]),
+    ]);
+    expect(keyOf(story, 'armed').history).toEqual([
+      { turn: 1, value: true },
+      { turn: 2, value: false },
+    ]);
+    expect(keyOf(story, 'mood').history).toEqual([{ turn: 1, value: 'tense' }]);
+    // The turns are there (a delete or a value that doesn't fit is a point too), the values are not.
+    expect(keyOf(story, 'note').history).toStrictEqual([{ turn: 1 }, { turn: 2 }]);
+    expect(keyOf(story, 'extra').history).toStrictEqual([{ turn: 2 }]);
+    expect(JSON.stringify(story.definitions[0]!.keys.note!.history).length).toBeLessThan(100);
+    // The current values are still whole.
+    expect(valueAt(story, 'note')).toBe('short');
+  });
+
+  it('keeps only small values in the history of a node key that has no declared type', () => {
+    const history = (value: unknown) =>
+      foldTurns([turnEntry('a', [nodeSetWrite('n', 'k', value)])], { defs: [] }).nodes[0]!.keys.k!.history;
+    expect(history(4)).toEqual([{ turn: 1, value: 4 }]);
+    expect(history(false)).toEqual([{ turn: 1, value: false }]);
+    expect(history('x'.repeat(5000))).toStrictEqual([{ turn: 1 }]);
+    expect(history({ any: 'thing' })).toStrictEqual([{ turn: 1 }]);
+    const deleted = foldTurns([turnEntry('a', [nodeDeleteWrite('n', 'k')])], { defs: [] });
+    expect(deleted.nodes[0]!.keys.k!.history).toEqual([{ turn: 1, value: null }]);
   });
 
   it('keeps the newest 100 points', () => {

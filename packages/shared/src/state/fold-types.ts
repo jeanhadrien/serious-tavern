@@ -15,8 +15,11 @@ export const keyMetaSchema = z.object({
 });
 export type KeyMeta = z.infer<typeof keyMetaSchema>;
 
-/** The value of a key after one turn that wrote it; a collection's value is its kept item count. */
-export const historyPointSchema = z.object({ turn: z.number(), value: z.unknown() });
+/**
+ * The value of a key after one turn that wrote it; a collection's value is its kept item count. Text and
+ * object keys keep no value (only the turn), so a long chat's history stays small.
+ */
+export const historyPointSchema = z.object({ turn: z.number(), value: z.unknown().optional() });
 export type HistoryPoint = z.infer<typeof historyPointSchema>;
 
 /** A stored value that does not fit the current definition (the key reads as its default instead). */

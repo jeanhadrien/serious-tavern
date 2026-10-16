@@ -19,11 +19,16 @@ function metaFor(lastTurn: number | undefined, turn: number): KeyMeta {
 }
 
 // One point per present turn that wrote the key, holding the value after that turn's last write.
-function pushPoint(history: HistoryPoint[], turn: number, value: unknown) {
-  const point = { turn, value };
-  if (history.at(-1)?.turn === turn) history[history.length - 1] = point;
+function pushPoint(history: HistoryPoint[], point: HistoryPoint) {
+  if (history.at(-1)?.turn === point.turn) history[history.length - 1] = point;
   else history.push(point);
 }
+
+// Text and object values can be large and change every turn, so their history keeps only the turns (a sparkline
+// has nothing to draw for them anyway). Number, boolean and enum values are small.
+const smallValues = (def: StateKeyDef) => def.type !== 'text' && def.type !== 'object';
+// A node's implicit scalar has no declared type: keep what is certainly small.
+const isSmall = (value: unknown) => value === null || typeof value === 'number' || typeof value === 'boolean';
 
 /** What a write leaves in a scalar key: the value as it reads now, and why a stored value was refused. */
 type Effective = { value: unknown; warning?: string };
@@ -32,13 +37,14 @@ function foldScalar(
   writes: readonly SlotWrite[],
   fallback: unknown,
   effectiveOf: (write: StateWrite) => Effective,
+  keepsValue: (value: unknown) => boolean,
   turn: number,
 ): { key: FoldedKey; warning?: string } {
   const history: HistoryPoint[] = [];
   let last: Effective | undefined;
   for (const { turn: at, write } of writes) {
     last = effectiveOf(write);
-    pushPoint(history, at, structuredClone(last.value));
+    pushPoint(history, keepsValue(last.value) ? { turn: at, value: structuredClone(last.value) } : { turn: at });
   }
   const lastTurn = writes.at(-1)?.turn;
   return {
@@ -60,7 +66,7 @@ function replay(writes: readonly SlotWrite[], cap: number | undefined, history: 
     else if (write.op === 'remove') items = items.filter(({ item }) => item.id !== write.itemId);
     else if (write.op === 'delete') items = [];
     else continue;
-    pushPoint(history, turn, Math.min(items.length, cap ?? Number.POSITIVE_INFINITY));
+    pushPoint(history, { turn, value: Math.min(items.length, cap ?? Number.POSITIVE_INFINITY) });
   }
   return items;
 }
@@ -113,6 +119,7 @@ export function foldDefinitionKey(
         warning: `Stored value ${describeSettingValue(write.value)} ${problem}; using default ${describeSettingValue(fallback)}`,
       };
     },
+    () => smallValues(def),
     turn,
   );
   return { key, problems: warning ? [...problems, warning] : problems };
@@ -134,5 +141,5 @@ export function foldNodeKey(writes: readonly SlotWrite[], turn: number): FoldedK
       undefined,
       turn,
     );
-  return foldScalar(writes, null, (write) => ({ value: write.op === 'set' ? write.value : null }), turn).key;
+  return foldScalar(writes, null, (write) => ({ value: write.op === 'set' ? write.value : null }), isSmall, turn).key;
 }
