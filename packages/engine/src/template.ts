@@ -5,12 +5,16 @@ export { stringify } from './text.js';
 
 export type TemplateContext = {
   inputs: Record<string, unknown>;
-  trigger: { message: string; sessionId: string };
+  // `turn` is the turn being run; absent when the run has no story state.
+  trigger: { message: string; sessionId: string; turn?: number };
   history?: unknown[];
   character?: Character;
   persona?: Persona;
   // Resolved chat settings, `{{settings.<key>}}`.
   settings?: Readonly<Record<string, unknown>>;
+  // Story state at the start of the turn: `values` is `{ <definition name>: { <key>: value } }`, the
+  // `{{state.*}}` namespace. A `StateAccess` fits (it keeps its methods out of the template by design).
+  state?: { readonly values: Readonly<Record<string, unknown>> };
 };
 
 // `preset` renders inputs and bare `{{history}}` as message transcripts; `node` renders JSON.
@@ -50,6 +54,8 @@ function templateData(context: TemplateContext, style: TemplateStyle, active: Se
     history: presented(context.history, formatInputs, stringify),
     // `{{settings}}` renders compact JSON; paths, `#if` and helpers see the raw values.
     settings: presented(context.settings ?? {}, stringify),
+    // Same for `{{state}}` and `{{state.<definition>}}`; `{{#each state.<d>.<collection>}}` sees the items.
+    state: presented(context.state?.values ?? {}, stringify),
     // A bare character has no alias, so it renders as empty text like any unknown name.
     character: context.character ? withToString(cardScope(context, 'character', active), () => '') : undefined,
   };

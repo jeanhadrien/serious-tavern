@@ -32,11 +32,12 @@ export function renderPreset(
   options: {
     inputs: Record<string, unknown>;
     templateContext: {
-      trigger: { message: string; sessionId: string };
+      trigger: { message: string; sessionId: string; turn?: number };
       history?: unknown[];
       character?: Character;
       persona?: Persona;
       settings?: Readonly<Record<string, unknown>>;
+      state?: { readonly values: Readonly<Record<string, unknown>> };
     };
   },
 ): PromptMessage[] {
@@ -57,6 +58,7 @@ export function renderPreset(
     character: options.templateContext.character,
     persona: options.templateContext.persona,
     settings: options.templateContext.settings,
+    state: options.templateContext.state,
   };
   for (const entry of valid.entries) {
     if (entry.kind !== 'message' || !entry.enabled) continue;

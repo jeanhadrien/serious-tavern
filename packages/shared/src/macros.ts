@@ -1,12 +1,13 @@
 import { usableSettings, type WorkflowSetting } from './chat-settings.js';
 import type { PortDataType } from './ports.js';
+import type { StateHint } from './state/snapshot.js';
 import { analyzeTemplate } from './template-analysis.js';
 
 export type MacroDefinition = {
   name: string;
   description: string;
-  category: 'character' | 'persona' | 'input' | 'trigger' | 'history' | 'settings' | 'alias';
-  source: 'character' | 'persona' | 'inputs' | 'trigger' | 'history' | 'settings';
+  category: 'character' | 'persona' | 'input' | 'trigger' | 'history' | 'settings' | 'state' | 'alias';
+  source: 'character' | 'persona' | 'inputs' | 'trigger' | 'history' | 'settings' | 'state';
   field?: string;
   defaultValue?: string;
   pattern?: RegExp;
@@ -111,6 +112,14 @@ export const macroRegistry: readonly MacroDefinition[] = [
     field: 'sessionId',
     dataType: 'text',
   },
+  {
+    name: 'trigger.turn',
+    description: 'Number of the turn being run (1 for the first reply)',
+    category: 'trigger',
+    source: 'trigger',
+    field: 'turn',
+    dataType: 'number',
+  },
   { name: 'trigger', description: 'Trigger context', category: 'trigger', source: 'trigger', dataType: 'object' },
   {
     name: 'trigger.<path>',
@@ -143,6 +152,16 @@ export const macroRegistry: readonly MacroDefinition[] = [
     category: 'settings',
     source: 'settings',
     pattern: /^settings\.[\w]+(?:\.[\w]+)*$/,
+    dataType: 'any',
+  },
+  { name: 'state', description: 'All story state values', category: 'state', source: 'state', dataType: 'object' },
+  {
+    // Paths come from the state definitions (`stateHints`), never from a hand-written list.
+    name: 'state.<path>',
+    description: 'Story state value',
+    category: 'state',
+    source: 'state',
+    pattern: /^state\.[\w]+(?:\.[\w]+)*$/,
     dataType: 'any',
   },
 ];
@@ -187,10 +206,12 @@ const settingHintTypes: Record<WorkflowSetting['type'], PortDataType> = {
   text: 'text',
 };
 
-// `settings` lists declared chat settings (a workflow's own, or `settingsCatalog` for presets).
+// `settings` lists declared chat settings (a workflow's own, or `settingsCatalog` for presets); `state` lists
+// the keys of the state definitions (`stateHints`).
 export function macroHints(
   inputs: readonly { key: string; dataType: PortDataType }[],
   settings: readonly Pick<WorkflowSetting, 'key' | 'type' | 'description'>[] = [],
+  state: readonly StateHint[] = [],
 ) {
   const hints = macroRegistry.flatMap((macro) => {
     if (macro.pattern) {
@@ -199,6 +220,12 @@ export function macroHints(
           expression: `{{${macro.name.replace('<key>', setting.key)}}}`,
           description: setting.description || 'Chat setting',
           type: settingHintTypes[setting.type],
+        }));
+      if (macro.source === 'state')
+        return state.map((hint) => ({
+          expression: `{{${macro.name.replace('<path>', hint.path)}}}`,
+          description: hint.description,
+          type: hint.type,
         }));
       if (macro.source !== 'inputs') return [];
       return inputs.map((input) => ({
@@ -216,5 +243,12 @@ export function macroHints(
       description: 'Repeats for each message of the input (this.role, this.content, this.name)',
       type: input.dataType,
     }));
-  return [...hints, ...loops, ...templateSnippets];
+  const stateLoops = state
+    .filter((hint) => hint.type === 'array')
+    .map((hint) => ({
+      expression: `{{#each state.${hint.path}}}{{/each}}`,
+      description: 'Repeats for each stored item, newest first (this.text, this.id and the declared fields)',
+      type: hint.type,
+    }));
+  return [...hints, ...loops, ...stateLoops, ...templateSnippets];
 }

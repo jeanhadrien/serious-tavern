@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { presetInputLabel, presetSchema, presetWarnings, upgradeLegacyPreset } from './preset.js';
 import { findMacro, macroHints } from './macros.js';
+import type { StateDefinition, StateKeyDef } from './state/definition.js';
+import { stateHints } from './state/snapshot.js';
 
 const base = () => ({
   id: 'e305f530-421a-492b-9d25-fbb054f28c04',
@@ -426,5 +428,80 @@ describe('chat settings macros', () => {
       ],
     ).filter((hint) => hint.expression.startsWith('{{settings.'));
     expect(hints).toEqual([{ expression: '{{settings.mood}}', description: 'Chat setting', type: 'text' }]);
+  });
+});
+
+describe('story state macros', () => {
+  const definition = (name: string, keys: Record<string, StateKeyDef>, over: Partial<StateDefinition> = {}) => ({
+    id: '11111111-1111-4111-8111-111111111111',
+    name,
+    keys,
+    createdAt: '2026-01-01',
+    updatedAt: '2026-01-01',
+    ...over,
+  });
+  const scene = definition('scene', {
+    tension: { type: 'number', min: 0, max: 10 },
+    mood: { type: 'enum', options: ['calm', 'tense'] },
+    injected: { type: 'collection', cap: 30 },
+  });
+
+  it('knows trigger.turn and state paths, and does not warn about them', () => {
+    expect(findMacro('trigger.turn')).toMatchObject({ category: 'trigger', dataType: 'number', field: 'turn' });
+    expect(findMacro('state')).toMatchObject({ category: 'state', dataType: 'object' });
+    for (const path of ['state.scene', 'state.scene.tension', 'state.anything.at.all'])
+      expect(findMacro(path)).toMatchObject({ category: 'state', source: 'state' });
+    // Other trigger paths keep resolving through the pattern.
+    expect(findMacro('trigger.sessionId')?.name).toBe('trigger.sessionId');
+    expect(findMacro('trigger.other')?.name).toBe('trigger.<path>');
+    const parsed = presetSchema.parse({
+      ...base(),
+      inputs: [],
+      entries: [
+        {
+          id: 'note',
+          kind: 'message',
+          enabled: true,
+          displayName: 'Note',
+          role: 'system',
+          content:
+            'Turn {{trigger.turn}}: {{state.scene.tension}} {{state}} {{#each state.scene.injected}}{{this.text}}{{/each}} {{#if (gt state.scene.tension 5)}}x{{/if}} {{state.unknown.key}}',
+        },
+      ],
+    });
+    expect(presetWarnings(parsed)).toEqual([]);
+    // Lookalikes are not state macros.
+    expect(findMacro('State.scene.tension')).toBeUndefined();
+    expect(findMacro('states.scene')).toBeUndefined();
+  });
+
+  it('hints one state path per definition key, typed by the key, and a loop for collections', () => {
+    const hints = macroHints([], [], stateHints([scene]));
+    expect(hints).toContainEqual({
+      expression: '{{state.scene.tension}}',
+      description: 'Story state: Number from 0 to 10',
+      type: 'number',
+    });
+    expect(hints).toContainEqual(expect.objectContaining({ expression: '{{state.scene.mood}}', type: 'text' }));
+    expect(hints).toContainEqual(expect.objectContaining({ expression: '{{state.scene.injected}}', type: 'array' }));
+    expect(hints).toContainEqual(
+      expect.objectContaining({ expression: '{{#each state.scene.injected}}{{/each}}', type: 'array' }),
+    );
+    expect(hints).toContainEqual(expect.objectContaining({ expression: '{{trigger.turn}}', type: 'number' }));
+    expect(hints).toContainEqual(expect.objectContaining({ expression: '{{state}}' }));
+    const variables = hints.filter((hint) => !hint.expression.startsWith('{{#') && !hint.expression.startsWith('{{!'));
+    expect(variables.every((hint) => findMacro(hint.expression.slice(2, -2)) !== undefined)).toBe(true);
+    // Only collections get a loop.
+    expect(hints.filter((hint) => hint.expression.startsWith('{{#each state.')).length).toBe(1);
+  });
+
+  it('hints no state path without definitions, and the first definition of a repeated name', () => {
+    expect(macroHints([]).some((hint) => hint.expression.startsWith('{{state.'))).toBe(false);
+    expect(macroHints([], [], []).some((hint) => hint.expression.startsWith('{{state.'))).toBe(false);
+    const older = definition('scene', { a: { type: 'text' } }, { id: 'o', createdAt: '2025-01-01' });
+    const hints = macroHints([], [], stateHints([scene, older])).filter((hint) =>
+      hint.expression.startsWith('{{state.'),
+    );
+    expect(hints.map((hint) => hint.expression)).toEqual(['{{state.scene.a}}']);
   });
 });
