@@ -112,7 +112,7 @@ describe('story state in use', () => {
       const titles = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
       for (const title of titles) await chat(title, definition.id);
       const { message, details } = refusal(await call(app, 'DELETE', `/api/state-definitions/${definition.id}`));
-      expect(details.sessions.map((session) => session.title).sort()).toEqual(titles);
+      expect(details.sessions.map((session) => session.title)).toEqual(titles);
       expect(details.workflows).toEqual([]);
       expect(message).toMatch(
         /^"scene" can't be deleted: story state is stored in these chats: (\w, ){4}\w and 2 more\.$/,
@@ -239,7 +239,7 @@ describe('workflows that use a definition', () => {
 
       const { message, details } = refusal(await call(app, 'DELETE', `/api/state-definitions/${definition.id}`));
       expect(details.sessions).toEqual([]);
-      expect([...details.workflows].sort()).toEqual(['Reader', 'Writer']);
+      expect(details.workflows).toEqual(['Reader', 'Writer']);
       expect(message).toContain('these workflows use it: Reader, Writer');
       expect(
         (await call(app, 'PUT', `/api/state-definitions/${definition.id}`, { ...body, name: 'mood' })).statusCode,
