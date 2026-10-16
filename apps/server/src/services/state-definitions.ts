@@ -9,7 +9,7 @@ import { now, type AppContext } from '../context.js';
 import { HttpError, notFound } from '../errors.js';
 import { KeyedLock } from '../storage/lock.js';
 import { publishFileChange } from './change-events.js';
-import { sessionsUsing, workflowsUsing } from './state-definition-usage.js';
+import { pruneWorkflowsUsingDefinition, sessionsUsing, workflowsUsing } from './state-definition-usage.js';
 
 type DefinitionBody = ApiParsedBody<'createStateDefinition'>;
 
@@ -76,7 +76,8 @@ export function updateStateDefinition(context: AppContext, id: string, body: Def
     const current = await getStateDefinition(context, id);
     await requireFreeName(context, fields.name, id);
     // Templates bind to the name, so it can't change while a chat holds state under it. Keys and types may
-    // change freely: the fold reads stored data against whatever the definition says now.
+    // change freely: the fold reads stored data against whatever the definition says now (the workflows' State
+    // nodes are pruned or reported by validation, below).
     if (fields.name !== current.name) {
       const sessions = await sessionsUsing(context, id);
       if (sessions.length)
@@ -97,6 +98,7 @@ export function updateStateDefinition(context: AppContext, id: string, body: Def
       }),
     );
     if (!updated) throw notFound('State definition');
+    await pruneWorkflowsUsingDefinition(context, id);
     await announce(context);
     return updated;
   });

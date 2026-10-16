@@ -1,5 +1,7 @@
-import { sessionUsesDefinition, type StateDefinitionInUseDetails } from '@st/shared';
-import type { AppContext } from '../context.js';
+import { pruneInvalidEdges } from '@st/engine';
+import { sessionUsesDefinition, type StateDefinitionInUseDetails, type Workflow } from '@st/shared';
+import { now, type AppContext } from '../context.js';
+import { nodeResources } from './node-resources.js';
 
 // The node types whose `definitionId` config reads or writes a definition.
 const stateNodeTypes = new Set(['state-read', 'state-write']);
@@ -19,12 +21,33 @@ export async function sessionsUsing(
     .sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
 }
 
+const usesDefinition = (workflow: Workflow, id: string) =>
+  workflow.nodes.some((node) => stateNodeTypes.has(node.type) && node.config?.definitionId === id);
+
 /** Workflows with a State Read or State Write node that uses the definition (names, sorted). */
 export async function workflowsUsing({ workflows }: AppContext, id: string): Promise<string[]> {
   return (await workflows.list())
-    .filter((workflow) =>
-      workflow.nodes.some((node) => stateNodeTypes.has(node.type) && node.config?.definitionId === id),
-    )
+    .filter((workflow) => usesDefinition(workflow, id))
     .map((workflow) => workflow.name)
     .sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * After the definition changed: drops the connections of workflows using it to ports that no longer exist
+ * (State Read's `count` once the key stopped being a collection), like a preset edit does for its inputs.
+ * A node whose key or operation no longer fits keeps its connections and is reported by validation instead.
+ */
+export async function pruneWorkflowsUsingDefinition(context: AppContext, id: string): Promise<void> {
+  const { workflows } = context;
+  const resources = nodeResources(context);
+  for (const workflow of await workflows.list()) {
+    if (!usesDefinition(workflow, id)) continue;
+    if ((await pruneInvalidEdges(workflow, resources)).edges.length === workflow.edges.length) continue;
+    // Pruned again on the record as it is now, so a save made since the listing is not overwritten.
+    await workflows.update(workflow.id, async (old) => ({
+      ...old,
+      edges: (await pruneInvalidEdges(old, resources)).edges,
+      updatedAt: now(),
+    }));
+  }
 }

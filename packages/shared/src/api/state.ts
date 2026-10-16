@@ -73,7 +73,9 @@ export const stateEndpoints = {
   // 409 `STATE_DEFINITION_NAME_TAKEN` when another definition has the name (compared ignoring case).
   createStateDefinition: endpoint(stateDefinitionSchema, stateDefinitionWriteSchema),
   // Replaces name, description and keys; unknown top-level fields of the stored record survive. Changing keys or
-  // types is always allowed (stored data is never rewritten). 409 `STATE_DEFINITION_NAME_TAKEN`, and
+  // types is always allowed (stored data is never rewritten); workflows using the definition lose their
+  // connections to ports that no longer exist, and a State node whose key or operation no longer fits is
+  // reported by validation until it is reconfigured. 409 `STATE_DEFINITION_NAME_TAKEN`, and
   // 409 `STATE_DEFINITION_IN_USE` for a rename while a chat holds story state under the old name.
   updateStateDefinition: endpoint(stateDefinitionSchema, stateDefinitionWriteSchema, idParamsSchema),
   // 409 `STATE_DEFINITION_IN_USE` while a chat holds story state for it or a workflow node uses it.
