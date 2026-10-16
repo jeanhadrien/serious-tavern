@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { portDataTypes } from './ports.js';
 import { workflowSettingSchema } from './chat-settings.js';
+import { sessionStateSchema } from './state/writes.js';
 export const validationIssueSchema = z.object({
   message: z.string(),
   edgeId: z.string().optional(),
@@ -52,6 +53,8 @@ export const messageSchema = z
     // Stored for display only; reasoning never enters prompt content.
     reasoning: z.string().optional(),
     nodeId: z.string().optional(),
+    // Set when the content was edited after it was stored (display only: stored state is never recomputed).
+    editedAt: z.string().optional(),
   })
   .passthrough();
 export const sessionSchema = z
@@ -65,6 +68,9 @@ export const sessionSchema = z
     // The chat's own setting values, by key (user-owned, see chat-settings.ts). Absent in older files:
     // read as `session.settings ?? {}`. Keys the workflow doesn't declare are kept, unused.
     settings: z.record(z.string(), z.unknown()).optional(),
+    // What the chat's settled turns stored (see state/). Absent in older files, and stored records are not
+    // parsed on read: read the entries through `readTurnEntries`, never as `session.state.turns`.
+    state: sessionStateSchema.optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })

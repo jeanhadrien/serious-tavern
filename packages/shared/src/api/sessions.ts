@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { sessionSchema, messageSchema, executionLogSchema } from '../models.js';
 import { endpoint, errorEnvelopeSchema, idParamsSchema, noContentSchema } from './common.js';
 
-export const sessionSummarySchema = sessionSchema.omit({ messages: true }).extend({ messageCount: z.number() });
+export const sessionSummarySchema = sessionSchema
+  .omit({ messages: true, state: true })
+  .extend({ messageCount: z.number() });
 export const createSessionSchema = z.object({
   workflowId: z.string().uuid(),
   title: z.string().trim().min(1).optional(),
