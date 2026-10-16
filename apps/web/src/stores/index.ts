@@ -6,10 +6,20 @@ import {
   presetsApi,
   providersApi,
   sessionsApi,
+  stateDefinitionsApi,
   workflowsApi,
 } from '../api.js';
 import { compareRecent } from '../pages/recentOrder.js';
-import type { Character, Collection, CollectionSummary, Persona, Preset, ProviderView, Workflow } from '@st/shared';
+import type {
+  Character,
+  Collection,
+  CollectionSummary,
+  Persona,
+  Preset,
+  ProviderView,
+  StateDefinition,
+  Workflow,
+} from '@st/shared';
 import { createEditorStore } from './editorStore.js';
 import { createListStore, type ListStore } from './listStore.js';
 
@@ -59,6 +69,13 @@ export const collectionsStore = createListStore({
   compare: byName,
 });
 
+// State definitions are small, so the list holds whole records (the editor and the node panels read them as is).
+export const stateDefinitionsStore = createListStore({
+  event: 'stateDefinitions.changed',
+  load: () => stateDefinitionsApi.list(silent),
+  compare: byName,
+});
+
 /** Reads a shared list; the component re-renders when the list changes. */
 export function useList<T>(store: ListStore<T>): T[] {
   return useSyncExternalStore(store.subscribe, store.getSnapshot);
@@ -70,5 +87,6 @@ export const presetEditorStore = createEditorStore<Preset>();
 export const characterEditorStore = createEditorStore<Character>();
 export const personaEditorStore = createEditorStore<Persona>();
 export const providerEditorStore = createEditorStore<ProviderView>();
+export const stateDefinitionEditorStore = createEditorStore<StateDefinition>();
 // The list opens summaries; the editor fetches the whole collection (a full one is used as is).
 export const collectionEditorStore = createEditorStore<CollectionSummary | Collection>();

@@ -8,6 +8,7 @@ import {
   workflowsApi,
   charactersApi,
   collectionsApi,
+  stateDefinitionsApi,
   nodeTypesApi,
   secretsApi,
 } from './api.js';
@@ -131,4 +132,23 @@ it('reads and writes collections by id', async () => {
     ['/api/collections/c1', 'PUT'],
     ['/api/collections/c1', 'DELETE'],
   ]);
+});
+
+it('reads and writes state definitions by id (whole records, no single get)', async () => {
+  const fetchMock = vi
+    .spyOn(globalThis, 'fetch')
+    .mockImplementation(
+      async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }),
+    );
+  await stateDefinitionsApi.list();
+  await stateDefinitionsApi.create({ name: 'scene', keys: {} });
+  await stateDefinitionsApi.update('d/1', { name: 'scene', keys: {} });
+  await stateDefinitionsApi.delete('d1');
+  expect(fetchMock.mock.calls.map(([url, init]) => [url, (init as RequestInit | undefined)?.method ?? 'GET'])).toEqual([
+    ['/api/state-definitions', 'GET'],
+    ['/api/state-definitions', 'POST'],
+    ['/api/state-definitions/d%2F1', 'PUT'],
+    ['/api/state-definitions/d1', 'DELETE'],
+  ]);
+  expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ body: '{"name":"scene","keys":{}}' });
 });

@@ -9,6 +9,7 @@ import {
   secretsApi,
   importsApi,
   collectionsApi,
+  stateDefinitionsApi,
 } from '../api.js';
 
 it('infers client requests and responses directly from shared schemas', () => {
@@ -24,4 +25,6 @@ it('infers client requests and responses directly from shared schemas', () => {
   expectTypeOf(importsApi.sync).returns.toEqualTypeOf<Promise<ApiResponse<'syncImportSource'>>>();
   expectTypeOf(collectionsApi.update).parameter(1).toEqualTypeOf<ApiBody<'updateCollection'>>();
   expectTypeOf(collectionsApi.list).returns.toEqualTypeOf<Promise<ApiResponse<'listCollections'>>>();
+  expectTypeOf(stateDefinitionsApi.update).parameter(1).toEqualTypeOf<ApiBody<'updateStateDefinition'>>();
+  expectTypeOf(stateDefinitionsApi.list).returns.toEqualTypeOf<Promise<ApiResponse<'listStateDefinitions'>>>();
 });

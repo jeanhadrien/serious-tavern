@@ -9,7 +9,7 @@ What was built, and where it refines the design below:
 - **List ↔ editor link:** per-resource editor stores in `apps/web/src/stores/`. Shared list stores refresh from server change events.
 - **Two-column breakpoint:** 1000px viewport width.
 - **Settings has no list** (`LISTLESS`). Its L icon shows the form directly.
-- **URL:** the layout is encoded as `/?session=…&left=…&wide=preset:<id>&right=character:<id>` (`layout/url.ts`). Old paths such as `/presets?id=…` are inbound aliases.
+- **URL:** the layout is encoded as `/?session=…&left=…&wide=preset:<id>&right=character:<id>` (`layout/url.ts`); a narrow editor open in L is `left=provider:<id>` or `left=stateDefinition:<id>`. Old paths such as `/presets?id=…` are inbound aliases.
 
 ## Layout
 
@@ -31,7 +31,7 @@ What was built, and where it refines the design below:
 
 | Column | Content | Notes |
 |---|---|---|
-| **L** | Technical lists: workflows, presets, providers. Settings. | Providers and settings are narrow editors shown in L (settings has no list). |
+| **L** | Technical lists: workflows, presets, providers, state definitions. Settings. | Providers, state definitions and settings are narrow editors shown in L (settings has no list). |
 | **M** | The chat, by default. | Wide editors take M over. |
 | **R** | Content lists: chats (session history), characters, personas, collections. | Browsing and editing only (see below). |
 
@@ -39,7 +39,7 @@ What was built, and where it refines the design below:
 
 Every editor is either **narrow** or **wide**.
 
-- **Narrow editors** (character, persona, collection, provider, settings) open **inside their own column** and replace its list. A back arrow returns to the list. They are mostly text; the user resizes the column if they need room.
+- **Narrow editors** (character, persona, collection, provider, state definition, settings) open **inside their own column** and replace its list. A back arrow returns to the list. They are mostly text; the user resizes the column if they need room.
 - **Wide editors** (workflow, preset) open in **M**, and the **chat moves to R**. A close button on the editor returns the chat to M.
 
 Example: `preset list | chat | character list` becomes `preset list | preset editor | chat`.
@@ -65,7 +65,7 @@ Below a width breakpoint the layout collapses to **L | M**:
 
 Below 700px the two-column layout is shown **one column at a time**:
 
-- A menu button in the header opens a drawer listing the chat, the open wide editor (if any) and every list, grouped as Content (chats, characters, personas, collections) and Setup (workflows, presets, providers, settings). Dirty dots show on the items and on the menu button.
+- A menu button in the header opens a drawer listing the chat, the open wide editor (if any) and every list, grouped as Content (chats, characters, personas, collections) and Setup (workflows, presets, providers, state definitions, settings). Dirty dots show on the items and on the menu button.
 - Picking a list shows it full width. Opening an item follows it: a narrow editor replaces its list, a wide editor or a chat (from the chats list) takes the screen.
 - The header shows what is on screen. With a wide editor open it keeps the chat toggle and the close button.
 - Browser Back steps through the views the phone showed (the URL carries `view=` on phones).

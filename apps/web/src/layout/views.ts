@@ -1,4 +1,5 @@
 import {
+  Brain,
   History,
   Library,
   MessageSquare,
@@ -19,6 +20,7 @@ export const VIEW_INFO: Record<IconId, { icon: LucideIcon; label: string }> = {
   workflows: { icon: Workflow, label: 'Workflows' },
   presets: { icon: ScrollText, label: 'Presets' },
   providers: { icon: Server, label: 'Providers' },
+  stateDefinitions: { icon: Brain, label: 'State definitions' },
   settings: { icon: Settings, label: 'Settings' },
   characters: { icon: Users, label: 'Characters' },
   personas: { icon: UserRound, label: 'Personas' },

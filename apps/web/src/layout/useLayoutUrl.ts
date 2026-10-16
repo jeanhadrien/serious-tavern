@@ -13,6 +13,8 @@ import {
   providerEditorStore,
   providersStore,
   sessionsStore,
+  stateDefinitionEditorStore,
+  stateDefinitionsStore,
   workflowEditorStore,
   workflowsStore,
 } from '../stores/index.js';
@@ -38,6 +40,7 @@ const ITEM_SOURCES: Partial<Record<ResourceId, { list: ListStore<Item>; editor: 
   workflows: { list: workflowsStore, editor: workflowEditorStore },
   presets: { list: presetsStore, editor: presetEditorStore },
   providers: { list: providersStore, editor: providerEditorStore },
+  stateDefinitions: { list: stateDefinitionsStore, editor: stateDefinitionEditorStore },
   characters: { list: charactersStore, editor: characterEditorStore },
   personas: { list: personasStore, editor: personaEditorStore },
   collections: { list: collectionsStore, editor: collectionEditorStore },
@@ -161,11 +164,13 @@ export function useLayoutUrl(layout: LayoutState, dispatch: Dispatch<LayoutActio
   const characterId = useOpenId(characterEditorStore);
   const personaId = useOpenId(personaEditorStore);
   const providerId = useOpenId(providerEditorStore);
+  const stateDefinitionId = useOpenId(stateDefinitionEditorStore);
   const collectionId = useOpenId(collectionEditorStore);
   const openIds = {
     workflows: workflowId,
     presets: presetId,
     providers: providerId,
+    stateDefinitions: stateDefinitionId,
     characters: characterId,
     personas: personaId,
     collections: collectionId,

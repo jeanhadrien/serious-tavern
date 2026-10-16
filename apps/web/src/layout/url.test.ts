@@ -41,6 +41,14 @@ it('round-trips layouts through the URL and the reducer', () => {
       { providers: 'x', workflows: 'w1', personas: 'p' },
       's1',
     ],
+    ['left=stateDefinitions', {}, undefined],
+    ['left=stateDefinition:abc', { stateDefinitions: 'abc' }, undefined],
+    ['left=stateDefinition:x&right=character:c', { stateDefinitions: 'x', characters: 'c' }, undefined],
+    [
+      'session=s1&left=stateDefinition:x&wide=workflow:w1&right=persona:p',
+      { stateDefinitions: 'x', workflows: 'w1', personas: 'p' },
+      's1',
+    ],
     ['right=collections', {}, undefined],
     ['right=collection:k1', { collections: 'k1' }, undefined],
     ['left=provider:x&right=collection:k', { providers: 'x', collections: 'k' }, undefined],
@@ -68,6 +76,7 @@ it('falls back to defaults on garbage', () => {
     'wide=preset:&right=persona:',
     'left=character:c1&right=provider:x',
     'right=collection:&left=collection:k',
+    'left=stateDefinition:&right=stateDefinition:x',
     '%E0%A4%A&&===',
   ]) {
     const url = parseLayoutUrl(garbage);
@@ -129,12 +138,23 @@ it('opens the providers editor in compact mode, where L shows one view', () => {
   expect(viewSlots(both)['editor:characters']).toBe('L');
 });
 
+it('opens the state definitions editor in compact mode, where L shows one view', () => {
+  const compact = initialLayout(DESIGN_KINDS, true);
+  const restored = run(compact, { type: 'restore', target: urlTarget(parseLayoutUrl('left=stateDefinition:x')) });
+  expect(restored.narrowOpen.stateDefinitions).toBe(true);
+  expect(viewSlots(restored)['editor:stateDefinitions']).toBe('L');
+  expect(formatLayoutUrl(layoutToUrl(restored, { stateDefinitions: 'x' }))).toBe('left=stateDefinition:x');
+});
+
 it('tells content changes from tab switches', () => {
   expect(sameContent(parseLayoutUrl('left=presets'), parseLayoutUrl(''))).toBe(true);
   expect(sameContent(parseLayoutUrl('session=a'), parseLayoutUrl('session=b'))).toBe(false);
   expect(sameContent(parseLayoutUrl('wide=preset:a'), parseLayoutUrl('wide=preset:b'))).toBe(false);
   expect(sameContent(parseLayoutUrl('right=character:a'), parseLayoutUrl('right=characters'))).toBe(false);
   expect(sameContent(parseLayoutUrl('left=provider:a'), parseLayoutUrl('left=providers'))).toBe(false);
+  expect(sameContent(parseLayoutUrl('left=stateDefinition:a'), parseLayoutUrl('left=stateDefinitions'))).toBe(false);
+  expect(sameContent(parseLayoutUrl('left=stateDefinition:a'), parseLayoutUrl('left=stateDefinition:b'))).toBe(false);
+  expect(sameContent(parseLayoutUrl('left=stateDefinition:a'), parseLayoutUrl('left=stateDefinition:a'))).toBe(true);
 });
 
 it('builds links for other parts of the app', () => {
@@ -169,6 +189,8 @@ it('round-trips what a phone shows', () => {
     ['wide=preset:p1&right=chats', { presets: 'p1' }],
     ['right=character:c1', { characters: 'c1' }],
     ['right=character:c1&view=chat', { characters: 'c1' }],
+    ['left=stateDefinition:s1', { stateDefinitions: 's1' }],
+    ['left=stateDefinitions&view=stateDefinitions', {}],
   ] as const) {
     expect(phoneReload(search, ids)).toBe(search);
   }
@@ -191,5 +213,12 @@ it('holds the URL while a phone shows an editor that is still loading', () => {
   const lore = run(phone(), { type: 'selectTab', id: 'collections' }, { type: 'openEditor', id: 'collections' });
   expect(phoneEditorLoading(lore, {})).toBe(true);
   expect(phoneEditorLoading(lore, { collections: 'k1' })).toBe(false);
+  const state = run(
+    phone(),
+    { type: 'selectTab', id: 'stateDefinitions' },
+    { type: 'openEditor', id: 'stateDefinitions' },
+  );
+  expect(phoneEditorLoading(state, {})).toBe(true);
+  expect(phoneEditorLoading(state, { stateDefinitions: 's1' })).toBe(false);
   expect(phoneEditorLoading(run(start(), { type: 'openEditor', id: 'workflows' }), {})).toBe(false);
 });

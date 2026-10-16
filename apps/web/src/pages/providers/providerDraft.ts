@@ -1,5 +1,6 @@
 import { parse, stringify } from 'yaml';
 import { providerFieldsSchema, type ProviderFields, type ProviderView } from '@st/shared';
+import { classifyDraftChange } from '../draftChange.js';
 import type { DiskChange } from '../fileLiveSync.js';
 
 /**
@@ -112,26 +113,10 @@ function normalized(draft: ProviderDraft, provider: ProviderView): ProviderDraft
   return result.ok ? toDraft({ ...provider, secret: undefined, ...result.body }) : undefined;
 }
 
-/**
- * What a fresh provider list means for the open editor. Records are compared through their drafts, so key order
- * and timestamps never count as a change (a UI save followed by its own change event is `unchanged`). A dirty
- * draft that the disk already holds (its own save, seen before the save's response) is a reload, not a conflict.
- */
+/** What a fresh provider list means for the open editor (see `classifyDraftChange`). */
 export function classifyProviderChange(
   editor: { draft?: ProviderDraft; provider?: ProviderView; deleting?: boolean },
   fresh: readonly ProviderView[],
 ): DiskChange<ProviderView> {
-  const { draft, provider } = editor;
-  // The editor's own delete is announced before its response: the item vanishing is expected, not news.
-  if (!draft || !provider || editor.deleting) return { kind: 'unchanged' };
-  const dirty = draftChanged(draft, provider);
-  const onDisk = fresh.find((item) => item.id === provider.id);
-  if (!onDisk) return dirty ? { kind: 'conflict', removed: true, version: 'removed' } : { kind: 'removed' };
-  const incoming = toDraft(onDisk);
-  if (sameDraft(incoming, toDraft(provider))) return { kind: 'unchanged' };
-  const saved = dirty ? normalized(draft, provider) : undefined;
-  if (saved && sameDraft(incoming, saved)) return { kind: 'reload', item: onDisk };
-  return dirty
-    ? { kind: 'conflict', removed: false, version: JSON.stringify(incoming) }
-    : { kind: 'reload', item: onDisk };
+  return classifyDraftChange({ ...editor, item: editor.provider }, fresh, { toDraft, stored: normalized });
 }

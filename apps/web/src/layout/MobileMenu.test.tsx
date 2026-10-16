@@ -7,6 +7,7 @@ const clean: Record<ResourceId, boolean> = {
   workflows: false,
   presets: false,
   providers: false,
+  stateDefinitions: false,
   settings: false,
   characters: false,
   personas: false,
@@ -29,12 +30,25 @@ it('lists the chat and every list, marking what is on screen', () => {
     'Workflows',
     'Presets',
     'Providers',
+    'State definitions',
     'Settings',
   ])
     expect(html).toContain(`<span>${label}</span>`);
   expect(html.match(/aria-current="page"/g)).toHaveLength(1);
   expect(html).toMatch(/aria-current="page"[^>]*>.*?<span>Presets<\/span>/);
   expect(html).not.toContain('editor');
+});
+
+it('lists State definitions under Setup, between Providers and Settings', () => {
+  const html = render({});
+  const at = (label: string) => html.indexOf(`<span>${label}</span>`);
+  expect(at('Providers')).toBeGreaterThan(at('Presets'));
+  expect(at('State definitions')).toBeGreaterThan(at('Providers'));
+  expect(at('Settings')).toBeGreaterThan(at('State definitions'));
+  // It is a list like the others: selectable, and flagged when its editor has unsaved changes.
+  const active = render({ active: 'stateDefinitions', dirty: { ...clean, stateDefinitions: true } });
+  expect(active).toMatch(/aria-current="page"[^>]*>.*?<span>State definitions<\/span>/);
+  expect(active.match(/aria-label="Unsaved changes"/g)).toHaveLength(1);
 });
 
 it('offers the open wide editor and flags unsaved changes', () => {

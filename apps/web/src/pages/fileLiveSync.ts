@@ -2,7 +2,7 @@ import type { InvalidFile } from '@st/shared';
 import { subscribeToChanges } from '../api/events.js';
 import { alerts as defaultAlerts } from '../alerts/index.js';
 
-// Live sync for the editors of resources stored as hand-editable YAML files (presets, providers, collections):
+// Live sync for the editors of resources stored as hand-editable YAML files (presets, providers, collections, state definitions):
 // the server announces `<resource>.changed` with the files it could not load, and the open editor follows the disk.
 
 /** What an on-disk change means for the item open in an editor. */
@@ -31,7 +31,7 @@ export function planInvalidFileAlerts(
 
 /** The resource being synced and how messages name it. */
 export interface FileResource {
-  event: 'presets.changed' | 'providers.changed' | 'collections.changed';
+  event: 'presets.changed' | 'providers.changed' | 'collections.changed' | 'stateDefinitions.changed';
   /** Lowercase singular noun, e.g. "preset". */
   noun: string;
   /**

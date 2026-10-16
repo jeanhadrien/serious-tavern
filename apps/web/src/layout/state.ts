@@ -2,7 +2,15 @@
 // Nothing here knows about React, the DOM or the URL: the shell renders whatever
 // `viewSlots`/`columnIcons` derive from this state, and `url.ts` serializes it.
 
-export type ResourceId = 'workflows' | 'presets' | 'providers' | 'settings' | 'characters' | 'personas' | 'collections';
+export type ResourceId =
+  | 'workflows'
+  | 'presets'
+  | 'providers'
+  | 'stateDefinitions'
+  | 'settings'
+  | 'characters'
+  | 'personas'
+  | 'collections';
 /** Something a column can list: a resource's list, or the chat history. */
 export type ListId = ResourceId | 'chats';
 /** Header icons also include the chat itself, which only appears while it sits in R. */
@@ -17,6 +25,7 @@ export const LIST_COLUMN: Record<ListId, 'L' | 'R'> = {
   workflows: 'L',
   presets: 'L',
   providers: 'L',
+  stateDefinitions: 'L',
   settings: 'L',
   chats: 'R',
   characters: 'R',
@@ -31,6 +40,7 @@ export const RESOURCE_IDS: readonly ResourceId[] = [
   'workflows',
   'presets',
   'providers',
+  'stateDefinitions',
   'settings',
   'characters',
   'personas',
@@ -92,6 +102,7 @@ const noResources = (): Record<ResourceId, boolean> => ({
   workflows: false,
   presets: false,
   providers: false,
+  stateDefinitions: false,
   settings: false,
   characters: false,
   personas: false,
@@ -103,6 +114,7 @@ export const DESIGN_KINDS: Record<ResourceId, EditorKind> = {
   workflows: 'wide',
   presets: 'wide',
   providers: 'narrow',
+  stateDefinitions: 'narrow',
   settings: 'narrow',
   characters: 'narrow',
   personas: 'narrow',

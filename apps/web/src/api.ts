@@ -7,4 +7,5 @@ export { charactersApi, personasApi } from './api/entities.js';
 export { nodeTypesApi, secretsApi } from './api/catalog.js';
 export { providersApi } from './api/providers.js';
 export { collectionsApi } from './api/collections.js';
+export { stateDefinitionsApi } from './api/state.js';
 export { importsApi } from './api/imports.js';

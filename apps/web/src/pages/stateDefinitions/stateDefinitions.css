@@ -1,0 +1,164 @@
+/* State definitions live in L (a side column of about 180-450px), so everything stacks in one column. */
+.state-list {
+  height: 100%;
+  padding: 14px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.state-list > .toolbar h2 {
+  margin: 8px 0;
+}
+.state-list > .toolbar button {
+  flex: none;
+  white-space: nowrap;
+}
+.state-list > .hint {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+}
+.state-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 7px 9px;
+}
+.state-row.selected {
+  background: #33394b;
+  border-color: #59617a;
+}
+.state-row > small,
+.state-row-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.state-editor {
+  height: 100%;
+  min-width: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.state-toolbar {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid #363b46;
+}
+.state-toolbar .toolbar,
+.state-banner .toolbar {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.state-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.state-title h1 {
+  font-size: 1.2rem;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.state-banner {
+  margin: 12px 14px 0;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: #2f3547;
+  border: 1px solid #4a5370;
+}
+.state-banner p {
+  margin: 0 0 6px;
+}
+.state-banner ul {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+.state-form {
+  padding: 14px;
+  min-width: 0;
+  display: grid;
+  /* A plain `auto` column would grow to the widest field and push the form past the column. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.state-form input,
+.state-form select,
+.state-form textarea {
+  width: 100%;
+}
+/* The global label style capitalizes every word, which also hits the hints inside these labels. */
+.state-form label {
+  text-transform: none;
+}
+.state-keys h2 {
+  margin: 0 0 4px;
+}
+.state-keys > .hint {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+}
+.state-keys > ul {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+.state-key {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #414757;
+  border-radius: 7px;
+  min-width: 0;
+}
+.state-key-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+/* In a narrow column the name takes a line of its own; the type and the remove button wrap below it. */
+.state-key-head input {
+  flex: 1 1 9em;
+  width: auto;
+}
+.state-key-head select {
+  flex: 0 0 auto;
+  width: auto;
+}
+.state-key-head .icon-button {
+  flex: none;
+}
+.state-key-numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 8px;
+}
+.state-key-problems {
+  margin: 0;
+  padding-left: 18px;
+}
+.state-code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.85rem;
+}
+.state-banner a {
+  color: #aab4ff;
+}

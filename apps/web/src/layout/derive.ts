@@ -68,7 +68,7 @@ export function mobileView(state: LayoutState): MobileView {
   return wideEditorShown(state) ? 'editor' : 'chat';
 }
 
-const LEFT_ICONS: readonly IconId[] = ['workflows', 'presets', 'providers', 'settings'];
+const LEFT_ICONS: readonly IconId[] = ['workflows', 'presets', 'providers', 'stateDefinitions', 'settings'];
 const RIGHT_ICONS: readonly IconId[] = ['chats', 'characters', 'personas', 'collections'];
 
 /** The icons a column header shows. M has none. */
