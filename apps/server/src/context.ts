@@ -5,9 +5,11 @@ import { KeyedLock } from './storage/lock.js';
 import { PresetRepository } from './storage/preset-repository.js';
 import { ProviderRepository } from './storage/provider-repository.js';
 import { CollectionRepository } from './storage/collection-repository.js';
+import { StateDefinitionRepository } from './storage/state-definition-repository.js';
 import { migrateJsonPresets } from './storage/preset-migration.js';
 import { SecretStore } from './secrets/store.js';
 import { seed } from './seed.js';
+import { seedStateDefinitions } from './seed-state.js';
 import { TurnRegistry } from './services/turns.js';
 import { ModelCatalog } from './services/provider-models.js';
 import { ChangeHub, NotifyingRepository, type RecordResource } from './services/change-events.js';
@@ -19,6 +21,8 @@ export interface AppContext {
   providers: ProviderRepository;
   /** Authored collections (lorebooks, decks): YAML files under `data/collections/`; read-only for workflows. */
   collections: CollectionRepository;
+  /** State definitions: YAML files under `data/state/definitions/` naming what a chat's turns may store. */
+  stateDefinitions: StateDefinitionRepository;
   sessions: NotifyingRepository<Session>;
   executions: Repository<ExecutionLog>;
   characters: NotifyingRepository<Character>;
@@ -46,12 +50,17 @@ export async function createContext(dataDir: string, options: { seed?: boolean }
   await migrateJsonPresets(join(dataDir, 'presets'), presets);
   const secrets = new SecretStore(dataDir);
   await secrets.init();
-  if (options.seed !== false) await seed(workflows, presets);
+  const stateDefinitions = new StateDefinitionRepository(join(dataDir, 'state', 'definitions'));
+  if (options.seed !== false) {
+    await seed(workflows, presets);
+    await seedStateDefinitions(stateDefinitions);
+  }
   return {
     workflows,
     presets,
     providers: new ProviderRepository(join(dataDir, 'providers')),
     collections: new CollectionRepository(join(dataDir, 'collections')),
+    stateDefinitions,
     sessions: notifying<Session>('sessions'),
     executions: new JsonRepository<ExecutionLog>(join(dataDir, 'executions')),
     characters: notifying<Character>('characters'),

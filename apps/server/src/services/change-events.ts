@@ -3,6 +3,7 @@ import type { Repository } from '../storage/repository.js';
 import type { PresetRepository } from '../storage/preset-repository.js';
 import type { ProviderRepository } from '../storage/provider-repository.js';
 import type { CollectionRepository } from '../storage/collection-repository.js';
+import type { StateDefinitionRepository } from '../storage/state-definition-repository.js';
 import type { YamlRecord, YamlRepository } from '../storage/yaml-repository.js';
 import { watchDirectory, type DirectoryWatcher } from '../storage/directory-watcher.js';
 import { isYamlFile } from '../storage/yaml-filenames.js';
@@ -71,22 +72,25 @@ export class NotifyingRepository<T extends { id: string }> implements Repository
 }
 
 /** Resources stored as YAML files that users may edit by hand; a directory watcher announces their changes. */
-type FileResource = 'presets' | 'providers' | 'collections';
+type FileResource = 'presets' | 'providers' | 'collections' | 'stateDefinitions';
 
 /** The current state of every event type, sent to each new subscriber so it can resync. */
 export async function currentChangeEvents({
   presets,
   providers,
   collections,
+  stateDefinitions,
 }: {
   presets: PresetRepository;
   providers: ProviderRepository;
   collections: CollectionRepository;
+  stateDefinitions: StateDefinitionRepository;
 }): Promise<ChangeEvent[]> {
   return [
     { type: 'presets.changed', invalidFiles: await presets.listInvalid() },
     { type: 'providers.changed', invalidFiles: await providers.listInvalid() },
     { type: 'collections.changed', invalidFiles: await collections.listInvalid() },
+    { type: 'stateDefinitions.changed', invalidFiles: await stateDefinitions.listInvalid() },
     { type: 'workflows.changed' },
     { type: 'characters.changed' },
     { type: 'personas.changed' },

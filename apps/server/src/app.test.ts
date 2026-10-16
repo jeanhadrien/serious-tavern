@@ -95,6 +95,20 @@ it('returns payloads conforming to every shared endpoint response contract', asy
       payload: { name: 'Contract lore', entries: [] },
     });
     await request('deleteCollection', { method: 'DELETE', url: `/api/collections/${collection.id}` });
+    const definition = await request('createStateDefinition', {
+      method: 'POST',
+      url: '/api/state-definitions',
+      payload: { name: 'contract', keys: { tension: { type: 'number', min: 0, max: 10 } } },
+    });
+    await request('getStateDefinition', { method: 'GET', url: `/api/state-definitions/${definition.id}` });
+    const definitions = await request('listStateDefinitions', { method: 'GET', url: '/api/state-definitions' });
+    expect(definitions.map((entry) => entry.name)).toEqual(['contract']);
+    await request('updateStateDefinition', {
+      method: 'PUT',
+      url: `/api/state-definitions/${definition.id}`,
+      payload: { name: 'contract', keys: { mood: { type: 'enum', options: ['calm'] } } },
+    });
+    await request('deleteStateDefinition', { method: 'DELETE', url: `/api/state-definitions/${definition.id}` });
     const workflow = await request('createWorkflow', {
       method: 'POST',
       url: '/api/workflows',

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { messageSchema } from '../models.js';
-import { apiContract, changeEventTypes, errorEnvelopeSchema } from './index.js';
+import { apiContract, changeEventTypes, errorEnvelopeSchema, stateDefinitionInUseDetailsSchema } from './index.js';
 
 it('preserves existing entity defaults, including defaults on partial updates', () => {
   expect(apiContract.createCharacter.body.parse({ name: '  Alice  ' })).toMatchObject({
@@ -96,6 +96,7 @@ it('describes the change event stream, one event per resource type', () => {
     'presets.changed',
     'providers.changed',
     'collections.changed',
+    'stateDefinitions.changed',
     'workflows.changed',
     'characters.changed',
     'personas.changed',
@@ -106,6 +107,31 @@ it('describes the change event stream, one event per resource type', () => {
   const collections = { type: 'collections.changed', invalidFiles: [{ file: 'lore.yaml', reason: 'bad' }] };
   expect(apiContract.streamChanges.response.parse(collections)).toEqual(collections);
   expect(apiContract.streamChanges.response.safeParse({ type: 'collections.changed' }).success).toBe(false);
+  const definitions = { type: 'stateDefinitions.changed', invalidFiles: [{ file: 'scene.yaml', reason: 'bad' }] };
+  expect(apiContract.streamChanges.response.parse(definitions)).toEqual(definitions);
+  expect(apiContract.streamChanges.response.safeParse({ type: 'stateDefinitions.changed' }).success).toBe(false);
+});
+
+it('describes state definitions: keys are required on a write, defaulted on a stored record', () => {
+  const body = { name: 'scene', keys: { tension: { type: 'number', min: 0, max: 10 } } };
+  expect(apiContract.createStateDefinition.body.parse(body)).toEqual(body);
+  expect(apiContract.createStateDefinition.body.safeParse({ name: 'scene' }).success).toBe(false);
+  for (const bad of [
+    { name: '1x', keys: {} },
+    { name: 'ok', keys: { a: { type: 'date' } } },
+    { name: 'ok', keys: { a: { type: 'number', min: 2, max: 1 } } },
+  ])
+    expect(apiContract.updateStateDefinition.body.safeParse(bad).success).toBe(false);
+  expect(apiContract.updateStateDefinition.params.safeParse({ id: 'not-a-uuid' }).success).toBe(false);
+  const stored = { ...body, id: '11111111-1111-4111-8111-111111111111', createdAt: 'a', updatedAt: 'b' };
+  expect(apiContract.listStateDefinitions.response.parse([stored])).toEqual([stored]);
+  expect(apiContract.getStateDefinition.response.safeParse({ ...stored, id: 'x' }).success).toBe(false);
+  expect(apiContract.deleteStateDefinition.response.parse(undefined)).toBeUndefined();
+  expect(stateDefinitionInUseDetailsSchema.parse({ sessions: [{ id: 's', title: 'T' }], workflows: [] })).toEqual({
+    sessions: [{ id: 's', title: 'T' }],
+    workflows: [],
+  });
+  expect(stateDefinitionInUseDetailsSchema.safeParse({ sessions: [] }).success).toBe(false);
 });
 
 it('describes collections: full records to write, summaries to list', () => {

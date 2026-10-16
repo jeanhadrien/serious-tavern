@@ -57,7 +57,7 @@ function readEvents(response: Response) {
   return { events, comments, done, cancel: () => reader.cancel() };
 }
 // The snapshot every new connection starts with: one event per type.
-const SNAPSHOT_SIZE = 7;
+const SNAPSHOT_SIZE = 8;
 type PresetsChanged = Extract<ChangeEvent, { type: 'presets.changed' }>;
 const last = (events: ChangeEvent[]) =>
   events.filter((event): event is PresetsChanged => event.type === 'presets.changed').at(-1);
@@ -74,6 +74,7 @@ it('streams the current state on connect, then a change event per edit with the 
       'presets.changed',
       'providers.changed',
       'collections.changed',
+      'stateDefinitions.changed',
       'workflows.changed',
       'characters.changed',
       'personas.changed',
@@ -173,11 +174,13 @@ it('closes the watcher with the app, so no timers or handles are left behind', a
   await writeFile(join(dataDir, 'presets', 'late.yaml'), presetYaml('Late'));
   await writeFile(join(dataDir, 'providers', 'late.yaml'), providerYaml('Late'));
   await writeFile(join(dataDir, 'collections', 'late.yaml'), 'name: Late\n');
+  await writeFile(join(dataDir, 'state', 'definitions', 'late.yaml'), 'name: Late\nkeys: {}\n');
   // Longer than the watchers' debounce: a watcher left open would scan and stamp these id-less files.
   await new Promise((resolve) => setTimeout(resolve, 400));
   expect(warn).not.toHaveBeenCalled();
   expect(await readFile(join(dataDir, 'providers', 'late.yaml'), 'utf8')).toBe(providerYaml('Late'));
   expect(await readFile(join(dataDir, 'collections', 'late.yaml'), 'utf8')).toBe('name: Late\n');
+  expect(await readFile(join(dataDir, 'state', 'definitions', 'late.yaml'), 'utf8')).toBe('name: Late\nkeys: {}\n');
 });
 
 const providerYaml = (name: string) => `name: ${name}\nbaseUrl: http://localhost:1234/v1\n`;
@@ -413,6 +416,75 @@ it('announces collection files edited on disk, with the files it could not load'
     await vi.waitFor(() => expect(collectionEvents(events()).at(-1)?.invalidFiles).toEqual([]));
     const list = apiContract.listCollections.response.parse((await app.inject({ url: '/api/collections' })).json());
     expect(list.map((collection) => [collection.name, collection.entryCount])).toEqual([['Lore', 1]]);
+    await stream.cancel();
+  } finally {
+    await app.close();
+  }
+});
+
+type DefinitionsChanged = Extract<ChangeEvent, { type: 'stateDefinitions.changed' }>;
+const definitionEvents = (events: ChangeEvent[]) =>
+  events.filter((event): event is DefinitionsChanged => event.type === 'stateDefinitions.changed');
+
+it('announces state definition files edited on disk, with the files it could not load', async () => {
+  const app = await createApp(dataDir, { seed: false, watch: true });
+  try {
+    const { stream, events } = await openStream(app);
+    expect(definitionEvents(stream.events)).toEqual([{ type: 'stateDefinitions.changed', invalidFiles: [] }]);
+
+    const broken = join(dataDir, 'state', 'definitions', 'broken.yaml');
+    await writeFile(broken, 'name: scene\nkeys:\n  tension:\n    type: date\n');
+    await vi.waitFor(() =>
+      expect(definitionEvents(events()).at(-1)?.invalidFiles).toEqual([
+        { file: 'broken.yaml', reason: expect.stringContaining('invalid state definition: keys.tension.type') },
+      ]),
+    );
+
+    // Fixing the file clears the warning, and the (stamped) definition is listed.
+    await writeFile(broken, 'name: scene\nkeys:\n  tension:\n    type: number\n');
+    await vi.waitFor(() => expect(definitionEvents(events()).at(-1)?.invalidFiles).toEqual([]));
+    const list = apiContract.listStateDefinitions.response.parse(
+      (await app.inject({ url: '/api/state-definitions' })).json(),
+    );
+    expect(list.map((definition) => [definition.name, Object.keys(definition.keys)])).toEqual([['scene', ['tension']]]);
+    await stream.cancel();
+  } finally {
+    await app.close();
+  }
+});
+
+it('announces state definition writes made through the API, keeping invalid files listed', async () => {
+  // No watcher: the API itself must announce.
+  const app = await createApp(dataDir, { seed: false });
+  try {
+    await mkdir(join(dataDir, 'state', 'definitions'), { recursive: true });
+    await writeFile(join(dataDir, 'state', 'definitions', 'broken.yaml'), BROKEN_YAML);
+    const { stream, events } = await openStream(app);
+    const announced = () => definitionEvents(events());
+    const write = async (request: InjectOptions, status: number) => {
+      const before = announced().length;
+      const response = await app.inject(request);
+      expect(response.statusCode).toBe(status);
+      if (status < 300) await vi.waitFor(() => expect(announced().length).toBe(before + 1));
+      return response.body ? (response.json() as { id: string }) : undefined;
+    };
+    const body = { name: 'scene', keys: { tension: { type: 'number' } } };
+    const definition = await write({ method: 'POST', url: '/api/state-definitions', payload: body }, 201);
+    await write(
+      { method: 'PUT', url: `/api/state-definitions/${definition!.id}`, payload: { ...body, name: 'mood' } },
+      200,
+    );
+    // A refused write (name taken) announces nothing.
+    await write({ method: 'POST', url: '/api/state-definitions', payload: { ...body, name: 'MOOD' } }, 409);
+    await settle();
+    expect(announced()).toHaveLength(2);
+    await write({ method: 'DELETE', url: `/api/state-definitions/${definition!.id}` }, 204);
+    expect(announced()).toHaveLength(3);
+    for (const event of announced())
+      expect(event).toEqual({
+        type: 'stateDefinitions.changed',
+        invalidFiles: [{ file: 'broken.yaml', reason: expect.any(String) }],
+      });
     await stream.cancel();
   } finally {
     await app.close();
