@@ -106,3 +106,15 @@ export function showStateDefinition(definition: StateDefinition, show: () => voi
   stateDefinitionEditorStore.open(structuredClone(definition));
   show();
 }
+
+/**
+ * Opens a definition by id (a node panel's link): from the shared list, fetched once more when it is not there
+ * yet (just created elsewhere), and a warning when it no longer exists. The open one keeps its draft.
+ */
+export async function openStateDefinition(id: string, show: () => void): Promise<void> {
+  const find = (list: readonly StateDefinition[]) => list.find((item) => item.id === id);
+  const definition =
+    find(stateDefinitionsStore.getSnapshot()) ?? find(await stateDefinitionsStore.refresh().catch(() => []));
+  if (definition) showStateDefinition(definition, show);
+  else alerts.warning('That state definition no longer exists');
+}

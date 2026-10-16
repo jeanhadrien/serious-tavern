@@ -5,6 +5,7 @@ import { CharacterPanel } from './panels/character.js';
 import { LlmPanel } from './panels/llm.js';
 import { RecallPanel } from './panels/recall.js';
 import { DrawPanel } from './panels/draw.js';
+import { StateReadPanel } from './panels/stateRead.js';
 import { supportsKeyValueArray, isKeyValueRows, numberFieldValue, type Field } from './fields.js';
 export type { NodePanelContext, NodeConfigPanelProps } from './panels/types.js';
 
@@ -208,6 +209,7 @@ export const customPanels: Record<string, (props: Props) => React.JSX.Element> =
   llm: LlmPanel,
   recall: RecallPanel,
   draw: DrawPanel,
+  'state-read': StateReadPanel,
 };
 export function NodeConfigPanel(props: Props) {
   const Panel = customPanels[props.descriptor.type] ?? GenericPanel;

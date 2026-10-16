@@ -116,3 +116,13 @@
   font-size: 0.85rem;
   white-space: nowrap;
 }
+
+/* State Read and State Write: key names are case-sensitive, so the options keep their spelling. */
+.state-picker select,
+.state-field select {
+  text-transform: none;
+}
+.state-picker a {
+  justify-self: start;
+  font-size: 0.85rem;
+}

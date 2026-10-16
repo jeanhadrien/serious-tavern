@@ -1,6 +1,6 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { Edge } from '@xyflow/react';
-import type { Character, NodeTypeDescriptor, Preset } from '@st/shared';
+import type { Character, NodeTypeDescriptor, Preset, StateDefinition } from '@st/shared';
 import { nodeTypesApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
 import type { CanvasNode } from './model.js';
@@ -14,6 +14,7 @@ export function useDynamicPorts(
   types: NodeTypeDescriptor[],
   presets: Preset[],
   characters: Character[],
+  stateDefinitions: StateDefinition[],
   canvasVersion: number,
 ) {
   const requests = portRequests(nodes);
@@ -49,5 +50,5 @@ export function useDynamicPorts(
     return () => {
       active = false;
     };
-  }, [requestKey, types, presets, characters, canvasVersion, setNodes, setEdges]);
+  }, [requestKey, types, presets, characters, stateDefinitions, canvasVersion, setNodes, setEdges]);
 }

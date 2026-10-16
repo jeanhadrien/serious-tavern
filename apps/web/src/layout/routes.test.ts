@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { collectionLinkId, legacySearch } from './routes.js';
+import { collectionLinkId, legacySearch, stateDefinitionLinkId } from './routes.js';
 
 it('maps legacy item links to a wide editor, edge highlight included', () => {
   expect(legacySearch('/workflows', '?workflow=w1&edge=e1')).toBe('wide=workflow:w1&edge=e1');
@@ -29,4 +29,21 @@ it('finds the collection a link opens in R', () => {
   expect(collectionLinkId('/?right=collection:k2')).toBe('k2');
   expect(collectionLinkId('/collections')).toBeUndefined();
   expect(collectionLinkId('/presets?id=x')).toBeUndefined();
+});
+
+it("maps the node panels' state definition link to the definition editor in L", () => {
+  expect(legacySearch('/state-definitions', '?id=d1')).toBe('left=stateDefinition:d1');
+  expect(legacySearch('/state-definitions', '')).toBe('left=stateDefinitions');
+  expect(legacySearch('/state-definitions', '?id=a%2Fb')).toBe('left=stateDefinition:a%2Fb');
+});
+
+it('finds the state definition a link opens in L', () => {
+  expect(stateDefinitionLinkId('/state-definitions?id=d1')).toBe('d1');
+  expect(stateDefinitionLinkId('/state-definitions?id=a%2Fb')).toBe('a/b');
+  expect(stateDefinitionLinkId('/?left=stateDefinition:d2')).toBe('d2');
+  expect(stateDefinitionLinkId('/state-definitions')).toBeUndefined();
+  expect(stateDefinitionLinkId('/collections?id=k1')).toBeUndefined();
+  expect(stateDefinitionLinkId('/presets?id=x')).toBeUndefined();
+  // A collection link is not a state definition link, and the other way round.
+  expect(collectionLinkId('/state-definitions?id=d1')).toBeUndefined();
 });

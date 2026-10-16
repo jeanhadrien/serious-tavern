@@ -19,7 +19,7 @@ const { ApiError } = await import('../../api.js');
 const { createStateDefinition, createStateDefinitionFrom, deleteStateDefinition, saveStateDefinition } = await import(
   './stateDefinitionActions.js'
 );
-const { showStateDefinition, uniqueName } = await import('./stateDefinitionActions.js');
+const { openStateDefinition, showStateDefinition, uniqueName } = await import('./stateDefinitionActions.js');
 
 const scene = { id: 'd1', name: 'scene', keys: {} } as unknown as StateDefinition;
 const body = { name: 'scene', keys: {} };
@@ -138,4 +138,28 @@ it('opens a definition in the editor as a copy, then shows the editor', () => {
   expect(open.mock.calls[0]![0]).toEqual(scene);
   expect(open.mock.calls[0]![0]).not.toBe(scene);
   expect(show).toHaveBeenCalledOnce();
+});
+
+it('opens a definition by id from the shared list', async () => {
+  const show = vi.fn();
+  listed = [scene as unknown as { name: string }];
+  await openStateDefinition('d1', show);
+  expect(open).toHaveBeenCalledOnce();
+  expect(show).toHaveBeenCalledOnce();
+  expect(refresh).not.toHaveBeenCalled();
+});
+
+it('fetches the list once when the id is not there yet, and warns when it is still gone', async () => {
+  const show = vi.fn();
+  refresh.mockResolvedValueOnce([scene] as never);
+  await openStateDefinition('d1', show);
+  expect(refresh).toHaveBeenCalledOnce();
+  expect(open).toHaveBeenCalledOnce();
+
+  vi.clearAllMocks();
+  await openStateDefinition('gone', show);
+  expect(refresh).toHaveBeenCalledOnce();
+  expect(open).not.toHaveBeenCalled();
+  expect(show).not.toHaveBeenCalled();
+  expect(alerts.warning).toHaveBeenCalledWith('That state definition no longer exists');
 });

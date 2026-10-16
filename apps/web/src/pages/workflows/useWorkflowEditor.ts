@@ -40,7 +40,7 @@ export function useWorkflowEditor() {
   const stateDefinitionsList = useList(stateDefinitionsStore);
   const [workflow, setWorkflow] = useState<Workflow>();
   const [saved, setSaved] = useState('');
-  const canvas = useWorkflowCanvas(types, presets, characters);
+  const canvas = useWorkflowCanvas(types, presets, characters, stateDefinitionsList);
 
   useEffect(() => {
     void nodeTypesApi

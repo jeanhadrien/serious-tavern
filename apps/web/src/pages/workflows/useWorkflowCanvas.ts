@@ -17,19 +17,27 @@ import {
   type NodeInstance,
   type Preset,
   type Character,
+  type StateDefinition,
 } from '@st/shared';
 import { alerts } from '../../alerts/index.js';
 import { checkConnection } from '../../connection.js';
 import { workflowToCanvas, type CanvasNode } from './model.js';
 import { useDynamicPorts } from './useDynamicPorts.js';
 
-export function useWorkflowCanvas(types: NodeTypeDescriptor[], presets: Preset[], characters: Character[]) {
+export function useWorkflowCanvas(
+  types: NodeTypeDescriptor[],
+  presets: Preset[],
+  characters: Character[],
+  stateDefinitions: StateDefinition[],
+) {
   const [nodes, setNodes] = useState<CanvasNode[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selected, setSelected] = useState<string>();
   const [highlightedEdge, setHighlightedEdge] = useState<string>();
   const [canvasVersion, setCanvasVersion] = useState(0);
-  useDynamicPorts(nodes, setNodes, edges, setEdges, types, presets, characters, canvasVersion);
+  // Ports depend on what the node reads from presets, characters and state definitions: they are resolved
+  // again when any of those lists changes.
+  useDynamicPorts(nodes, setNodes, edges, setEdges, types, presets, characters, stateDefinitions, canvasVersion);
   const canvasRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, deleteElements } = useReactFlow();
   const visibleEdges = useMemo(
