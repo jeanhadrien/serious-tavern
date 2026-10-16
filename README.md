@@ -476,12 +476,14 @@ Both pick a definition and a key in their config (`definitionId`, `key`) and res
 | Key type | `op` | Input `value` | Output `value` |
 | --- | --- | --- | --- |
 | number | `set` | `number`, required; clamped to min and max | the stored value |
-| number | `increment` | `number`, only when connected (1 when not; negative subtracts; a skipped source skips the node) | this turn's start value plus the amount, clamped |
+| number | `increment` | `number`, only when connected (the fixed `value` setting, else 1, when not; negative subtracts; a skipped source skips the node) | this turn's start value plus the amount, clamped |
 | boolean, enum, text, object | `set` | typed `boolean`, `text`, `text`, `object`; an enum value must be one of its options | the stored value |
 | any scalar | `delete` | none | the default |
 | collection | `add` | `any`, required: text becomes `{ text }`; an object needs a string `text`; only the key's declared `fields` are kept (each checked against its type, undeclared fields and a client `id` dropped, missing ones omitted) | the stored item, with its id |
 | collection | `remove` | `text`, required: the id of an item the key held at turn start; an unknown id stores nothing | the removed item (optional: absent when nothing was removed) |
 | collection | `delete` | none | `[]` |
+
+**Fixed value.** The optional config field `value` is a literal that stands in for the `value` input while that input is not connected, so the common writes need no helper node: set `scene.mood` to `"tense"`, `scene.tension` to `5`, increment by `2`, add a fixed item (`{ "text": "a storm", "level": 2 }`) or remove a fixed id. It is JSON in the workflow, so it keeps its type (`5`, `true`, `"tense"`, an object). A **connected input always wins**, and the fixed value is checked exactly like an input value (same plain errors, numbers clamped). `delete` ignores it. A missing or `null` setting is none: `set`, `add` and `remove` then need the input connected (it is `required`, a validation issue otherwise), while `increment` adds 1. With a fixed value the `value` input becomes optional (`requiredIfConnected`, as `increment`'s always is), and the ports re-resolve when it changes. The generic node form only shows `value` as a text box (text only, one cleared box stores empty text, not none); the State Write panel planned for the next phase offers a typed editor per key type.
 
 A value of the wrong type or an enum option that doesn't exist is a node error naming the key (`scene.mood must be one of: calm, uneasy, tense, release; got "sad"`). The pass-through output of an `increment` is computed from the turn-start value plus this node's own amount; it differs from the stored value only when several nodes write the same key in one turn. Each node logs one line per write in the execution (`scene.tension: 3 -> 6`).
 

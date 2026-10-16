@@ -156,7 +156,9 @@ deleting a reply rewinds what its turn wrote (the next turn starts from the prev
 message changes nothing.
 
 A State Write node runs every turn unless you gate it: connect a Condition branch (or a Random chance output) to
-its **Run when** input and it only writes when that branch is taken, whatever the operation is.
+its **Run when** input and it only writes when that branch is taken, whatever the operation is. A State Write can
+also store a fixed value (its **Value** setting) when nothing is connected to its **Value** input, so setting a
+mood to `"tense"` or adding 2 needs no helper node; a connected input overrides the setting.
 
 ## Organizing with comments
 

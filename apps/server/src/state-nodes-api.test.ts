@@ -60,6 +60,30 @@ describe('State Read and State Write through the API', () => {
     await app.close();
   });
 
+  it('makes the Value input optional when the node has a fixed value, and validates accordingly', async () => {
+    const app = await open();
+    const definition = await define(app);
+    const setting = { definitionId: definition.id, key: 'tension', op: 'set' };
+    const needed = await ports(app, 'state-write', setting);
+    expect(needed.json().inputs[0]).toMatchObject({ name: 'value', required: true });
+    const fixed = await ports(app, 'state-write', { ...setting, value: 5 });
+    expect(fixed.json().inputs[0]).toMatchObject({ name: 'value', requiredIfConnected: true });
+    expect(fixed.json().inputs[0].required).toBeUndefined();
+
+    const flow = (config: object) =>
+      workflowBody(
+        [node('input', 'chat-input', {}), node('output', 'chat-output', {}), node('mark', 'state-write', config)],
+        [edge('input', 'message', 'output', 'value')],
+      );
+    const unset = (await call(app, 'POST', '/api/workflows', flow(setting))).json() as Workflow;
+    const refused = await call(app, 'POST', `/api/workflows/${unset.id}/validate`);
+    expect(refused.statusCode).toBe(422);
+    const set = (await call(app, 'POST', '/api/workflows', flow({ ...setting, value: 5 }))).json() as Workflow;
+    const accepted = await call(app, 'POST', `/api/workflows/${set.id}/validate`);
+    expect(accepted.json()).toEqual({ valid: true, errors: [] });
+    await app.close();
+  });
+
   it.each([
     [{}, 'Select a state definition'],
     [{ definitionId: randomUUID(), key: 'tension' }, 'not found'],

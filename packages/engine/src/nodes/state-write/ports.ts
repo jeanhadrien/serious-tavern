@@ -27,8 +27,22 @@ const gate: PortDef = {
     'Optional. Connect a branch (for example a Condition output) and the write only runs when that branch does. Not connected, it runs every turn.',
 };
 
-/** The `value` input an operation takes; none for `delete`. */
-function valueInput(def: StateKeyDef, op: StateNodeOp): PortDef[] {
+/**
+ * The node's fixed `value` setting, or undefined when it has none. It stands in for the `value` input while that
+ * is not connected (a connected input wins). A cleared (null) setting counts as none; any other value, an
+ * empty text included, is a value, and is checked like one from the input.
+ */
+export function fixedValue(config: Record<string, unknown>): unknown {
+  return config.value ?? undefined;
+}
+
+/**
+ * The `value` input an operation takes; none for `delete`. With a fixed value the input is optional, since
+ * the node has something to store without it; without one it must be connected.
+ */
+function valueInput(def: StateKeyDef, op: StateNodeOp, fixed: boolean): PortDef[] {
+  const needed = fixed ? { requiredIfConnected: true } : { required: true };
+  const instead = fixed ? " A connected value is used instead of the node's fixed value." : '';
   switch (op) {
     case 'delete':
       return [];
@@ -39,7 +53,7 @@ function valueInput(def: StateKeyDef, op: StateNodeOp): PortDef[] {
           label: 'Amount',
           dataType: 'number',
           requiredIfConnected: true,
-          description: 'How much to add; 1 when not connected. Negative numbers subtract.',
+          description: "How much to add; negative numbers subtract. Not connected: the node's fixed value, else 1.",
         },
       ];
     case 'add':
@@ -48,8 +62,8 @@ function valueInput(def: StateKeyDef, op: StateNodeOp): PortDef[] {
           name: 'value',
           label: 'Item',
           dataType: 'any',
-          required: true,
-          description: 'Text, or an object with a text field and the declared fields of the key',
+          ...needed,
+          description: `Text, or an object with a text field and the declared fields of the key.${instead}`,
         },
       ];
     case 'remove':
@@ -58,8 +72,8 @@ function valueInput(def: StateKeyDef, op: StateNodeOp): PortDef[] {
           name: 'value',
           label: 'Item id',
           dataType: 'text',
-          required: true,
-          description: 'The id of the item to remove, e.g. from an item this key holds',
+          ...needed,
+          description: `The id of the item to remove, e.g. from an item this key holds.${instead}`,
         },
       ];
     default:
@@ -68,8 +82,8 @@ function valueInput(def: StateKeyDef, op: StateNodeOp): PortDef[] {
           name: 'value',
           label: 'Value',
           dataType: stateKeyPortType(def.type),
-          required: true,
-          description: 'The value to store',
+          ...needed,
+          description: `The value to store.${instead}`,
         },
       ];
   }
@@ -86,10 +100,14 @@ const OUTPUT_DESCRIPTION: Record<StateNodeOp, string> = {
   delete: 'The default the key goes back to',
 };
 
-/** Ports of a State Write node for a key and operation. */
-export function writePorts(def: StateKeyDef, op: StateNodeOp): { inputs: PortDef[]; outputs: PortDef[] } {
+/** Ports of a State Write node for a key and operation; `fixed` says the node has a fixed value setting. */
+export function writePorts(
+  def: StateKeyDef,
+  op: StateNodeOp,
+  fixed = false,
+): { inputs: PortDef[]; outputs: PortDef[] } {
   return {
-    inputs: [...valueInput(def, op), gate],
+    inputs: [...valueInput(def, op, fixed), gate],
     outputs: [
       {
         name: 'value',

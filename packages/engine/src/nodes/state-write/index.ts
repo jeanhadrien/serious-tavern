@@ -3,7 +3,7 @@ import { stateNodeOps } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { locateConfigured } from '../state-key.js';
 import { planWrite } from './plan.js';
-import { checkOp, writePorts } from './ports.js';
+import { checkOp, fixedValue, writePorts } from './ports.js';
 
 export const stateWrite: NodeDefinition = {
   type: 'state-write',
@@ -19,20 +19,30 @@ export const stateWrite: NodeDefinition = {
     definitionId: z.string().min(1, 'Select a state definition'),
     key: z.string().min(1, 'Select a key'),
     op: z.enum(stateNodeOps).default('set').describe('What to do; the choices depend on the key type'),
+    // JSON data like any config, so it keeps its type: 5, true, "tense" or {"text": "a storm"}.
+    value: z
+      .unknown()
+      .optional()
+      .describe(
+        'A fixed value to store when nothing is connected to Value (a connected one wins). It has to fit the key, like a connected one.',
+      ),
   }),
   defaultConfig: { definitionId: '', key: '', op: 'set' },
   async resolvePorts(config, resources) {
     const found = await locateConfigured(config, (id) => resources.stateDefinitions?.get(id));
-    return writePorts(found.def, checkOp(found.def, String(config.op ?? 'set')));
+    return writePorts(found.def, checkOp(found.def, String(config.op ?? 'set')), fixedValue(config) !== undefined);
   },
   async execute(ctx) {
     const found = await locateConfigured(ctx.config, (id) => ctx.state.definition(id));
     const op = checkOp(found.def, String(ctx.config.op));
     // The start-of-turn value: reads never see this run's writes, however many nodes wrote the key.
     const current = ctx.state.read(found.definition.id, found.key)?.value;
+    // A connected value wins; otherwise the node's fixed one stands in for it, checked the same way.
+    const connected = Object.hasOwn(ctx.inputs, 'value');
+    const fixed = fixedValue(ctx.config);
     const plan = planWrite(found, op, {
-      connected: Object.hasOwn(ctx.inputs, 'value'),
-      value: ctx.inputs.value,
+      connected: connected || fixed !== undefined,
+      value: connected ? ctx.inputs.value : fixed,
       current,
     });
     for (const line of plan.logs) ctx.log(line);
