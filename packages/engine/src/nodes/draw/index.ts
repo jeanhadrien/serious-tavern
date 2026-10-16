@@ -1,10 +1,16 @@
 import { z } from 'zod';
 import type { NodeDefinition } from '../../types.js';
-import { candidates, entryOutput, loadCollections } from '../../collections.js';
+import { candidates, entryOutput, loadCollections, type Candidate } from '../../collections.js';
 import { describeValue } from '../../text.js';
+import { entryKey, recentEntryKeys } from './recent.js';
 import { describeDraw, drawEntries, type DrawFilters } from './select.js';
 
-type DrawConfig = DrawFilters & { collectionIds: string[]; count: number; useWeights: boolean };
+type DrawConfig = DrawFilters & {
+  collectionIds: string[];
+  count: number;
+  useWeights: boolean;
+  avoidRecent: number;
+};
 
 const level = z.number().int().min(1, 'Levels go from 1 to 5').max(5, 'Levels go from 1 to 5');
 
@@ -89,6 +95,12 @@ export const draw: NodeDefinition = {
       minLevel: level.optional(),
       maxLevel: level.optional(),
       useWeights: z.boolean().default(true).describe('Off: every eligible entry has the same chance'),
+      avoidRecent: z
+        .number()
+        .int()
+        .min(0)
+        .default(0)
+        .describe('Skip entries drawn in the last N turns of this chat; 0 = off'),
     })
     .superRefine((config, issues) => {
       // Object-level: zod returns a `.default()` value without running the array's own checks.
@@ -97,7 +109,15 @@ export const draw: NodeDefinition = {
       if (config.minLevel !== undefined && config.maxLevel !== undefined && config.minLevel > config.maxLevel)
         issues.addIssue({ code: 'custom', path: ['maxLevel'], message: 'Max level must be at least min level' });
     }),
-  defaultConfig: { collectionIds: [], count: 1, requireTags: [], anyTags: [], excludeTags: [], useWeights: true },
+  defaultConfig: {
+    collectionIds: [],
+    count: 1,
+    requireTags: [],
+    anyTags: [],
+    excludeTags: [],
+    useWeights: true,
+    avoidRecent: 0,
+  },
   async execute(ctx) {
     const config = ctx.config as DrawConfig;
     // Both inputs are requiredIfConnected: present here means connected, so a skipped source skips the node.
@@ -109,11 +129,26 @@ export const draw: NodeDefinition = {
       maxLevel: Object.hasOwn(ctx.inputs, 'maxLevel') ? levelInput(ctx.inputs.maxLevel) : config.maxLevel,
     };
     const collections = await loadCollections(ctx, config.collectionIds);
-    const options = { count: config.count, useWeights: config.useWeights };
+    // Off (0): nothing is read or remembered. On: what this node drew in the last N turns of the chat is left
+    // out, and what it draws now is remembered under its own `draws` key (undone with the reply).
+    const recent =
+      config.avoidRecent > 0 ? recentEntryKeys(ctx.state.own('draws'), ctx.state.turn, config.avoidRecent) : undefined;
+    const options = {
+      count: config.count,
+      useWeights: config.useWeights,
+      ...(recent && { isExcluded: (candidate: Candidate) => recent.has(entryKey(candidate)) }),
+    };
     const result = drawEntries(candidates(collections), filters, options, ctx.random);
     const reason = describeDraw(result, filters, options);
     // Nothing eligible: `entry`, `text` and `level` are absent (a node that requires them is skipped).
     if (!result.drawn.length) return { entries: [], reason };
+    if (recent)
+      for (const candidate of result.drawn)
+        ctx.writeState({
+          target: { kind: 'node', key: 'draws' },
+          op: 'add',
+          item: { text: candidate.entry.text, entryKey: entryKey(candidate) },
+        });
     const entries = result.drawn.map(entryOutput);
     const first = entries[0]!;
     return {

@@ -70,6 +70,14 @@ export function DrawPanel({ descriptor, config, onChange, context }: NodeConfigP
         Off: every entry has the same chance. Weight 0 is never drawn. Connected Max level and Tags inputs override
         these settings.
       </p>
+      <DraftInput
+        label="Avoid recent draws"
+        value={Number(value('avoidRecent') ?? 0)}
+        format={String}
+        parse={(text) => parseCount(text, 0)}
+        onCommit={(next) => set('avoidRecent', next)}
+        hint="Skip entries drawn in the last N turns (0 = off). Remembered per chat; deleting a reply forgets its draws."
+      />
     </div>
   );
 }
