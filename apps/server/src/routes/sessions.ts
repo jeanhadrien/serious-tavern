@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { apiContract, type ApiResponse } from '@st/shared';
 import { now, type AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
+import { sessionStateView } from '../services/session-state.js';
 import { updateSession } from '../services/sessions.js';
 import type { ApiRoute } from './types.js';
 
@@ -38,6 +39,9 @@ export function registerSessions(app: FastifyInstance, context: AppContext) {
   });
   app.get<ApiRoute<'getSession'>>('/api/sessions/:id', async (request) =>
     requireEntity(sessions, apiContract.getSession.params.parse(request.params).id, 'Session'),
+  );
+  app.get<ApiRoute<'getSessionState'>>('/api/sessions/:id/state', async (request) =>
+    sessionStateView(context, apiContract.getSessionState.params.parse(request.params).id),
   );
   app.patch<ApiRoute<'updateSession'>>('/api/sessions/:id', async (request) => {
     const { id } = apiContract.updateSession.params.parse(request.params);

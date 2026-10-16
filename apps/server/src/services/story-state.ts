@@ -47,3 +47,10 @@ export function foldSession(
     ],
   };
 }
+
+export async function loadStoryState(
+  repository: Pick<StateDefinitionRepository, 'list'>,
+  session: Pick<Session, 'messages' | 'state'>,
+): Promise<SessionStory> {
+  return foldSession(await listDefinitions(repository), session);
+}

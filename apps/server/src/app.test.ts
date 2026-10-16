@@ -208,6 +208,9 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     const sessions = await request('listSessions', { method: 'GET', url: '/api/sessions' });
     expect(sessions[0]?.messageCount).toBe(2);
     await request('getSession', { method: 'GET', url: `/api/sessions/${session.id}` });
+    const story = await request('getSessionState', { method: 'GET', url: `/api/sessions/${session.id}/state` });
+    expect(story.turn).toBe(2);
+    expect(story.turns.map((entry) => entry.turnNumber)).toEqual([1]);
     await request('getExecution', { method: 'GET', url: `/api/executions/${message.execution.id}` });
     const streamed = await app.inject({
       method: 'POST',

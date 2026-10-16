@@ -134,6 +134,57 @@ it('describes state definitions: keys are required on a write, defaulted on a st
   expect(stateDefinitionInUseDetailsSchema.safeParse({ sessions: [] }).success).toBe(false);
 });
 
+it("describes a chat's computed story state: keys by name, turns with their writes", () => {
+  const meta = { written: true, turnsSinceWrite: 1, writtenAtTurn: 2 };
+  const view = {
+    turn: 3,
+    definitions: [
+      {
+        definitionId: 'd',
+        name: 'scene',
+        values: { tension: 4, injected: [{ id: 'i', text: 'x' }] },
+        meta: { tension: meta, injected: { ...meta, count: 1, droppedByCap: 0 } },
+        history: { tension: [{ turn: 2, value: 4 }], injected: [{ turn: 2, value: 1 }] },
+        warnings: [
+          { definition: 'scene', key: 'mood', message: 'Stored value 1 is not one of: calm; using default calm' },
+        ],
+      },
+    ],
+    nodes: [
+      { nodeId: 'pick', label: 'Draw #1 (draw)', values: { draws: [] }, meta: { draws: meta }, history: { draws: [] } },
+    ],
+    turns: [
+      {
+        executionId: 'e1',
+        at: 'a',
+        completed: true,
+        replies: 1,
+        turnNumber: 1,
+        writes: [
+          {
+            write: {
+              op: 'set',
+              target: { kind: 'definition', definitionId: 'd', key: 'tension' },
+              nodeId: 'w',
+              value: 4,
+            },
+            definitionName: 'scene',
+            nodeLabel: 'State Write #1 (state-write)',
+          },
+        ],
+      },
+      { executionId: 'e2', at: 'b', completed: false, replies: 0, turnNumber: null, writes: [] },
+    ],
+  };
+  expect(apiContract.getSessionState.response.parse(view)).toEqual(view);
+  expect(apiContract.getSessionState.params.safeParse({ id: 'not-a-uuid' }).success).toBe(false);
+  // A turn number is a number or null, never missing; a node's label may be left out.
+  const { turnNumber: _turnNumber, ...unnumbered } = view.turns[1]!;
+  expect(apiContract.getSessionState.response.safeParse({ ...view, turns: [unnumbered] }).success).toBe(false);
+  const { label: _label, ...nameless } = view.nodes[0]!;
+  expect(apiContract.getSessionState.response.safeParse({ ...view, nodes: [nameless] }).success).toBe(true);
+});
+
 it('describes collections: full records to write, summaries to list', () => {
   expect(apiContract.createCollection.body.parse({ name: 'Lore', entries: [{ text: 'a' }] })).toEqual({
     name: 'Lore',
