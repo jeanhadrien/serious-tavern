@@ -21,8 +21,19 @@ export function Workflows() {
 }
 
 function WorkflowEditor() {
-  const { types, presets, characters, providersList, collectionsList, workflow, setWorkflow, canvas, save, validate } =
-    useWorkflowEditor();
+  const {
+    types,
+    presets,
+    characters,
+    providersList,
+    collectionsList,
+    stateDefinitionsList,
+    workflow,
+    setWorkflow,
+    canvas,
+    save,
+    validate,
+  } = useWorkflowEditor();
   const [settingsOpen, setSettingsOpen] = useState(false);
   // The draft's raw declarations (items that don't parse included); node panels hint the usable ones.
   const settings = workflow?.settings;
@@ -58,6 +69,7 @@ function WorkflowEditor() {
                 characters={characters}
                 providersList={providersList}
                 collections={collectionsList}
+                stateDefinitions={stateDefinitionsList}
                 settings={hinted}
                 updateConfig={canvas.updateConfig}
                 onDelete={canvas.deleteNode}

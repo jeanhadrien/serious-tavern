@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { presetSchema, settingsCatalog, type Preset } from '@st/shared';
+import { presetSchema, settingsCatalog, stateHints, type Preset } from '@st/shared';
 import { presetsApi } from '../api.js';
-import { presetEditorStore, presetsStore, useEditorCommands, useList, workflowsStore } from '../stores/index.js';
+import {
+  presetEditorStore,
+  presetsStore,
+  stateDefinitionsStore,
+  useEditorCommands,
+  useList,
+  workflowsStore,
+} from '../stores/index.js';
 import { alerts } from '../alerts/index.js';
 import { PresetEditor } from './presets/PresetEditor.js';
 import { PresetEntryEditor } from './presets/PresetEntryEditor.js';
@@ -21,6 +28,9 @@ export function Presets() {
   // A preset isn't tied to one workflow, so its hints offer every key any workflow declares.
   const workflows = useList(workflowsStore);
   const settings = useMemo(() => settingsCatalog(workflows), [workflows]);
+  // Story state keys come from the definitions, never from a hand-written list.
+  const definitions = useList(stateDefinitionsStore);
+  const state = useMemo(() => stateHints(definitions), [definitions]);
 
   const openPreset = (preset: Preset, entryId: string) => {
     setDraft(structuredClone(preset));
@@ -92,6 +102,7 @@ export function Presets() {
               entry={selectedEntry}
               readOnly={readOnly}
               settings={settings}
+              state={state}
               onChange={(next) =>
                 change({ ...draft, entries: draft.entries.map((item) => (item.id === next.id ? next : item)) })
               }

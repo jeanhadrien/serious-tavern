@@ -6,6 +6,7 @@ import type {
   Preset,
   ProviderModelList,
   ProviderView,
+  StateDefinition,
   WorkflowSetting,
 } from '@st/shared';
 
@@ -21,6 +22,8 @@ export type NodePanelContext = {
   /** Authored collections for Recall and Draw; ids without a record show as unknown. */
   collections?: readonly Pick<CollectionSummary, 'id' | 'name'>[];
   renderLink?(to: string, label: string): ReactNode;
+  /** State definitions (whole records) for the State panels and the `{{state.*}}` hints in template fields. */
+  stateDefinitions?: readonly StateDefinition[];
   /** Chat settings the open workflow declares, hinted as `{{settings.<key>}}` in template fields. */
   settings?: readonly Pick<WorkflowSetting, 'key' | 'type' | 'description'>[];
 };

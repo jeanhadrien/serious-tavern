@@ -1,5 +1,5 @@
 import { useRef, type ChangeEvent } from 'react';
-import { macroHints } from '@st/shared';
+import { macroHints, stateHints } from '@st/shared';
 import type { NodeConfigPanelProps as Props } from './panels/types.js';
 import { CharacterPanel } from './panels/character.js';
 import { LlmPanel } from './panels/llm.js';
@@ -28,6 +28,7 @@ function GenericPanel({ descriptor, config, onChange, context }: Props) {
   const variables = macroHints(
     descriptor.inputs.map((port) => ({ key: port.name, dataType: port.dataType })),
     context?.settings,
+    context?.stateDefinitions && stateHints(context.stateDefinitions),
   );
   const insert = (field: string, expression: string) => {
     const target = focused.current;

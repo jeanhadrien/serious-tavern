@@ -18,6 +18,7 @@ export function WorkflowConfigPanel({
   providersList,
   collections,
   settings,
+  stateDefinitions,
   updateConfig,
   onDelete,
   onClose,
@@ -30,6 +31,8 @@ export function WorkflowConfigPanel({
   collections?: NodePanelContext['collections'];
   /** The draft's chat settings, hinted in template fields. */
   settings?: readonly WorkflowSetting[];
+  /** State definitions, for the State panels and `{{state.*}}` hints. */
+  stateDefinitions?: NodePanelContext['stateDefinitions'];
   updateConfig: (config: NodeInstance['config']) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
@@ -64,6 +67,7 @@ export function WorkflowConfigPanel({
             collections,
             loadModels,
             settings,
+            stateDefinitions,
             renderLink: (to, label) => <PanelLink to={to} label={label} />,
           }}
         />

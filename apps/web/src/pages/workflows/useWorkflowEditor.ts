@@ -8,6 +8,7 @@ import {
   collectionsStore,
   presetsStore,
   providersStore,
+  stateDefinitionsStore,
   useEditorCommands,
   useList,
   workflowEditorStore,
@@ -35,6 +36,8 @@ export function useWorkflowEditor() {
   const providersList = useList(providersStore);
   // The Recall and Draw panels' collection pickers; the store follows `collections.changed`.
   const collectionsList = useList(collectionsStore);
+  // The State Read and State Write pickers and the `{{state.*}}` hints; the store follows `stateDefinitions.changed`.
+  const stateDefinitionsList = useList(stateDefinitionsStore);
   const [workflow, setWorkflow] = useState<Workflow>();
   const [saved, setSaved] = useState('');
   const canvas = useWorkflowCanvas(types, presets, characters);
@@ -121,5 +124,17 @@ export function useWorkflowEditor() {
       /* API errors are toasted. */
     }
   };
-  return { types, presets, characters, providersList, collectionsList, workflow, setWorkflow, canvas, save, validate };
+  return {
+    types,
+    presets,
+    characters,
+    providersList,
+    collectionsList,
+    stateDefinitionsList,
+    workflow,
+    setWorkflow,
+    canvas,
+    save,
+    validate,
+  };
 }

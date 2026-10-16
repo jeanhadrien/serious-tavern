@@ -5,6 +5,7 @@ import {
   presetSchema,
   type Preset,
   type PresetEntry,
+  type StateHint,
   type WorkflowSetting,
 } from '@st/shared';
 
@@ -15,6 +16,8 @@ export function PresetEntryEditor(props: {
   readOnly: boolean;
   /** Chat settings declared by any workflow, hinted as `{{settings.<key>}}`. */
   settings?: readonly WorkflowSetting[];
+  /** Keys of the state definitions, hinted as `{{state.<definition>.<key>}}` (`stateHints`). */
+  state?: readonly StateHint[];
   onChange(entry: PresetEntry): void;
 }) {
   const contentRef = useRef<HTMLTextAreaElement | null>(null);
@@ -140,7 +143,7 @@ export function PresetEntryEditor(props: {
             </label>
             <div className="template-hints">
               <small>Insert variable at cursor</small>
-              {macroHints(preset.inputs, props.settings).map((variable) => (
+              {macroHints(preset.inputs, props.settings, props.state).map((variable) => (
                 <button
                   type="button"
                   key={variable.expression}
