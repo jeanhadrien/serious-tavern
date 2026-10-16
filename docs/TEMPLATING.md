@@ -155,8 +155,10 @@ State Write node's `value` output where you need it. Because state belongs to th
 deleting a reply rewinds what its turn wrote (the next turn starts from the previous values), while editing a
 message changes nothing.
 
-## Organizing with comments
+A State Write node runs every turn unless you gate it: connect a Condition branch (or a Random chance output) to
+its **Run when** input and it only writes when that branch is taken, whatever the operation is.
 
+## Organizing with comments
 
 ```hbs
 {{! Only used by the tavern workflow; the debug workflow has no weather input. }}
