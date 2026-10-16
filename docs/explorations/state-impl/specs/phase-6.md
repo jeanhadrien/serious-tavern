@@ -1,0 +1,23 @@
+HISTORY SUMMARIES (STATE-DESIGN-PROPOSAL-3 Part 3). Summaries are tied to the messages they cover, not to the turn that wrote them. The prompt gets the most recent messages raw and older history as summaries of fixed chunks. A summary is used only while its covered messages are unchanged; otherwise that chunk falls back to raw messages and is summarized again.
+
+SHARED
+- Session gains `summaries: Record<setName, Summary[]>` (additive, default {}). `Summary = { id, messageIds: string[] (in chat order), fingerprint: string, text: string, createdAt, executionId }`.
+- Fingerprint: a stable hash (pure JS, in shared; reuse the engine's hash if it can move to shared cleanly) over the covered messages' ids AND contents (role + name + content) in order.
+- Pure validity function: a summary is valid iff every id in `messageIds` still exists among history messages (status final/undefined) and the recomputed fingerprint equals the stored one. Pure chunk planner (see Next Chunk). Both table-tested.
+
+ENGINE NODES (category 'History')
+- `next-chunk` ('Next Chunk'): config `set` (string, default 'main', template-safe), `chunkSize` (int >= 2, default 20), `rawWindow` (int >= 0, default 16). Needs the session's history (all history messages, not only Memory's lastN) and the session's summaries for the set → provide them through the execution context (e.g. `ctx.summaries` snapshot passed by the server at run start). Algorithm over history messages excluding the last `rawWindow`: walk existing summaries of the set in chat order; the FIRST summary that is invalid → its chunk is re-planned over its surviving message ids (if none survive, it's simply dropped) and returned; otherwise, if at least `chunkSize` consecutive messages after the last covered message (or from the start) are uncovered and outside the raw window → return the next chunk of exactly `chunkSize` messages. Otherwise return nothing (outputs optional → downstream skipped). Outputs: `messages` (messages), `text` (text transcript like Memory's text format), `chunk` (object ref `{ set, messageIds, fingerprint, replaces?: summaryId }`). One chunk per run.
+- `save-summary` ('Save Summary', `sink: true`): inputs `chunk` (object, required) and `text` (text, required, trimmed, must be non-empty). Buffers a summary write (like state writes: returned with the result and on ExecutionFailure for completed nodes). Output `summary` (object) pass-through.
+- `memory` (existing) gains config `summarySet` (string, default '' = off). When set: output = for history before the raw window (`lastN` keeps meaning "the last N messages raw"), valid summaries of that set replace the runs of messages they cover (rendered as a system-role message `[Summary of earlier messages]\n<text>` in messages format, and as `Summary: <text>` lines in text format), uncovered messages stay raw; then the last N raw messages. With `summarySet` empty, behaviour is exactly as today (existing tests unchanged). Note: `lastN: 0` today means no history — keep that meaning for the raw part.
+
+SERVER
+- Pass the summaries snapshot (and full history) to every run (reply and post parts). Commit summary writes at settle (reply part: in settleTurn's mutation; post part: in the post-run settle) under the session lock: re-check the fingerprint against the CURRENT messages at commit time; if it no longer matches, drop the write and add a warning to the execution log. A write with `replaces` removes the replaced summary. Summaries are not undone by deleting the turn that wrote them (they are not turn state).
+- `GET /api/sessions/:id/state` (or a sibling endpoint, contract first) includes per set: summaries with covered message range (first/last message id, count), validity, text, createdAt.
+- Tests: chunk planning cases (fresh chat, partial chunk, raw window, invalid middle summary re-planned, all deleted), memory output composition, commit-time fingerprint check, edit → invalid → fallback raw → re-summarized.
+
+WEB
+- Chat panel gains a "Summaries" section: per set, list chunks "messages 21–40 (20)" with valid/invalid badge and the summary text (collapsible); clicking scrolls to the first covered message. Invalid ones explain "a covered message was edited or deleted; raw messages are used until it's summarized again".
+
+SEEDED EXAMPLE (only if small): none in this phase.
+
+DOCS: README, AGENTS.md (summary validity contract, not turn state, commit-time check), docs/TEMPLATING.md if templates change.
