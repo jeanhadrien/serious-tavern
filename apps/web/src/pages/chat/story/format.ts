@@ -18,3 +18,8 @@ export function formatValue(value: unknown): string {
     return 'none';
   }
 }
+
+/** `text` in single quotes, whitespace collapsed and cut to `max` characters (the quotes not counted). */
+export function quote(text: string, max: number): string {
+  return `'${shortText(text, max)}'`;
+}

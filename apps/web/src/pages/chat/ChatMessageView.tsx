@@ -6,12 +6,16 @@ import { ExecutionDetails } from './ExecutionDetails.js';
 import { MessageContent } from './MessageContent.js';
 import { MessageActions } from './MessageActions.js';
 import { MessageEditor } from './MessageEditor.js';
+import { TurnChip } from './story/TurnChip.js';
+import type { StoryChip } from './story/turnChips.js';
 
 interface ChatMessageViewProps {
   message: ChatMessage;
   character?: Character;
   persona?: Persona;
   execution?: ExecutionLog;
+  /** What the message's turn stored in the chat's story state (only on the last reply of a turn that stored any). */
+  storyChip?: StoryChip;
   disabled?: boolean;
   onEdit?: (id: string, content: string) => Promise<boolean>;
   onDelete?: (id: string) => Promise<boolean>;
@@ -22,6 +26,7 @@ export function ChatMessageView({
   character,
   persona,
   execution,
+  storyChip,
   disabled = false,
   onEdit,
   onDelete,
@@ -98,6 +103,7 @@ export function ChatMessageView({
           {message.status === 'partial' && <small className="message-stopped">Stopped before it finished</small>}
         </>
       )}
+      {storyChip && !editing && <TurnChip chip={storyChip} />}
       {message.executionId && <ExecutionDetails id={message.executionId} cached={execution} />}
     </article>
   );

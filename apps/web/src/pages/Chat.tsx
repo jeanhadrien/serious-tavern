@@ -43,6 +43,7 @@ export function Chat({ chat }: { chat: ChatState }) {
                 characters={chat.characters}
                 persona={chat.personas.find((item) => item.id === session.personaId)}
                 logs={chat.logs}
+                story={story.view}
                 busy={chat.busy}
                 disabled={locked}
                 onEdit={chat.editMessage}

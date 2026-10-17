@@ -178,3 +178,59 @@ it("shows a node's log lines in the execution details", () => {
   expect(html).toContain('<p class="error">No JSON value found in the text</p>');
   expect(html).toContain('<pre>Input: &lt;nope&gt;</pre>');
 });
+
+it('shows the story chip on a message only when it is given one, and puts it on the last reply of a turn', () => {
+  const base = { role: 'assistant' as const, content: 'Hi', createdAt: '' };
+  const chip = { turnNumber: 2, lines: ['scene.tension → 7'], editedAfter: false };
+  expect(renderToStaticMarkup(<ChatMessageView message={{ id: 'a', ...base }} storyChip={chip} />)).toContain(
+    'aria-label="What this turn stored"',
+  );
+  expect(renderToStaticMarkup(<ChatMessageView message={{ id: 'a', ...base }} />)).not.toContain(
+    'What this turn stored',
+  );
+  const messages = [
+    { id: 'first', ...base, executionId: 'e1', nodeId: 'a' },
+    { id: 'last', ...base, executionId: 'e1', nodeId: 'b' },
+  ];
+  const story = {
+    turn: 2,
+    definitions: [],
+    nodes: [],
+    turns: [
+      {
+        executionId: 'e1',
+        at: '',
+        completed: true,
+        replies: 2,
+        turnNumber: 1,
+        writes: [
+          {
+            write: {
+              op: 'set' as const,
+              target: { kind: 'definition' as const, definitionId: 'd', key: 'tension' },
+              nodeId: 'n',
+              value: 7,
+            },
+            definitionName: 'scene',
+          },
+        ],
+      },
+    ],
+  };
+  const list = renderToStaticMarkup(
+    <MessageList
+      sessionId="s"
+      messages={messages}
+      characters={[]}
+      logs={{}}
+      story={story}
+      busy={false}
+      disabled={false}
+      onEdit={async () => true}
+      onDelete={async () => true}
+    />,
+  );
+  expect(list.match(/What this turn stored/g)).toHaveLength(2); // aria-label and title of the one button
+  expect(list.indexOf('What this turn stored')).toBeGreaterThan(list.indexOf('data-execution-id="e1"'));
+  expect(list.lastIndexOf('data-execution-id="e1"')).toBeLessThan(list.indexOf('What this turn stored'));
+});

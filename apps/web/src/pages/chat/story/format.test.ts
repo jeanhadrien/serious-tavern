@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { formatValue, shortText } from './format.js';
+import { formatValue, quote, shortText } from './format.js';
 
 it('collapses whitespace and cuts with an ellipsis only when too long', () => {
   expect(shortText('  a   bell\non\ta lost animal ', 40)).toBe('a bell on a lost animal');
@@ -35,4 +35,10 @@ it('cuts a long object and survives values JSON cannot hold', () => {
   circular.self = circular;
   expect(formatValue(circular)).toBe('none');
   expect(formatValue(() => 1)).toBe('none');
+});
+
+it('quotes text with single quotes after collapsing and cutting it', () => {
+  expect(quote('a  bell\non a lost animal', 60)).toBe("'a bell on a lost animal'");
+  expect(quote('abcdefgh', 5)).toBe("'abcd…'");
+  expect(quote('', 5)).toBe("''");
 });

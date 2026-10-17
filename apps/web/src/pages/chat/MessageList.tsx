@@ -1,5 +1,7 @@
-import type { Character, ChatMessage, ExecutionLog, Persona } from '@st/shared';
+import { useMemo } from 'react';
+import type { Character, ChatMessage, ExecutionLog, Persona, SessionStateView } from '@st/shared';
 import { ChatMessageView } from './ChatMessageView.js';
+import { chipsFor, describeTurns } from './story/turnChips.js';
 import { useStickToBottom } from './useStickToBottom.js';
 
 interface MessageListProps {
@@ -8,6 +10,8 @@ interface MessageListProps {
   characters: Character[];
   persona?: Persona;
   logs: Record<string, ExecutionLog>;
+  /** The chat's story state view, for the "What this turn stored" chips. */
+  story?: SessionStateView;
   busy: boolean;
   disabled: boolean;
   onEdit: (id: string, content: string) => Promise<boolean>;
@@ -20,12 +24,16 @@ export function MessageList({
   characters,
   persona,
   logs,
+  story,
   busy,
   disabled,
   onEdit,
   onDelete,
 }: MessageListProps) {
   const { viewport, content, onScroll } = useStickToBottom(sessionId, messages);
+  // The lines are described once per loaded view; placing the chips is one pass over the messages.
+  const turns = useMemo(() => describeTurns(story), [story]);
+  const chips = chipsFor(turns, messages);
   // Once a reply row is streaming the text itself is the progress indicator.
   const waiting = busy && !messages.some((message) => message.status === 'streaming');
   return (
@@ -39,6 +47,7 @@ export function MessageList({
             character={characters.find((card) => card.id === message.characterId)}
             persona={persona}
             execution={message.executionId ? logs[message.executionId] : undefined}
+            storyChip={chips.get(message.id)}
             disabled={disabled}
             onEdit={onEdit}
             onDelete={onDelete}

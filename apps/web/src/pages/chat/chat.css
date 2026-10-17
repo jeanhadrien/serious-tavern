@@ -347,3 +347,37 @@ button.stop-generation:hover {
     padding: 12px;
   }
 }
+
+/* "What this turn stored": a small button on the last reply of a turn that stored story state, with an inline card. */
+.message-story {
+  margin-top: 8px;
+}
+.message-story .icon-button {
+  padding: 4px;
+  color: #a7adbd;
+}
+.message-story .icon-button[aria-expanded="true"] {
+  color: #c3ceff;
+  background: #3d4560;
+  border-color: #6f7fd8;
+}
+.message-story-card {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid #363b46;
+  border-radius: 8px;
+  background: #1d2028;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.message-story-card ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 3px;
+}
+.message-story-card .hint {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: #f2c98b;
+}
