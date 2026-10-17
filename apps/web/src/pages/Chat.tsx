@@ -1,11 +1,13 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import type { ChatState } from './chat/useChat.js';
 import { ChatHeader } from './chat/ChatHeader.js';
 import { MessageList } from './chat/MessageList.js';
 import { Composer } from './chat/Composer.js';
 import { ChatPanel } from './chat/ChatPanel.js';
+import { undoneByDelete } from './chat/story/undoList.js';
 import { useStoryState } from './chat/story/useStoryState.js';
+import { stateDefinitionsStore, useList } from '../stores/index.js';
 import './chat/chat.css';
 
 /** The open conversation: header, messages and composer. The shell owns `useChat`, so the session list can share it. */
@@ -16,6 +18,15 @@ export function Chat({ chat }: { chat: ChatState }) {
   const closePanel = useCallback(() => setPanelOpen(false), []);
   // One fetch of the chat's story state; it reloads when a turn or a message change finishes, never per token.
   const story = useStoryState(session?.id, !locked);
+  // What deleting a reply would undo; the shared fold runs only when the trash button is clicked.
+  const definitions = useList(stateDefinitionsStore);
+  const messages = session?.messages;
+  const view = story.view;
+  const undoOnDelete = useMemo(
+    () =>
+      messages && view ? (messageId: string) => undoneByDelete({ messageId, messages, view, definitions }) : undefined,
+    [messages, view, definitions],
+  );
   return (
     <section className="chat-main">
       {session ? (
@@ -44,6 +55,7 @@ export function Chat({ chat }: { chat: ChatState }) {
                 persona={chat.personas.find((item) => item.id === session.personaId)}
                 logs={chat.logs}
                 story={story.view}
+                undoOnDelete={undoOnDelete}
                 busy={chat.busy}
                 disabled={locked}
                 onEdit={chat.editMessage}

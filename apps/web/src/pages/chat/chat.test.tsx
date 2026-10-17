@@ -8,6 +8,7 @@ import { Composer } from './Composer.js';
 import { MessageEditor } from './MessageEditor.js';
 import { MessageList } from './MessageList.js';
 import { ExecutionDetails } from './ExecutionDetails.js';
+import { MessageActions } from './MessageActions.js';
 
 const key = { key: 'Enter', shiftKey: false, ctrlKey: false, metaKey: false, isComposing: false };
 it.each([
@@ -233,4 +234,19 @@ it('shows the story chip on a message only when it is given one, and puts it on 
   expect(list.match(/What this turn stored/g)).toHaveLength(2); // aria-label and title of the one button
   expect(list.indexOf('What this turn stored')).toBeGreaterThan(list.indexOf('data-execution-id="e1"'));
   expect(list.lastIndexOf('data-execution-id="e1"')).toBeLessThan(list.indexOf('What this turn stored'));
+});
+
+it('keeps the inline delete step until the trash button is clicked, even when deleting would undo story state', () => {
+  const html = renderToStaticMarkup(
+    <MessageActions
+      disabled={false}
+      onEdit={() => {}}
+      onDelete={async () => true}
+      undoOnDelete={() => {
+        throw new Error('asked while rendering');
+      }}
+    />,
+  );
+  expect(html).toContain('aria-label="Delete message"');
+  expect(html).not.toContain('Delete message?');
 });

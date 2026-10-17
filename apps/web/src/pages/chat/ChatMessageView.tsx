@@ -16,6 +16,8 @@ interface ChatMessageViewProps {
   execution?: ExecutionLog;
   /** What the message's turn stored in the chat's story state (only on the last reply of a turn that stored any). */
   storyChip?: StoryChip;
+  /** What deleting the message would undo of the story state (see `MessageActions`). */
+  undoOnDelete?: () => readonly string[] | undefined;
   disabled?: boolean;
   onEdit?: (id: string, content: string) => Promise<boolean>;
   onDelete?: (id: string) => Promise<boolean>;
@@ -27,6 +29,7 @@ export function ChatMessageView({
   persona,
   execution,
   storyChip,
+  undoOnDelete,
   disabled = false,
   onEdit,
   onDelete,
@@ -76,6 +79,7 @@ export function ChatMessageView({
             disabled={disabled || editing}
             onEdit={() => setEditing(true)}
             onDelete={() => onDelete(message.id)}
+            undoOnDelete={undoOnDelete}
           />
         )}
       </div>

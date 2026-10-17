@@ -11,7 +11,6 @@ export function TurnChipCard({ chip, id }: { chip: StoryChip; id?: string }) {
       <ul>
         {chip.lines.map((line, index) => (
           // A turn can write the same words twice (two Draw nodes): the position keeps keys unique.
-          // biome-ignore lint/suspicious/noArrayIndexKey: the lines are static text in a fixed order.
           <li key={index}>{line}</li>
         ))}
       </ul>

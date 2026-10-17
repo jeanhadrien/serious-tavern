@@ -31,6 +31,12 @@ export const addWrite = (key: string, id: string, text: string, extra: Record<st
   nodeId: 'note',
   item: { id, text, ...extra },
 });
+export const removeWrite = (key: string, itemId: string): StateWrite => ({
+  op: 'remove',
+  target: target(key),
+  nodeId: 'note',
+  itemId,
+});
 export const drawWrite = (id: string, text: string): StateWrite => ({
   op: 'add',
   target: { kind: 'node', nodeId: 'draw', key: 'draws' },

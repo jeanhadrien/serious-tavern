@@ -12,6 +12,8 @@ interface MessageListProps {
   logs: Record<string, ExecutionLog>;
   /** The chat's story state view, for the "What this turn stored" chips. */
   story?: SessionStateView;
+  /** What deleting a message would undo of the story state; asked lazily, on the delete click. */
+  undoOnDelete?: (messageId: string) => readonly string[] | undefined;
   busy: boolean;
   disabled: boolean;
   onEdit: (id: string, content: string) => Promise<boolean>;
@@ -25,6 +27,7 @@ export function MessageList({
   persona,
   logs,
   story,
+  undoOnDelete,
   busy,
   disabled,
   onEdit,
@@ -48,6 +51,7 @@ export function MessageList({
             persona={persona}
             execution={message.executionId ? logs[message.executionId] : undefined}
             storyChip={chips.get(message.id)}
+            undoOnDelete={undoOnDelete && (() => undoOnDelete(message.id))}
             disabled={disabled}
             onEdit={onEdit}
             onDelete={onDelete}
