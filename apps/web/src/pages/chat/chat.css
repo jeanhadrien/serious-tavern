@@ -361,6 +361,11 @@ button.stop-generation:hover {
   background: #3d4560;
   border-color: #6f7fd8;
 }
+@media (max-width: 700px), (pointer: coarse) {
+  .message-story .icon-button {
+    padding: 8px;
+  }
+}
 .message-story-card {
   margin: 6px 0 8px;
   padding: 8px 10px;

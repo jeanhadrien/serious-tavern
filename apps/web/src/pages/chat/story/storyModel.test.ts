@@ -1,5 +1,5 @@
-import { expect, it } from 'vitest';
-import { addWrite, buildView, drawWrite, entry, reply, scene, setWrite, userMessage } from './fixtures.js';
+import { describe, expect, it } from 'vitest';
+import { addWrite, buildView, drawWrite, entry, reply, scene, setWrite, userMessage } from './test-fixtures.js';
 import {
   definitionBlocks,
   hasStoredState,
@@ -7,7 +7,7 @@ import {
   NODE_ITEMS_SHOWN,
   nodeMemory,
   REMOVED_NODE_LABEL,
-  turnExecutionId,
+  replyExecutionId,
 } from './storyModel.js';
 
 const twoTurns = () =>
@@ -177,10 +177,10 @@ it('says whether a turn that still counts stored anything', () => {
 
 it('finds the run of a numbered turn', () => {
   const view = twoTurns();
-  expect(turnExecutionId(view, 1)).toBe('e1');
-  expect(turnExecutionId(view, 2)).toBe('e2');
-  expect(turnExecutionId(view, 3)).toBeUndefined();
-  expect(turnExecutionId(view, 0)).toBeUndefined();
+  expect(replyExecutionId(view, 1)).toBe('e1');
+  expect(replyExecutionId(view, 2)).toBe('e2');
+  expect(replyExecutionId(view, 3)).toBeUndefined();
+  expect(replyExecutionId(view, 0)).toBeUndefined();
 });
 
 it('numbers around a turn whose replies were deleted', () => {
@@ -188,5 +188,34 @@ it('numbers around a turn whose replies were deleted', () => {
     messages: [reply('e1'), reply('e3')],
     entries: [entry('e1', [setWrite('tension', 5)]), entry('e2', [setWrite('tension', 6)]), entry('e3', [])],
   });
-  expect(turnExecutionId(view, 2)).toBe('e3');
+  expect(replyExecutionId(view, 2)).toBe('e3');
+});
+
+describe('jumping to the turn that wrote a key', () => {
+  const keyOf = (view: ReturnType<typeof buildView>, name: string) =>
+    definitionBlocks(view)[0]?.keys.find((row) => row.key === name);
+
+  it('can jump when the turn has a reply, and not when it ran no Chat Output', () => {
+    const view = buildView({
+      messages: [reply('e2')],
+      entries: [entry('e1', [setWrite('tension', 5)], 0), entry('e2', [setWrite('mood', 'calm')])],
+    });
+    expect(keyOf(view, 'tension')).toMatchObject({ writtenAtTurn: 1, jumpable: false });
+    expect(keyOf(view, 'mood')).toMatchObject({ writtenAtTurn: 2, jumpable: true });
+    expect(keyOf(view, 'place')).toMatchObject({ writtenAtTurn: null, jumpable: false });
+  });
+
+  it('finds no reply for a turn that ran no Chat Output', () => {
+    const view = buildView({ messages: [], entries: [entry('e1', [setWrite('tension', 5)], 0)] });
+    expect(view.turns[0]?.turnNumber).toBe(1);
+    expect(replyExecutionId(view, 1)).toBeUndefined();
+  });
+
+  it('also decides it for a node memory key', () => {
+    const view = buildView({
+      messages: [reply('e1')],
+      entries: [entry('e1', [drawWrite('e1:draw:0', 'resin')])],
+    });
+    expect(nodeMemory(view)[0]?.keys[0]).toMatchObject({ writtenAtTurn: 1, jumpable: true });
+  });
 });

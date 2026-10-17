@@ -1,13 +1,9 @@
-import type { SessionStateView } from '@st/shared';
-import { formatValue, quote } from './format.js';
+import { DRAW_STATE_KEY, type SessionStateView } from '@st/shared';
+import { formatValue, itemFields, quote } from './format.js';
 
 export type TurnWrite = SessionStateView['turns'][number]['writes'][number];
 
 const TEXT_MAX = 60;
-// Bookkeeping of an item, not something the user declared.
-const BOOKKEEPING = new Set(['id', 'text', 'entryKey']);
-// Draw's implicit node key (see "Implicit node state" in the README).
-const DRAW_KEY = 'draws';
 
 /** Every item text the view shows, by item id, so a removal can say what it removed. */
 export function itemTexts(view: SessionStateView): Map<string, string> {
@@ -20,9 +16,7 @@ export function itemTexts(view: SessionStateView): Map<string, string> {
 const valueText = (value: unknown) => (typeof value === 'string' ? quote(value, TEXT_MAX) : formatValue(value));
 
 function extras(item: Record<string, unknown>): string {
-  const fields = Object.entries(item)
-    .filter(([name]) => !BOOKKEEPING.has(name))
-    .map(([name, value]) => `${name} ${formatValue(value)}`);
+  const fields = itemFields(item).map(({ name, value }) => `${name} ${value}`);
   return fields.length ? ` (${fields.join(', ')})` : '';
 }
 
@@ -38,7 +32,7 @@ export function describeWrite({ write, definitionName, nodeLabel }: TurnWrite, i
     const who = nodeLabel ?? 'A removed node';
     switch (write.op) {
       case 'add':
-        return target.key === DRAW_KEY
+        return target.key === DRAW_STATE_KEY
           ? `${who}: drew ${quote(write.item.text, TEXT_MAX)}`
           : `${who}: remembered ${quote(write.item.text, TEXT_MAX)} (${target.key})`;
       case 'set':

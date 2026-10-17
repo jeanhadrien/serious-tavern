@@ -2,18 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionStateView } from '@st/shared';
 import { sessionsApi } from '../../../api.js';
 import { subscribeToChanges } from '../../../api/events.js';
+import { becameIdle, currentSlot, nextSlot, type Slot } from './storySlot.js';
 import { startStoryLoader } from './storyStateLoader.js';
 
 /** What the chat panel's Story state section shows. The object keeps its identity until the view changes. */
 export interface StoryPanelData {
   view?: SessionStateView;
   /** The last load failed (the previous view, if any, is still shown). */
-  failed: boolean;
-}
-
-interface Slot {
-  sessionId: string;
-  view?: SessionStateView;
   failed: boolean;
 }
 
@@ -35,13 +30,7 @@ export function useStoryState(
     const started = startStoryLoader(
       sessionId,
       { fetch: (id) => sessionsApi.state(id, { silent: true }), subscribe: subscribeToChanges },
-      (result) =>
-        setSlot((previous) => {
-          const before = previous?.sessionId === sessionId ? previous : undefined;
-          return 'view' in result
-            ? { sessionId, view: result.view, failed: false }
-            : { sessionId, view: before?.view, failed: true };
-        }),
+      (result) => setSlot((previous) => nextSlot(previous, sessionId, result)),
     );
     loader.current = started;
     return () => {
@@ -51,12 +40,12 @@ export function useStoryState(
   }, [sessionId]);
   const wasIdle = useRef(idle);
   useEffect(() => {
-    if (idle && !wasIdle.current) loader.current?.reload();
+    if (becameIdle(wasIdle.current, idle)) loader.current?.reload();
     wasIdle.current = idle;
   }, [idle]);
 
   // A slot of another chat is never shown.
-  const current = slot?.sessionId === sessionId ? slot : undefined;
+  const current = currentSlot(slot, sessionId);
   const view = current?.view;
   const failed = current?.failed ?? false;
   const panel = useMemo(() => ({ view, failed }), [view, failed]);

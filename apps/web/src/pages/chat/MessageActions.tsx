@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Check, Pencil, Trash2, X } from 'lucide-react';
 import { IconButton } from '../../components/IconButton.js';
-import { deleteConfirmText } from './story/undoList.js';
+import { deleteClick } from './story/deleteConfirm.js';
 
 interface MessageActionsProps {
   disabled: boolean;
@@ -39,10 +39,9 @@ export function MessageActions({ disabled, onEdit, onDelete, undoOnDelete }: Mes
             label="Delete message"
             disabled={disabled}
             onClick={() => {
-              const undone = undoOnDelete?.();
-              if (undone?.length) {
-                if (window.confirm(deleteConfirmText(undone))) void onDelete();
-              } else setConfirming(true);
+              const click = deleteClick(undoOnDelete?.(), (text) => window.confirm(text));
+              if (click === 'inline') setConfirming(true);
+              else if (click === 'delete') void onDelete();
             }}
           />
         </>

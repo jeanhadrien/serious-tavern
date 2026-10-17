@@ -69,13 +69,18 @@ it('reloads on a change without an id (the connect snapshot) and on definition c
   expect(fetch).toHaveBeenCalledTimes(3);
 });
 
-it('turns the two announcements of a saved definition into one fetch', async () => {
+it('waits for the second announcement of a saved definition and turns both into one fetch', async () => {
   const { fetch, emit, settle } = setup();
   await settle();
+  // The API write is announced first and the file watcher a moment later: the window is longer than a chat change's.
   emit({ type: 'stateDefinitions.changed', invalidFiles: [] });
-  await vi.advanceTimersByTimeAsync(180);
+  await vi.advanceTimersByTimeAsync(150);
+  expect(fetch).toHaveBeenCalledTimes(1);
   emit({ type: 'stateDefinitions.changed', invalidFiles: [] });
-  await vi.advanceTimersByTimeAsync(500);
+  await vi.advanceTimersByTimeAsync(200);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  await settle();
+  await vi.advanceTimersByTimeAsync(1000);
   expect(fetch).toHaveBeenCalledTimes(2);
 });
 

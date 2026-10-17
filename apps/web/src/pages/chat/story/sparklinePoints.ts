@@ -23,8 +23,8 @@ const round = (n: number) => Math.round(n * 10) / 10;
 
 /**
  * A key's numeric history as polyline points. Only points with a finite number count (text and object keys keep no
- * value); x is proportional to the turn number, y is inverted (a high value is near the top). One point is a
- * centred dot and a flat series runs at mid height. Undefined when nothing can be drawn.
+ * value); x is proportional to the turn number, y is inverted (a high value is near the top) and a flat series
+ * runs at mid height. A line needs at least two points: with fewer, nothing is drawn (undefined).
  */
 export function sparklinePoints(
   history: readonly HistoryPoint[],
@@ -35,14 +35,22 @@ export function sparklinePoints(
   );
   const first = points[0];
   const newest = points[points.length - 1];
-  if (!first || !newest) return undefined;
+  if (!first || !newest || points.length < 2) return undefined;
   const values = points.map((point) => point.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const turns = newest.turn - first.turn;
   const x = (turn: number) => (turns > 0 ? pad + ((turn - first.turn) / turns) * (width - 2 * pad) : width / 2);
   const y = (value: number) => (max > min ? pad + ((max - value) / (max - min)) * (height - 2 * pad) : height / 2);
-  const placed = points.map((point) => ({ x: round(x(point.turn)), y: round(y(point.value)) }));
-  const last = placed[placed.length - 1] ?? { x: round(width / 2), y: round(height / 2) };
-  return { points: placed.map((point) => `${point.x},${point.y}`).join(' '), last, min, max, values };
+  const place = (point: { turn: number; value: number }) => ({ x: round(x(point.turn)), y: round(y(point.value)) });
+  return {
+    points: points
+      .map(place)
+      .map((point) => `${point.x},${point.y}`)
+      .join(' '),
+    last: place(newest),
+    min,
+    max,
+    values,
+  };
 }

@@ -6,27 +6,29 @@ import {
   type FoldedKey,
   type SessionStateView,
   type StateDefinition,
-  type StateWrite,
+  type StateTarget,
   type StoryState,
   type TurnEntry,
 } from '@st/shared';
-import { formatValue, quote } from './format.js';
+import { formatValue, itemText, quote } from './format.js';
 
 // What deleting a reply would undo, for the confirmation. The answer comes from the SHARED fold, run twice over the
 // chat's messages (with and without the reply) and the turn entries rebuilt from the state view; nothing here
 // interprets writes itself. Limit: the view cuts very long write values (`truncated`), so an object key never
-// shows its value ("restored to its earlier value") and a long text shows the cut text; a check made before the
-// view has caught up with the chat (its turn is missing from it) finds nothing, and the delete then takes the
-// ordinary inline confirmation. The server's fold is the truth either way.
+// shows its value ("restored to its earlier value") and a long text shows the cut text. A cut can also make two
+// different values look the same to the fold (two long objects both read as the default): then the key is
+// listed as "may change" instead of being left out. A check made before the view has caught up with the chat (its
+// turn is missing from it) finds nothing, and the delete then takes the ordinary inline confirmation. The
+// server's fold is the truth either way.
 
 const TEXT_MAX = 40;
 const ITEM_MAX = 30;
 const ITEMS_LISTED = 3;
 
-type Target = { kind: 'definition'; definitionId: string; key: string } | { kind: 'node'; nodeId: string; key: string };
 type Item = { id: string; text: string };
+type Turn = SessionStateView['turns'][number];
 
-const sameTarget = (a: Target, b: Target) =>
+const sameTarget = (a: StateTarget, b: StateTarget) =>
   a.key === b.key &&
   (a.kind === 'definition'
     ? b.kind === 'definition' && a.definitionId === b.definitionId
@@ -34,7 +36,7 @@ const sameTarget = (a: Target, b: Target) =>
 
 const sameValue = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-const entryOf = (turn: SessionStateView['turns'][number]): TurnEntry => ({
+const entryOf = (turn: Turn): TurnEntry => ({
   executionId: turn.executionId,
   at: turn.at,
   completed: turn.completed,
@@ -42,24 +44,32 @@ const entryOf = (turn: SessionStateView['turns'][number]): TurnEntry => ({
   writes: turn.writes.map(({ write }) => write),
 });
 
-function distinctTargets(writes: readonly StateWrite[]): Target[] {
-  const targets: Target[] = [];
-  for (const { target } of writes) {
-    const next: Target =
-      target.kind === 'definition'
-        ? { kind: 'definition', definitionId: target.definitionId, key: target.key }
-        : { kind: 'node', nodeId: target.nodeId, key: target.key };
-    if (!targets.some((known) => sameTarget(known, next))) targets.push(next);
-  }
+function distinctTargets(turn: Turn): StateTarget[] {
+  const targets: StateTarget[] = [];
+  for (const { write } of turn.writes)
+    if (!targets.some((known) => sameTarget(known, write.target))) targets.push(write.target);
   return targets;
+}
+
+/**
+ * Whether a cut value could hide a change of the key: the deleted turn is the last to write it (otherwise a later
+ * write decides the value with or without the reply) and some write of the key that still counts was cut.
+ */
+function cutMayHide(turns: readonly Turn[], deleted: Turn, target: StateTarget): boolean {
+  const writes = turns
+    .filter((turn) => turn.turnNumber !== null)
+    .flatMap((turn) =>
+      turn.writes
+        .filter(({ write }) => sameTarget(write.target, target))
+        .map((view) => ({ turn, cut: !!view.truncated })),
+    );
+  return writes.at(-1)?.turn === deleted && writes.some(({ cut }) => cut);
 }
 
 const itemsOf = (value: unknown): Item[] =>
   Array.isArray(value)
     ? value.flatMap((raw): Item[] =>
-        isPlainObject(raw) && typeof raw.id === 'string'
-          ? [{ id: raw.id, text: typeof raw.text === 'string' ? raw.text : formatValue(raw.text) }]
-          : [],
+        isPlainObject(raw) && typeof raw.id === 'string' ? [{ id: raw.id, text: itemText(raw) }] : [],
       )
     : [];
 
@@ -100,10 +110,11 @@ function scalarChange(def: StateDefinition['keys'][string], after: FoldedKey): s
 }
 
 function definitionLine(
-  target: Extract<Target, { kind: 'definition' }>,
+  target: Extract<StateTarget, { kind: 'definition' }>,
   before: StoryState,
   after: StoryState,
   definitions: readonly StateDefinition[],
+  mayHide: boolean,
 ): string | undefined {
   const def = definitions.find((item) => item.id === target.definitionId)?.keys[target.key];
   const was = before.definitions.find((item) => item.definitionId === target.definitionId);
@@ -111,15 +122,16 @@ function definitionLine(
   const wasKey = was?.keys[target.key];
   const nowKey = now?.keys[target.key];
   // A deleted definition or key has nothing to restore; a write for another key type is ignored by the fold.
-  if (!def || !was || !wasKey || !nowKey || sameValue(wasKey.value, nowKey.value)) return undefined;
+  if (!def || !was || !wasKey || !nowKey) return undefined;
   const name = `${was.name}.${target.key}`;
+  if (sameValue(wasKey.value, nowKey.value)) return mayHide ? `${name} (may change)` : undefined;
   return def.type === 'collection'
     ? `${name} (${itemChange(wasKey.value, nowKey.value)})`
     : `${name} (${scalarChange(def, nowKey)})`;
 }
 
 function nodeLine(
-  target: Extract<Target, { kind: 'node' }>,
+  target: Extract<StateTarget, { kind: 'node' }>,
   before: StoryState,
   after: StoryState,
   label: string | undefined,
@@ -168,17 +180,12 @@ export function undoneByDelete({
     if (write.target.kind === 'node' && nodeLabel && !labels.has(write.target.nodeId))
       labels.set(write.target.nodeId, nodeLabel);
 
-  const lines = distinctTargets(turn.writes.map(({ write }) => write)).flatMap((target) => {
+  const lines = distinctTargets(turn).flatMap((target) => {
     const line =
       target.kind === 'definition'
-        ? definitionLine(target, before, after, definitions)
+        ? definitionLine(target, before, after, definitions, cutMayHide(view.turns, turn, target))
         : nodeLine(target, before, after, labels.get(target.nodeId));
     return line ? [line] : [];
   });
   return lines.length ? lines : undefined;
-}
-
-/** The text of the `window.confirm` for a delete that undoes stored state. */
-export function deleteConfirmText(lines: readonly string[]): string {
-  return `Deleting this reply also undoes what its turn stored:\n\n${lines.map((line) => `- ${line}`).join('\n')}\n\nDelete the reply?`;
 }

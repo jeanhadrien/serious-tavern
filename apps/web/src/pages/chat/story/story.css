@@ -124,3 +124,17 @@
   display: grid;
   gap: 10px;
 }
+
+/* Touch screens (phones, or a chat panel laid over a narrow chat): the controls get the app's usual 36px target. */
+@media (max-width: 700px), (pointer: coarse) {
+  .story-definition-head .icon-button {
+    padding: 8px;
+  }
+  .story-turn-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    /* The taller target must not make the line taller. */
+    margin-block: -9px;
+  }
+}

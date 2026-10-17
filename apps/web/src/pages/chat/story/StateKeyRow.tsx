@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { formatValue, shortText } from './format.js';
+import { formatValue, fullText, shortText } from './format.js';
 import { Sparkline } from './Sparkline.js';
 import type { Item, KeyRow } from './storyModel.js';
 
@@ -27,7 +27,8 @@ function Items({ items }: { items: readonly Item[] }) {
 
 /**
  * One key of the story state: its value, a sparkline for a number, when it was written (a link to that turn's
- * reply) and, for a list, its items newest first. `older` is only set for a node's memory.
+ * last reply, plain text when the turn has none) and, for a list, its items newest first. `older` is only set for
+ * a node's memory.
  */
 export const StateKeyRow = memo(function StateKeyRow({
   row,
@@ -47,7 +48,7 @@ export const StateKeyRow = memo(function StateKeyRow({
       <div className="story-key-line">
         <span className="story-key-name">{row.key}</span>
         {text !== undefined && (
-          <span className="story-key-value" title={text}>
+          <span className="story-key-value" title={fullText(row.value)}>
             {shortText(text, VALUE_MAX)}
           </span>
         )}
@@ -57,14 +58,15 @@ export const StateKeyRow = memo(function StateKeyRow({
         <details className="story-list" open={row.items.length <= OPEN_UP_TO || undefined}>
           <summary>{row.items.length === 1 ? '1 item' : `${row.items.length} items`}</summary>
           <Items items={row.items} />
-          {row.dropped > 0 && (
-            <small className="story-note">
-              {row.dropped === 1 ? '1 older item' : `${row.dropped} older items`} dropped by the cap
-            </small>
-          )}
-          {older > 0 && <small className="story-note">and {older} older</small>}
         </details>
       )}
+      {/* Outside the details: the note stays visible while the list is collapsed. */}
+      {list && row.dropped > 0 && (
+        <small className="story-note">
+          {row.dropped === 1 ? '1 older item' : `${row.dropped} older items`} dropped by the cap
+        </small>
+      )}
+      {list && older > 0 && <small className="story-note">and {older} older</small>}
       <div className="story-key-meta">
         {!row.written ? (
           'never written'
@@ -73,9 +75,13 @@ export const StateKeyRow = memo(function StateKeyRow({
         ) : (
           <>
             written at{' '}
-            <button type="button" className="story-turn-link" onClick={() => onJump(turn)}>
-              turn {turn}
-            </button>
+            {row.jumpable ? (
+              <button type="button" className="story-turn-link" onClick={() => onJump(turn)}>
+                turn {turn}
+              </button>
+            ) : (
+              `turn ${turn}`
+            )}
           </>
         )}
       </div>

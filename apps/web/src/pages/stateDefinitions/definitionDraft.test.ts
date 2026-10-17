@@ -9,7 +9,7 @@ import {
   toDraft,
   type DefinitionDraft,
 } from './definitionDraft.js';
-import { definition } from './fixtures.js';
+import { definition } from './test-fixtures.js';
 
 const bodyOf = (draft: DefinitionDraft) => {
   const { body, problems } = compile(draft);

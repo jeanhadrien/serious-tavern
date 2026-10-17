@@ -25,14 +25,9 @@ it('draws a flat series at mid height', () => {
   });
 });
 
-it('draws a single point as a centred dot', () => {
-  expect(sparklinePoints(history([7, 3]))).toEqual({
-    points: '36,10',
-    last: { x: 36, y: 10 },
-    min: 3,
-    max: 3,
-    values: [3],
-  });
+it('draws nothing for a single point: a line needs two', () => {
+  expect(sparklinePoints(history([7, 3]))).toBeUndefined();
+  expect(sparklinePoints(history([1, 'x'], [2, 5]))).toBeUndefined();
 });
 
 it('spaces points by turn number, not by position', () => {

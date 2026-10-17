@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { StorySection } from './StorySection.js';
-import { addWrite, buildView, drawWrite, entry, reply, scene, setWrite, userMessage } from './fixtures.js';
+import { addWrite, buildView, drawWrite, entry, reply, scene, setWrite, userMessage } from './test-fixtures.js';
 import type { StoryPanelData } from './useStoryState.js';
 
 const render = (story: StoryPanelData) => renderToStaticMarkup(<StorySection story={story} onJump={() => {}} />);
@@ -142,4 +142,88 @@ it('keeps showing the last view when a refresh failed', () => {
   const html = render({ failed: true, view: played() });
   expect(html).toContain('Could not refresh');
   expect(html).toContain('>scene</h4>');
+});
+
+it('shows a turn that has no reply as plain text, not a link', () => {
+  // A turn that ran no Chat Output (replies 0) still counts, but there is nothing in the thread to scroll to.
+  const view = buildView({
+    messages: [userMessage(), reply('e2')],
+    entries: [entry('e1', [setWrite('tension', 5)], 0), entry('e2', [setWrite('mood', 'calm')])],
+  });
+  const html = render({ failed: false, view });
+  expect(html).toContain('written at turn 1</div>');
+  expect(html).not.toContain('>turn 1</button>');
+  expect(html).toContain('written at <button type="button" class="story-turn-link">turn 2</button>');
+});
+
+it('says "written" alone when the turn is no longer numbered', () => {
+  const view = played();
+  const [first, ...others] = view.definitions;
+  const meta = { ...first?.meta.tension, written: true, writtenAtTurn: null } as NonNullable<
+    typeof first
+  >['meta'][string];
+  const html = render({
+    failed: false,
+    view: { ...view, definitions: [{ ...first!, meta: { ...first!.meta, tension: meta } }, ...others] },
+  });
+  expect(html).toMatch(/<div class="story-key-meta">written<\/div>/);
+});
+
+it('says "1 item" and "1 older item" in the singular', () => {
+  const capped = { ...scene, keys: { ...scene.keys, injected: { type: 'collection' as const, cap: 1 } } };
+  const view = buildView({
+    definitions: [capped],
+    messages: [reply('e1')],
+    entries: [entry('e1', [addWrite('injected', 'e1:note:0', 'one'), addWrite('injected', 'e1:note:1', 'two')])],
+  });
+  const html = render({ failed: false, view });
+  expect(html).toContain('<summary>1 item</summary>');
+  expect(html).toContain('1 older item dropped by the cap');
+  expect(html).not.toContain('1 older items');
+});
+
+it('keeps the cap note visible while the list is collapsed', () => {
+  const capped = { ...scene, keys: { ...scene.keys, injected: { type: 'collection' as const, cap: 6 } } };
+  const view = buildView({
+    definitions: [capped],
+    messages: [reply('e1')],
+    entries: [
+      entry(
+        'e1',
+        Array.from({ length: 8 }, (_, i) => addWrite('injected', `e1:note:${i}`, `item ${i}`)),
+      ),
+    ],
+  });
+  const html = render({ failed: false, view });
+  const details = html.slice(html.indexOf('<details class="story-list"'), html.indexOf('</details>'));
+  expect(details).not.toContain('dropped by the cap');
+  expect(html.indexOf('dropped by the cap')).toBeGreaterThan(html.indexOf('</details>'));
+});
+
+it.each([
+  [5, true],
+  [6, false],
+])('opens a list of %i items: %s', (count, open) => {
+  const view = buildView({
+    messages: [reply('e1')],
+    entries: [
+      entry(
+        'e1',
+        Array.from({ length: count }, (_, i) => addWrite('injected', `e1:note:${i}`, `item ${i}`)),
+      ),
+    ],
+  });
+  const html = render({ failed: false, view });
+  expect(html.includes('<details class="story-list" open="">')).toBe(open);
+});
+
+it('gives an object value its full pretty-printed JSON as the tooltip', () => {
+  const flags = { notes: 'n'.repeat(80), nested: { a: 1 } };
+  const view = buildView({
+    messages: [reply('e1')],
+    entries: [entry('e1', [setWrite('flags', flags)])],
+  });
+  const html = render({ failed: false, view });
+  const title = html.match(/<span class="story-key-value" title="([^"]*)">\{/)?.[1] ?? '';
+  expect(title.replaceAll('&quot;', '"').replaceAll('&#10;', '\n')).toBe(JSON.stringify(flags, null, 2));
 });

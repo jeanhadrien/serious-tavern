@@ -1,6 +1,8 @@
 import {
+  DRAW_STATE_KEY,
   foldStoryState,
   oldestFirst,
+  previewWrite,
   type ChatMessage,
   type FoldedKey,
   type SessionStateView,
@@ -8,11 +10,11 @@ import {
   type StateWrite,
   type TurnEntry,
 } from '@st/shared';
-import { definition } from '../../stateDefinitions/fixtures.js';
+import { definition } from '../../stateDefinitions/test-fixtures.js';
 
 // Test fixtures for the story state helpers. `buildView` assembles the answer of `GET /api/sessions/:id/state` the
-// way the server does (the shared fold over the stored turns), so the chips and the delete check are tested
-// against a view that is consistent with its messages.
+// way the server does (the shared fold over the stored turns, the writes shortened by the shared `previewWrite`),
+// so the chips and the delete check are tested against a view that is consistent with its messages.
 
 export const scene: StateDefinition = definition();
 const SCENE = scene.id;
@@ -39,7 +41,7 @@ export const removeWrite = (key: string, itemId: string): StateWrite => ({
 });
 export const drawWrite = (id: string, text: string): StateWrite => ({
   op: 'add',
-  target: { kind: 'node', nodeId: 'draw', key: 'draws' },
+  target: { kind: 'node', nodeId: 'draw', key: DRAW_STATE_KEY },
   nodeId: 'draw',
   item: { id, text, entryKey: `smells:${text}` },
 });
@@ -112,8 +114,10 @@ export function buildView({
       writes: stored.writes.map((write) => {
         const definitionName = write.target.kind === 'definition' ? names.get(write.target.definitionId) : undefined;
         const nodeLabel = nodeLabels[write.nodeId];
+        const preview = previewWrite(write);
         return {
-          write,
+          write: preview.write,
+          ...(preview.truncated && { truncated: true }),
           ...(definitionName !== undefined && { definitionName }),
           ...(nodeLabel !== undefined && { nodeLabel }),
         };

@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { presetSchema, stateHints, type Preset } from '@st/shared';
-import { definition } from '../stateDefinitions/fixtures.js';
+import { definition } from '../stateDefinitions/test-fixtures.js';
 import { PresetEntryEditor } from './PresetEntryEditor.js';
 
 const preset: Preset = presetSchema.parse({

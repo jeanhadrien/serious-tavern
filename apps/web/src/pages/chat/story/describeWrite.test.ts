@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { describeWrite, itemTexts, type TurnWrite } from './describeWrite.js';
-import { addWrite, buildView, drawWrite, entry, reply, setWrite } from './fixtures.js';
+import { addWrite, buildView, drawWrite, entry, reply, setWrite } from './test-fixtures.js';
 
 const named = (write: TurnWrite['write'], extra: Partial<TurnWrite> = {}): TurnWrite => ({
   write,

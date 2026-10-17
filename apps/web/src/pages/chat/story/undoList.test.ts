@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatMessage, StateDefinition, StateWrite } from '@st/shared';
-import { addWrite, buildView, drawWrite, entry, removeWrite, reply, scene, setWrite, userMessage } from './fixtures.js';
-import { deleteConfirmText, undoneByDelete } from './undoList.js';
+import {
+  addWrite,
+  buildView,
+  drawWrite,
+  entry,
+  removeWrite,
+  reply,
+  scene,
+  setWrite,
+  userMessage,
+} from './test-fixtures.js';
+import { undoneByDelete } from './undoList.js';
 
 /** A chat of `turns` (the writes of each), every turn with one user message and one reply `m-e<n>`. */
 function chat(turns: StateWrite[][], definitions: StateDefinition[] = [scene]) {
@@ -71,11 +81,43 @@ describe('scalars', () => {
     expect(undo('m-e2')).toBeUndefined();
   });
 
-  it('does not leak a cut object, which the fold cannot read as an object', () => {
-    const cut = `{"secret":"${'x'.repeat(200)}`;
-    const { undo } = chat([[setWrite('flags', { a: 1 })], [setWrite('flags', cut)]]);
-    const lines = undo('m-e2');
-    expect(JSON.stringify(lines ?? [])).not.toContain('xxxx');
+  it('does not show the content of a cut object, which the fold cannot read as an object', () => {
+    const { undo } = chat([[setWrite('flags', { a: 1 })], [setWrite('flags', { notes: 'x'.repeat(300) })]]);
+    expect(JSON.stringify(undo('m-e2') ?? [])).not.toContain('xxxx');
+  });
+
+  describe('values the view cut', () => {
+    // The view shortens long writes (`previewWrite`); the fold then cannot tell two long objects apart, and
+    // reads both as the default. The key must not drop out of the list because of that.
+    const long = (letter: string) => ({ notes: letter.repeat(300) });
+
+    it('lists a key whose two last values were both cut as "may change"', () => {
+      const { view, undo } = chat([[setWrite('flags', long('A'))], [setWrite('flags', long('B'))]]);
+      expect(view.turns.map((turn) => turn.writes[0]?.truncated)).toEqual([true, true]);
+      expect(undo('m-e2')).toEqual(['scene.flags (may change)']);
+    });
+
+    it('lists a long text whose cut texts are equal', () => {
+      const { undo } = chat([[setWrite('place', `${'A'.repeat(300)}x`)], [setWrite('place', `${'A'.repeat(300)}y`)]]);
+      expect(undo('m-e2')).toEqual(['scene.place (may change)']);
+    });
+
+    it('lists nothing when a later write decides the value anyway', () => {
+      const { undo } = chat([
+        [setWrite('flags', long('A'))],
+        [setWrite('flags', long('B'))],
+        [setWrite('flags', { a: 2 })],
+      ]);
+      expect(undo('m-e2')).toBeUndefined();
+    });
+
+    it('lists nothing for a key that no cut write touched', () => {
+      const { undo } = chat([
+        [setWrite('flags', { a: 1 })],
+        [setWrite('flags', { a: 1 }), setWrite('place', 'x'.repeat(300))],
+      ]);
+      expect(undo('m-e2')).toEqual(["scene.place (back to the default, 'a tavern')"]);
+    });
   });
 
   it('keeps the order of the writes and lists a key once however often the turn wrote it', () => {
@@ -202,10 +244,4 @@ describe('when no special confirmation is needed', () => {
     const { undo } = chat([[setWrite('tension', 6), setWrite('gone', 1)]]);
     expect(undo('m-e1')).toEqual(['scene.tension (back to the default, 3)']);
   });
-});
-
-it('words the confirmation', () => {
-  expect(deleteConfirmText(['scene.tension (back to 4)', "scene.injected (forgets 'a bell')"])).toBe(
-    "Deleting this reply also undoes what its turn stored:\n\n- scene.tension (back to 4)\n- scene.injected (forgets 'a bell')\n\nDelete the reply?",
-  );
 });

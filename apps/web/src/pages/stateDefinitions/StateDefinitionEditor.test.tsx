@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { layoutHref } from '../../layout/url.js';
 import { compile } from './definitionCompile.js';
 import { changeKeyType, newKeyDraft, toDraft, type DefinitionDraft } from './definitionDraft.js';
-import { definition } from './fixtures.js';
+import { definition } from './test-fixtures.js';
 import { StateDefinitionEditor, type BlockedRename } from './StateDefinitionEditor.js';
 
 const saved = toDraft(definition());

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { nodeTypeDescriptorSchema, type NodeTypeDescriptor } from '@st/shared';
-import { definition } from '../stateDefinitions/fixtures.js';
+import { definition } from '../stateDefinitions/test-fixtures.js';
 import { WorkflowConfigPanel } from './WorkflowConfigPanel.js';
 
 const scene = definition();

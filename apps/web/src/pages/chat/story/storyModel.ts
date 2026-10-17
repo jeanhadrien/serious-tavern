@@ -1,5 +1,5 @@
 import { isPlainObject, type HistoryPoint, type KeyMeta, type SessionStateView, type StateWarning } from '@st/shared';
-import { formatValue } from './format.js';
+import { formatValue, itemFields, itemText } from './format.js';
 import { sparklinePoints, type Sparkline } from './sparklinePoints.js';
 
 // The view model of the Story state section: pure functions over the `GET /api/sessions/:id/state` answer. The
@@ -16,6 +16,8 @@ export type KeyRow = {
   value: unknown;
   written: boolean;
   writtenAtTurn: number | null;
+  /** The turn that wrote it has a reply in the thread to scroll to. */
+  jumpable: boolean;
   /** Lists only, newest first. */
   items: Item[];
   /** Lists only: items the definition's cap cut off. */
@@ -40,8 +42,6 @@ export type NodeMemoryBlock = { nodeId: string; label: string; keys: NodeMemoryR
 export const NODE_ITEMS_SHOWN = 8;
 export const REMOVED_NODE_LABEL = 'A node that no longer exists';
 
-const BOOKKEEPING = new Set(['id', 'text', 'entryKey']);
-
 export function kindOf(value: unknown): KeyKind {
   if (Array.isArray(value)) return 'list';
   if (typeof value === 'number') return 'number';
@@ -52,11 +52,7 @@ export function kindOf(value: unknown): KeyKind {
 
 function itemOf(raw: unknown, index: number): Item {
   if (!isPlainObject(raw)) return { id: String(index), text: formatValue(raw), extras: [] };
-  const text = typeof raw.text === 'string' ? raw.text : formatValue(raw.text);
-  const extras = Object.entries(raw)
-    .filter(([name]) => !BOOKKEEPING.has(name))
-    .map(([name, value]) => ({ name, value: formatValue(value) }));
-  return { id: typeof raw.id === 'string' ? raw.id : String(index), text, extras };
+  return { id: typeof raw.id === 'string' ? raw.id : String(index), text: itemText(raw), extras: itemFields(raw) };
 }
 
 type KeyViews = {
@@ -65,19 +61,26 @@ type KeyViews = {
   history: Record<string, HistoryPoint[] | undefined>;
 };
 
-function keyRows({ values, meta, history }: KeyViews): KeyRow[] {
+/** The numbers of the turns that still count and have a reply (a turn that ran no Chat Output has none). */
+function repliedTurns(view: SessionStateView): ReadonlySet<number> {
+  const turns = new Set<number>();
+  for (const { turnNumber, replies } of view.turns) if (turnNumber !== null && replies > 0) turns.add(turnNumber);
+  return turns;
+}
+
+function keyRows({ values, meta, history }: KeyViews, replied: ReadonlySet<number>): KeyRow[] {
   return Object.entries(values).map(([key, value]) => {
     const kind = kindOf(value);
     const facts = meta[key];
-    // One point is a lone dot that says nothing: a line needs at least two turns.
-    const line = kind === 'number' ? sparklinePoints(history[key] ?? []) : undefined;
-    const spark = line && line.values.length > 1 ? line : undefined;
+    const spark = kind === 'number' ? sparklinePoints(history[key] ?? []) : undefined;
+    const writtenAtTurn = facts?.writtenAtTurn ?? null;
     return {
       key,
       kind,
       value,
       written: facts?.written ?? false,
-      writtenAtTurn: facts?.writtenAtTurn ?? null,
+      writtenAtTurn,
+      jumpable: writtenAtTurn !== null && replied.has(writtenAtTurn),
       items: Array.isArray(value) ? value.map(itemOf) : [],
       dropped: facts?.droppedByCap ?? 0,
       ...(spark && { spark }),
@@ -87,8 +90,9 @@ function keyRows({ values, meta, history }: KeyViews): KeyRow[] {
 
 /** The state definitions' blocks, in the view's order (oldest definition first). */
 export function definitionBlocks(view: SessionStateView): DefinitionBlock[] {
+  const replied = repliedTurns(view);
   return view.definitions.map((definition) => {
-    const keys = keyRows(definition);
+    const keys = keyRows(definition, replied);
     return {
       id: definition.definitionId,
       name: definition.name,
@@ -101,11 +105,12 @@ export function definitionBlocks(view: SessionStateView): DefinitionBlock[] {
 
 /** What nodes remember under their own implicit keys (Draw's recent draws). Only keys that were written exist. */
 export function nodeMemory(view: SessionStateView): NodeMemoryBlock[] {
+  const replied = repliedTurns(view);
   return view.nodes
     .map((node) => ({
       nodeId: node.nodeId,
       label: node.label ?? REMOVED_NODE_LABEL,
-      keys: keyRows(node).map((row) => {
+      keys: keyRows(node, replied).map((row) => {
         const omitted = node.omitted[row.key] ?? 0;
         return {
           ...row,
@@ -122,7 +127,11 @@ export function hasStoredState(view: SessionStateView): boolean {
   return view.turns.some((turn) => turn.turnNumber !== null && turn.writes.length > 0);
 }
 
-/** The run that produced the reply of turn number `turn` (1-based among the turns that still count). */
-export function turnExecutionId(view: SessionStateView, turn: number): string | undefined {
-  return view.turns.find((entry) => entry.turnNumber === turn)?.executionId;
+/**
+ * The run whose replies belong to turn number `turn` (1-based among the turns that still count), or undefined when
+ * that turn has no reply to scroll to.
+ */
+export function replyExecutionId(view: SessionStateView, turn: number): string | undefined {
+  const found = view.turns.find((entry) => entry.turnNumber === turn);
+  return found && found.replies > 0 ? found.executionId : undefined;
 }

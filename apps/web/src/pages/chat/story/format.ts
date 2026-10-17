@@ -23,3 +23,28 @@ export function formatValue(value: unknown): string {
 export function quote(text: string, max: number): string {
   return `'${shortText(text, max)}'`;
 }
+
+/** A stored value in full, for a tooltip: text as itself, an object or list as indented JSON. */
+export function fullText(value: unknown): string {
+  if (value === null || value === undefined) return 'none';
+  if (typeof value !== 'object') return formatValue(value);
+  try {
+    return JSON.stringify(value, null, 2) ?? 'none';
+  } catch {
+    return 'none';
+  }
+}
+
+// What a stored collection item holds besides what the user declared: its `id` and `text`, and a node memory's
+// `entryKey`. Both the panel and the chip cards leave these out of an item's fields.
+const ITEM_BOOKKEEPING: ReadonlySet<string> = new Set(['id', 'text', 'entryKey']);
+
+/** The text of a stored item: its `text` field, or whatever that holds in words. */
+export const itemText = (item: Record<string, unknown>): string =>
+  typeof item.text === 'string' ? item.text : formatValue(item.text);
+
+/** The fields an item declares (everything but its bookkeeping) as name and value in words. */
+export const itemFields = (item: Record<string, unknown>): { name: string; value: string }[] =>
+  Object.entries(item)
+    .filter(([name]) => !ITEM_BOOKKEEPING.has(name))
+    .map(([name, value]) => ({ name, value: formatValue(value) }));

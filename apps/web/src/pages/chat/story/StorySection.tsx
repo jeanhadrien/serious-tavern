@@ -5,13 +5,13 @@ import { useLayoutActions } from '../../../layout/LayoutActions.js';
 import { openStateDefinition } from '../../stateDefinitions/stateDefinitionActions.js';
 import { NodeMemory } from './NodeMemory.js';
 import { StateKeyRow } from './StateKeyRow.js';
-import { definitionBlocks, hasStoredState, nodeMemory, turnExecutionId } from './storyModel.js';
+import { definitionBlocks, hasStoredState, nodeMemory, replyExecutionId } from './storyModel.js';
 import type { StoryPanelData } from './useStoryState.js';
 import './story.css';
 
 /**
  * The chat panel's Story state section: what this chat's workflow nodes have stored, per state definition, read
- * from the server's computed view. `onJump` scrolls the thread to a turn's reply.
+ * from the server's computed view. `onJump` scrolls the thread to the last reply of a turn.
  */
 export function StorySection({ story, onJump }: { story: StoryPanelData; onJump(executionId: string): void }) {
   const { view, failed } = story;
@@ -37,7 +37,7 @@ export function StorySection({ story, onJump }: { story: StoryPanelData; onJump(
       </div>
     );
   const jump = (turn: number) => {
-    const executionId = turnExecutionId(view, turn);
+    const executionId = replyExecutionId(view, turn);
     if (executionId) onJump(executionId);
   };
   const used = blocks.filter((block) => block.used);

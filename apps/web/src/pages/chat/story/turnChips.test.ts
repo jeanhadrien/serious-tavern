@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import type { ChatMessage } from '@st/shared';
-import { addWrite, buildView, drawWrite, entry, reply, setWrite, userMessage } from './fixtures.js';
+import { addWrite, buildView, drawWrite, entry, reply, setWrite, userMessage } from './test-fixtures.js';
 import { chipsFor, describeTurns } from './turnChips.js';
 
 const chips = (view: ReturnType<typeof buildView> | undefined, messages: ChatMessage[]) =>
