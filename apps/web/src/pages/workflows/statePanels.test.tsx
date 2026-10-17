@@ -102,6 +102,16 @@ describe('State Read panel', () => {
     expect(panel(stateRead, { definitionId: '', key: '' })).toContain('Create a state definition');
   });
 
+  it('tells a new node what to pick next: the definition, then the key', () => {
+    const fresh = read({ definitionId: '', key: '', read: 'value' });
+    expect(fresh).toContain('<small class="hint">Select a state definition.</small>');
+    const picked = read({ definitionId: scene.id, key: '', read: 'value' });
+    expect(picked).toContain('<small class="hint">Select a key.</small>');
+    expect(picked).not.toContain('Select a state definition');
+    const done = read({ definitionId: scene.id, key: 'tension', read: 'value' });
+    expect(done).not.toContain('Select a');
+  });
+
   it('keeps a read value it does not know visible', () => {
     expect(read({ definitionId: scene.id, key: 'tension', read: 'bogus' })).toContain('Unknown read (bogus)');
   });

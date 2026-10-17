@@ -2,7 +2,7 @@ import { stateOpsFor, type StateKeyDef, type StateNodeOp } from '@st/shared';
 import type { NodeConfigPanelProps } from './types.js';
 import { StateKeyPicker } from './StateKeyPicker.js';
 import { StateValueEditor } from './StateValueEditor.js';
-import { withFixedValue } from './stateValue.js';
+import { pickOp, withFixedValue } from './stateValue.js';
 
 /** How each operation reads in the select; `delete` means a different thing for a list. */
 function opLabel(op: string, def: StateKeyDef | undefined): string {
@@ -35,12 +35,7 @@ export function StateWritePanel({ descriptor, config, onChange, context }: NodeC
       <StateKeyPicker kind="write" config={config} onChange={onChange} context={context} />
       <label className="state-field">
         Operation
-        <select
-          value={op}
-          disabled={!def}
-          // Another operation takes another kind of value, so the fixed value goes.
-          onChange={(event) => onChange(withFixedValue({ ...config, op: event.target.value }, undefined))}
-        >
+        <select value={op} disabled={!def} onChange={(event) => onChange(pickOp(config, event.target.value))}>
           {!allowed.includes(op) && (
             <option value={op}>{def ? `Not allowed for this key (${op})` : opLabel(op, undefined)}</option>
           )}

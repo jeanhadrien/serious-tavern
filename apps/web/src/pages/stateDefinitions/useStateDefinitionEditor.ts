@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { isSettingKey, type StateDefinition } from '@st/shared';
+import type { StateDefinition } from '@st/shared';
 import { alerts } from '../../alerts/index.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
 import { stateDefinitionEditorStore, stateDefinitionsStore, useEditorCommands, useList } from '../../stores/index.js';
-import { startFileLiveSync } from '../fileLiveSync.js';
-import { compile } from './definitionCompile.js';
+import { useFileSync } from '../useFileSync.js';
+import { compile, definitionNameProblem } from './definitionCompile.js';
+import { afterEdit, afterKeepName, afterSave, freshNameState } from './nameState.js';
 import { classifyDefinitionChange, draftChanged, toDraft, type DefinitionDraft } from './definitionDraft.js';
-import type { BlockedRename } from './StateDefinitionEditor.js';
 import {
   createStateDefinitionFrom,
   deleteStateDefinition,
@@ -34,11 +34,8 @@ export function useStateDefinitionEditor() {
   const { closeEditor } = useLayoutActions();
   const [definition, setDefinition] = useState<StateDefinition>();
   const [draft, setDraft] = useState<DefinitionDraft>();
-  // The server refused a rename because chats hold state under the name: the name stays read-only while the
-  // definition is open, and the banner offers the ways forward.
-  const [nameLocked, setNameLocked] = useState(false);
-  const [blocked, setBlocked] = useState<BlockedRename>();
-  const [nameTaken, setNameTaken] = useState<string>();
+  // The server's answers about the name (a refused rename locks it while the definition is open).
+  const [names, setNames] = useState(freshNameState);
   // True while a save is in flight: a second click must not send another.
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -57,15 +54,12 @@ export function useStateDefinitionEditor() {
   const open = (item: StateDefinition) => {
     setDefinition(item);
     setDraft(toDraft(item));
-    setNameLocked(false);
-    setBlocked(undefined);
-    setNameTaken(undefined);
+    setNames(freshNameState);
   };
   const clear = () => {
     setDefinition(undefined);
     setDraft(undefined);
-    setBlocked(undefined);
-    setNameTaken(undefined);
+    setNames(freshNameState);
   };
 
   const openId = definition?.id;
@@ -77,36 +71,24 @@ export function useStateDefinitionEditor() {
     },
   });
 
-  const latest = useRef({ definition, draft });
-  latest.current = { definition, draft };
-  // The definition this editor deleted (or is deleting). Writes are announced before their response arrives,
-  // so the sync must not report the editor's own delete as "removed from disk". Ids are never reused, so it is
-  // not reset after a successful delete.
-  const deleting = useRef<string>(undefined);
-  useEffect(
-    () =>
-      startFileLiveSync<StateDefinition>(STATE_DEFINITIONS, () => {
-        const editor = latest.current;
-        const baseline = editor.definition ? JSON.stringify(toDraft(editor.definition)) : '';
-        return {
-          signature: () => [editor.definition?.id ?? '', deleting.current ?? '', baseline].join('\n'),
-          refresh: () => stateDefinitionsStore.refresh(),
-          classify: (fresh) =>
-            classifyDefinitionChange({ ...editor, deleting: deleting.current === editor.definition?.id }, fresh),
-          openName: () => editor.definition?.name ?? '',
-          onReload: open,
-          onClose: () => {
-            clear();
-            closeEditor('stateDefinitions');
-          },
-        };
-      }),
-    [],
-  );
+  const deleting = useFileSync<StateDefinition, DefinitionDraft>({
+    resource: STATE_DEFINITIONS,
+    item: definition,
+    draft,
+    baseline: (item) => JSON.stringify(toDraft(item)),
+    refresh: () => stateDefinitionsStore.refresh(),
+    classify: ({ item, draft: current, deleting: own }, fresh) =>
+      classifyDefinitionChange({ definition: item, draft: current, deleting: own }, fresh),
+    onReload: open,
+    onClose: () => {
+      clear();
+      closeEditor('stateDefinitions');
+    },
+  });
 
   const change = (next: DefinitionDraft) => {
     setDraft(next);
-    setNameTaken(undefined);
+    setNames(afterEdit);
   };
   const save = async () => {
     if (!definition || !draft || savingRef.current || problems.count) return;
@@ -117,11 +99,7 @@ export function useStateDefinitionEditor() {
     try {
       const outcome = await saveStateDefinition(definition.id, body);
       if (outcome.kind === 'saved') open(outcome.definition);
-      else if (outcome.kind === 'name-taken') setNameTaken(outcome.message);
-      else if (outcome.kind === 'in-use') {
-        setBlocked({ name: body.name, message: outcome.message, sessions: outcome.sessions });
-        setNameLocked(true);
-      }
+      else setNames((current) => afterSave(current, outcome, body.name));
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -130,12 +108,13 @@ export function useStateDefinitionEditor() {
   /** Copies the saved definition (not an unsaved draft) under a name the user picks. */
   const duplicate = async () => {
     if (!definition) return;
-    const names = definitions.map((item) => item.name);
-    const asked = window.prompt('Name of the copy', uniqueName(`${definition.name}_copy`, names));
+    const taken = definitions.map((item) => item.name);
+    const asked = window.prompt('Name of the copy', uniqueName(`${definition.name}_copy`, taken));
     if (asked === null) return;
     const name = asked.trim();
-    if (!isSettingKey(name) || names.some((taken) => taken.toLowerCase() === name.toLowerCase())) {
-      alerts.warning(`"${name}" can't be used: it is invalid or another definition has that name.`);
+    const problem = definitionNameProblem(name, taken);
+    if (problem) {
+      alerts.warning(problem);
       return;
     }
     const copy = await createStateDefinitionFrom(copyOf(definition, name));
@@ -151,7 +130,7 @@ export function useStateDefinitionEditor() {
   const keepName = () => {
     if (!definition || !draft) return;
     setDraft({ ...draft, name: definition.name });
-    setBlocked(undefined);
+    setNames(afterKeepName);
   };
   const remove = async () => {
     if (!definition || !window.confirm(`Delete state definition "${definition.name}"?`)) return;
@@ -167,9 +146,9 @@ export function useStateDefinitionEditor() {
     draft,
     dirty,
     problems,
-    nameLocked,
-    nameTaken,
-    blocked,
+    nameLocked: names.locked,
+    nameTaken: names.taken,
+    blocked: names.blocked,
     saving,
     change,
     save,

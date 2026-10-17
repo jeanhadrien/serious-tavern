@@ -1,19 +1,16 @@
 import { z } from 'zod';
-import { stateKeyPortType, type PortDef } from '@st/shared';
+import { stateKeyPortType, stateReads, type PortDef, type StateRead } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { locateConfigured, shown, type LocatedKey } from '../state-key.js';
 
-const reads = ['value', 'meta'] as const;
-type Read = (typeof reads)[number];
-
-const readOf = (config: Record<string, unknown>): Read => {
+const readOf = (config: Record<string, unknown>): StateRead => {
   const read = config.read ?? 'value';
-  if (!reads.includes(read as Read)) throw new Error(`Unknown read "${String(read)}"`);
-  return read as Read;
+  if (!stateReads.includes(read as StateRead)) throw new Error(`Unknown read "${String(read)}"`);
+  return read as StateRead;
 };
 
 /** What the node outputs: the key's value, or facts about it (collections also report their size). */
-function outputsFor({ def }: LocatedKey, read: Read): PortDef[] {
+function outputsFor({ def }: LocatedKey, read: StateRead): PortDef[] {
   if (read === 'value')
     return [
       {
@@ -59,7 +56,10 @@ export const stateRead: NodeDefinition = {
   configSchema: z.object({
     definitionId: z.string().min(1, 'Select a state definition'),
     key: z.string().min(1, 'Select a key'),
-    read: z.enum(reads).default('value').describe('The value, or facts about it: written, turns since write, count'),
+    read: z
+      .enum(stateReads)
+      .default('value')
+      .describe('The value, or facts about it: written, turns since write, count'),
   }),
   defaultConfig: { definitionId: '', key: '', read: 'value' },
   async resolvePorts(config, resources) {

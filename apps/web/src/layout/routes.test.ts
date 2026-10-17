@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { collectionLinkId, legacySearch, stateDefinitionLinkId } from './routes.js';
+import { collectionLinkId, legacySearch, panelLinkTarget, stateDefinitionLinkId } from './routes.js';
 
 it('maps legacy item links to a wide editor, edge highlight included', () => {
   expect(legacySearch('/workflows', '?workflow=w1&edge=e1')).toBe('wide=workflow:w1&edge=e1');
@@ -46,4 +46,15 @@ it('finds the state definition a link opens in L', () => {
   expect(stateDefinitionLinkId('/presets?id=x')).toBeUndefined();
   // A collection link is not a state definition link, and the other way round.
   expect(collectionLinkId('/state-definitions?id=d1')).toBeUndefined();
+});
+
+it('says what a link from a node panel opens in place', () => {
+  expect(panelLinkTarget('/collections?id=k1')).toEqual({ kind: 'collection', id: 'k1' });
+  expect(panelLinkTarget('/?right=collection:k2')).toEqual({ kind: 'collection', id: 'k2' });
+  expect(panelLinkTarget('/state-definitions?id=d1')).toEqual({ kind: 'stateDefinition', id: 'd1' });
+  expect(panelLinkTarget('/?left=stateDefinition:d2')).toEqual({ kind: 'stateDefinition', id: 'd2' });
+  // Anything else follows its URL: a preset, or a list without an id.
+  expect(panelLinkTarget('/presets?id=x')).toBeUndefined();
+  expect(panelLinkTarget('/collections')).toBeUndefined();
+  expect(panelLinkTarget('/state-definitions')).toBeUndefined();
 });

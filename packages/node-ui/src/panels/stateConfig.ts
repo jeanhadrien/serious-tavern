@@ -2,16 +2,28 @@
 // `stateOpsFor`, never from a list written here.
 import { stateOpsFor, type StateDefinition } from '@st/shared';
 
-export type Option = { value: string; label: string; known: boolean };
+export type Option = { value: string; label: string };
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
+/**
+ * What the picker tells the user to do next: create a definition when there is none, else pick the definition,
+ * then the key. Nothing when both are chosen. (The node's ports cannot resolve until then, which is not reported
+ * as an error: this is where it is said.)
+ */
+export function pickerHint(config: Record<string, unknown>, catalog: readonly StateDefinition[]): string | undefined {
+  if (!catalog.length) return 'Create a state definition in the State definitions list first.';
+  if (!text(config.definitionId)) return 'Select a state definition.';
+  if (!text(config.key)) return 'Select a key.';
+  return undefined;
+}
+
 /** The definitions to pick from; a configured id without a record comes first as an unknown entry. */
 export function definitionOptions(current: unknown, catalog: readonly StateDefinition[]): Option[] {
-  const options = catalog.map((definition) => ({ value: definition.id, label: definition.name, known: true }));
+  const options = catalog.map((definition) => ({ value: definition.id, label: definition.name }));
   const id = text(current);
   if (!id || catalog.some((definition) => definition.id === id)) return options;
-  return [{ value: id, label: `Unknown definition (${id})`, known: false }, ...options];
+  return [{ value: id, label: `Unknown definition (${id})` }, ...options];
 }
 
 /** The keys of a definition (`name (type)`); a configured key it does not have comes first as an unknown entry. */
@@ -19,11 +31,10 @@ export function keyOptions(definition: StateDefinition | undefined, current: unk
   const options = Object.entries(definition?.keys ?? {}).map(([name, def]) => ({
     value: name,
     label: `${name} (${def.type})`,
-    known: true,
   }));
   const key = text(current);
   if (!key || options.some((option) => option.value === key)) return options;
-  return [{ value: key, label: `Unknown key (${key})`, known: false }, ...options];
+  return [{ value: key, label: `Unknown key (${key})` }, ...options];
 }
 
 /**

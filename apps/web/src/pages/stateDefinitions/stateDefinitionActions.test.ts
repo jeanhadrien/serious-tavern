@@ -163,3 +163,12 @@ it('fetches the list once when the id is not there yet, and warns when it is sti
   expect(show).not.toHaveBeenCalled();
   expect(alerts.warning).toHaveBeenCalledWith('That state definition no longer exists');
 });
+
+it('does not claim the definition is gone when the list could not be loaded', async () => {
+  const show = vi.fn();
+  refresh.mockRejectedValueOnce(new Error('offline'));
+  await openStateDefinition('d1', show);
+  expect(open).not.toHaveBeenCalled();
+  expect(show).not.toHaveBeenCalled();
+  expect(alerts.warning).toHaveBeenCalledExactlyOnceWith('Could not load the state definitions');
+});

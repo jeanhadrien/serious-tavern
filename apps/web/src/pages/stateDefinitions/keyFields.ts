@@ -1,4 +1,4 @@
-import { isSettingKey } from '@st/shared';
+import { isPlainObject, isSettingKey, parseDecimal, TEMPLATE_NAME_RULE } from '@st/shared';
 
 // Text <-> value helpers of the key editor. Every field is typed as text in the form and turned into a value only
 // when the draft is compiled, so a half-typed number never loses what the user typed.
@@ -6,16 +6,13 @@ import { isSettingKey } from '@st/shared';
 export type FieldType = 'text' | 'number' | 'boolean';
 const FIELD_TYPES: readonly string[] = ['text', 'number', 'boolean'];
 
-const NUMBER = /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i;
-
 export const numberText = (value?: number): string => (value === undefined ? '' : String(value));
 
 /** Blank means "not set"; anything that is not a plain decimal number is rejected. */
 export function parseNumberText(text: string): { ok: true; value?: number } | { ok: false } {
-  const trimmed = text.trim();
-  if (!trimmed) return { ok: true };
-  const value = NUMBER.test(trimmed) ? Number(trimmed) : Number.NaN;
-  return Number.isFinite(value) ? { ok: true, value } : { ok: false };
+  if (!text.trim()) return { ok: true };
+  const value = parseDecimal(text);
+  return value === undefined ? { ok: false } : { ok: true, value };
 }
 
 /** One option per line. */
@@ -50,8 +47,7 @@ export function parseFields(
     const type = colon < 0 ? '' : entry.slice(colon + 1).trim();
     const problem = (() => {
       if (!name || !FIELD_TYPES.includes(type)) return 'write name:type, with type text, number or boolean';
-      if (!isSettingKey(name))
-        return `"${name}" is not a usable field name (letters, digits and _, not starting with a digit)`;
+      if (!isSettingKey(name)) return `"${name}" is not a usable field name. ${TEMPLATE_NAME_RULE}`;
       if (Object.hasOwn(fields, name)) return `"${name}" is listed twice`;
       fields[name] = type as FieldType;
       return undefined;
@@ -77,7 +73,6 @@ export function parseObjectText(
   } catch (error) {
     return { ok: false, error: `Not valid JSON (${(error as Error).message})` };
   }
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    return { ok: false, error: 'Must be a JSON object, like {"a": 1}' };
-  return { ok: true, value: value as Record<string, unknown> };
+  if (!isPlainObject(value)) return { ok: false, error: 'Must be a JSON object, like {"a": 1}' };
+  return { ok: true, value };
 }

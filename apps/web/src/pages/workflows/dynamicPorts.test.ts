@@ -2,7 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ApiResponse } from '@st/shared';
 import type { CanvasNode } from './model.js';
 import { checkConnection } from '../../connection.js';
-import { applyResolvedPorts, createPortErrors, portRequests, portsEqual, resolvePortRequests } from './dynamicPorts.js';
+import {
+  applyResolvedPorts,
+  createPortErrors,
+  portRequests,
+  portsEqual,
+  resolvePortRequests,
+  unsetSettings,
+} from './dynamicPorts.js';
 
 const base: ApiResponse<'resolvePorts'> = {
   inputs: [{ name: 'input', label: 'Input', dataType: 'text' }],
@@ -127,6 +134,49 @@ describe('dynamic ports', () => {
   });
 });
 
+// The config schema State Read and State Write send (their required ids are `minLength: 1` strings).
+const stateSchema = {
+  type: 'object',
+  properties: {
+    definitionId: { type: 'string', minLength: 1 },
+    key: { type: 'string', minLength: 1 },
+    read: { type: 'string', default: 'value', enum: ['value', 'meta'] },
+  },
+  required: ['definitionId', 'key', 'read'],
+};
+
+describe('unsetSettings', () => {
+  it('names the required text settings that are blank, missing or only spaces', () => {
+    expect(unsetSettings(stateSchema, { definitionId: '', key: '', read: 'value' })).toEqual(['definitionId', 'key']);
+    expect(unsetSettings(stateSchema, {})).toEqual(['definitionId', 'key']);
+    expect(unsetSettings(stateSchema, { definitionId: 'd', key: '  ' })).toEqual(['key']);
+    expect(unsetSettings(stateSchema, { definitionId: 'd', key: 'tension' })).toEqual([]);
+  });
+
+  it('ignores settings with a default, other types and a schema without properties', () => {
+    const schema = {
+      properties: {
+        provider: { type: 'string', minLength: 1, default: 'openrouter' },
+        note: { type: 'string' },
+        count: { type: 'number', minimum: 1 },
+        flag: true,
+      },
+    };
+    expect(unsetSettings(schema, {})).toEqual([]);
+    expect(unsetSettings({}, {})).toEqual([]);
+    expect(unsetSettings({ properties: 'x' }, {})).toEqual([]);
+  });
+
+  it('is what a canvas node asks of its port request', () => {
+    const blank = node('state-read');
+    blank.data.descriptor = { ...blank.data.descriptor, configSchema: stateSchema };
+    blank.data.config = { definitionId: '', key: '', read: 'value' };
+    expect(portRequests([blank])[0]?.unset).toEqual(['definitionId', 'key']);
+    const picked = { ...blank, data: { ...blank.data, config: { definitionId: 'd', key: 'tension', read: 'value' } } };
+    expect(portRequests([picked])[0]?.unset).toEqual([]);
+  });
+});
+
 describe('port error toasts', () => {
   const setup = () => {
     let next = 0;
@@ -157,6 +207,18 @@ describe('port error toasts', () => {
     expect(alerts.dismiss).toHaveBeenCalledTimes(2);
     errors.failed('a', 'Select a key');
     expect(alerts.error).toHaveBeenCalledTimes(3);
+  });
+
+  it('shows nothing for a node that is still being set up, and takes back the toast it had', () => {
+    const { alerts, errors } = setup();
+    errors.failed('a', 'Select a state definition', false);
+    expect(alerts.error).not.toHaveBeenCalled();
+    // A real failure of a set-up node is shown; once the node is blank again the toast goes.
+    errors.failed('a', 'State definition d not found');
+    expect(alerts.error).toHaveBeenCalledTimes(1);
+    errors.failed('a', 'Select a state definition', false);
+    expect(alerts.dismiss).toHaveBeenCalledExactlyOnceWith('alert-1');
+    expect(alerts.error).toHaveBeenCalledTimes(1);
   });
 
   it('drops the errors of nodes that left the canvas', () => {

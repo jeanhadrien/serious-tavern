@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compile } from './definitionCompile.js';
+import { compile, definitionNameProblem } from './definitionCompile.js';
 import { changeKeyType, newKeyDraft, type DefinitionDraft, type KeyDraft } from './definitionDraft.js';
 import type { StateKeyType } from '@st/shared';
 
@@ -40,7 +40,23 @@ describe('names', () => {
   });
 });
 
+describe('definitionNameProblem', () => {
+  it('gives the reason in plain words, one for every way a name fails', () => {
+    expect(definitionNameProblem('', [])).toBe('Give the definition a name');
+    expect(definitionNameProblem('a b', [])).toMatch(/^Use letters, digits and _/);
+    expect(definitionNameProblem('Scene', ['scene'])).toBe('A state definition named "Scene" already exists');
+    expect(definitionNameProblem('scene_copy', ['scene'])).toBeUndefined();
+  });
+});
+
 describe('key names', () => {
+  it('trims a key name, and treats names that differ only by surrounding spaces as one', () => {
+    const { body } = compile(draft([key(' mood ', 'text')]));
+    expect(Object.keys(body?.keys ?? {})).toEqual(['mood']);
+    const [first, again] = [key('mood', 'text'), key(' mood', 'text')];
+    expect(compile(draft([first!, again!])).problems.keys[again!.uid]).toEqual(['Another key is already named mood']);
+  });
+
   it('lands each problem on its own row', () => {
     const rowsWithProblems = [
       key('', 'number'),
@@ -55,7 +71,7 @@ describe('key names', () => {
     expect(problems.keys[empty!.uid]).toEqual(['Give the key a name']);
     expect(problems.keys[digit!.uid]?.[0]).toMatch(/^Use letters, digits and _/);
     expect(problems.keys[space!.uid]?.[0]).toMatch(/^Use letters, digits and _/);
-    expect(problems.keys[reserved!.uid]?.[0]).toMatch(/not a reserved word|reserved word/);
+    expect(problems.keys[reserved!.uid]?.[0]).toMatch(/reserved/);
     expect(problems.keys[fine!.uid]).toBeUndefined();
     expect(problems.count).toBe(4);
   });

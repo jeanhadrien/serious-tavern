@@ -1,7 +1,7 @@
 import type { MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
-import { collectionLinkId, stateDefinitionLinkId } from '../../layout/routes.js';
+import { panelLinkTarget } from '../../layout/routes.js';
 import { openCollection } from '../collections/collectionActions.js';
 import { openStateDefinition } from '../stateDefinitions/stateDefinitionActions.js';
 
@@ -11,17 +11,17 @@ const plainClick = (event: MouseEvent) =>
 
 /**
  * A link from a node config panel (node-ui's `renderLink`). A collection opens in R and a state definition in L
- * next to the workflow being edited, like a click in their lists (`collectionLinkId`, `stateDefinitionLinkId`);
+ * next to the workflow being edited, like a click in their lists (`panelLinkTarget`);
  * other links route through their URL.
  */
 export function PanelLink({ to, label }: { to: string; label: string }) {
   const { openEditor } = useLayoutActions();
   const open = (event: MouseEvent) => {
     if (!plainClick(event)) return;
-    const collectionId = collectionLinkId(to);
-    const definitionId = collectionId ? undefined : stateDefinitionLinkId(to);
-    if (collectionId) void openCollection(collectionId, () => openEditor('collections'));
-    else if (definitionId) void openStateDefinition(definitionId, () => openEditor('stateDefinitions'));
+    const target = panelLinkTarget(to);
+    if (target?.kind === 'collection') void openCollection(target.id, () => openEditor('collections'));
+    else if (target?.kind === 'stateDefinition')
+      void openStateDefinition(target.id, () => openEditor('stateDefinitions'));
     else return;
     event.preventDefault();
   };

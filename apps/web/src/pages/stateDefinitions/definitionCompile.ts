@@ -1,4 +1,4 @@
-import { isSettingKey, stateDefinitionWriteSchema, type StateDefinitionFields } from '@st/shared';
+import { isSettingKey, stateDefinitionWriteSchema, TEMPLATE_NAME_RULE, type StateDefinitionFields } from '@st/shared';
 import type { DefinitionDraft, KeyDraft } from './definitionDraft.js';
 import { parseFields, parseNumberText, parseObjectText, parseOptions } from './keyFields.js';
 
@@ -8,9 +8,6 @@ export interface DraftProblems {
   keys: Record<string, string[]>;
   count: number;
 }
-
-const NAME_RULE =
-  'Use letters, digits and _, not starting with a digit, and not a reserved word such as this, true or toString';
 
 /** The typed properties of one key, or the problems with its text fields. */
 function compileKey(key: KeyDraft): { def?: Record<string, unknown>; problems: string[] } {
@@ -60,6 +57,19 @@ function compileKey(key: KeyDraft): { def?: Record<string, unknown>; problems: s
   return problems.length ? { problems } : { def: { type: key.type, ...typed, ...key.rest }, problems };
 }
 
+/**
+ * Why a definition cannot take `name` (already trimmed): it is blank, not usable in templates, or another
+ * definition has it (compared ignoring case). The one check behind the form, the save and Duplicate.
+ */
+export function definitionNameProblem(name: string, takenNames: readonly string[]): string | undefined {
+  if (!name) return 'Give the definition a name';
+  if (!isSettingKey(name)) return TEMPLATE_NAME_RULE;
+  const lower = name.toLowerCase();
+  return takenNames.some((taken) => taken.toLowerCase() === lower)
+    ? `A state definition named "${name}" already exists`
+    : undefined;
+}
+
 /** The schema adds `"<key>: "` in front of its own messages. */
 const withoutPrefix = (message: string, key: string) =>
   message.startsWith(`${key}: `) ? message.slice(key.length + 2) : message;
@@ -79,11 +89,7 @@ export function compile(
   };
 
   const name = draft.name.trim();
-  const lower = name.toLowerCase();
-  if (!name) problems.name = 'Give the definition a name';
-  else if (!isSettingKey(name)) problems.name = NAME_RULE;
-  else if (takenNames.some((taken) => taken.toLowerCase() === lower))
-    problems.name = `A state definition named "${name}" already exists`;
+  problems.name = definitionNameProblem(name, takenNames);
   if (problems.name) problems.count++;
 
   const keys: Record<string, unknown> = {};
@@ -93,7 +99,7 @@ export function compile(
     const own = compileKey(key);
     for (const message of own.problems) addKey(key.uid, message);
     if (!keyName) addKey(key.uid, 'Give the key a name');
-    else if (!isSettingKey(keyName)) addKey(key.uid, NAME_RULE);
+    else if (!isSettingKey(keyName)) addKey(key.uid, TEMPLATE_NAME_RULE);
     else if (uidOf.has(keyName)) addKey(key.uid, `Another key is already named ${keyName}`);
     else if (own.def) {
       keys[keyName] = own.def;

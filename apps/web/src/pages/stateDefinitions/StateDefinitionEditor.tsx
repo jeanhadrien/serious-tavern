@@ -5,14 +5,7 @@ import { layoutHref } from '../../layout/url.js';
 import { newKeyDraft, type DefinitionDraft, type KeyDraft } from './definitionDraft.js';
 import type { DraftProblems } from './definitionCompile.js';
 import { KeyRow } from './KeyRow.js';
-
-/** A rename the server refused because chats hold story state under the current name. */
-export interface BlockedRename {
-  /** The name the user tried. */
-  name: string;
-  message: string;
-  sessions: readonly { id: string; title: string }[];
-}
+import type { BlockedRename } from './stateDefinitionActions.js';
 
 interface StateDefinitionEditorProps {
   draft: DefinitionDraft;

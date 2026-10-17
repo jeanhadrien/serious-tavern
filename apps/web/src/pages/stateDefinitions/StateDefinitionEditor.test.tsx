@@ -5,7 +5,8 @@ import { layoutHref } from '../../layout/url.js';
 import { compile } from './definitionCompile.js';
 import { changeKeyType, newKeyDraft, toDraft, type DefinitionDraft } from './definitionDraft.js';
 import { definition } from './test-fixtures.js';
-import { StateDefinitionEditor, type BlockedRename } from './StateDefinitionEditor.js';
+import { StateDefinitionEditor } from './StateDefinitionEditor.js';
+import type { BlockedRename } from './stateDefinitionActions.js';
 
 const saved = toDraft(definition());
 const render = (
@@ -76,7 +77,7 @@ it('shows each row’s problems under the row, as alerts', () => {
   const row = { ...changeKeyType(newKeyDraft(), 'number'), name: 'this', min: '9', max: '1' };
   const html = render({ draft: { ...saved, keys: [row] }, dirty: true });
   expect(html).toContain('class="error state-key-problems" role="alert"');
-  expect(html).toMatch(/reserved word/);
+  expect(html).toMatch(/words such as this, true or toString are reserved/);
   expect(html).toContain('aria-invalid="true"');
   const clean = render();
   expect(clean).not.toContain('state-key-problems');
@@ -120,4 +121,15 @@ it('does not offer Duplicate as while the draft has problems', () => {
   const blocked: BlockedRename = { name: 'x y', message: 'blocked', sessions: [] };
   const html = render({ draft: { ...saved, name: 'x y' }, dirty: true, nameLocked: true, blocked });
   expect(html).toMatch(/<button type="button" disabled="" title="Fix the problems[^"]*">Duplicate as/);
+});
+
+it('keeps showing an enum default whose option was removed, flagged as not an option', () => {
+  const stale: DefinitionDraft = {
+    ...saved,
+    keys: saved.keys.map((key) => (key.type === 'enum' ? { ...key, options: 'calm\ntense', default: 'furious' } : key)),
+  };
+  const html = render({ draft: stale });
+  expect(html).toContain('<option value="furious" selected="">(not an option) furious</option>');
+  // The problem is shown too, so the stale default is never silently replaced by "First option".
+  expect(html).toContain('is not one of its options');
 });

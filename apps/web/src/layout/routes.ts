@@ -55,3 +55,14 @@ export function stateDefinitionLinkId(to: string): string | undefined {
   const layout = layoutOfLink(to);
   return layout.left === 'stateDefinitions' ? layout.leftId : undefined;
 }
+
+/** What a plain click on a link in a node panel opens in place instead of following its URL. */
+type PanelLinkTarget = { kind: 'collection' | 'stateDefinition'; id: string };
+
+/** The resource an in-app link from a node panel opens in place, if any (see `collectionLinkId`). */
+export function panelLinkTarget(to: string): PanelLinkTarget | undefined {
+  const collection = collectionLinkId(to);
+  if (collection) return { kind: 'collection', id: collection };
+  const definition = stateDefinitionLinkId(to);
+  return definition ? { kind: 'stateDefinition', id: definition } : undefined;
+}

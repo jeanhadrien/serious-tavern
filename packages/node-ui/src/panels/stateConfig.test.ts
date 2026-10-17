@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { stateOpsFor, type StateDefinition, type StateKeyType } from '@st/shared';
-import { definitionOptions, keyOptions, pickDefinition, pickKey, retarget } from './stateConfig.js';
+import { definitionOptions, keyOptions, pickDefinition, pickerHint, pickKey, retarget } from './stateConfig.js';
 
 const definition = (id: string, name: string, keys: StateDefinition['keys']): StateDefinition => ({
   id,
@@ -23,8 +23,8 @@ const catalog = [scene, other];
 describe('definitionOptions', () => {
   it('lists the catalog by name', () => {
     expect(definitionOptions('d-scene', catalog)).toEqual([
-      { value: 'd-scene', label: 'scene', known: true },
-      { value: 'd-other', label: 'other', known: true },
+      { value: 'd-scene', label: 'scene' },
+      { value: 'd-other', label: 'other' },
     ]);
   });
 
@@ -32,12 +32,9 @@ describe('definitionOptions', () => {
     expect(definitionOptions('gone', catalog)[0]).toEqual({
       value: 'gone',
       label: 'Unknown definition (gone)',
-      known: false,
     });
     expect(definitionOptions('gone', catalog)).toHaveLength(3);
-    expect(definitionOptions('gone', [])).toEqual([
-      { value: 'gone', label: 'Unknown definition (gone)', known: false },
-    ]);
+    expect(definitionOptions('gone', [])).toEqual([{ value: 'gone', label: 'Unknown definition (gone)' }]);
   });
 
   it('adds nothing for an empty or missing id, and is empty for an empty catalog', () => {
@@ -61,10 +58,10 @@ describe('keyOptions', () => {
   });
 
   it('puts a key the definition does not have first, as unknown', () => {
-    expect(keyOptions(scene, 'old')[0]).toEqual({ value: 'old', label: 'Unknown key (old)', known: false });
+    expect(keyOptions(scene, 'old')[0]).toEqual({ value: 'old', label: 'Unknown key (old)' });
     expect(keyOptions(scene, 'old')).toHaveLength(7);
     // Without a definition the stored key is all there is.
-    expect(keyOptions(undefined, 'old')).toEqual([{ value: 'old', label: 'Unknown key (old)', known: false }]);
+    expect(keyOptions(undefined, 'old')).toEqual([{ value: 'old', label: 'Unknown key (old)' }]);
   });
 
   it('adds nothing for an empty key, and is empty without a definition', () => {
@@ -180,5 +177,23 @@ describe('pickKey', () => {
     const config = { definitionId: 'd-scene', key: 'tension', op: 'increment', value: 3 };
     expect(pickKey(config, 'place', catalog, 'write')).toEqual({ definitionId: 'd-scene', key: 'place', op: 'set' });
     expect(pickKey(config, 'tension', catalog, 'write')).toEqual(config);
+  });
+});
+
+describe('pickerHint', () => {
+  it('asks for a definition first when there is none to pick', () => {
+    expect(pickerHint({}, [])).toBe('Create a state definition in the State definitions list first.');
+    expect(pickerHint({ definitionId: 'd-scene', key: 'tension' }, [])).toContain('Create a state definition');
+  });
+
+  it('says what to pick next, definition then key', () => {
+    expect(pickerHint({ definitionId: '', key: '' }, catalog)).toBe('Select a state definition.');
+    expect(pickerHint({}, catalog)).toBe('Select a state definition.');
+    expect(pickerHint({ definitionId: 'd-scene', key: '' }, catalog)).toBe('Select a key.');
+  });
+
+  it('says nothing once both are chosen, even for ids the catalog does not know', () => {
+    expect(pickerHint({ definitionId: 'd-scene', key: 'tension' }, catalog)).toBeUndefined();
+    expect(pickerHint({ definitionId: 'gone', key: 'x' }, catalog)).toBeUndefined();
   });
 });

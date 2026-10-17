@@ -1,6 +1,8 @@
 import {
   clampToKey,
+  collectionItem,
   incrementedValue,
+  itemFieldNeeds,
   isPlainObject,
   keyDefault,
   keyValueProblem,
@@ -92,30 +94,16 @@ function planDelete(found: LocatedKey, ctx: Inputs): WritePlan {
 
 type Inputs = { connected: boolean; value: unknown; current: unknown };
 
-/** The item an `add` stores: only the key's declared fields survive, each of the declared type. */
+/** The item an `add` stores (see `collectionItem`), or an error that says what is wrong with the value. */
 function itemOf({ label, def }: LocatedKey & { def: CollectionKeyDef }, value: unknown) {
-  if (typeof value === 'string') return { item: { text: value }, ignored: [] as string[] };
-  if (!isPlainObject(value) || typeof value.text !== 'string')
+  const fit = collectionItem(def, value);
+  if (fit.problem?.kind === 'shape')
     throw new Error(`${label} can only add text or an object with a text field, got ${describeValue(value)}`);
-  const fields = def.fields ?? {};
-  const item: { text: string } & Record<string, unknown> = { text: value.text };
-  for (const [name, type] of Object.entries(fields)) {
-    const field = Object.hasOwn(value, name) ? value[name] : undefined;
-    if (field === undefined) continue;
-    const fits =
-      type === 'text'
-        ? typeof field === 'string'
-        : type === 'number'
-          ? typeof field === 'number' && Number.isFinite(field)
-          : typeof field === 'boolean';
-    if (!fits)
-      throw new Error(
-        `${label}: field "${name}" must be ${type === 'boolean' ? 'true or false' : type === 'number' ? 'a number' : 'text'}, got ${describeValue(field)}`,
-      );
-    item[name] = field;
-  }
-  const ignored = Object.keys(value).filter((name) => name !== 'text' && !Object.hasOwn(fields, name));
-  return { item, ignored };
+  if (fit.problem)
+    throw new Error(
+      `${label}: field "${fit.problem.name}" must be ${itemFieldNeeds[fit.problem.type]}, got ${describeValue(fit.problem.value)}`,
+    );
+  return fit;
 }
 
 function planCollection(found: LocatedKey & { def: CollectionKeyDef }, op: StateNodeOp, ctx: Inputs): WritePlan {

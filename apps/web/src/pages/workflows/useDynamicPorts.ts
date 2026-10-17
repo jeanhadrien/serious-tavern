@@ -38,7 +38,11 @@ export function useDynamicPorts(
           return await nodeTypesApi.resolvePorts(request.type, request.config, { silent: true });
         } catch (error) {
           if (active)
-            portErrors.failed(request.id, error instanceof Error ? error.message : 'Could not resolve node ports');
+            portErrors.failed(
+              request.id,
+              error instanceof Error ? error.message : 'Could not resolve node ports',
+              request.unset.length === 0,
+            );
           return undefined;
         }
       },

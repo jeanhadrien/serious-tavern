@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { TEMPLATE_NAME_RULE } from '@st/shared';
 import {
   fieldsText,
   numberText,
@@ -80,7 +81,7 @@ describe('item fields', () => {
     });
     expect(parseFields('a:text\n\nb c:text')).toEqual({
       ok: false,
-      errors: ['Line 3: "b c" is not a usable field name (letters, digits and _, not starting with a digit)'],
+      errors: [`Line 3: "b c" is not a usable field name. ${TEMPLATE_NAME_RULE}`],
     });
     expect(parseFields('a:text\na:number')).toEqual({ ok: false, errors: ['Line 2: "a" is listed twice'] });
     expect(parseFields(':text')).toMatchObject({ ok: false });

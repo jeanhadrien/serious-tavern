@@ -104,6 +104,10 @@
 .state-form label {
   text-transform: none;
 }
+/* A long definition name must not widen the column: the `{{state.name.key}}` hint breaks anywhere. */
+.state-form small code {
+  overflow-wrap: anywhere;
+}
 .state-keys h2 {
   margin: 0 0 4px;
 }

@@ -1,14 +1,33 @@
 import type { Edge } from '@xyflow/react';
-import type { ApiResponse, NodeInstance } from '@st/shared';
+import { isPlainObject, type ApiResponse, type NodeInstance } from '@st/shared';
 import type { CanvasNode } from './model.js';
 
 type Ports = ApiResponse<'resolvePorts'>;
-type PortRequest = { id: string; type: string; config: NodeInstance['config'] };
+type PortRequest = { id: string; type: string; config: NodeInstance['config']; unset: string[] };
+
+/**
+ * The required text settings (a JSON-schema `minLength` of 1 or more, no default) that a config leaves blank. A node
+ * with such a setting has not been set up yet (State Read before a definition is picked); its panel says what to
+ * pick, and failing to resolve its ports is no mistake to report.
+ */
+export function unsetSettings(schema: Record<string, unknown>, config: NodeInstance['config']): string[] {
+  const properties = isPlainObject(schema.properties) ? schema.properties : {};
+  return Object.entries(properties).flatMap(([name, rule]) => {
+    if (!isPlainObject(rule) || rule.type !== 'string' || !(Number(rule.minLength) > 0) || 'default' in rule) return [];
+    const value = config[name];
+    return typeof value === 'string' && value.trim() ? [] : [name];
+  });
+}
 
 export function portRequests(nodes: CanvasNode[]): PortRequest[] {
   return nodes
     .filter((node) => !node.data.unknown && node.data.descriptor.dynamicPorts)
-    .map((node) => ({ id: node.id, type: node.data.descriptor.type, config: node.data.config }));
+    .map((node) => ({
+      id: node.id,
+      type: node.data.descriptor.type,
+      config: node.data.config,
+      unset: unsetSettings(node.data.descriptor.configSchema, node.data.config),
+    }));
 }
 
 export function portsEqual(left: Ports, right: Ports): boolean {
@@ -71,8 +90,9 @@ export async function resolvePortRequests(
 
 /**
  * The error toasts of nodes whose ports could not be resolved: one per node and message (a re-run that fails the
- * same way adds nothing), dismissed as soon as the node resolves, is deleted, or fails differently. Without it a
- * node added with an empty config (State Read before a definition is picked) would leave its error on screen.
+ * same way adds nothing), dismissed as soon as the node resolves, is deleted, or fails differently. A node that is
+ * still being set up (`setUp` false: a required setting is blank, see `unsetSettings`) gets no toast, since its
+ * panel already says what to pick; it also takes back the toast it had.
  */
 export function createPortErrors(alerts: { error(message: string): string; dismiss(id: string): void }) {
   const shown = new Map<string, { message: string; alertId: string }>();
@@ -83,7 +103,8 @@ export function createPortErrors(alerts: { error(message: string): string; dismi
     shown.delete(nodeId);
   };
   return {
-    failed(nodeId: string, message: string) {
+    failed(nodeId: string, message: string, setUp = true) {
+      if (!setUp) return resolved(nodeId);
       if (shown.get(nodeId)?.message === message) return;
       resolved(nodeId);
       shown.set(nodeId, { message, alertId: alerts.error(message) });

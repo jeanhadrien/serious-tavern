@@ -1,6 +1,15 @@
 // Pure helpers of the State Write panel's typed fixed-value editor. A key's type and the chosen operation decide
 // what kind of value the node can store; the operations themselves come from the shared `stateOpsFor`.
-import { isPlainObject, keyValueProblem, type CollectionKeyDef, type StateKeyDef, type StateNodeOp } from '@st/shared';
+import {
+  collectionItem,
+  isPlainObject,
+  itemFieldNeeds,
+  keyValueProblem,
+  parseDecimal,
+  type CollectionKeyDef,
+  type StateKeyDef,
+  type StateNodeOp,
+} from '@st/shared';
 
 export type ValueKind = 'none' | 'number' | 'amount' | 'boolean' | 'enum' | 'text' | 'object' | 'item' | 'itemId';
 
@@ -17,14 +26,9 @@ export function valueKind(def: StateKeyDef, op: StateNodeOp): ValueKind {
   }
 }
 
-const NUMBER = /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i;
-
 /** Blank is `null` (no value); a plain decimal number is that number; anything else is `undefined` (invalid). */
 export function parseNumber(text: string): number | null | undefined {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-  const value = NUMBER.test(trimmed) ? Number(trimmed) : Number.NaN;
-  return Number.isFinite(value) ? value : undefined;
+  return text.trim() ? parseDecimal(text) : null;
 }
 
 /** Blank is `null` (no value); a JSON object is that object; anything else is `undefined` (invalid). */
@@ -83,13 +87,6 @@ export function boundsHint(def: StateKeyDef): string | undefined {
   return `The key stays ${range}: a value outside is clamped.`;
 }
 
-const FIELD_FITS: Record<'text' | 'number' | 'boolean', (value: unknown) => boolean> = {
-  text: (value) => typeof value === 'string',
-  number: (value) => typeof value === 'number' && Number.isFinite(value),
-  boolean: (value) => typeof value === 'boolean',
-};
-const FIELD_NEEDS = { text: 'text', number: 'a number', boolean: 'true or false' } as const;
-
 /**
  * Why the node's fixed value would fail when it runs, in plain words; undefined when it fits (or there is none,
  * or the operation ignores it). Mirrors what State Write checks at run time: numbers are clamped, never refused.
@@ -103,15 +100,10 @@ export function fixedValueProblem(def: StateKeyDef, op: StateNodeOp, value: unkn
     case 'amount':
       return typeof value === 'number' && Number.isFinite(value) ? undefined : 'The fixed value is not a number';
     case 'item': {
-      if (typeof value === 'string') return undefined;
-      if (!isPlainObject(value) || typeof value.text !== 'string')
-        return 'The fixed item must be text, or an object with a text field';
-      const declared = (def as CollectionKeyDef).fields ?? {};
-      for (const [name, type] of Object.entries(declared)) {
-        if (Object.hasOwn(value, name) && value[name] !== undefined && !FIELD_FITS[type](value[name]))
-          return `The fixed item's field "${name}" must be ${FIELD_NEEDS[type]}`;
-      }
-      return undefined;
+      // The node's own rule (shared with the engine), so the panel warns about exactly what a run would refuse.
+      const { problem } = collectionItem(def as CollectionKeyDef, value);
+      if (problem?.kind === 'shape') return 'The fixed item must be text, or an object with a text field';
+      return problem ? `The fixed item's field "${problem.name}" must be ${itemFieldNeeds[problem.type]}` : undefined;
     }
     case 'itemId':
       return typeof value === 'string' && value.trim() ? undefined : 'The fixed item id must be text';
@@ -121,6 +113,13 @@ export function fixedValueProblem(def: StateKeyDef, op: StateNodeOp, value: unkn
     }
   }
 }
+
+/**
+ * The config after the user picks an operation. Another operation takes another kind of value, so the fixed
+ * `value` goes.
+ */
+export const pickOp = (config: Record<string, unknown>, op: string): Record<string, unknown> =>
+  withFixedValue({ ...config, op }, undefined);
 
 /**
  * The config with its fixed `value` set. No value (undefined or null) removes the setting: it is never stored as

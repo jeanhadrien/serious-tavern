@@ -10,13 +10,10 @@ import { isPlainObject } from './helpers.js';
  */
 export const stateKeyTypes = ['number', 'boolean', 'enum', 'text', 'object', 'collection'] as const;
 
-// Definition and key names are template path segments (`{{state.scene.tension}}`).
-const templateName = z
-  .string()
-  .refine(
-    isSettingKey,
-    'Use letters, digits and _, not starting with a digit; words such as this, true or toString are reserved',
-  );
+/** Why a name is refused: definition, key and item field names are template path segments (`{{state.scene.tension}}`). */
+export const TEMPLATE_NAME_RULE =
+  'Use letters, digits and _, not starting with a digit; words such as this, true or toString are reserved';
+const templateName = z.string().refine(isSettingKey, TEMPLATE_NAME_RULE);
 
 export const stateKeyDefSchema = z.discriminatedUnion('type', [
   z

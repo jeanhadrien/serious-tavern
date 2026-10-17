@@ -122,6 +122,20 @@
 .state-field select {
   text-transform: none;
 }
+/* A long definition or key name must not widen the panel: the selects shrink to it and cut the name short. */
+.state-picker,
+.state-picker label,
+.state-field,
+.state-value {
+  min-width: 0;
+}
+.state-picker select,
+.state-field select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
 .state-picker a {
   justify-self: start;
   font-size: 0.85rem;

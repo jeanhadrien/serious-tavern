@@ -2,6 +2,8 @@
 .story-blocks,
 .story-empty {
   display: grid;
+  /* A plain `auto` column grows to the widest line (a long definition name) and pushes the rest out of view. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   min-width: 0;
 }
@@ -10,6 +12,7 @@
 }
 .story-definition {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   min-width: 0;
 }
@@ -114,6 +117,7 @@
 }
 .story-unused {
   color: #8a91a3;
+  overflow-wrap: anywhere;
 }
 .story-node-memory > summary {
   cursor: pointer;

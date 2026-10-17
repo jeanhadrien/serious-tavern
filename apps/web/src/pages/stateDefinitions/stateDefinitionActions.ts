@@ -23,6 +23,14 @@ export function uniqueName(base: string, taken: readonly string[]): string {
   }
 }
 
+/** A rename the server refused because chats hold story state under the current name. */
+export interface BlockedRename {
+  /** The name the user tried. */
+  name: string;
+  message: string;
+  sessions: StateDefinitionInUseDetails['sessions'];
+}
+
 /** What a save came to. The two 409s are answered inline by the editor; anything else is reported here. */
 export type SaveOutcome =
   | { kind: 'saved'; definition: StateDefinition }
@@ -109,12 +117,17 @@ export function showStateDefinition(definition: StateDefinition, show: () => voi
 
 /**
  * Opens a definition by id (a node panel's link): from the shared list, fetched once more when it is not there
- * yet (just created elsewhere), and a warning when it no longer exists. The open one keeps its draft.
+ * yet (just created elsewhere). It warns when the list cannot be loaded, and only says the definition no longer
+ * exists after a list that was loaded does not have it. The open one keeps its draft.
  */
 export async function openStateDefinition(id: string, show: () => void): Promise<void> {
   const find = (list: readonly StateDefinition[]) => list.find((item) => item.id === id);
-  const definition =
-    find(stateDefinitionsStore.getSnapshot()) ?? find(await stateDefinitionsStore.refresh().catch(() => []));
+  let definition = find(stateDefinitionsStore.getSnapshot());
+  if (!definition) {
+    const fresh = await stateDefinitionsStore.refresh().catch(() => undefined);
+    if (!fresh) return void alerts.warning('Could not load the state definitions');
+    definition = find(fresh);
+  }
   if (definition) showStateDefinition(definition, show);
   else alerts.warning('That state definition no longer exists');
 }

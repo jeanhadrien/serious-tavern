@@ -8,6 +8,7 @@ import {
   parseNumber,
   parseObject,
   valueKind,
+  pickOp,
   withFixedValue,
   type ValueKind,
 } from './stateValue.js';
@@ -137,6 +138,25 @@ describe('items', () => {
   it('round-trips', () => {
     for (const value of ['a bell', { text: 'a bell', level: 2, note: 'x', hot: true }])
       expect(itemValue(itemParts(value, injected), injected, value)).toEqual(value);
+  });
+});
+
+describe('pickOp', () => {
+  it('sets the operation and drops the fixed value, which was typed for the old one', () => {
+    const config = { definitionId: 'd', key: 'k', op: 'set', value: 5 };
+    expect(pickOp(config, 'increment')).toEqual({ definitionId: 'd', key: 'k', op: 'increment' });
+    expect(pickOp(config, 'delete')).not.toHaveProperty('value');
+  });
+
+  it('keeps the other settings and does not change its input', () => {
+    const config = { definitionId: 'd', key: 'k', op: 'set', value: 'x' };
+    pickOp(config, 'delete');
+    expect(config).toEqual({ definitionId: 'd', key: 'k', op: 'set', value: 'x' });
+    expect(pickOp({ definitionId: 'd', key: 'k', op: 'set' }, 'delete')).toEqual({
+      definitionId: 'd',
+      key: 'k',
+      op: 'delete',
+    });
   });
 });
 

@@ -1,5 +1,5 @@
 import type { NodePanelContext } from './types.js';
-import { definitionOptions, keyOptions, pickDefinition, pickKey } from './stateConfig.js';
+import { definitionOptions, keyOptions, pickDefinition, pickKey, pickerHint } from './stateConfig.js';
 
 interface StateKeyPickerProps {
   /** State Write also fits its operation to the key and drops its fixed value when the target changes. */
@@ -15,6 +15,7 @@ export function StateKeyPicker({ kind, config, onChange, context }: StateKeyPick
   const definitionId = typeof config.definitionId === 'string' ? config.definitionId : '';
   const key = typeof config.key === 'string' ? config.key : '';
   const definition = catalog.find((item) => item.id === definitionId);
+  const hint = pickerHint(config, catalog);
   const link = () => {
     const to = `/state-definitions?id=${encodeURIComponent(definitionId)}`;
     return context?.renderLink ? context.renderLink(to, 'Edit definition ↗') : <a href={to}>Edit definition ↗</a>;
@@ -52,9 +53,7 @@ export function StateKeyPicker({ kind, config, onChange, context }: StateKeyPick
           ))}
         </select>
       </label>
-      {!catalog.length && (
-        <small className="hint">Create a state definition in the State definitions list first.</small>
-      )}
+      {hint && <small className="hint">{hint}</small>}
     </div>
   );
 }
