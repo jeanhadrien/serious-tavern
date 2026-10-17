@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DRAW_STATE_KEY } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { candidates, entryOutput, loadCollections, type Candidate } from '../../collections.js';
 import { describeValue } from '../../text.js';
@@ -132,7 +133,9 @@ export const draw: NodeDefinition = {
     // Off (0): nothing is read or remembered. On: what this node drew in the last N turns of the chat is left
     // out, and what it draws now is remembered under its own `draws` key (undone with the reply).
     const recent =
-      config.avoidRecent > 0 ? recentEntryKeys(ctx.state.own('draws'), ctx.state.turn, config.avoidRecent) : undefined;
+      config.avoidRecent > 0
+        ? recentEntryKeys(ctx.state.own(DRAW_STATE_KEY), ctx.state.turn, config.avoidRecent)
+        : undefined;
     const options = {
       count: config.count,
       useWeights: config.useWeights,
@@ -145,7 +148,7 @@ export const draw: NodeDefinition = {
     if (recent)
       for (const candidate of result.drawn)
         ctx.writeState({
-          target: { kind: 'node', key: 'draws' },
+          target: { kind: 'node', key: DRAW_STATE_KEY },
           op: 'add',
           item: { text: memoryText(candidate.entry.text), entryKey: entryKey(candidate) },
         });

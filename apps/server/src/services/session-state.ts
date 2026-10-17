@@ -1,9 +1,15 @@
 import { registry } from '@st/engine';
-import { NODE_ITEMS_LIMIT, nodeDisplayName, type ApiResponse, type FoldedKey, type StateWrite } from '@st/shared';
+import {
+  NODE_ITEMS_LIMIT,
+  nodeDisplayName,
+  previewWrite,
+  type ApiResponse,
+  type FoldedKey,
+  type StateWrite,
+} from '@st/shared';
 import type { AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
 import { loadStoryState } from './story-state.js';
-import { previewWrite } from './write-preview.js';
 
 type View = ApiResponse<'getSessionState'>;
 

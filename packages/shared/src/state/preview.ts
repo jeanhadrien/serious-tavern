@@ -1,4 +1,5 @@
-import { WRITE_PREVIEW_LIMIT, type StateWrite } from '@st/shared';
+import { WRITE_PREVIEW_LIMIT } from '../api/state.js';
+import type { StateWrite } from './writes.js';
 
 /**
  * A stored write as the state view shows it. Long text is cut to `WRITE_PREVIEW_LIMIT` characters and a large

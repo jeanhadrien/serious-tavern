@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { WRITE_PREVIEW_LIMIT, type StateWrite } from '@st/shared';
-import { previewWrite } from './services/write-preview.js';
+import { WRITE_PREVIEW_LIMIT } from '../api/state.js';
+import { previewWrite } from './preview.js';
+import type { StateWrite } from './writes.js';
 
 const target = { kind: 'definition' as const, definitionId: 'd', key: 'k' };
 const set = (value: unknown): StateWrite => ({ op: 'set', target, nodeId: 'w', value });
