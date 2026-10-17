@@ -1,5 +1,6 @@
 import { collectionWriteSchema, type Collection, type CollectionEntry, type CollectionFields } from '@st/shared';
 import type { DiskChange } from '../fileLiveSync.js';
+import { classifyDraftChange } from '../draftChange.js';
 
 export const LEVELS = ['1', '2', '3', '4', '5'] as const;
 
@@ -175,26 +176,15 @@ export function draftChanged(
   return !saved || !stored || !sameDraft(saved, stored);
 }
 
-/**
- * What a fresh read of the open collection means for the editor (`fresh` holds it, or nothing when it is gone).
- * Collections are compared through their drafts, so key order and timestamps never count as a change. A dirty
- * draft that the disk already holds (its own save, announced before the response) is a reload, not a conflict.
- */
+/** What a fresh read of the open collection means for the editor (see `classifyDraftChange`). */
 export function classifyCollectionChange(
   editor: { draft?: CollectionDraft; collection?: Collection; deleting?: boolean },
   fresh: readonly Collection[],
 ): DiskChange<Collection> {
-  const { draft, collection } = editor;
-  // The editor's own delete is announced before its response: the item vanishing is expected, not news.
-  if (!draft || !collection || editor.deleting) return { kind: 'unchanged' };
-  const dirty = draftChanged(draft, collection);
-  const onDisk = fresh.find((item) => item.id === collection.id);
-  if (!onDisk) return dirty ? { kind: 'conflict', removed: true, version: 'removed' } : { kind: 'removed' };
-  const incoming = toDraft(onDisk);
-  if (sameDraft(incoming, toDraft(collection))) return { kind: 'unchanged' };
-  const saved = dirty ? normalized(draft, collection) : undefined;
-  if (saved && sameDraft(incoming, saved)) return { kind: 'reload', item: onDisk };
-  return dirty
-    ? { kind: 'conflict', removed: false, version: JSON.stringify(incoming) }
-    : { kind: 'reload', item: onDisk };
+  // Dirty is what saving would change: a hand-written ` title ` or an added trailing space is not an edit.
+  return classifyDraftChange({ ...editor, item: editor.collection }, fresh, {
+    toDraft,
+    stored: normalized,
+    dirty: (draft, collection) => draftChanged(draft, collection),
+  });
 }

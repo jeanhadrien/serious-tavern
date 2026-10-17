@@ -3,7 +3,7 @@ import type { Collection, CollectionSummary } from '@st/shared';
 import { ApiError, collectionsApi } from '../../api.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
 import { collectionEditorStore, collectionsStore, useEditorCommands } from '../../stores/index.js';
-import { startFileLiveSync } from '../fileLiveSync.js';
+import { useFileSync } from '../useFileSync.js';
 import { deleteCollection, saveCollection } from './collectionActions.js';
 import {
   classifyCollectionChange,
@@ -96,33 +96,23 @@ export function useCollectionEditor() {
 
   const latest = useRef({ collection, draft });
   latest.current = { collection, draft };
-  // Collection writes are announced before their response arrives, so the sync must not report this editor's
-  // own delete as "removed from disk". Ids are never reused, so it is not reset after a successful delete.
-  const deleting = useRef<string>(undefined);
-  useEffect(
-    () =>
-      startFileLiveSync<Collection>(COLLECTIONS, () => {
-        const editor = latest.current;
-        const baseline = editor.collection ? JSON.stringify(toDraft(editor.collection)) : '';
-        const id = editor.collection?.id;
-        return {
-          signature: () => [id ?? '', deleting.current ?? '', baseline].join('\n'),
-          refresh: async () => {
-            await collectionsStore.refresh().catch(() => {});
-            return id ? readOpen(id) : [];
-          },
-          classify: (fresh) =>
-            classifyCollectionChange({ ...editor, deleting: !!id && deleting.current === id }, fresh),
-          openName: () => editor.collection?.name ?? '',
-          onReload: (item) => load(item, true),
-          onClose: () => {
-            clear();
-            closeEditor('collections');
-          },
-        };
-      }),
-    [],
-  );
+  const deleting = useFileSync<Collection, CollectionDraft>({
+    resource: COLLECTIONS,
+    item: collection,
+    draft,
+    baseline: (item) => JSON.stringify(toDraft(item)),
+    refresh: async (id) => {
+      await collectionsStore.refresh().catch(() => {});
+      return id ? readOpen(id) : [];
+    },
+    classify: ({ item, draft: current, deleting: own }, fresh) =>
+      classifyCollectionChange({ collection: item, draft: current, deleting: own }, fresh),
+    onReload: (item) => load(item, true),
+    onClose: () => {
+      clear();
+      closeEditor('collections');
+    },
+  });
 
   const change = (next: CollectionDraft) => {
     setDraft(next);

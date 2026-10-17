@@ -7,6 +7,8 @@ export interface DraftOps<Item, Draft> {
   stored(draft: Draft, item: Item): Draft | undefined;
   /** Equality key of a draft; drafts with the same key are the same. Defaults to their JSON. */
   key?(draft: Draft): string;
+  /** Whether the draft holds unsaved edits. Defaults to its key differing from the saved item's draft. */
+  dirty?(draft: Draft, item: Item): boolean;
 }
 
 /**
@@ -25,7 +27,7 @@ export function classifyDraftChange<Item extends { id: string }, Draft>(
   if (!draft || !item || editor.deleting) return { kind: 'unchanged' };
   const key = ops.key ?? ((value: Draft) => JSON.stringify(value));
   const baseline = key(ops.toDraft(item));
-  const dirty = key(draft) !== baseline;
+  const dirty = ops.dirty ? ops.dirty(draft, item) : key(draft) !== baseline;
   const onDisk = fresh.find((candidate) => candidate.id === item.id);
   if (!onDisk) return dirty ? { kind: 'conflict', removed: true, version: 'removed' } : { kind: 'removed' };
   const incoming = key(ops.toDraft(onDisk));

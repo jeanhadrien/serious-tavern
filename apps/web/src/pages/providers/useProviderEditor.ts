@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ProviderView } from '@st/shared';
 import { secretsApi } from '../../api.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
 import { providerEditorStore, providersStore, useEditorCommands } from '../../stores/index.js';
-import { startFileLiveSync } from '../fileLiveSync.js';
+import { useFileSync } from '../useFileSync.js';
 import { deleteProvider, duplicateProvider, saveProvider } from './providerActions.js';
 import { classifyProviderChange, draftChanged, draftToBody, toDraft, type ProviderDraft } from './providerDraft.js';
 
@@ -52,32 +52,20 @@ export function useProviderEditor() {
     },
   });
 
-  const latest = useRef({ provider, draft });
-  latest.current = { provider, draft };
-  // The provider this editor deleted (or is deleting). Provider writes are announced before their response
-  // arrives, so the sync must not report the editor's own delete as "removed from disk". Ids are never reused,
-  // so it is not reset after a successful delete.
-  const deleting = useRef<string>(undefined);
-  useEffect(
-    () =>
-      startFileLiveSync<ProviderView>(PROVIDERS, () => {
-        const editor = latest.current;
-        const baseline = editor.provider ? JSON.stringify(toDraft(editor.provider)) : '';
-        return {
-          signature: () => [editor.provider?.id ?? '', deleting.current ?? '', baseline].join('\n'),
-          refresh: () => providersStore.refresh(),
-          classify: (fresh) =>
-            classifyProviderChange({ ...editor, deleting: deleting.current === editor.provider?.id }, fresh),
-          openName: () => editor.provider?.name ?? '',
-          onReload: open,
-          onClose: () => {
-            clear();
-            closeEditor('providers');
-          },
-        };
-      }),
-    [],
-  );
+  const deleting = useFileSync<ProviderView, ProviderDraft>({
+    resource: PROVIDERS,
+    item: provider,
+    draft,
+    baseline: (item) => JSON.stringify(toDraft(item)),
+    refresh: () => providersStore.refresh(),
+    classify: ({ item, draft: current, deleting: own }, fresh) =>
+      classifyProviderChange({ provider: item, draft: current, deleting: own }, fresh),
+    onReload: open,
+    onClose: () => {
+      clear();
+      closeEditor('providers');
+    },
+  });
 
   const change = (next: ProviderDraft) => {
     if (readOnly) return;

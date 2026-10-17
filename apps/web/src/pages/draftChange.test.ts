@@ -41,6 +41,17 @@ describe('classifyDraftChange', () => {
     expect(classifyDraftChange({ item: saved }, [saved], ops)).toEqual({ kind: 'unchanged' });
   });
 
+  it('lets an editor say what counts as an edit (what saving would change)', () => {
+    // A trailing space is saved as nothing new: not an edit, so a changed file reloads instead of conflicting.
+    const lenient: DraftOps<Item, Draft> = { ...ops, dirty: (draft, current) => draft.name.trim() !== current.name };
+    const padded = { item: saved, draft: { name: 'One ' } };
+    const edited = item('Two');
+    expect(classifyDraftChange(padded, [edited], lenient)).toEqual({ kind: 'reload', item: edited });
+    expect(classifyDraftChange(padded, [edited], ops)).toMatchObject({ kind: 'conflict' });
+    const mine = { item: saved, draft: { name: 'Mine' } };
+    expect(classifyDraftChange(mine, [edited], lenient)).toMatchObject({ kind: 'conflict' });
+  });
+
   it('keeps a dirty draft and reports a conflict when the disk moved on', () => {
     const dirty = { item: saved, draft: { name: 'Mine' } };
     expect(classifyDraftChange(dirty, [item('Two')], ops)).toEqual({
