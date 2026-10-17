@@ -61,6 +61,7 @@ export function Shell() {
     () => ({
       openEditor: (id: ResourceId) => dispatch({ type: 'openEditor', id }),
       closeEditor: (id: ResourceId) => dispatch({ type: 'closeEditor', id }),
+      selectTab: (id: IconId) => dispatch({ type: 'selectTab', id }),
     }),
     [],
   );
@@ -95,7 +96,7 @@ export function Shell() {
     ...STATIC_VIEWS,
   };
 
-  const select = (id: IconId) => dispatch({ type: 'selectTab', id });
+  const select = actions.selectTab;
   const shown = mobileView(layout);
   const selectMobile = (view: MobileView) =>
     view === 'chat' || view === 'editor' ? dispatch({ type: 'showMiddle', chat: view === 'chat' }) : select(view);

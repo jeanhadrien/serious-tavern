@@ -18,7 +18,14 @@ const workflow = (settings?: unknown[]): Workflow => ({
 const render = (target: Workflow | undefined, stored?: Record<string, unknown>) =>
   renderToStaticMarkup(
     <MemoryRouter>
-      <ChatPanel workflow={target} stored={stored} sessionId="s1" onSave={async () => {}} onClose={() => {}} />
+      <ChatPanel
+        workflow={target}
+        stored={stored}
+        sessionId="s1"
+        story={{ failed: false }}
+        onSave={async () => {}}
+        onClose={() => {}}
+      />
     </MemoryRouter>,
   );
 
@@ -30,6 +37,13 @@ it('says when the workflow declares no settings and links to its editor', () => 
   expect(html).toContain(`href="${layoutHref({ wide: 'workflows', wideId: 'w1' })}"`);
   expect(html).toContain('aria-label="Close chat panel"');
   expect(render(undefined)).not.toContain('<a ');
+});
+
+it('has a Story state section under Settings, loading until the state arrives', () => {
+  const html = render(workflow());
+  expect(html.indexOf('>Settings</h3>')).toBeLessThan(html.indexOf('>Story state</h3>'));
+  expect(html).toContain('aria-labelledby="chat-story-s1"');
+  expect(html).toContain('Loading story state…');
 });
 
 it('renders one control per declaration with the stored value or the default, resets and issues', () => {
@@ -76,10 +90,10 @@ it('shows the panel toggle in the chat header, usable while the chat is busy', (
       onTogglePanel={() => {}}
     />,
   );
-  const toggle = html.match(/<button[^>]*aria-label="Chat settings"[^>]*>/)?.[0];
+  const toggle = html.match(/<button[^>]*aria-label="Chat panel"[^>]*>/)?.[0];
   expect(toggle).toBeDefined();
   expect(toggle).toContain('aria-pressed="false"');
-  expect(toggle).toContain('title="Chat settings"');
+  expect(toggle).toContain('title="Chat panel"');
   expect(toggle).not.toContain('disabled');
 });
 

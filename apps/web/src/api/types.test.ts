@@ -16,6 +16,7 @@ it('infers client requests and responses directly from shared schemas', () => {
   expectTypeOf(sessionsApi.sendMessage).parameter(1).toEqualTypeOf<ApiBody<'sendMessage'>>();
   expectTypeOf(sessionsApi.sendMessage).returns.toEqualTypeOf<Promise<ApiResponse<'sendMessage'>>>();
   expectTypeOf(sessionsApi.update).parameter(1).toEqualTypeOf<ApiBody<'updateSession'>>();
+  expectTypeOf(sessionsApi.state).returns.toEqualTypeOf<Promise<ApiResponse<'getSessionState'>>>();
   expectTypeOf(workflowsApi.update).parameter(1).toEqualTypeOf<ApiBody<'updateWorkflow'>>();
   expectTypeOf(presetsApi.preview).parameter(0).toEqualTypeOf<ApiBody<'previewPreset'>>();
   expectTypeOf(charactersApi.create).parameter(0).toEqualTypeOf<ApiBody<'createCharacter'>>();

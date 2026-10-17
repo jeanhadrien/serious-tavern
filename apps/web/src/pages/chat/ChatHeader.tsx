@@ -46,7 +46,7 @@ interface ChatHeaderProps {
   personas: Persona[];
   disabled: boolean;
   onUpdate: (changes: ApiBody<'updateSession'>) => Promise<void>;
-  /** The chat panel (settings); usable while a turn runs, unlike the rest of the header. */
+  /** The chat panel (settings, story state); usable while a turn runs, unlike the rest of the header. */
   panelOpen: boolean;
   onTogglePanel: () => void;
 }
@@ -94,7 +94,7 @@ export function ChatHeader({
         </select>
         <IconButton
           icon={SlidersHorizontal}
-          label="Chat settings"
+          label="Chat panel"
           className="chat-panel-toggle"
           aria-pressed={panelOpen}
           onClick={onTogglePanel}

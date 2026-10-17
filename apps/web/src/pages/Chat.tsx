@@ -5,6 +5,7 @@ import { ChatHeader } from './chat/ChatHeader.js';
 import { MessageList } from './chat/MessageList.js';
 import { Composer } from './chat/Composer.js';
 import { ChatPanel } from './chat/ChatPanel.js';
+import { useStoryState } from './chat/story/useStoryState.js';
 import './chat/chat.css';
 
 /** The open conversation: header, messages and composer. The shell owns `useChat`, so the session list can share it. */
@@ -13,6 +14,8 @@ export function Chat({ chat }: { chat: ChatState }) {
   const locked = chat.busy || chat.mutating;
   const [panelOpen, setPanelOpen] = useState(false);
   const closePanel = useCallback(() => setPanelOpen(false), []);
+  // One fetch of the chat's story state; it reloads when a turn or a message change finishes, never per token.
+  const story = useStoryState(session?.id, !locked);
   return (
     <section className="chat-main">
       {session ? (
@@ -61,6 +64,7 @@ export function Chat({ chat }: { chat: ChatState }) {
                 workflow={chat.workflows.find((item) => item.id === session.workflowId)}
                 stored={session.settings}
                 sessionId={session.id}
+                story={story.panel}
                 onSave={chat.updateSettings}
                 onClose={closePanel}
               />

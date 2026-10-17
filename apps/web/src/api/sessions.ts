@@ -16,6 +16,9 @@ export const sessionsApi = {
     api<ApiResponse<'updateMessage'>>(`/sessions/${id}/messages/${messageId}`, { ...json('PATCH', body), ...options }),
   deleteMessage: (id: string, messageId: string, options?: RequestOptions) =>
     api<ApiResponse<'deleteMessage'>>(`/sessions/${id}/messages/${messageId}`, { ...json('DELETE'), ...options }),
+  /** The chat's computed story state (read-only; the fold the next turn starts from). */
+  state: (id: string, options?: RequestOptions) =>
+    api<ApiResponse<'getSessionState'>>(`/sessions/${id}/state`, options),
   stopTurn: (id: string, options?: RequestOptions) =>
     api<ApiResponse<'stopTurn'>>(`/sessions/${id}/stop`, { ...json('POST'), ...options }),
 };
