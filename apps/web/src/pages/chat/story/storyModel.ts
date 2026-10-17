@@ -20,7 +20,7 @@ export type KeyRow = {
   items: Item[];
   /** Lists only: items the definition's cap cut off. */
   dropped: number;
-  /** Numeric keys with at least one numeric history point. */
+  /** Numeric keys with at least two numeric history points. */
   spark?: Sparkline;
 };
 
@@ -69,7 +69,9 @@ function keyRows({ values, meta, history }: KeyViews): KeyRow[] {
   return Object.entries(values).map(([key, value]) => {
     const kind = kindOf(value);
     const facts = meta[key];
-    const spark = kind === 'number' ? sparklinePoints(history[key] ?? []) : undefined;
+    // One point is a lone dot that says nothing: a line needs at least two turns.
+    const line = kind === 'number' ? sparklinePoints(history[key] ?? []) : undefined;
+    const spark = line && line.values.length > 1 ? line : undefined;
     return {
       key,
       kind,

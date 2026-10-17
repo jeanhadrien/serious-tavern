@@ -362,7 +362,7 @@ button.stop-generation:hover {
   border-color: #6f7fd8;
 }
 .message-story-card {
-  margin-top: 6px;
+  margin: 6px 0 8px;
   padding: 8px 10px;
   border: 1px solid #363b46;
   border-radius: 8px;

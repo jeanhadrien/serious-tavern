@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Database } from 'lucide-react';
 import { IconButton } from '../../../components/IconButton.js';
 import type { StoryChip } from './turnChips.js';
@@ -29,8 +29,11 @@ export function TurnChipCard({ chip, id }: { chip: StoryChip; id?: string }) {
 export function TurnChip({ chip }: { chip: StoryChip }) {
   const [open, setOpen] = useState(false);
   const cardId = useId();
+  const wrapper = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
+    // The card grows the message: keep it on screen when the reply sits at the bottom of the thread.
+    wrapper.current?.scrollIntoView?.({ block: 'nearest' });
     const close = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(false);
     };
@@ -38,7 +41,7 @@ export function TurnChip({ chip }: { chip: StoryChip }) {
     return () => document.removeEventListener('keydown', close);
   }, [open]);
   return (
-    <div className="message-story">
+    <div className="message-story" ref={wrapper}>
       <IconButton
         icon={Database}
         label="What this turn stored"

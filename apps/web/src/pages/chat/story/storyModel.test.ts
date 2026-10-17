@@ -45,6 +45,13 @@ it('builds a block per definition with its keys in definition order', () => {
   expect(tension?.spark).toMatchObject({ min: 5, max: 7 });
 });
 
+it('draws no sparkline for a number written in only one turn', () => {
+  const view = buildView({ messages: [reply('e1')], entries: [entry('e1', [setWrite('tension', 5)])] });
+  const tension = definitionBlocks(view)[0]?.keys.find((key) => key.key === 'tension');
+  expect(tension).toMatchObject({ value: 5, written: true });
+  expect(tension?.spark).toBeUndefined();
+});
+
 it('marks keys nobody wrote and gives them no sparkline', () => {
   const quiet = definitionBlocks(twoTurns())[0]?.keys.find((key) => key.key === 'quiet');
   expect(quiet).toMatchObject({ kind: 'boolean', value: false, written: false, writtenAtTurn: null });

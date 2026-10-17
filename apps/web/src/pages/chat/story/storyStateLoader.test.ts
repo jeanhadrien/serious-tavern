@@ -65,8 +65,18 @@ it('reloads on a change without an id (the connect snapshot) and on definition c
   expect(fetch).toHaveBeenCalledTimes(2);
   await settle();
   emit({ type: 'stateDefinitions.changed', invalidFiles: [] });
-  await vi.advanceTimersByTimeAsync(100);
+  await vi.advanceTimersByTimeAsync(300);
   expect(fetch).toHaveBeenCalledTimes(3);
+});
+
+it('turns the two announcements of a saved definition into one fetch', async () => {
+  const { fetch, emit, settle } = setup();
+  await settle();
+  emit({ type: 'stateDefinitions.changed', invalidFiles: [] });
+  await vi.advanceTimersByTimeAsync(180);
+  emit({ type: 'stateDefinitions.changed', invalidFiles: [] });
+  await vi.advanceTimersByTimeAsync(500);
+  expect(fetch).toHaveBeenCalledTimes(2);
 });
 
 it('ignores events that cannot change the story', async () => {
