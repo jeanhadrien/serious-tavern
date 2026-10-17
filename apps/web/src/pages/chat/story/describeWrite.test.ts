@@ -61,6 +61,18 @@ it("words Draw's memory as a draw and other node memory as remembered", () => {
   expect(describeWrite({ write: set, nodeLabel: 'Custom #1 (custom)' }, texts)).toBe('Custom #1 (custom): seen → 3');
 });
 
+it('words a removal and a reset of node memory', () => {
+  const key = { kind: 'node' as const, nodeId: 'draw', key: 'draws' };
+  const remove = { op: 'remove' as const, target: key, nodeId: 'draw', itemId: 'd1' };
+  const label = 'Draw #1 (draw)';
+  expect(describeWrite({ write: remove, nodeLabel: label }, new Map([['d1', 'resin smell']]))).toBe(
+    "Draw #1 (draw): forgot 'resin smell' (draws)",
+  );
+  expect(describeWrite({ write: remove, nodeLabel: label }, texts)).toBe('Draw #1 (draw): forgot an item (draws)');
+  const reset = { op: 'delete' as const, target: key, nodeId: 'draw' };
+  expect(describeWrite({ write: reset, nodeLabel: label }, texts)).toBe('Draw #1 (draw): draws cleared');
+});
+
 it('names a node that no longer exists', () => {
   expect(describeWrite({ write: drawWrite('d1', 'resin smell') }, texts)).toBe("A removed node: drew 'resin smell'");
 });

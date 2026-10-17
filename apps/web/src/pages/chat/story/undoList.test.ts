@@ -245,3 +245,19 @@ describe('when no special confirmation is needed', () => {
     expect(undo('m-e1')).toEqual(['scene.tension (back to the default, 3)']);
   });
 });
+
+describe('node memory', () => {
+  const nodeKey = { kind: 'node' as const, nodeId: 'draw', key: 'draws' };
+
+  it("forgets what Draw drew in the reply, by the node's name", () => {
+    const { undo } = chat([[drawWrite('e1:draw:0', 'resin smell')]]);
+    expect(undo('m-e1')).toEqual(["Draw #1 (draw) forgets 'resin smell'"]);
+  });
+
+  it('goes back to the earlier value of a node key that holds one value', () => {
+    const set = (value: unknown): StateWrite => ({ op: 'set', target: nodeKey, nodeId: 'draw', value });
+    const { undo } = chat([[set(1)], [set(2)]]);
+    expect(undo('m-e2')).toEqual(['Draw #1 (draw): draws (back to 1)']);
+    expect(chat([[set(1)]]).undo('m-e1')).toEqual(['Draw #1 (draw): draws cleared']);
+  });
+});
