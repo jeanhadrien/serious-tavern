@@ -133,7 +133,7 @@ several keys. Phase 7 decides how a `memory` definition is seeded (with `scene`)
 
 ```
 Reply part:
-  Memory (Last N large) → Unlinked Messages (memory.summaries) → LLM input "recent"      (B)
+  Memory (all messages) → Unlinked Messages (memory.summaries) → LLM input "recent"      (B)
   preset entry: {{#each (linked state.memory.summaries)}}{{text}}{{/each}}               (A)
 
 After-reply part:
@@ -144,8 +144,8 @@ After-reply part:
 ```
 
 - **B** gets every message no intact summary stands for: the raw window, the messages that don't fill a
-  chunk yet, and the messages of broken summaries. Memory's Last N is a safety cap; set it above the
-  chat lengths you expect plus a chunk, or it cuts messages that no summary covers yet.
+  chunk yet, and the messages of broken summaries. Memory is set to all messages (a Last N
+  would cut messages that no summary covers yet).
 - **A** gets the intact summaries in chat order.
 - Ordering caveat (accepted): with A and B as separate inputs, a broken summary in the middle puts its
   raw messages (in B) after later summaries (in A) until the next turn re-summarizes it.
@@ -191,9 +191,7 @@ Phase 6 is on the working branch only, never on `main`, so the rework needs no d
 
 ## Open questions
 
-1. Memory has no "all messages" setting (`lastN: 0` means none). B needs a large Last N; an explicit
-   "all" option would be clearer. Decide when planning phase 6b (additive: the current meaning of 0
-   stays).
-2. Should the state view send the full text of linked items (summaries can be long, and the view cuts
-   write values with `previewWrite`), or should the panel fetch an item on expand? Decide when planning
-   phase 6b.
+1. ~~Memory has no "all messages" setting.~~ Decided: Memory gains an explicit "all messages" setting
+   (additive; `lastN: 0` keeps meaning none).
+2. ~~Full text of linked items in the state view?~~ Decided: linked items' text is sent whole (the view
+   cuts other long values to 200 characters); a fetch-on-expand only if the view gets heavy.
