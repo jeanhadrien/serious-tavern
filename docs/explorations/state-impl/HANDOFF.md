@@ -1,9 +1,9 @@
 # State and creativity implementation: handoff
 
-Written 2026-10-16 to move this work to a new session. It is everything a fresh orchestrator needs to
-finish the plan in [STATE-DESIGN-PROPOSAL-3.md](../STATE-DESIGN-PROPOSAL-3.md). Start a new session on
-this repository and tell it: *"Read docs/explorations/state-impl/HANDOFF.md and continue the
-implementation."*
+First written 2026-10-16 (after phase 3), updated 2026-10-18 after phase 5. It is everything a fresh
+orchestrator needs to finish the plan in [STATE-DESIGN-PROPOSAL-3.md](../STATE-DESIGN-PROPOSAL-3.md).
+Start a new session on this repository and tell it: *"Read docs/explorations/state-impl/HANDOFF.md and
+continue with phase 6."*
 
 ## The mandate
 
@@ -20,6 +20,8 @@ the user:
   and Draw (weighted random).
 - Draw and Trigger keep their own bookkeeping as implicit per-node state.
 - No variations view or divergence harness in this plan.
+- Sub-agents are Sonnet; the pipeline is the lean one in [agent-briefs/](agent-briefs/README.md)
+  (4 agents per phase, 5 with UI), not the 12-agent one phases 1–4b used.
 
 ## Where things are
 
@@ -27,22 +29,22 @@ the user:
 | --- | --- |
 | `main` | The design docs (proposals 1–3, reviews 1–2). Do not push implementation work here unless the user asks. |
 | `claude/state-impl` | Working branch for phases 1–3 and the first version of this handoff. |
-| `ccr-b85e38c4-41l3eu` | Working branch from phase 4a on (the second session's designated branch): all phases so far. Continue here. |
+| `ccr-b85e38c4-41l3eu` | Working branch for phases 4a–5 (the second session's designated branch): all phases so far. A new session gets its own designated branch: start it from this one (or from `claude/state-impl-phase-5`) and continue there. |
 | `claude/state-impl-phase-1` | Checkpoint after phase 1 (`b3fd32b`) |
 | `claude/state-impl-phase-2` | Checkpoint after phase 2 (`4465609`) |
 | `claude/state-impl-phase-3` | Checkpoint after phase 3 (`9d852a9`) |
 | `claude/state-impl-phase-4a` | Checkpoint after phase 4a |
 | `claude/state-impl-phase-4b` | Checkpoint after phase 4b |
+| `claude/state-impl-phase-5` | Checkpoint after phase 5 |
 
 After each phase, push the working branch and create the next checkpoint:
 `git push origin HEAD:refs/heads/claude/state-impl-phase-<N>`.
 
 ## Done
 
-Every phase went through plan → implement → five parallel reviews (spec, correctness, conventions,
-tests, live UI with Playwright) → fixes → second review → fixes → final verification, then an
-orchestrator check (`npm run check` green, clean tree, diff skim). AGENTS.md was updated by the agents
-with every new contract; read its sections on sinks, randomness, chat settings and collections.
+Every phase ended with an orchestrator check (`npm run check` green, clean tree, diff skim). AGENTS.md
+was updated with every new contract; read its sections on sinks, randomness, chat settings, collections,
+story state and post-turn runs.
 
 | Phase | What it added | Tests |
 | --- | --- | --- |
@@ -51,68 +53,63 @@ with every new contract; read its sections on sinks, randomness, chat settings a
 | 3. Authored collections | YAML records under `data/collections/`, API and `collections.changed`; list and editor in the right column; the **Recall** and **Draw** nodes with custom config panels; `docs/COLLECTIONS.md` | 1206 |
 | 4a. Story state, backend | State definitions (YAML records under `data/state/definitions/`, API, `stateDefinitions.changed`, 409 rules, seeded `scene`); `session.state.turns` and the pure fold in `packages/shared/src/state/`; **State Read** and **State Write** (a sink; `when` gate input; fixed config `value`); buffered writes; `{{state.*}}`, `{{trigger.turn}}`; Draw `avoidRecent`; `GET /api/sessions/:id/state`; `editedAt`; definition edits prune workflow edges | 1894 |
 | 4b. Story state, web | State definitions editor in L (`left=stateDefinition:<id>`, phone menu under Setup, disk sync, reactive name lock with "Duplicate as"); `state.*` hints; **State Read**/**State Write** panels with pickers and a typed fixed-value editor; one shared state-view fetch per chat feeding a "Story state" section in the chat panel (sparklines, "written at turn k", node memory), per-reply chips and a delete confirmation listing what is undone (shared fold); `useFileSync` shared by the provider, collection and definition editors | 2303 |
+| 5. Post-turn runs | The **After Reply** node and the reply/post partition (`PreparedWorkflow.parts`; a Chat Output depending on After Reply is a validation issue); the post part runs after the reply is delivered, inside the turn's queue slot (the next message waits; Stop stops it; a queued message can be cancelled); seed `${seed}:post`; its writes join the turn's entry (undone with its replies), and nodes that also ran in the reply part write nothing in the post part; `postStatus`/`postError` per turn (a stored `running` the server no longer holds reads as "interrupted by a server restart", computed on read); status row above the composer, one failure toast, post details on the chip and failed runs listed in the Story state panel | 2541 |
 
 How to try each one, written for the user: [howto/](howto/).
 
 ## Remaining work, in order
 
-Specs are in [specs/](specs/). Each is the `spec` argument for one phase run. Before launching, add a
-one-paragraph "Context: phases 1..N-1 on this branch added …" at the top, and adjust details to what
-earlier phases actually built (read their AGENTS.md sections and code).
+Specs are in [specs/](specs/). Each starts with a "Context from phases …" note written at the phase 5
+checkpoint; re-read the AGENTS.md sections it names and adjust it to what the code actually holds.
 
 | Phase | Spec | UI | Notes |
 | --- | --- | --- | --- |
-| 4a. Story state, backend (**done**) | [phase-4a.md](specs/phase-4a.md) | no | State definitions (YAML records), `session.state.turns`, the fold in `shared`, State Read / State Write, buffered writes, `{{state.*}}`, `trigger.turn`, Draw's `avoidRecent`, `GET /api/sessions/:id/state`, `editedAt` on edits, seeded `scene` definition |
-| 4b. Story state, web (**done**) | [phase-4b.md](specs/phase-4b.md) | yes | Definitions editor in L; "Story state" section in `ChatPanel` with sparklines; per-message chip; delete confirmation listing what is undone |
-| 5. Post-turn runs | [phase-5.md](specs/phase-5.md) | yes | After Reply node, second run on the session's turn queue (derived seed `${seed}:post`, see AGENTS.md "Randomness"), post status on the turn, UI status and failure toast |
-| 6. History summaries | [phase-6.md](specs/phase-6.md) | yes | `session.summaries` per set, fingerprint validity, Next Chunk / Save Summary, Memory `summarySet`, panel section |
-| 7. Trigger + example + guide | [phase-7.md](specs/phase-7.md) | yes | Trigger node; seeded "Fresh texture" example (collection, preset, workflow; idempotent seeds; seeded-workflows test); user guide `docs/STATE-AND-LORE.md` folding in the howto files |
+| 4a, 4b, 5 (**done**) | [phase-4a.md](specs/phase-4a.md), [phase-4b.md](specs/phase-4b.md), [phase-5.md](specs/phase-5.md) | | |
+| 6. History summaries | [phase-6.md](specs/phase-6.md) | yes | `session.summaries` per set, fingerprint validity, Next Chunk / Save Summary (buffered like state writes, committed in `settleTurn` and `settlePostRun`), Memory `summarySet`, a "Summaries" section in the chat panel |
+| 7. Trigger + example + guide | [phase-7.md](specs/phase-7.md) | yes | Trigger node (implicit node state like Draw's); seeded "Fresh texture" example (collection, preset, workflow; idempotent seeds; seeded-workflows test; decide how `scene` is seeded for users who already have definitions); user guide `docs/STATE-AND-LORE.md` folding in the howto files |
 
 Then finish with a summary for the user: what is testable and how (`npm run dev`), the checkpoint
 branches, known limitations, and links to the guide.
 
 ## How to run a phase
 
-1. Read [PHASE-WORKFLOW.md](PHASE-WORKFLOW.md): it holds the Workflow-tool script used for every phase.
-   Pass it as `script` (or save it and use `scriptPath`) with these `args`:
+**Recommended: the Agent tool with the briefs in [agent-briefs/](agent-briefs/README.md)** (how phases
+4a–5 ran). Copy `agent-briefs/common.md` and `agent-briefs/roles/` to the session's scratchpad, fill in
+the placeholders, write `<scratch>/briefs/phase-<N>.md` (header, then the spec file), and run the 4–5 agent
+pipeline described in the briefs' README. Every agent prompt is short: "read common.md, the phase brief
+and your role file, then …".
 
-   ```json
-   {
-     "phase": 4,
-     "title": "Story state, backend",
-     "base": "<sha of HEAD before the phase>",
-     "ui": false,
-     "scratch": "<the session's scratchpad directory>",
-     "spec": "<contents of the spec file, with the context paragraph>"
-   }
-   ```
+**Alternative: the Workflow-tool script** in [PHASE-WORKFLOW.md](PHASE-WORKFLOW.md) (phases 1–3). It runs
+the older 12-agent pipeline; trim its review lenses to spec, correctness and ui first. It needs the user
+to opt into workflows explicitly.
 
-   It writes the plan to `<scratch>/plans/phase-N.md` and a "how to try it" note to
-   `<scratch>/plans/phase-N-howto.md`. Copy the howto into [howto/](howto/) when the phase is done.
-   For 4a/4b use `"phase": "4a"` / `"4b"`.
-2. The script spends 10 to 12 agents and roughly 60–90 minutes per phase.
-3. **Session limits:** runs have been cut twice by "You've hit your session limit · resets HH:MM
-   UTC". Wait for the reset, then re-invoke with the same `args` plus `resumeFromRunId` (the run id in
-   the launch result): completed agents replay from cache. The fix prompt already tells a fixer to
-   finish uncommitted partial work left by an interrupted one.
-4. **Verify before checkpointing:** `git status` clean, `npm run check` green (note the test count),
-   skim the core diffs, then push the working branch and the checkpoint branch.
-5. Uncommitted changes while an agent works are normal: don't commit them yourself (a stop hook may ask;
-   explain instead). Commit trailers the agents use:
+Either way:
+
+1. **Usage limits** ("You've hit your session limit · resets HH:MM UTC", and once a weekly limit) cut
+   agents mid-task several times. A stopped agent keeps its transcript: after the reset, send it a
+   message to continue; its uncommitted work is in the tree.
+2. **Verify before checkpointing:** `git status` clean, `npm run check` green (run it twice: one race in a
+   post-run test only showed under full-suite load), skim the core diffs, then push the working branch and
+   the checkpoint branch.
+3. Uncommitted changes while an agent works are normal: don't commit them yourself (a stop hook may ask;
+   explain instead). Commit trailers:
 
    ```
    Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
-   Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
-   Claude-Session: <the new session's URL>
+   Co-Authored-By: <the attribution line the harness gives>
+   Claude-Session: <the session's URL>
    ```
 
 ## Environment notes
 
 - The cloud container is Linux with bash; AGENTS.md's Windows/PowerShell notes don't apply here.
-- Run `npm ci` first in a fresh container (Biome isn't found otherwise).
-- Chromium and Playwright are available at `/opt/pw-browsers` (don't run `playwright install`); the UI
-  reviewer uses them for live checks against a server started from a temp data directory.
+- Run `npm ci` first in a fresh container (Biome isn't found otherwise). `npm run check` takes about
+  45 seconds here, not 7.
+- Chromium and Playwright are available at `/opt/pw-browsers` (don't run `playwright install`). Live
+  checks run the server from a temp data directory on a free port and vite with an out-of-repo config,
+  because the `/api` proxy target in `apps/web/vite.config.ts` is hard-coded to `localhost:3001`.
 - Never run anything against `apps/server/data`.
+- Server tests leave an empty `.test-data/` directory; it is gitignored.
 
 ## Open notes for the remaining phases
 
@@ -120,7 +117,8 @@ branches, known limitations, and links to the guide.
   a `level` output; phase 7's seeded example must word the seed by level through wiring (see the note
   at the top of [phase-7.md](specs/phase-7.md)).
 - Template macros inside collection entry text are not rendered (documented in `docs/COLLECTIONS.md`).
-- AGENTS.md says the orchestrator owns it; agents have been updating its key contracts as part of each
-  phase, and the orchestrator reviewed those edits. Keep doing that, and keep PLAN.md untouched.
-- Phase 3 added a `409 COLLECTION_IN_USE` guard on collection delete and a `neverSkips` input flag
-  (Recall's optional `text` input); both are documented in AGENTS.md.
+- AGENTS.md says the orchestrator owns it; agents update its key contracts as part of each phase, and the
+  orchestrator reviews those edits. Keep doing that, and keep PLAN.md untouched.
+- Known limitations carried forward from phase 5: a message waiting behind a post run gets no response
+  bytes until the run ends; nodes needed by both parts run (and cost) twice; there is no retry for a
+  failed or interrupted post run.
