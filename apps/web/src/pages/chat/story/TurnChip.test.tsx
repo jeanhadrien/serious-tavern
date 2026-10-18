@@ -79,6 +79,17 @@ describe('a turn whose after-reply run did not finish well', () => {
     );
   });
 
+  it('offers the log of a completed run too, and says so when it stored nothing', () => {
+    const done = { ...failed, post: { status: 'completed' as const, executionId: 'p1' } };
+    const empty = renderToStaticMarkup(<TurnChipCard chip={done} />);
+    expect(empty).toContain('The after-reply steps ran and stored nothing.');
+    expect(empty).toContain('<summary>After-reply run details</summary>');
+    expect(renderToStaticMarkup(<TurnChip chip={done} />)).not.toContain('chip-alert');
+    const stored = renderToStaticMarkup(<TurnChipCard chip={{ ...done, lines: ['scene.tension → 9'] }} />);
+    expect(stored).not.toContain('stored nothing');
+    expect(stored).toContain('<summary>After-reply run details</summary>');
+  });
+
   it('leaves out the edited note for a chip with no stored lines', () => {
     expect(renderToStaticMarkup(<TurnChipCard chip={{ ...failed, editedAfter: true }} />)).not.toContain(
       'Edited after',

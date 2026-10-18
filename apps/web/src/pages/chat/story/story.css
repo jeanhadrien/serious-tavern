@@ -142,3 +142,25 @@
     margin-block: -9px;
   }
 }
+
+/* After-reply runs that failed: they stay listed here after the toast is gone. */
+.story-post-failures {
+  display: grid;
+  gap: 6px;
+}
+.chat-panel .story-post-failures h4 {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.story-post-failures ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.story-post-failures p {
+  margin: 0 0 4px;
+}

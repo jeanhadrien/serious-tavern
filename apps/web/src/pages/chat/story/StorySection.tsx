@@ -4,6 +4,8 @@ import { IconButton } from '../../../components/IconButton.js';
 import { useLayoutActions } from '../../../layout/LayoutActions.js';
 import { openStateDefinition } from '../../stateDefinitions/stateDefinitionActions.js';
 import { NodeMemory } from './NodeMemory.js';
+import { PostFailures } from './PostFailures.js';
+import { postFailures } from './postRuns.js';
 import { StateKeyRow } from './StateKeyRow.js';
 import { definitionBlocks, hasStoredState, nodeMemory, replyExecutionId } from './storyModel.js';
 import type { StoryPanelData } from './useStoryState.js';
@@ -18,6 +20,7 @@ export function StorySection({ story, onJump }: { story: StoryPanelData; onJump(
   const { openEditor, selectTab } = useLayoutActions();
   const blocks = useMemo(() => (view ? definitionBlocks(view) : []), [view]);
   const memory = useMemo(() => (view ? nodeMemory(view) : []), [view]);
+  const failures = useMemo(() => postFailures(view), [view]);
   if (!view)
     return (
       <p className="hint" role="status">
@@ -27,6 +30,7 @@ export function StorySection({ story, onJump }: { story: StoryPanelData; onJump(
   if (!hasStoredState(view))
     return (
       <div className="story-empty">
+        <PostFailures failures={failures} />
         <p className="hint">
           Nothing has been stored in this chat yet. Story state is what workflow nodes (State Write, Draw's recent
           draws) remember between turns, and it disappears with the replies that stored it.
@@ -45,6 +49,7 @@ export function StorySection({ story, onJump }: { story: StoryPanelData; onJump(
   return (
     <div className="story-blocks">
       {failed && <p className="hint warning">Could not refresh; this is the last state that loaded.</p>}
+      <PostFailures failures={failures} />
       {used.map((block) => (
         <div key={block.id} className="story-definition">
           <div className="story-definition-head">

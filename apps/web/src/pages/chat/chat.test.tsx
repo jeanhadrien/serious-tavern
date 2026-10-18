@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { composerShouldSend, editorKeyAction } from './keyboard.js';
-import { isNearBottom, shouldStickToBottom } from './useStickToBottom.js';
+import { isNearBottom, shouldStickToBottom, watchResize } from './useStickToBottom.js';
 import { MessageContent } from './MessageContent.js';
 import { ChatMessageView } from './ChatMessageView.js';
 import { Composer } from './Composer.js';
@@ -283,4 +283,46 @@ it('shows the label the caller gives an execution log', () => {
   const html = renderToStaticMarkup(<ExecutionDetails id="x" label="After-reply run details" optional />);
   expect(html).toContain('<summary>After-reply run details</summary>');
   expect(renderToStaticMarkup(<ExecutionDetails id="x" />)).toContain('<summary>Execution details</summary>');
+});
+
+it('watches every element it is given, skips missing ones, and stops watching on cleanup', () => {
+  const observed: unknown[] = [];
+  let disconnected = 0;
+  let callback: () => void = () => {};
+  class FakeObserver {
+    constructor(onResize: () => void) {
+      callback = onResize;
+    }
+    observe(element: unknown) {
+      observed.push(element);
+    }
+    disconnect() {
+      disconnected++;
+    }
+  }
+  const content = {} as Element;
+  const viewport = {} as Element;
+  let resizes = 0;
+  const stop = watchResize([content, null, viewport], () => resizes++, FakeObserver);
+  // The thread's viewport is watched too, so a row that appears below it re-sticks the newest message.
+  expect(observed).toEqual([content, viewport]);
+  callback();
+  expect(resizes).toBe(1);
+  stop();
+  expect(disconnected).toBe(1);
+  expect(watchResize([content], () => {}, undefined)).toBeTypeOf('function');
+});
+
+it('labels the composer button for a message that waits behind an after-reply run', () => {
+  const render = (queued: boolean) =>
+    renderToStaticMarkup(
+      <Composer content="" busy queued={queued} locked onChange={() => {}} onSend={async () => {}} onStop={() => {}} />,
+    );
+  expect(render(false)).toContain('aria-label="Stop generation"');
+  expect(render(false)).toContain('Generating… Esc to stop');
+  const queued = render(true);
+  expect(queued).toContain('aria-label="Cancel queued message"');
+  expect(queued).toContain('title="Cancel queued message"');
+  expect(queued).toContain('Esc to cancel');
+  expect(queued).not.toContain('Stop generation');
 });

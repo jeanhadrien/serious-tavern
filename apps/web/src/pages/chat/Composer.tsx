@@ -7,13 +7,15 @@ import { composerShouldSend } from './keyboard.js';
 interface ComposerProps {
   content: string;
   busy: boolean;
+  /** The message waits behind an after-reply run: the button cancels it instead of stopping a generation. */
+  queued?: boolean;
   locked: boolean;
   onChange: (content: string) => void;
   onSend: () => Promise<void>;
   onStop: () => void;
 }
 
-export function Composer({ content, busy, locked, onChange, onSend, onStop }: ComposerProps) {
+export function Composer({ content, busy, queued = false, locked, onChange, onSend, onStop }: ComposerProps) {
   const input = useRef<HTMLTextAreaElement>(null);
   const composing = useRef(false);
   const restoreFocus = useRef(false);
@@ -52,7 +54,13 @@ export function Composer({ content, busy, locked, onChange, onSend, onStop }: Co
         aria-label="Message"
         aria-disabled={locked}
         readOnly={locked}
-        placeholder={busy ? 'Generating… Esc to stop' : 'Write a message… (empty to generate a reply)'}
+        placeholder={
+          busy
+            ? queued
+              ? 'Waiting for the after-reply steps… Esc to cancel'
+              : 'Generating… Esc to stop'
+            : 'Write a message… (empty to generate a reply)'
+        }
         value={content}
         onChange={(event) => onChange(event.target.value)}
         onCompositionStart={() => {
@@ -83,7 +91,7 @@ export function Composer({ content, busy, locked, onChange, onSend, onStop }: Co
       />
       <IconButton
         icon={busy ? Square : Send}
-        label={busy ? 'Stop generation' : 'Send message'}
+        label={busy ? (queued ? 'Cancel queued message' : 'Stop generation') : 'Send message'}
         className={`primary${busy ? ' stop-generation' : ''}`}
         disabled={!busy && locked}
         onClick={busy ? onStop : send}

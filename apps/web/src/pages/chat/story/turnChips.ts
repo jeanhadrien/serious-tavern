@@ -1,9 +1,9 @@
-import type { ChatMessage, SessionStateView } from '@st/shared';
+import type { ChatMessage, PostStatus, SessionStateView } from '@st/shared';
 import { describeWrite, itemTexts } from './describeWrite.js';
 import { postRunOf } from './postRuns.js';
 
-/** A turn's after-reply run that ended badly: the chip shows what happened and links to its log. */
-type PostNote = { status: 'error' | 'stopped'; message?: string; executionId?: string };
+/** A turn's after-reply run once it ended: the chip says how and links to its log (a running one has none yet). */
+type PostNote = { status: Exclude<PostStatus, 'running'>; message?: string; executionId?: string };
 
 type DescribedTurn = { turnNumber: number; lines: string[]; post?: PostNote };
 
@@ -14,8 +14,9 @@ export type StoryChip = DescribedTurn & {
 };
 
 /**
- * The turns of a view that still count and stored something, or whose after-reply run failed or was stopped, by
- * execution id, described once per view. `lines` is one plain-words line per write, in write order.
+ * The turns of a view that still count and stored something, or whose after-reply run has ended (the chip is how
+ * its log is reached, whatever came of it), by execution id, described once per view. `lines` is one plain-words
+ * line per write, in write order.
  */
 export type DescribedTurns = ReadonlyMap<string, DescribedTurn>;
 
@@ -27,7 +28,7 @@ export function describeTurns(view: SessionStateView | undefined): DescribedTurn
     if (turn.turnNumber === null) continue;
     const run = postRunOf(turn);
     const post: PostNote | undefined =
-      run?.status === 'error' || run?.status === 'stopped'
+      run && run.status !== 'running'
         ? {
             status: run.status,
             ...(run.error !== undefined && { message: run.error }),

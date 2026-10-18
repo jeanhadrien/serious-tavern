@@ -26,6 +26,14 @@ export function useChat() {
   const [content, setContent] = useState('');
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  // A sent message the server has not started yet: it may wait behind another turn or an after-reply run.
+  const [queued, setQueued] = useState(false);
+  const queuedRef = useRef(false);
+  const cancelledRef = useRef(false);
+  const setWaiting = (value: boolean) => {
+    queuedRef.current = value;
+    setQueued(value);
+  };
   const opening = useRef(0);
   const streamControllerRef = useRef<AbortController | undefined>(undefined);
   const [logs, setLogs] = useState<Record<string, ExecutionLog>>({});
@@ -117,9 +125,16 @@ export function useChat() {
     }
   };
   // Asks the server to stop; the open stream then ends with the partial rows, which `send` settles.
-  // Aborting the connection is only the fallback, for when the stop request itself cannot get through.
+  // Aborting the connection is only the fallback, for when the stop request itself cannot get through. A message
+  // that has not started yet is not what the server's Stop would stop (it ends the job that runs, e.g. an
+  // after-reply run), so it is cancelled by aborting its request instead; the server then drops it unstored.
   const stop = () => {
     if (!busyRef.current || !session) return;
+    if (queuedRef.current) {
+      cancelledRef.current = true;
+      streamControllerRef.current?.abort();
+      return;
+    }
     sessionsApi.stopTurn(session.id, { silent: true }).catch(() => streamControllerRef.current?.abort());
   };
   const send = async () => {
@@ -129,6 +144,7 @@ export function useChat() {
     const text = content.trim();
     setContent('');
     setBusy(true);
+    setWaiting(true);
 
     // An empty send adds no user message; the turn runs on the history as it is.
     const optimisticUser: ChatMessage | undefined = text
@@ -154,6 +170,7 @@ export function useChat() {
         sessionId,
         text,
         {
+          onStart: () => setWaiting(false),
           onDelta: (nodeId, textDelta, reasoningDelta) =>
             patchMessages((messages) => applyDelta(messages, nodeId, textDelta, reasoningDelta)),
           onComplete: settle,
@@ -170,13 +187,17 @@ export function useChat() {
       } else {
         if (error instanceof ApiError) notifyError(error);
         else if (!(error instanceof Error && error.name === 'AbortError')) alerts.error(String(error));
+        // A message cancelled while it waited goes back to the composer, to be edited or sent again.
+        if (cancelledRef.current) setContent((current) => current || text);
         // Whatever the server kept (the user message, partial rows) is the truth; drop local rows.
         await resync();
       }
     } finally {
       streamControllerRef.current = undefined;
+      cancelledRef.current = false;
       busyRef.current = false;
       setBusy(false);
+      setWaiting(false);
       refresh().catch(() => {});
     }
   };
@@ -189,6 +210,7 @@ export function useChat() {
     content,
     setContent,
     busy,
+    queued,
     logs,
     open,
     close,

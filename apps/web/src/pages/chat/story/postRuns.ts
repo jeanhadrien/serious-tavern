@@ -24,6 +24,27 @@ export function runningPostRun(view: SessionStateView | undefined): PostRunRef |
   return undefined;
 }
 
+/** The newest failed or interrupted runs the chat panel lists. */
+const POST_FAILURES_SHOWN = 3;
+
+/** A failed (or interrupted) after-reply run, with what the panel needs to say which turn it belongs to. */
+export type PostFailure = PostRunRef & { replies: number };
+
+/**
+ * The newest runs that failed or were cut short, newest first: they stay visible after a toast is gone, for a turn
+ * without a reply (no chip to hang on) and for failures that happened while the chat was not open. A stopped run is
+ * the user's own doing and is not listed.
+ */
+export function postFailures(view: SessionStateView | undefined): PostFailure[] {
+  const failures: PostFailure[] = [];
+  for (const turn of [...(view?.turns ?? [])].reverse()) {
+    const run = postRunOf(turn);
+    if (run?.status === 'error') failures.push({ ...run, replies: turn.replies });
+    if (failures.length === POST_FAILURES_SHOWN) break;
+  }
+  return failures;
+}
+
 /** Which failures were already seen in the open chat, so each one toasts once. */
 export type AlertMemory = { sessionId: string; seen: ReadonlySet<string> };
 

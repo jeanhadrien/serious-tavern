@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionStateView } from '@st/shared';
 import { sessionsApi } from '../../../api.js';
 import { subscribeToChanges } from '../../../api/events.js';
@@ -22,7 +22,7 @@ export interface StoryPanelData {
 export function useStoryState(
   sessionId: string | undefined,
   idle: boolean,
-): { view?: SessionStateView; panel: StoryPanelData } {
+): { view?: SessionStateView; panel: StoryPanelData; reload: () => void } {
   const [slot, setSlot] = useState<Slot>();
   const loader = useRef<{ reload(): void } | undefined>(undefined);
   useEffect(() => {
@@ -49,5 +49,7 @@ export function useStoryState(
   const view = current?.view;
   const failed = current?.failed ?? false;
   const panel = useMemo(() => ({ view, failed }), [view, failed]);
-  return { view, panel };
+  // Loads again now (coalesced like any reload): for when the screen may be behind what the server holds.
+  const reload = useCallback(() => loader.current?.reload(), []);
+  return { view, panel, reload };
 }

@@ -1,8 +1,14 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Database, TriangleAlert } from 'lucide-react';
+import { Database, ListChecks, TriangleAlert } from 'lucide-react';
 import { IconButton } from '../../../components/IconButton.js';
 import { ExecutionDetails } from '../ExecutionDetails.js';
-import { POST_DETAILS_LABEL, POST_STOPPED_NOTE, chipLabel, postFailureNote } from './postRunText.js';
+import {
+  POST_DETAILS_LABEL,
+  POST_NOTHING_STORED,
+  POST_STOPPED_NOTE,
+  chipLabel,
+  postFailureNote,
+} from './postRunText.js';
 import type { StoryChip } from './turnChips.js';
 
 /**
@@ -31,6 +37,7 @@ export function TurnChipCard({ chip, id }: { chip: StoryChip; id?: string }) {
       )}
       {post?.status === 'error' && <p className="error">{postFailureNote(post.message)}</p>}
       {post?.status === 'stopped' && <p className="hint">{POST_STOPPED_NOTE}</p>}
+      {post?.status === 'completed' && !chip.lines.length && <p className="hint">{POST_NOTHING_STORED}</p>}
       {post?.executionId && <ExecutionDetails id={post.executionId} label={POST_DETAILS_LABEL} optional />}
     </div>
   );
@@ -59,7 +66,7 @@ export function TurnChip({ chip }: { chip: StoryChip }) {
   return (
     <div className="message-story" ref={wrapper}>
       <IconButton
-        icon={chip.post?.status === 'error' ? TriangleAlert : Database}
+        icon={chip.post?.status === 'error' ? TriangleAlert : chip.lines.length ? Database : ListChecks}
         label={chipLabel(chip.lines.length > 0)}
         className={chip.post?.status === 'error' ? 'chip-alert' : ''}
         aria-expanded={open}

@@ -19,6 +19,24 @@ export function shouldStickToBottom(sessionChanged: boolean, nearBottom: boolean
   return sessionChanged || nearBottom;
 }
 
+type Observer = new (callback: () => void) => Pick<ResizeObserver, 'observe' | 'disconnect'>;
+
+/**
+ * Calls `onResize` whenever one of the elements changes size; returns the function that stops watching. The thread
+ * watches both its content (it grows with messages, images, details) and its own viewport: a row appearing between
+ * the thread and the composer shrinks the viewport, and the newest message would be clipped behind it otherwise.
+ */
+export function watchResize(
+  elements: readonly (Element | null)[],
+  onResize: () => void,
+  Observer: Observer | undefined = globalThis.ResizeObserver,
+): () => void {
+  if (!Observer) return () => {};
+  const observer = new Observer(onResize);
+  for (const element of elements) if (element) observer.observe(element);
+  return () => observer.disconnect();
+}
+
 export function useStickToBottom(sessionId: string, revision: unknown) {
   const viewport = useRef<HTMLElement>(null);
   const content = useRef<HTMLDivElement>(null);
@@ -36,12 +54,7 @@ export function useStickToBottom(sessionId: string, revision: unknown) {
     }
     previousSession.current = sessionId;
   }, [sessionId, revision]);
-  useLayoutEffect(() => {
-    if (!content.current || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(stick);
-    observer.observe(content.current);
-    return () => observer.disconnect();
-  }, []);
+  useLayoutEffect(() => watchResize([content.current, viewport.current], stick), []);
   return {
     viewport,
     content,

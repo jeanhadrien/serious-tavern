@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { PostStatus } from '@st/shared';
 import { buildView, entry, reply, userMessage } from './test-fixtures.js';
-import { nextAlerts, postRunOf, runningPostRun, type AlertMemory } from './postRuns.js';
-import { postFailureToast } from './postRunText.js';
+import { nextAlerts, postFailures, postRunOf, runningPostRun, type AlertMemory } from './postRuns.js';
+import { postFailureSubject, postFailureToast } from './postRunText.js';
 
 const turn = (id: string, post?: { status: PostStatus; error?: string; executionId?: string }) => ({
   ...entry(id),
@@ -116,5 +116,50 @@ describe('postFailureToast', () => {
     [{ status: 'error', turnNumber: 1 }, 'After-reply steps failed on turn 1: unknown error'],
   ] as const)('words %j', (run, text) => {
     expect(postFailureToast(run)).toBe(text);
+  });
+});
+
+describe('postFailures', () => {
+  const failed = (id: string, error = 'boom', replies = 1) => ({ ...turn(id, { status: 'error', error }), replies });
+
+  it('lists the failed and interrupted runs, newest first, and nothing else', () => {
+    const view = viewOf(
+      failed('e1'),
+      turn('e2', { status: 'completed' }),
+      turn('e3', { status: 'stopped' }),
+      failed('e4', 'HTTP 500'),
+      turn('e5', { status: 'running' }),
+    );
+    expect(postFailures(view).map((item) => [item.turnNumber, item.error])).toEqual([
+      [4, 'HTTP 500'],
+      [1, 'boom'],
+    ]);
+  });
+
+  it('keeps the newest three', () => {
+    const view = viewOf(failed('e1'), failed('e2'), failed('e3'), failed('e4'));
+    expect(postFailures(view).map((item) => item.turnNumber)).toEqual([4, 3, 2]);
+  });
+
+  it('is empty without a view or without failures', () => {
+    expect(postFailures(undefined)).toEqual([]);
+    expect(postFailures(viewOf(turn('e1', { status: 'completed' })))).toEqual([]);
+  });
+
+  it('carries what is needed to say which turn it was: one without a reply, one whose replies are gone', () => {
+    const noReply = buildView({ messages: [], entries: [{ ...failed('e1', 'boom', 0) }] });
+    expect(postFailures(noReply)[0]).toMatchObject({ turnNumber: 1, replies: 0 });
+    const gone = buildView({ messages: [], entries: [failed('e1')] });
+    expect(postFailures(gone)[0]).toMatchObject({ turnNumber: null, replies: 1 });
+  });
+});
+
+describe('postFailureSubject', () => {
+  it.each([
+    [{ turnNumber: 3, replies: 1 }, 'Turn 3'],
+    [{ turnNumber: 2, replies: 0 }, 'Turn 2 (no reply)'],
+    [{ turnNumber: null, replies: 1 }, 'A turn whose replies were deleted'],
+  ])('names %j', (turnRef, text) => {
+    expect(postFailureSubject(turnRef)).toBe(text);
   });
 });

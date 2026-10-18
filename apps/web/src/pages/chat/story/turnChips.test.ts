@@ -121,14 +121,29 @@ describe('the after-reply run of a turn', () => {
     });
   });
 
-  it.each(['running', 'completed'])('adds nothing for a %s run without writes', (status) => {
-    const view = buildView({ messages, entries: [{ ...entry('e1'), ...post(status) }] });
-    expect(chips(view, messages).size).toBe(0);
+  it('gives a completed run without writes a chip, which is how its log is reached', () => {
+    const view = buildView({ messages, entries: [{ ...entry('e1'), ...post('completed') }] });
+    expect(chips(view, messages).get('m-e1')).toEqual({
+      turnNumber: 1,
+      lines: [],
+      post: { status: 'completed', executionId: 'p1' },
+      editedAfter: false,
+    });
   });
 
-  it.each(['running', 'completed'])('adds no note to the chip of a turn with writes and a %s run', (status) => {
-    const view = buildView({ messages, entries: [{ ...entry('e1', [setWrite('tension', 6)]), ...post(status) }] });
-    expect(chips(view, messages).get('m-e1')).not.toHaveProperty('post');
+  it('keeps the writes and links the log of a completed run', () => {
+    const view = buildView({ messages, entries: [{ ...entry('e1', [setWrite('tension', 6)]), ...post('completed') }] });
+    expect(chips(view, messages).get('m-e1')).toMatchObject({
+      lines: ['scene.tension → 6'],
+      post: { status: 'completed', executionId: 'p1' },
+    });
+  });
+
+  it('says nothing about a run that is still running: it has no log yet', () => {
+    const none = buildView({ messages, entries: [{ ...entry('e1'), ...post('running') }] });
+    expect(chips(none, messages).size).toBe(0);
+    const stored = buildView({ messages, entries: [{ ...entry('e1', [setWrite('tension', 6)]), ...post('running') }] });
+    expect(chips(stored, messages).get('m-e1')).not.toHaveProperty('post');
   });
 
   it('gives no chip to a turn that no longer counts', () => {

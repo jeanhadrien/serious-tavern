@@ -67,12 +67,13 @@ export function Chat({ chat }: { chat: ChatState }) {
                 onEdit={chat.editMessage}
                 onDelete={chat.deleteMessage}
               />
-              <PostRunStatus key={`post-${session.id}`} sessionId={session.id} run={postRun} />
+              <PostRunStatus key={`post-${session.id}`} sessionId={session.id} run={postRun} onStopped={story.reload} />
               <Composer
                 key={`composer-${session.id}`}
                 content={chat.content}
                 onChange={chat.setContent}
                 busy={chat.busy}
+                queued={chat.queued && postRun !== undefined}
                 locked={locked}
                 onSend={chat.send}
                 onStop={chat.stop}

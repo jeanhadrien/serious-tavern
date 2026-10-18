@@ -4,6 +4,8 @@ import { ApiError, apiErrorFrom, networkError } from './transport.js';
 export type TurnResult = ApiResponse<'sendMessage'>;
 
 export type TurnHandlers = {
+  /** The turn began on the server. Until then the message may be waiting in its queue and can still be cancelled. */
+  onStart?: () => void;
   onDelta?: (nodeId: string, textDelta?: string, reasoningDelta?: string) => void;
   onComplete?: (result: TurnResult) => void;
 };
@@ -79,6 +81,9 @@ function handleFrame(frame: string, handlers: TurnHandlers): boolean {
   if (!parsed.success) return false;
   const event = parsed.data;
   switch (event.type) {
+    case 'turn.start':
+      handlers.onStart?.();
+      return false;
     case 'node.delta':
       handlers.onDelta?.(event.nodeId, event.textDelta, event.reasoningDelta);
       return false;

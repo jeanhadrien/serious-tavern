@@ -25,8 +25,14 @@ it('dispatches deltas and the completed turn, even when frames are split across 
   respondWith([frame({ type: 'turn.start', executionId: 'e' }), text.slice(0, 20), text.slice(20) + done]);
   const deltas: string[] = [];
   const completed = vi.fn();
-  await streamMessage('s', 'hi', { onDelta: (_node, delta) => deltas.push(delta ?? ''), onComplete: completed });
+  const started = vi.fn();
+  await streamMessage('s', 'hi', {
+    onStart: started,
+    onDelta: (_node, delta) => deltas.push(delta ?? ''),
+    onComplete: completed,
+  });
   expect(deltas).toEqual(['Hi']);
+  expect(started).toHaveBeenCalledOnce();
   expect(completed).toHaveBeenCalledOnce();
 });
 
