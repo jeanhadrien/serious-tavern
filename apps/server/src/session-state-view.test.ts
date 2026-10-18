@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { apiContract, NODE_ITEMS_LIMIT, WRITE_PREVIEW_LIMIT } from '@st/shared';
@@ -240,6 +240,57 @@ describe('the shape of the state view', () => {
       expect(state.nodes[0]!.label).toBeUndefined();
       expect(state.turns[0]!.turnNumber).toBe(1);
       expect(state.turns[0]!.writes[0]!.nodeLabel).toBeUndefined();
+    } finally {
+      await app.close();
+    }
+  });
+});
+
+describe('the post-turn run of a stored turn', () => {
+  const entry = (extra: object) => ({
+    executionId: 'x',
+    at: DATE,
+    completed: true,
+    replies: 0,
+    writes: [],
+    postExecutionId: 'post-1',
+    ...extra,
+  });
+
+  it('reads as an error after a restart, without rewriting the file', async () => {
+    const { app, directory } = await apps.open();
+    try {
+      const id = await stored(directory, { state: { turns: [entry({ postStatus: 'running' })] } });
+      const path = join(directory, 'sessions', `${id}.json`);
+      const before = await readFile(path);
+      expect((await view(app, id)).turns[0]).toMatchObject({
+        turnNumber: 1,
+        postStatus: 'error',
+        postExecutionId: 'post-1',
+        postError: expect.stringContaining('interrupted by a server restart'),
+      });
+      expect((await readFile(path)).equals(before)).toBe(true);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it.each([
+    ['completed', { postStatus: 'completed' }, { postStatus: 'completed' }],
+    [
+      'an error with its message',
+      { postStatus: 'error', postError: 'boom' },
+      { postStatus: 'error', postError: 'boom' },
+    ],
+    ['stopped', { postStatus: 'stopped' }, { postStatus: 'stopped' }],
+    ['a bad status', { postStatus: 7 }, {}],
+  ])('reports %s as stored', async (_name, stored_, expected) => {
+    const { app, directory } = await apps.open();
+    try {
+      const id = await stored(directory, { state: { turns: [entry(stored_)] } });
+      const turnView = (await view(app, id)).turns[0]!;
+      expect(turnView).toMatchObject(expected);
+      if (!('postStatus' in expected)) expect(turnView).not.toHaveProperty('postStatus');
     } finally {
       await app.close();
     }

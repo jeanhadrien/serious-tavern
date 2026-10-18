@@ -10,27 +10,24 @@ import type {
   WorkflowInvalidDetails,
 } from '@st/shared';
 import { resolveChatSettings, workflowSettings } from '@st/shared';
-import { executeWorkflow, ExecutionFailure, registry, prepareWorkflow } from '@st/engine';
+import type { StateDefinition } from '@st/shared';
+import { executeWorkflow, ExecutionFailure, postRunSeed, prepareWorkflow } from '@st/engine';
 import type { ChatReply, PreparedWorkflow } from '@st/engine';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
+import { failureMessage, stopWarning } from './failure.js';
 import { nodeResources } from './node-resources.js';
+import { runPostTurn } from './post-turn.js';
 import { historyMessages, settleTurn } from './settle-turn.js';
 import { foldSession, listDefinitions } from './story-state.js';
 import { TurnStream, type TurnFrame } from './turn-stream.js';
-import type { RunningTurn, TurnStop } from './turns.js';
+import type { RunningTurn } from './turns.js';
 
 export type TurnOptions = {
   // Receives the turn's events. Passing it streams passthrough Chat Outputs live.
   emit?: (frame: TurnFrame) => void;
   // Aborts the turn when the stream's client disconnects.
   signal?: AbortSignal;
-};
-
-const stopWarnings: Record<TurnStop, string> = {
-  user: 'The turn was stopped by the user before it finished.',
-  disconnect: 'The turn ended because the client disconnected before it finished.',
-  shutdown: 'The turn ended because the server shut down before it finished.',
 };
 
 export function sendMessage(
@@ -65,6 +62,8 @@ async function startTurn(context: AppContext, sessionId: string, content: string
   const started: {
     value?: {
       prepared: PreparedWorkflow;
+      // The listing the ports were resolved with: the after-reply run folds its state against the same one.
+      definitions: StateDefinition[];
       userMessage?: ChatMessage;
       history: ChatMessage[];
       character?: Character;
@@ -101,6 +100,7 @@ async function startTurn(context: AppContext, sessionId: string, content: string
     const story = foldSession(definitions, current);
     started.value = {
       prepared,
+      definitions,
       userMessage,
       history: historyMessages(current.messages),
       character,
@@ -126,8 +126,18 @@ async function executeTurn(
   options: TurnOptions,
 ): Promise<ApiResponse<'sendMessage'>> {
   const { sessions, executions, secrets } = context;
-  const { prepared, userMessage, history, character, persona, settings, settingIssues, state, stateIssues } =
-    await startTurn(context, sessionId, content);
+  const {
+    prepared,
+    definitions,
+    userMessage,
+    history,
+    character,
+    persona,
+    settings,
+    settingIssues,
+    state,
+    stateIssues,
+  } = await startTurn(context, sessionId, content);
   const executionId = randomUUID();
   const stream = options.emit
     ? new TurnStream({ sessions: sessions.silent, sessionId, executionId, prepared, emit: options.emit })
@@ -159,8 +169,12 @@ async function executeTurn(
   const writes = outcome?.writes ?? (failure instanceof ExecutionFailure ? failure.writes : []);
   // A stored value that no longer fits its declaration is ignored (the default runs); say so in the log.
   execution?.warnings.push(...settingIssues, ...stateIssues);
-  if (!outcome && turn.stoppedBy && execution) execution.warnings.push(stopWarnings[turn.stoppedBy]);
+  if (!outcome && turn.stoppedBy && execution) execution.warnings.push(stopWarning('turn', turn.stoppedBy));
   if (execution) await executions.save(execution);
+  // A turn that ran to the end leaves an after-reply run when the workflow has one. It is announced in the entry
+  // (`running`) by the settle below, and its id is on the RunningTurn first, so a state read can tell it is live.
+  const postExecutionId = outcome && prepared.parts.postSinks.length ? randomUUID() : undefined;
+  if (postExecutionId) turn.postExecutionId = postExecutionId;
   const settled: { value?: { userMessage?: ChatMessage; assistantMessages: ChatMessage[] } } = {};
   // Everything a turn writes is silent; the settled turn announces itself once (success, failure or stop).
   const session = await sessions.silent.update(sessionId, (current) => {
@@ -171,12 +185,35 @@ async function executeTurn(
       streamed,
       interrupted: !outcome,
       writes,
+      postExecutionId,
     });
     return current;
   });
   if (!session) throw notFound('Session');
   context.changes.publish({ type: 'sessions.changed', id: sessionId });
   const { userMessage: saved, assistantMessages } = settled.value!;
+  // The reply is complete for the client. The after-reply run follows in this turn's queue slot, after the
+  // caller has its result.
+  if (postExecutionId && outcome)
+    turn.after = (run) =>
+      runPostTurn(
+        context,
+        sessionId,
+        {
+          prepared,
+          definitions,
+          turnExecutionId: executionId,
+          executionId: postExecutionId,
+          seed: postRunSeed(outcome.execution.seed ?? executionId),
+          message: content,
+          history,
+          settings,
+          character,
+          persona,
+          replies: assistantMessages,
+        },
+        run,
+      );
   if (outcome) return { userMessage: saved, assistantMessages, execution: outcome.execution };
   if (!(failure instanceof ExecutionFailure)) throw failure;
   const details = { execution: failure.execution, userMessage: saved, assistantMessages };
@@ -185,11 +222,6 @@ async function executeTurn(
       ...details,
       aborted: turn.stoppedBy,
     });
-  const failedId = failure.nodeId;
-  const label = failure.nodeType && registry.get(failure.nodeType)?.label;
-  const message =
-    label && failedId
-      ? `${label} (${failedId}): ${failure.execution.nodes[failedId]?.error ?? failure.message}`
-      : failure.message;
+  const message = failureMessage(failure);
   throw new HttpError(500, 'WORKFLOW_EXECUTION_FAILED', message, details);
 }

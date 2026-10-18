@@ -28,13 +28,15 @@ export async function listDefinitions(repository: Pick<StateDefinitionRepository
 /**
  * Folds a session's stored turns against `definitions`: what its state is right now, and the snapshot its
  * next turn runs on. Never throws and writes nothing; a stored value that doesn't fit its definition reads as
- * the default and shows up in `issues`.
+ * the default and shows up in `issues`. `atTurn` reads the state as of that turn instead of the next one (an
+ * after-reply run reads at the turn it follows).
  */
 export function foldSession(
   definitions: StateDefinition[],
   session: Pick<Session, 'messages' | 'state'>,
+  atTurn?: number,
 ): SessionStory {
-  const story = foldStoryState({ definitions, messages: session.messages, state: session.state });
+  const story = foldStoryState({ definitions, messages: session.messages, state: session.state, turn: atTurn });
   return {
     definitions,
     story,

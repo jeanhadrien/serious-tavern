@@ -1,5 +1,6 @@
 import { registry } from '@st/engine';
 import {
+  effectivePostRun,
   NODE_ITEMS_LIMIT,
   nodeDisplayName,
   previewWrite,
@@ -76,13 +77,23 @@ export async function sessionStateView(context: AppContext, sessionId: string): 
       const label = nodeLabel(folded.nodeId);
       return { nodeId: folded.nodeId, ...(label !== undefined && { label }), ...nodeKeyViews(folded.keys) };
     }),
-    turns: story.turns.map(({ entry, turn }) => ({
-      executionId: entry.executionId,
-      at: entry.at,
-      completed: entry.completed,
-      replies: entry.replies,
-      turnNumber: turn,
-      writes: entry.writes.map(view),
-    })),
+    turns: story.turns.map(({ entry, turn }) => {
+      // A run stored as `running` that this server does not hold is one a restart cut short: it reads as an error.
+      const post = effectivePostRun(
+        entry,
+        entry.postExecutionId !== undefined && context.turns.hasPostRun(sessionId, entry.postExecutionId),
+      );
+      return {
+        executionId: entry.executionId,
+        at: entry.at,
+        completed: entry.completed,
+        replies: entry.replies,
+        turnNumber: turn,
+        writes: entry.writes.map(view),
+        ...(post && { postStatus: post.status }),
+        ...(post?.executionId !== undefined && { postExecutionId: post.executionId }),
+        ...(post?.error !== undefined && { postError: post.error }),
+      };
+    }),
   };
 }

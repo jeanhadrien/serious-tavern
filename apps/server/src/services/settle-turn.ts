@@ -18,6 +18,9 @@ export type Settlement = {
   interrupted: boolean;
   // The story state writes of the nodes that completed; stored with the turn's entry.
   writes?: StateWrite[];
+  // The after-reply run this turn leaves behind: the entry says `running` from the moment it is saved, so the
+  // run never has a gap in which the chat shows none.
+  postExecutionId?: string;
 };
 
 /**
@@ -27,7 +30,7 @@ export type Settlement = {
  */
 export function settleTurn(
   current: Session,
-  { executionId, userMessage, replies, streamed, interrupted, writes = [] }: Settlement,
+  { executionId, userMessage, replies, streamed, interrupted, writes = [], postExecutionId }: Settlement,
 ) {
   const streamedIds = new Set(streamed.map((row) => row.id));
   const streamedByOutput = new Map(streamed.map((row) => [row.outputId, row]));
@@ -77,6 +80,7 @@ export function settleTurn(
     completed: !interrupted,
     replies: assistantMessages.length,
     writes,
+    ...(postExecutionId ? { postExecutionId, postStatus: 'running' as const } : {}),
   });
   current.updatedAt = now();
   return { userMessage: saved, assistantMessages };
