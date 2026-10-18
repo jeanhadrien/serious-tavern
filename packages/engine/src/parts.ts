@@ -64,19 +64,21 @@ export function partitionWorkflow(
 }
 
 /**
- * The nodes a run of `part` does not run that its log still lists as skipped, with the detail for each. The
- * reply log lists every node it does not run; the post log lists none, so it only shows the after-reply work.
+ * The nodes a run of `part` does not run that its log still lists as skipped, with the detail for each (the event's
+ * detail). The reply log lists every node it does not run, and says in the node's `logs` that an after-reply node
+ * runs in the other run; the post log lists none, so it only shows the after-reply work.
  */
 export function skippedNodes(
   parts: WorkflowParts,
   part: 'reply' | 'post',
   workflow: Workflow,
-): { nodeId: string; detail: string }[] {
+): { nodeId: string; detail: string; logs?: string[] }[] {
   if (part === 'post') return [];
   return workflow.nodes
     .filter((node) => !parts.reply.has(node.id))
-    .map((node) => ({
-      nodeId: node.id,
-      detail: parts.post.has(node.id) ? 'runs after the reply' : 'not needed by any output',
-    }));
+    .map((node) =>
+      parts.post.has(node.id)
+        ? { nodeId: node.id, detail: 'runs after the reply', logs: ['Runs after the reply, in the after-reply run.'] }
+        : { nodeId: node.id, detail: 'not needed by any output' },
+    );
 }

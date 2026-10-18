@@ -37,6 +37,8 @@ describe('the reply part', () => {
     });
     for (const id of ['after', 'postBump', 'postNote']) {
       expect(result.execution.nodes[id]?.status).toBe('skipped');
+      // The log says why in plain words, so the reply's execution details don't read as if the work never ran.
+      expect(result.execution.nodes[id]?.logs).toEqual(['Runs after the reply, in the after-reply run.']);
       expect(events).toContainEqual({ type: 'node:skipped', nodeId: id, detail: 'runs after the reply' });
     }
     expect(Object.keys(result.execution.nodes).sort()).toEqual([
@@ -77,12 +79,13 @@ describe('the reply part', () => {
     wf.nodes.push(node('dead1', 'pass-test'), node('dead2', 'pass-test'));
     wf.edges.push(edge('input', 'message', 'dead1', 'value'), edge('after', 'text', 'dead2', 'value'));
     const events: EngineEvent[] = [];
-    await executeWorkflow(wf, {
+    const { execution } = await executeWorkflow(wf, {
       ...run,
       resources,
       state: emptyStateSnapshot([scene]),
       onEvent: (event) => events.push(event),
     });
+    expect(execution.nodes.dead1?.logs).toBeUndefined();
     expect(events).toContainEqual({ type: 'node:skipped', nodeId: 'dead1', detail: 'not needed by any output' });
     expect(events).toContainEqual({ type: 'node:skipped', nodeId: 'dead2', detail: 'not needed by any output' });
     expect(events).toContainEqual({ type: 'node:skipped', nodeId: 'after', detail: 'runs after the reply' });

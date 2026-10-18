@@ -132,9 +132,15 @@ export async function executeWorkflow(
   const resolved = new Map<string, { output: Record<string, unknown>; skipped: boolean }>();
   const replies = new Map<string, ChatReply>();
   const pending = new Set(workflow.nodes.filter((node) => parts[part].has(node.id)).map((node) => node.id));
-  for (const { nodeId, detail } of skippedNodes(parts, part, workflow)) {
+  for (const { nodeId, detail, logs } of skippedNodes(parts, part, workflow)) {
     const timestamp = new Date().toISOString();
-    execution.nodes[nodeId] = { status: 'skipped', startedAt: timestamp, finishedAt: timestamp, durationMs: 0 };
+    execution.nodes[nodeId] = {
+      status: 'skipped',
+      startedAt: timestamp,
+      finishedAt: timestamp,
+      durationMs: 0,
+      ...(logs && { logs }),
+    };
     resolved.set(nodeId, { output: {}, skipped: true });
     emit({ type: 'node:skipped', nodeId, detail });
   }
