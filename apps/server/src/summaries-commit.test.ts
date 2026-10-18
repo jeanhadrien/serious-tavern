@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { fingerprintMessages, type ChatMessage } from '@st/shared';
+import { apiContract, fingerprintMessages, type ChatMessage } from '@st/shared';
 import { gateNode } from './test-support/post.js';
 import { postRunOf, waitForPostRun } from './test-support/post.js';
 import { readExecution, send } from './test-support/story.js';
@@ -9,6 +9,12 @@ import { summaryViews } from './services/summary-view.js';
 // The commit happens at settle time, under the session lock, against the chat as it is THEN.
 
 const harness = summaryHarness('summaries-commit');
+const DROPPED =
+  'The summary for set "main" was not saved: a message it covers was edited or deleted while it was being written.';
+const turnsOf = async (app: Parameters<typeof storedSummaries>[0], sessionId: string) =>
+  apiContract.getSessionState.response.parse(
+    (await app.inject({ method: 'GET', url: `/api/sessions/${sessionId}/state` })).json(),
+  ).turns;
 let gate: ReturnType<typeof gateNode> | undefined;
 afterEach(async () => {
   gate?.dispose();
@@ -61,12 +67,12 @@ describe('a summary whose messages changed while it was being written', () => {
     gate.release('stale summary');
     const response = await pending;
     expect(response.statusCode).toBe(200);
-    const warning =
-      'The summary for set "main" was not saved: a message it covers was edited or deleted while it was being written.';
+    const warning = DROPPED;
     const result = response.json();
     expect(result.execution.warnings).toContain(warning);
     expect((await readExecution(app, result.execution.id)).warnings).toContain(warning);
     expect((await storedSummaries(app, session.id)).summaries.map((s) => s.text)).not.toContain('stale summary');
+    expect((await turnsOf(app, session.id)).at(-1)!.summaryWarnings).toEqual([DROPPED]);
   });
 });
 

@@ -51,6 +51,9 @@ export const turnEntrySchema = z
     postExecutionId: z.string().min(1).optional().catch(undefined),
     postStatus: postStatusSchema.optional().catch(undefined),
     postError: z.string().optional().catch(undefined),
+    // Summaries this turn's runs asked to store but were dropped at commit time (see `commitSummaryWrites`), in plain
+    // words and cut (`SUMMARY_WARNING_LIMITS`): the chat shows them on the turn's chip.
+    summaryWarnings: z.array(z.string()).optional().catch(undefined),
   })
   .passthrough();
 export type TurnEntry = z.infer<typeof turnEntrySchema>;

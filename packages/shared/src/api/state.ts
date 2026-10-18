@@ -73,6 +73,9 @@ export const turnStateSchema = z.object({
   postStatus: postStatusSchema.optional(),
   postExecutionId: z.string().optional(),
   postError: z.string().optional(),
+  // Summaries the turn's runs (reply or after-reply) asked to store and that were dropped at commit time, in plain
+  // words (at most a few, each cut); absent when none were. The run's execution log has them too.
+  summaryWarnings: z.array(z.string()).optional(),
 });
 // One stored summary as the chat panel shows it. Positions count the chat's history messages (final or without a
 // status; partial and streaming rows do not count) from 1, user and assistant alike, and only the covered messages

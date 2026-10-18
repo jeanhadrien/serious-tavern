@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { ChatMessage, Session, StateWrite, SummaryWrite } from '@st/shared';
-import { withTurnEntry } from '@st/shared';
+import { SUMMARY_WARNING_LIMITS, withTurnEntry } from '@st/shared';
 import type { ChatReply } from '@st/engine';
 import { now } from '../context.js';
 import { commitSummaries } from './summaries.js';
@@ -80,6 +80,7 @@ export function settleTurn(
   const saved = userMessage && (current.messages.find((message) => message.id === userMessage.id) ?? userMessage);
   if (saved) saved.executionId = executionId;
   current.messages.push(...assistantMessages);
+  const summaryWarnings = commitSummaries(current, summaryWrites, executionId);
   // Every settled turn leaves an entry, with or without writes, so turn counting is stable. Whether it still
   // counts later depends on its replies (see `turnPresence`); `completed` is "ran to the end, no error or stop".
   current.state = withTurnEntry(current.state, {
@@ -88,9 +89,13 @@ export function settleTurn(
     completed: !interrupted,
     replies: assistantMessages.length,
     writes,
+    ...(summaryWarnings.length && {
+      summaryWarnings: summaryWarnings
+        .map((text) => text.slice(0, SUMMARY_WARNING_LIMITS.length))
+        .slice(-SUMMARY_WARNING_LIMITS.count),
+    }),
     ...(postExecutionId ? { postExecutionId, postStatus: 'running' as const } : {}),
   });
   current.updatedAt = now();
-  const summaryWarnings = commitSummaries(current, summaryWrites, executionId);
   return { userMessage: saved, assistantMessages, summaryWarnings };
 }

@@ -119,6 +119,7 @@ export function buildView({
         ...(post && { postStatus: post.status }),
         ...(post?.executionId !== undefined && { postExecutionId: post.executionId }),
         ...(post?.error !== undefined && { postError: post.error }),
+        ...(stored.summaryWarnings?.length && { summaryWarnings: stored.summaryWarnings }),
         writes: stored.writes.map((write) => {
           const definitionName = write.target.kind === 'definition' ? names.get(write.target.definitionId) : undefined;
           const nodeLabel = nodeLabels[write.nodeId];

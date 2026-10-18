@@ -96,3 +96,22 @@ describe('a turn whose after-reply run did not finish well', () => {
     );
   });
 });
+
+describe('a turn that lost a summary at commit time', () => {
+  const lost =
+    'The summary for set "main" was not saved: a message it covers was edited or deleted while it was being written.';
+  const warned = { turnNumber: 4, lines: [], editedAfter: false, warnings: [lost] };
+
+  it('names the button for the warnings and warns on the icon', () => {
+    const button = renderToStaticMarkup(<TurnChip chip={warned} />).match(/<button[^>]*>/)?.[0] ?? '';
+    expect(button).toContain('aria-label="Turn warnings"');
+    expect(button).toContain('title="Turn warnings"');
+    expect(button).toContain('chip-alert');
+  });
+
+  it('shows the warning in the card, next to what the turn stored', () => {
+    const html = renderToStaticMarkup(<TurnChipCard chip={{ ...warned, lines: ['scene.tension → 9'] }} />);
+    expect(html).toContain('<li>scene.tension → 9</li>');
+    expect(html).toContain('The summary for set &quot;main&quot; was not saved');
+  });
+});

@@ -16,7 +16,7 @@ describe('chunkLabel', () => {
     ['a single message', { covered: 1, firstIndex: 7, lastIndex: 7 }, 'message 7 (1)'],
     ['some messages deleted', { lastIndex: 38, missing: 2 }, 'messages 21–38 (18 of 20 left)'],
     ['one left of several', { firstIndex: 30, lastIndex: 30, missing: 19 }, 'message 30 (1 of 20 left)'],
-    ['none left', { missing: 20, firstIndex: undefined, lastIndex: undefined }, 'no messages left (0 of 20)'],
+    ['none left', { missing: 20, firstIndex: undefined, lastIndex: undefined }, 'all 20 covered messages deleted'],
   ])('%s', (_name, extra, label) => {
     expect(chunkLabel(summary(extra))).toBe(label);
   });

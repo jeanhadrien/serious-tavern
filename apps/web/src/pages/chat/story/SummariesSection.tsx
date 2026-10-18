@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { CircleCheck, CircleSlash } from 'lucide-react';
+import { MessageContent } from '../MessageContent.js';
 import { formatCreated, viewSummaryBlocks, type SummaryRow } from './summariesModel.js';
 import type { StoryPanelData } from './useStoryState.js';
 import './summaries.css';
@@ -29,7 +30,7 @@ function SummaryItem({ row, onJump }: { row: SummaryRow; onJump(messageId: strin
       {row.explanation && <p className="hint warning summary-why">{row.explanation}</p>}
       <details className="summary-text">
         <summary>Summary text</summary>
-        <p>{row.text}</p>
+        <MessageContent content={row.text} />
         <small>
           Written <time dateTime={row.createdAt}>{formatCreated(row.createdAt)}</time>
         </small>

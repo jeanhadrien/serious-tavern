@@ -15,12 +15,13 @@ export type PostSettlement = {
  * is now. Summaries are not turn state: they land in `session.summaries` whether or not the turn's entry still counts.
  * Called inside the caller's `sessions.silent.update` mutation, under the session lock; it leaves `updatedAt` alone
  * (only a message advances it). The one place a post run commits into the session. Returns the warnings of summary
- * writes that were dropped, for the run's execution log.
+ * writes that were dropped, for the run's execution log; the turn's entry keeps them too, so the chat can show them.
  */
 export function settlePostRun(
   current: Session,
   { turnExecutionId, executionId, summaryWrites = [], ...result }: PostSettlement,
 ): string[] {
-  current.state = withPostRun(current.state, turnExecutionId, result);
-  return commitSummaries(current, summaryWrites, executionId);
+  const warnings = commitSummaries(current, summaryWrites, executionId);
+  current.state = withPostRun(current.state, turnExecutionId, { ...result, summaryWarnings: warnings });
+  return warnings;
 }

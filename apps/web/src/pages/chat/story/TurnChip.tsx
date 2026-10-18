@@ -32,6 +32,11 @@ export function TurnChipCard({ chip, id }: { chip: StoryChip; id?: string }) {
       ) : (
         <strong>Turn {chip.turnNumber}</strong>
       )}
+      {chip.warnings?.map((warning) => (
+        <p key={warning} className="hint warning">
+          {warning}
+        </p>
+      ))}
       {chip.editedAfter && chip.lines.length > 0 && (
         <p className="hint">Edited after it was stored: the values above came from the original text.</p>
       )}
@@ -45,7 +50,7 @@ export function TurnChipCard({ chip, id }: { chip: StoryChip; id?: string }) {
 
 /**
  * "What this turn stored": a small button on the last reply of a turn that wrote story state or whose after-reply
- * run failed (the icon then warns). It discloses an inline
+ * run failed or that lost a summary (the icon then warns). It discloses an inline
  * card under the button (not a floating layer: the thread scrolls, and an inline card needs no placement on a
  * phone); Escape or a second click closes it.
  */
@@ -53,6 +58,8 @@ export function TurnChip({ chip }: { chip: StoryChip }) {
   const [open, setOpen] = useState(false);
   const cardId = useId();
   const wrapper = useRef<HTMLDivElement>(null);
+  // A failed after-reply run or a summary that was dropped: the icon warns.
+  const alert = chip.post?.status === 'error' || !!chip.warnings?.length;
   useEffect(() => {
     if (!open) return;
     // The card grows the message: keep it on screen when the reply sits at the bottom of the thread.
@@ -66,9 +73,9 @@ export function TurnChip({ chip }: { chip: StoryChip }) {
   return (
     <div className="message-story" ref={wrapper}>
       <IconButton
-        icon={chip.post?.status === 'error' ? TriangleAlert : chip.lines.length ? Database : ListChecks}
-        label={chipLabel(chip.lines.length > 0)}
-        className={chip.post?.status === 'error' ? 'chip-alert' : ''}
+        icon={alert ? TriangleAlert : chip.lines.length ? Database : ListChecks}
+        label={chipLabel(chip.lines.length > 0, !!chip.warnings?.length)}
+        className={alert ? 'chip-alert' : ''}
         aria-expanded={open}
         aria-controls={open ? cardId : undefined}
         onClick={() => setOpen((value) => !value)}

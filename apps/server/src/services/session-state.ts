@@ -115,6 +115,7 @@ export async function sessionStateView(context: AppContext, sessionId: string): 
         ...(post && { postStatus: post.status }),
         ...(post?.executionId !== undefined && { postExecutionId: post.executionId }),
         ...(post?.error !== undefined && { postError: post.error }),
+        ...(entry.summaryWarnings?.length && { summaryWarnings: entry.summaryWarnings }),
       };
     }),
     summaries: summaryViews(session.summaries, session.messages),

@@ -35,7 +35,9 @@
   justify-content: space-between;
   gap: 6px;
 }
-.summary-chunk {
+/* The jump label is also `.story-turn-link` (`font: inherit`): the doubled class wins whatever the CSS order. */
+.summary-chunk,
+.summary-chunk.story-turn-link {
   font-size: 0.85rem;
   font-weight: 600;
   text-align: left;
@@ -66,11 +68,26 @@
   font-size: 0.8rem;
   color: #a7adbd;
 }
-.summary-text p {
+/* The text is markdown, rendered like a message (`MessageContent`), at panel size. */
+.summary-text .message-content {
   margin: 6px 0;
   font-size: 0.85rem;
-  white-space: pre-wrap;
+  line-height: 1.45;
   overflow-wrap: anywhere;
+  min-width: 0;
+}
+.summary-text .message-content p {
+  margin: 6px 0;
+}
+.summary-text .message-content pre {
+  overflow: auto;
+}
+.chat-panel .summary-text .message-content :is(h1, h2, h3, h4, h5, h6) {
+  margin: 8px 0 4px;
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: inherit;
 }
 .summary-text small {
   color: #8a91a3;
@@ -80,6 +97,9 @@
 }
 @media (max-width: 700px), (pointer: coarse) {
   .summary-text summary {
+    /* 36px target, and the disclosure marker stays (display:flex would hide it). */
+    box-sizing: border-box;
+    min-height: 36px;
     padding-block: 9px;
   }
 }

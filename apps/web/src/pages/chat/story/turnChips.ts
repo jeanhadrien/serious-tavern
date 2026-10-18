@@ -5,7 +5,13 @@ import { postRunOf } from './postRuns.js';
 /** A turn's after-reply run once it ended: the chip says how and links to its log (a running one has none yet). */
 type PostNote = { status: Exclude<PostStatus, 'running'>; message?: string; executionId?: string };
 
-type DescribedTurn = { turnNumber: number; lines: string[]; post?: PostNote };
+type DescribedTurn = {
+  turnNumber: number;
+  lines: string[];
+  post?: PostNote;
+  /** Summaries the turn's runs lost at commit time (a covered message changed meanwhile). */
+  warnings?: string[];
+};
 
 /** What the chip on a turn's last reply shows. */
 export type StoryChip = DescribedTurn & {
@@ -15,7 +21,7 @@ export type StoryChip = DescribedTurn & {
 
 /**
  * The turns of a view that still count and stored something, or whose after-reply run has ended (the chip is how
- * its log is reached, whatever came of it), by execution id, described once per view. `lines` is one plain-words
+ * its log is reached, whatever came of it), or that lost a summary at commit time, by execution id, described once per view. `lines` is one plain-words
  * line per write, in write order.
  */
 export type DescribedTurns = ReadonlyMap<string, DescribedTurn>;
@@ -35,11 +41,13 @@ export function describeTurns(view: SessionStateView | undefined): DescribedTurn
             ...(run.executionId !== undefined && { executionId: run.executionId }),
           }
         : undefined;
-    if (turn.writes.length || post)
+    const warnings = turn.summaryWarnings ?? [];
+    if (turn.writes.length || post || warnings.length)
       described.set(turn.executionId, {
         turnNumber: turn.turnNumber,
         lines: turn.writes.map((write) => describeWrite(write, texts)),
         ...(post && { post }),
+        ...(warnings.length && { warnings }),
       });
   }
   return described;

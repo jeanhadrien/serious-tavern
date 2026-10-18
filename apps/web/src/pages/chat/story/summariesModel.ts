@@ -24,13 +24,14 @@ export const STALE_EXPLANATION =
   "A covered message was edited or deleted; raw messages are used until it's summarized again.";
 /** Said when the chat holds none of the messages a summary covered. */
 export const GONE_EXPLANATION =
-  'Every message this summary covered was deleted, so it is not used and there is nothing left to summarize.';
+  'All covered messages were deleted; this summary is not used and will be removed at the next summary save.';
 
-/** "messages 21–40 (20)"; "message 7 (1)"; with deletions "messages 21–38 (18 of 20 left)"; none left "no messages left (0 of 20)". */
+/** "messages 21–40 (20)"; "message 7 (1)"; with deletions "messages 21–38 (18 of 20 left)"; none left "all 20 covered messages deleted". */
 export function chunkLabel(summary: Pick<SummaryView, 'covered' | 'missing' | 'firstIndex' | 'lastIndex'>): string {
   const { covered, missing, firstIndex, lastIndex } = summary;
   const left = Math.max(0, covered - missing);
-  if (firstIndex === undefined || lastIndex === undefined || left === 0) return `no messages left (0 of ${covered})`;
+  if (firstIndex === undefined || lastIndex === undefined || left === 0)
+    return `all ${covered} covered messages deleted`;
   const range = firstIndex === lastIndex ? `message ${firstIndex}` : `messages ${firstIndex}–${lastIndex}`;
   return missing > 0 ? `${range} (${left} of ${covered} left)` : `${range} (${left})`;
 }

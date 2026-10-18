@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { effectivePostRun, POST_ERROR_LIMIT, POST_INTERRUPTED_MESSAGE, type PostRun, withPostRun } from './post-run.js';
+import {
+  effectivePostRun,
+  POST_ERROR_LIMIT,
+  POST_INTERRUPTED_MESSAGE,
+  type PostRun,
+  SUMMARY_WARNING_LIMITS,
+  withPostRun,
+} from './post-run.js';
 import { item, nodeAddWrite, setWrite, turnEntry } from './test-fixtures.js';
 import { readTurnEntries } from './writes.js';
 
@@ -74,6 +81,26 @@ describe('withPostRun', () => {
     const result = withPostRun({ turns: [running] }, 't1', { status: 'completed', writes: [post, memory] });
     expect(result.turns).toEqual([{ ...running, postStatus: 'completed', writes: [reply, post, memory] }]);
     expect(readTurnEntries(result)[0]?.writes).toEqual([reply, post, memory]);
+  });
+
+  it('appends dropped-summary warnings to the entry, cut and capped, and adds nothing without them', () => {
+    const first = withPostRun({ turns: [{ ...running, summaryWarnings: ['reply part'] }] }, 't1', {
+      status: 'completed',
+      writes: [],
+      summaryWarnings: ['post part'],
+    });
+    expect(readTurnEntries(first)[0]?.summaryWarnings).toEqual(['reply part', 'post part']);
+    const many = withPostRun(first, 't1', {
+      status: 'completed',
+      writes: [],
+      summaryWarnings: Array.from({ length: 9 }, (_, index) => `w${index}`.padEnd(400, 'x')),
+    });
+    const kept = readTurnEntries(many)[0]?.summaryWarnings ?? [];
+    expect(kept).toHaveLength(SUMMARY_WARNING_LIMITS.count);
+    expect(kept.every((text) => text.length === SUMMARY_WARNING_LIMITS.length)).toBe(true);
+    expect(kept.at(-1)?.startsWith('w8')).toBe(true);
+    const none = withPostRun({ turns: [running] }, 't1', { status: 'completed', writes: [], summaryWarnings: [] });
+    expect(none.turns[0]).not.toHaveProperty('summaryWarnings');
   });
 
   it('never changes postExecutionId and leaves the other fields as they are', () => {

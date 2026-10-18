@@ -34,7 +34,9 @@ it('lists a valid summary with its range, a valid badge, the collapsible text an
   expect(html).toContain('messages 21–40 (20)</button>');
   expect(html).toContain('summary-badge valid');
   expect(html).toContain('valid</span>');
-  expect(html).toContain('<details class="summary-text"><summary>Summary text</summary><p>They met at the inn.</p>');
+  expect(html).toContain(
+    '<details class="summary-text"><summary>Summary text</summary><div class="message-content"><p>They met at the inn.</p></div>',
+  );
   expect(html).toContain('<time dateTime="2026-01-01T10:00:00.000Z">');
   expect(html).not.toContain('<details class="summary-text" open');
   expect(html).not.toContain('summary-why');
@@ -70,9 +72,9 @@ it('shows how many messages are left of a partly deleted summary, and no button 
     }),
   );
   expect(html).toContain('messages 21–38 (18 of 20 left)</button>');
-  expect(html).toContain('<span class="summary-chunk">no messages left (0 of 5)</span>');
+  expect(html).toContain('<span class="summary-chunk">all 5 covered messages deleted</span>');
   expect(html.match(/<button/g)).toHaveLength(1);
-  expect(html).toContain('there is nothing left to summarize');
+  expect(html).toContain('will be removed at the next summary save');
 });
 
 it('lists every set under its own heading', () => {
@@ -80,4 +82,12 @@ it('lists every set under its own heading', () => {
     withSets({ set: 'main', summaries: [summary()] }, { set: 'arc', summaries: [summary({ id: 's9' })] }),
   );
   expect(html.indexOf('>main</h4>')).toBeLessThan(html.indexOf('>arc</h4>'));
+});
+
+it('renders the summary text as markdown like a message, never raw HTML', () => {
+  const text = '## Scene so far\n\n- they met\n- they argued\n\n<script>alert(1)</script>';
+  const html = render(withSets({ set: 'main', summaries: [summary({ text })] }));
+  expect(html).toContain('<h2>Scene so far</h2>');
+  expect(html).toContain('<li>they met</li>');
+  expect(html).not.toContain('<script');
 });

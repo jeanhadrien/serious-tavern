@@ -92,6 +92,23 @@ it('follows a renumbering when an earlier turn lost its replies', () => {
   expect(chips(view, messages).get('m-e2')?.turnNumber).toBe(1);
 });
 
+describe('summaries a turn lost at commit time', () => {
+  const messages = [reply('e1'), reply('e2')];
+  const lost =
+    'The summary for set "main" was not saved: a message it covers was edited or deleted while it was being written.';
+
+  it('gives a turn with no writes and no after-reply run a chip carrying the warnings', () => {
+    const view = buildView({ messages, entries: [{ ...entry('e1'), summaryWarnings: [lost] }, entry('e2')] });
+    expect(chips(view, messages).get('m-e1')).toEqual({
+      turnNumber: 1,
+      lines: [],
+      warnings: [lost],
+      editedAfter: false,
+    });
+    expect(chips(view, messages).has('m-e2')).toBe(false);
+  });
+});
+
 describe('the after-reply run of a turn', () => {
   const post = (status: string, extra: Record<string, unknown> = {}) => ({
     postStatus: status as 'error',

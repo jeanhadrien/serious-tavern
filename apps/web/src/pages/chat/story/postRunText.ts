@@ -24,6 +24,6 @@ export const postFailureToast = ({ turnNumber, error }: PostRunRef): string =>
 export const postFailureNote = (message?: string): string =>
   message ? `After-reply steps failed: ${message}` : 'After-reply steps failed.';
 
-/** The chip's button name: the stored lines when the turn has any, else the after-reply run alone. */
-export const chipLabel = (hasLines: boolean): string =>
-  hasLines ? 'What this turn stored' : 'After-reply steps details';
+/** The chip's button name: the stored lines when the turn has any, else its warnings, else the after-reply run alone. */
+export const chipLabel = (hasLines: boolean, hasWarnings = false): string =>
+  hasLines ? 'What this turn stored' : hasWarnings ? 'Turn warnings' : 'After-reply steps details';
