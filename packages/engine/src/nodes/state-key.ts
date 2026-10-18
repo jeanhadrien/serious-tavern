@@ -1,4 +1,4 @@
-import type { StateDefinition, StateKeyDef } from '@st/shared';
+import type { CollectionItem, CollectionKeyDef, StateDefinition, StateKeyDef } from '@st/shared';
 
 /** A key of a state definition, found by the ids a State Read or State Write node is configured with. */
 export type LocatedKey = { definition: StateDefinition; key: string; def: StateKeyDef; label: string };
@@ -29,6 +29,29 @@ export async function locateConfigured(
 ): Promise<LocatedKey> {
   const id = typeof config.definitionId === 'string' ? config.definitionId : '';
   return locateKey(id ? await lookup(id) : undefined, id, config.key);
+}
+
+/**
+ * `locateConfigured` for nodes that work on a collection key (Next Chunk, Unlinked Messages): a key of another type is
+ * an error that says so.
+ */
+export async function locateCollection(
+  config: Record<string, unknown>,
+  lookup: (id: string) => StateDefinition | undefined | Promise<StateDefinition | undefined>,
+): Promise<LocatedKey & { def: CollectionKeyDef }> {
+  const found = await locateConfigured(config, lookup);
+  if (found.def.type !== 'collection')
+    throw new Error(`${found.label} is a ${found.def.type} key; this node needs a collection key`);
+  return { ...found, def: found.def };
+}
+
+/** The items a collection key held when the turn started (a copy); an unknown key reads as no items. */
+export function itemsOf(
+  found: LocatedKey,
+  read: (definitionId: string, key: string) => { value: unknown } | undefined,
+) {
+  const value = read(found.definition.id, found.key)?.value;
+  return Array.isArray(value) ? (value as CollectionItem[]) : [];
 }
 
 /** A value for a log line: compact JSON, cut to `max` characters. */
