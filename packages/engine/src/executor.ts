@@ -10,6 +10,8 @@ import type {
   Persona,
   StateSnapshot,
   StateWrite,
+  Summary,
+  SummaryWrite,
 } from '@st/shared';
 import { labelOf, prepareWorkflow, type PreparedWorkflow } from './prepare.js';
 export { validateWorkflow } from './prepare.js';
@@ -18,6 +20,7 @@ import { stringify, coerceValue } from './text.js';
 import { orderReplies } from './replies.js';
 import { createRandom } from './seeded-random.js';
 import { StateRun } from './state-writes.js';
+import { SummaryRun } from './summary-writes.js';
 import { skippedNodes } from './parts.js';
 
 class NodeExecutionError extends Error {
@@ -39,6 +42,8 @@ export class ExecutionFailure extends Error {
     public readonly nodeType?: string,
     // The state writes of the nodes that completed before the run failed or was stopped.
     public readonly writes: StateWrite[] = [],
+    // The summary writes of the nodes that completed (Save Summary), likewise.
+    public readonly summaryWrites: SummaryWrite[] = [],
   ) {
     super(message);
   }
@@ -67,6 +72,9 @@ export async function executeWorkflow(
     // The story state the turn starts from (`foldStoryState` + `stateSnapshot`): what `ctx.state` reads and
     // `trigger.turn` reports. Writes nodes ask for are returned as `writes`, never visible during the run.
     state?: StateSnapshot;
+    // The chat's history summaries by set (`readSummaries`): what `ctx.summaries` reads. Summary writes nodes ask
+    // for are returned as `summaryWrites` for the caller to commit, never visible during the run.
+    summaries?: Record<string, Summary[]>;
     // Which part of the workflow to run (see `WorkflowParts`): the `reply` part while the turn is answered
     // (default), or the `post` part, the after-reply run of the sinks that depend on After Reply. The caller
     // passes the post run its own `seed` (`postRunSeed`) and `executionId`.
@@ -74,7 +82,7 @@ export async function executeWorkflow(
     // What After Reply outputs. Required for `part: 'post'`.
     afterReply?: AfterReply;
   },
-): Promise<{ replies: ChatReply[]; execution: ExecutionLog; writes: StateWrite[] }> {
+): Promise<{ replies: ChatReply[]; execution: ExecutionLog; writes: StateWrite[]; summaryWrites: SummaryWrite[] }> {
   const part = options.part ?? 'reply';
   if (part === 'post' && !options.afterReply)
     throw new Error('executeWorkflow: part "post" needs the afterReply payload');
@@ -123,11 +131,12 @@ export async function executeWorkflow(
     };
   };
   // The after-reply run does not repeat the state writes of nodes the reply run already ran (they are in both parts).
-  const stateRun = new StateRun(
-    options.state,
-    execution,
-    part === 'post' ? { ids: parts.reply, nameOf: (id) => nodeDisplayName(workflow.nodes, labelOf, id) } : undefined,
-  );
+  const repeated =
+    part === 'post'
+      ? { ids: parts.reply, nameOf: (id: string) => nodeDisplayName(workflow.nodes, labelOf, id) }
+      : undefined;
+  const stateRun = new StateRun(options.state, execution, repeated);
+  const summaryRun = new SummaryRun(options.summaries, execution, repeated);
   let wave = 0;
   const resolved = new Map<string, { output: Record<string, unknown>; skipped: boolean }>();
   const replies = new Map<string, ChatReply>();
@@ -229,6 +238,7 @@ export async function executeWorkflow(
                 },
                 random: createNodeRandom(`${seed}:${node.id}`),
                 ...stateRun.context(node.id, () => callbacksActive),
+                ...summaryRun.context(node.id, () => callbacksActive),
                 recordWire: (wire) => {
                   if (callbacksActive) execution.nodes[node.id] = { ...execution.nodes[node.id]!, wire };
                 },
@@ -290,6 +300,7 @@ export async function executeWorkflow(
             }
             // Only now do the node's state writes count: an error or a cancellation above drops them.
             stateRun.commit(node.id, nodeWave);
+            summaryRun.commit(node.id, nodeWave);
             resolved.set(node.id, { output, skipped: false });
             emit({ type: 'node:complete', nodeId: node.id, detail: output });
           } catch (cause) {
@@ -352,7 +363,12 @@ export async function executeWorkflow(
       });
     }
     execution.status = 'completed';
-    return { replies: orderReplies(workflow, replies, upstream), execution, writes: stateRun.finish() };
+    return {
+      replies: orderReplies(workflow, replies, upstream),
+      execution,
+      writes: stateRun.finish(),
+      summaryWrites: summaryRun.finish(),
+    };
   } catch (cause) {
     execution.status = 'error';
     throw new ExecutionFailure(
@@ -362,6 +378,7 @@ export async function executeWorkflow(
       cause instanceof NodeExecutionError ? cause.nodeId : undefined,
       cause instanceof NodeExecutionError ? cause.nodeType : undefined,
       stateRun.finish(),
+      summaryRun.finish(),
     );
   } finally {
     if (part === 'reply' && !replies.size)
