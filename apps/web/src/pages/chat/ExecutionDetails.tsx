@@ -1,20 +1,37 @@
 import { useEffect, useState } from 'react';
 import type { ExecutionLog } from '@st/shared';
 import { executionsApi } from '../../api.js';
+import { POST_NO_LOG } from './story/postRunText.js';
 import { LegacyRequestDetails, WireDetails } from './WireDetails.js';
 
-export function ExecutionDetails({ id, cached }: { id: string; cached?: ExecutionLog }) {
+/**
+ * A run's log in a disclosure. `optional` is for a run that may have no log (an after-reply run cut short by a
+ * restart): the fetch is silent, and a missing log is said in words instead of toasted.
+ */
+export function ExecutionDetails({
+  id,
+  cached,
+  label = 'Execution details',
+  optional = false,
+}: {
+  id: string;
+  cached?: ExecutionLog;
+  label?: string;
+  optional?: boolean;
+}) {
   const [execution, setExecution] = useState(cached);
+  const [missing, setMissing] = useState(false);
   useEffect(() => {
     if (!execution)
       void executionsApi
-        .get(id)
+        .get(id, optional ? { silent: true } : undefined)
         .then(setExecution)
-        .catch(() => {});
+        .catch(() => setMissing(optional));
   }, [id]);
   return (
     <details className="execution">
-      <summary>Execution details</summary>
+      <summary>{label}</summary>
+      {missing && <p className="hint">{POST_NO_LOG}</p>}
       {execution && (
         <>
           <small>

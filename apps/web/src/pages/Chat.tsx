@@ -5,7 +5,10 @@ import { ChatHeader } from './chat/ChatHeader.js';
 import { MessageList } from './chat/MessageList.js';
 import { Composer } from './chat/Composer.js';
 import { ChatPanel } from './chat/ChatPanel.js';
+import { PostRunStatus } from './chat/story/PostRunStatus.js';
+import { runningPostRun } from './chat/story/postRuns.js';
 import { undoneByDelete } from './chat/story/undoList.js';
+import { usePostRunAlerts } from './chat/story/usePostRunAlerts.js';
 import { useStoryState } from './chat/story/useStoryState.js';
 import { stateDefinitionsStore, useList } from '../stores/index.js';
 import './chat/chat.css';
@@ -18,6 +21,9 @@ export function Chat({ chat }: { chat: ChatState }) {
   const closePanel = useCallback(() => setPanelOpen(false), []);
   // One fetch of the chat's story state; it reloads when a turn or a message change finishes, never per token.
   const story = useStoryState(session?.id, !locked);
+  // The after-reply run of the latest turn: a quiet status row while it works, one toast if it fails.
+  const postRun = useMemo(() => runningPostRun(story.view), [story.view]);
+  usePostRunAlerts(session?.id, story.view);
   // What deleting a reply would undo; the shared fold runs only when the trash button is clicked.
   const definitions = useList(stateDefinitionsStore);
   const messages = session?.messages;
@@ -61,6 +67,7 @@ export function Chat({ chat }: { chat: ChatState }) {
                 onEdit={chat.editMessage}
                 onDelete={chat.deleteMessage}
               />
+              <PostRunStatus key={`post-${session.id}`} sessionId={session.id} run={postRun} />
               <Composer
                 key={`composer-${session.id}`}
                 content={chat.content}

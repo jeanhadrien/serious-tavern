@@ -1,5 +1,6 @@
 import {
   DRAW_STATE_KEY,
+  effectivePostRun,
   foldStoryState,
   oldestFirst,
   previewWrite,
@@ -105,23 +106,30 @@ export function buildView({
       const label = nodeLabels[folded.nodeId];
       return { nodeId: folded.nodeId, ...(label !== undefined && { label }), ...keyViews(folded.keys), omitted: {} };
     }),
-    turns: story.turns.map(({ entry: stored, turn }) => ({
-      executionId: stored.executionId,
-      at: stored.at,
-      completed: stored.completed,
-      replies: stored.replies,
-      turnNumber: turn,
-      writes: stored.writes.map((write) => {
-        const definitionName = write.target.kind === 'definition' ? names.get(write.target.definitionId) : undefined;
-        const nodeLabel = nodeLabels[write.nodeId];
-        const preview = previewWrite(write);
-        return {
-          write: preview.write,
-          ...(preview.truncated && { truncated: true }),
-          ...(definitionName !== undefined && { definitionName }),
-          ...(nodeLabel !== undefined && { nodeLabel }),
-        };
-      }),
-    })),
+    turns: story.turns.map(({ entry: stored, turn }) => {
+      // As the server reports it: the run is live (no restart happened), so a stored `running` stays running.
+      const post = effectivePostRun(stored, true);
+      return {
+        executionId: stored.executionId,
+        at: stored.at,
+        completed: stored.completed,
+        replies: stored.replies,
+        turnNumber: turn,
+        ...(post && { postStatus: post.status }),
+        ...(post?.executionId !== undefined && { postExecutionId: post.executionId }),
+        ...(post?.error !== undefined && { postError: post.error }),
+        writes: stored.writes.map((write) => {
+          const definitionName = write.target.kind === 'definition' ? names.get(write.target.definitionId) : undefined;
+          const nodeLabel = nodeLabels[write.nodeId];
+          const preview = previewWrite(write);
+          return {
+            write: preview.write,
+            ...(preview.truncated && { truncated: true }),
+            ...(definitionName !== undefined && { definitionName }),
+            ...(nodeLabel !== undefined && { nodeLabel }),
+          };
+        }),
+      };
+    }),
   };
 }

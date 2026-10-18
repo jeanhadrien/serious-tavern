@@ -1,0 +1,33 @@
+/* The row shown while an after-reply run works: one quiet line above the composer. */
+.post-run-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 24px;
+  font-size: 0.85rem;
+  color: #a7adbd;
+  overflow-wrap: anywhere;
+}
+.post-run-status .spinning {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.post-run-label {
+  flex: 1;
+  min-width: 0;
+}
+.post-run-status .icon-button {
+  padding: 4px;
+  color: #a7adbd;
+}
+@media (max-width: 700px) {
+  .post-run-status {
+    padding: 4px 12px;
+  }
+}
+@media (pointer: coarse) {
+  .post-run-status .icon-button {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}

@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import type { Character, ChatMessage, ExecutionLog, Persona, SessionStateView } from '@st/shared';
 import { ChatMessageView } from './ChatMessageView.js';
+import { runningPostRun } from './story/postRuns.js';
+import { POST_WAITING_LABEL } from './story/postRunText.js';
 import { chipsFor, describeTurns } from './story/turnChips.js';
 import { useStickToBottom } from './useStickToBottom.js';
 
@@ -39,6 +41,8 @@ export function MessageList({
   const chips = chipsFor(turns, messages);
   // Once a reply row is streaming the text itself is the progress indicator.
   const waiting = busy && !messages.some((message) => message.status === 'streaming');
+  // A message sent while the previous turn's after-reply run works is queued behind it by the server.
+  const queued = useMemo(() => runningPostRun(story) !== undefined, [story]);
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: A scrollable history region must be reachable for keyboard scrolling.
     <section ref={viewport} className="thread" onScroll={onScroll} aria-label="Message history" tabIndex={0}>
@@ -64,7 +68,7 @@ export function MessageList({
               <i />
               <i />
             </span>
-            <small>Preparing a reply</small>
+            <small>{queued ? POST_WAITING_LABEL : 'Preparing a reply'}</small>
           </div>
         )}
       </div>

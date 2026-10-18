@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { ChatMessage } from '@st/shared';
 import { addWrite, buildView, drawWrite, entry, reply, setWrite, userMessage } from './test-fixtures.js';
 import { chipsFor, describeTurns } from './turnChips.js';
@@ -90,4 +90,49 @@ it('follows a renumbering when an earlier turn lost its replies', () => {
     entries: [entry('e1', [setWrite('tension', 5)]), entry('e2', [setWrite('tension', 7)])],
   });
   expect(chips(view, messages).get('m-e2')?.turnNumber).toBe(1);
+});
+
+describe('the after-reply run of a turn', () => {
+  const post = (status: string, extra: Record<string, unknown> = {}) => ({
+    postStatus: status as 'error',
+    postExecutionId: 'p1',
+    ...extra,
+  });
+  const messages = [reply('e1')];
+
+  it('gives a failed run a chip even when the turn stored nothing', () => {
+    const view = buildView({ messages, entries: [{ ...entry('e1'), ...post('error', { postError: 'HTTP 500' }) }] });
+    expect(chips(view, messages).get('m-e1')).toEqual({
+      turnNumber: 1,
+      lines: [],
+      post: { status: 'error', message: 'HTTP 500', executionId: 'p1' },
+      editedAfter: false,
+    });
+  });
+
+  it('keeps the writes beside a stopped run', () => {
+    const view = buildView({
+      messages,
+      entries: [{ ...entry('e1', [setWrite('tension', 6)]), ...post('stopped') }],
+    });
+    expect(chips(view, messages).get('m-e1')).toMatchObject({
+      lines: ['scene.tension → 6'],
+      post: { status: 'stopped', executionId: 'p1' },
+    });
+  });
+
+  it.each(['running', 'completed'])('adds nothing for a %s run without writes', (status) => {
+    const view = buildView({ messages, entries: [{ ...entry('e1'), ...post(status) }] });
+    expect(chips(view, messages).size).toBe(0);
+  });
+
+  it.each(['running', 'completed'])('adds no note to the chip of a turn with writes and a %s run', (status) => {
+    const view = buildView({ messages, entries: [{ ...entry('e1', [setWrite('tension', 6)]), ...post(status) }] });
+    expect(chips(view, messages).get('m-e1')).not.toHaveProperty('post');
+  });
+
+  it('gives no chip to a turn that no longer counts', () => {
+    const view = buildView({ messages: [], entries: [{ ...entry('e1'), ...post('error', { postError: 'x' }) }] });
+    expect(chips(view, messages).size).toBe(0);
+  });
 });

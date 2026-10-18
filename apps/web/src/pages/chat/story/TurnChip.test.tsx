@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { TurnChip, TurnChipCard } from './TurnChip.js';
 
@@ -25,4 +25,63 @@ it('lists the turn and its writes in the card', () => {
 it('adds the note when a reply was edited after its turn stored state', () => {
   const html = renderToStaticMarkup(<TurnChipCard chip={{ ...chip, editedAfter: true }} />);
   expect(html).toContain('Edited after it was stored');
+});
+
+describe('a turn whose after-reply run did not finish well', () => {
+  const failed = {
+    turnNumber: 2,
+    lines: [],
+    editedAfter: false,
+    post: { status: 'error' as const, message: 'HTTP Request (fetch): HTTP 500', executionId: 'p1' },
+  };
+
+  it('names the button for the after-reply run when the turn stored nothing, and warns', () => {
+    const html = renderToStaticMarkup(<TurnChip chip={failed} />);
+    const button = html.match(/<button[^>]*>/)?.[0] ?? '';
+    expect(button).toContain('aria-label="After-reply steps details"');
+    expect(button).toContain('chip-alert');
+    expect(button).toContain('aria-expanded="false"');
+  });
+
+  it('keeps the stored name when the turn also stored something', () => {
+    const html = renderToStaticMarkup(<TurnChip chip={{ ...failed, lines: ['scene.tension → 9'] }} />);
+    expect(html.match(/<button[^>]*>/)?.[0]).toContain('aria-label="What this turn stored"');
+  });
+
+  it('shows the error and a disclosure for the run’s log in the card', () => {
+    const html = renderToStaticMarkup(<TurnChipCard chip={failed} />);
+    expect(html).toContain('<strong>Turn 2</strong>');
+    expect(html).not.toContain('stored:');
+    expect(html).toContain('After-reply steps failed: HTTP Request (fetch): HTTP 500');
+    expect(html).toContain('<summary>After-reply run details</summary>');
+  });
+
+  it('lists the writes above the error when there are some', () => {
+    const html = renderToStaticMarkup(<TurnChipCard chip={{ ...failed, lines: ['scene.tension → 9'] }} />);
+    expect(html).toContain('Turn 2 stored:');
+    expect(html.indexOf('scene.tension → 9')).toBeLessThan(html.indexOf('After-reply steps failed'));
+  });
+
+  it('has no disclosure for a run without a log id', () => {
+    const html = renderToStaticMarkup(<TurnChipCard chip={{ ...failed, post: { status: 'error' } }} />);
+    expect(html).toContain('After-reply steps failed.');
+    expect(html).not.toContain('<details');
+  });
+
+  it('says a stopped run was stopped, not that it failed', () => {
+    const html = renderToStaticMarkup(
+      <TurnChipCard chip={{ ...failed, post: { status: 'stopped', executionId: 'p1' } }} />,
+    );
+    expect(html).toContain('After-reply steps were stopped before they finished.');
+    expect(html).not.toContain('class="error"');
+    expect(renderToStaticMarkup(<TurnChip chip={{ ...failed, post: { status: 'stopped' } }} />)).not.toContain(
+      'chip-alert',
+    );
+  });
+
+  it('leaves out the edited note for a chip with no stored lines', () => {
+    expect(renderToStaticMarkup(<TurnChipCard chip={{ ...failed, editedAfter: true }} />)).not.toContain(
+      'Edited after',
+    );
+  });
 });

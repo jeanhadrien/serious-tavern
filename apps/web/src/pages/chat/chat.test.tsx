@@ -9,6 +9,7 @@ import { MessageEditor } from './MessageEditor.js';
 import { MessageList } from './MessageList.js';
 import { ExecutionDetails } from './ExecutionDetails.js';
 import { MessageActions } from './MessageActions.js';
+import { buildView, entry, reply, userMessage } from './story/test-fixtures.js';
 
 const key = { key: 'Enter', shiftKey: false, ctrlKey: false, metaKey: false, isComposing: false };
 it.each([
@@ -249,4 +250,37 @@ it('keeps the inline delete step until the trash button is clicked, even when de
   );
   expect(html).toContain('aria-label="Delete message"');
   expect(html).not.toContain('Delete message?');
+});
+
+it('says a message is waiting for the after-reply steps while the previous turn’s run works', () => {
+  const messages = [reply('e1'), userMessage('u2')];
+  const render = (story: ReturnType<typeof buildView>, busy = true) =>
+    renderToStaticMarkup(
+      <MessageList
+        sessionId="s"
+        messages={messages}
+        characters={[]}
+        logs={{}}
+        story={story}
+        busy={busy}
+        disabled
+        onEdit={async () => true}
+        onDelete={async () => true}
+      />,
+    );
+  const entries = (status: 'running' | 'completed') => [{ ...entry('e1'), postStatus: status, postExecutionId: 'p1' }];
+  expect(render(buildView({ messages, entries: entries('running') }))).toContain(
+    'Waiting for the after-reply steps to finish',
+  );
+  const done = render(buildView({ messages, entries: entries('completed') }));
+  expect(done).toContain('Preparing a reply');
+  expect(done).not.toContain('Waiting for the after-reply steps');
+  // Not waiting for a reply at all: no indicator.
+  expect(render(buildView({ messages, entries: entries('running') }), false)).not.toContain('typing-dots');
+});
+
+it('shows the label the caller gives an execution log', () => {
+  const html = renderToStaticMarkup(<ExecutionDetails id="x" label="After-reply run details" optional />);
+  expect(html).toContain('<summary>After-reply run details</summary>');
+  expect(renderToStaticMarkup(<ExecutionDetails id="x" />)).toContain('<summary>Execution details</summary>');
 });

@@ -1,28 +1,46 @@
 import type { ChatMessage, SessionStateView } from '@st/shared';
 import { describeWrite, itemTexts } from './describeWrite.js';
+import { postRunOf } from './postRuns.js';
+
+/** A turn's after-reply run that ended badly: the chip shows what happened and links to its log. */
+type PostNote = { status: 'error' | 'stopped'; message?: string; executionId?: string };
+
+type DescribedTurn = { turnNumber: number; lines: string[]; post?: PostNote };
 
 /** What the chip on a turn's last reply shows. */
-export type StoryChip = {
-  turnNumber: number;
-  /** One plain-words line per write, in write order. */
-  lines: string[];
+export type StoryChip = DescribedTurn & {
   /** A reply of the turn was edited after the turn stored its state: the values came from the original text. */
   editedAfter: boolean;
 };
 
-/** The turns of a view that still count and stored something, by execution id, described once per view. */
-export type DescribedTurns = ReadonlyMap<string, { turnNumber: number; lines: string[] }>;
+/**
+ * The turns of a view that still count and stored something, or whose after-reply run failed or was stopped, by
+ * execution id, described once per view. `lines` is one plain-words line per write, in write order.
+ */
+export type DescribedTurns = ReadonlyMap<string, DescribedTurn>;
 
 export function describeTurns(view: SessionStateView | undefined): DescribedTurns {
-  const described = new Map<string, { turnNumber: number; lines: string[] }>();
+  const described = new Map<string, DescribedTurn>();
   if (!view) return described;
   const texts = itemTexts(view);
-  for (const turn of view.turns)
-    if (turn.turnNumber !== null && turn.writes.length)
+  for (const turn of view.turns) {
+    if (turn.turnNumber === null) continue;
+    const run = postRunOf(turn);
+    const post: PostNote | undefined =
+      run?.status === 'error' || run?.status === 'stopped'
+        ? {
+            status: run.status,
+            ...(run.error !== undefined && { message: run.error }),
+            ...(run.executionId !== undefined && { executionId: run.executionId }),
+          }
+        : undefined;
+    if (turn.writes.length || post)
       described.set(turn.executionId, {
         turnNumber: turn.turnNumber,
         lines: turn.writes.map((write) => describeWrite(write, texts)),
+        ...(post && { post }),
       });
+  }
   return described;
 }
 

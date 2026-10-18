@@ -356,6 +356,9 @@ button.stop-generation:hover {
   padding: 4px;
   color: #a7adbd;
 }
+.message-story .icon-button.chip-alert {
+  color: #ffa8a8;
+}
 .message-story .icon-button[aria-expanded="true"] {
   color: #c3ceff;
   background: #3d4560;
@@ -380,6 +383,12 @@ button.stop-generation:hover {
   padding-left: 18px;
   display: grid;
   gap: 3px;
+}
+.message-story-card .error {
+  margin: 8px 0 0;
+}
+.message-story-card .execution {
+  margin-top: 8px;
 }
 .message-story-card .hint {
   margin: 8px 0 0;
