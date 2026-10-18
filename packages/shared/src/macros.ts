@@ -114,7 +114,8 @@ export const macroRegistry: readonly MacroDefinition[] = [
   },
   {
     name: 'trigger.turn',
-    description: 'Number of the turn being run (1 for the first reply)',
+    description:
+      'Number of the turn being run (1 for the first reply); in the after-reply run, the turn that just finished',
     category: 'trigger',
     source: 'trigger',
     field: 'turn',
