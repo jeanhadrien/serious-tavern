@@ -6,3 +6,4 @@ data/
 .codegraph/
 .vscode/
 opencode.jsonc
+.test-data/
