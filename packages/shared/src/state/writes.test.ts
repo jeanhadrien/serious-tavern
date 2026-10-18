@@ -24,6 +24,19 @@ describe('stateWriteSchema', () => {
       { op: 'add', target: { kind: 'node', nodeId: 'n', key: 'draws' }, nodeId: 'n', item: { id: 'i', text: '' } },
     ],
     ['unknown fields', { op: 'delete', target: { ...target, extra: 1 }, nodeId: 'n', note: 'x' }],
+    [
+      'an item linked to messages',
+      {
+        op: 'add',
+        target,
+        nodeId: 'n',
+        item: { id: 'i', text: 't', messages: { ids: ['m1', 'm2'], fingerprint: 'f' } },
+      },
+    ],
+    [
+      'a link without a fingerprint yet',
+      { op: 'add', target, nodeId: 'n', item: { id: 'i', text: 't', messages: { ids: ['m1'] } } },
+    ],
   ])('accepts %s', (_, write) => {
     expect(stateWriteSchema.parse(write)).toEqual(write);
   });
@@ -40,6 +53,40 @@ describe('stateWriteSchema', () => {
     ['a set without a value key', { op: 'set', target, nodeId: 'n' }],
   ])('rejects %s', (_, write) => {
     expect(stateWriteSchema.safeParse(write).success).toBe(false);
+  });
+});
+
+describe('the message link of an item', () => {
+  const target = { kind: 'definition', definitionId: 'd', key: 'k' };
+  const parse = (messages: unknown) => {
+    const write = { op: 'add', target, nodeId: 'n', item: { id: 'i', text: 't', messages } };
+    const parsed = stateWriteSchema.parse(write);
+    return parsed.op === 'add' ? parsed.item : undefined;
+  };
+
+  it('reads a link as it is and an item without one as having none', () => {
+    expect(parse({ ids: ['m1'], fingerprint: 'f' })?.messages).toEqual({ ids: ['m1'], fingerprint: 'f' });
+    expect(parse(undefined)?.messages).toBeUndefined();
+  });
+
+  it.each<[string, unknown]>([
+    ['no ids', { ids: [], fingerprint: 'f' }],
+    ['ids that are not text', { ids: [1], fingerprint: 'f' }],
+    ['an empty id', { ids: [''], fingerprint: 'f' }],
+    ['an empty fingerprint', { ids: ['m1'], fingerprint: '' }],
+    ['a number', 3],
+    ['text', 'm1'],
+    ['a list', ['m1']],
+  ])('reads %s as no link and keeps the item', (_, messages) => {
+    const item = parse(messages);
+    expect(item).toMatchObject({ id: 'i', text: 't' });
+    expect(item?.messages).toBeUndefined();
+  });
+
+  it('keeps an item with a bad link when reading stored turn entries', () => {
+    const write = { op: 'add', target, nodeId: 'n', item: { id: 'i', text: 't', messages: 'junk' } };
+    const [entry] = readTurnEntries({ turns: [{ ...turnEntry('e1'), writes: [write] }] });
+    expect(entry?.writes).toHaveLength(1);
   });
 });
 
@@ -99,6 +146,14 @@ describe('the post-turn run fields of an entry', () => {
     const [entry] = readTurnEntries({ turns: [{ ...base, postExecutionId: 'p', postStatus: 'bogus' }] });
     expect(entry?.postExecutionId).toBe('p');
     expect(entry?.postStatus).toBeUndefined();
+  });
+
+  it('keeps the dropped-link warnings of a turn, and drops a bad value without losing the turn', () => {
+    const entry = { ...base, writes: [], linkWarnings: ['memory.summaries: an item was not saved'] };
+    expect(turnEntrySchema.parse(entry)).toStrictEqual(entry);
+    const [bad] = readTurnEntries({ turns: [{ ...base, writes: [], linkWarnings: 'oops' }] });
+    expect(bad).toMatchObject({ executionId: 'e', writes: [] });
+    expect(bad?.linkWarnings).toBeUndefined();
   });
 
   it('accepts a session that stores them', () => {

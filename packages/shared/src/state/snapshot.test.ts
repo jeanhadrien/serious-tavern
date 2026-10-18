@@ -8,6 +8,7 @@ import {
   stateSnapshot,
   stateTemplateValues,
 } from './snapshot.js';
+import { chat, linkTo, range, withEdit } from '../links/test-fixtures.js';
 import { addWrite, DEF, definition, item, nodeAddWrite, reply, setWrite, turnEntry } from './test-fixtures.js';
 
 const OTHER = '22222222-2222-4222-8222-222222222222';
@@ -82,6 +83,83 @@ describe('stateSnapshot', () => {
     const { snapshot } = snapshotAfter([turnEntry('a', [nodeAddWrite('__proto__', 'draws', item('x'))])]);
     expect(Object.getPrototypeOf(snapshot.nodes)).toBe(Object.prototype);
     expect(Object.hasOwn(snapshot.nodes, '__proto__')).toBe(true);
+  });
+});
+
+describe('stateSnapshot: message links', () => {
+  const memory = definition('memory', { summaries: { type: 'collection' }, plain: { type: 'collection' } });
+  const history = chat(40);
+  const linked = (id: string, ids: string[], messages = history) =>
+    item(id, `summary ${id}`, { messages: linkTo(messages, ids) });
+  const turns = [
+    turnEntry('a', [
+      addWrite('summaries', linked('s1', range(1, 20))),
+      addWrite('plain', item('p1')),
+      nodeAddWrite('draw-1', 'facts', linked('f1', range(21, 22))),
+    ]),
+    turnEntry('b', [addWrite('summaries', linked('s2', range(21, 40)))]),
+  ];
+  const snapshotWith = (messages?: ReturnType<typeof chat>) => {
+    const story = foldStoryState({
+      definitions: [memory],
+      messages: turns.map((turn) => reply(turn.executionId)),
+      state: { turns },
+    });
+    return stateSnapshot(story, [memory], messages);
+  };
+  const items = (snapshot: ReturnType<typeof snapshotWith>, key = 'summaries') =>
+    snapshot.keys[DEF]![key]!.value as { id: string; link?: unknown }[];
+
+  it('adds the computed link to linked items: status, stored ids and the first position', () => {
+    expect(items(snapshotWith(history)).map(({ id, link }) => [id, link])).toEqual([
+      ['s2', { status: 'intact', ids: range(21, 40), first: 21 }],
+      ['s1', { status: 'intact', ids: range(1, 20), first: 1 }],
+    ]);
+  });
+
+  it('follows the history it is given: an edited message changes the status, a deleted one the position', () => {
+    const edited = items(snapshotWith(withEdit(history, 'm5', 'edited')));
+    expect(edited.map(({ id, link }) => [id, (link as { status: string }).status])).toEqual([
+      ['s2', 'intact'],
+      ['s1', 'changed'],
+    ]);
+    const shifted = items(snapshotWith(withEdit(history, 'm1')));
+    expect(shifted[1]!.link).toEqual({ status: 'partial', ids: range(1, 20), first: 1 });
+    expect(shifted[0]!.link).toEqual({ status: 'intact', ids: range(21, 40), first: 20 });
+  });
+
+  it('reports a gone item without a position', () => {
+    expect(items(snapshotWith(history.slice(20)))[1]!.link).toEqual({ status: 'gone', ids: range(1, 20) });
+  });
+
+  it('leaves items without a link alone, and adds nothing without a history', () => {
+    expect(items(snapshotWith(history), 'plain')).toEqual([{ id: 'p1', text: 'p1' }]);
+    for (const entry of items(snapshotWith())) expect(entry).not.toHaveProperty('link');
+  });
+
+  it('does the same for the implicit collections of nodes', () => {
+    const snapshot = snapshotWith(history);
+    expect(snapshot.nodes['draw-1']!.facts!.value).toMatchObject([
+      { id: 'f1', link: { status: 'intact', ids: range(21, 22), first: 21 } },
+    ]);
+  });
+
+  it('never changes the folded story it was made from', () => {
+    const story = foldStoryState({
+      definitions: [memory],
+      messages: turns.map((turn) => reply(turn.executionId)),
+      state: { turns },
+    });
+    stateSnapshot(story, [memory], history);
+    expect(JSON.stringify(story.definitions[0]!.keys.summaries!.value)).not.toContain('"link"');
+  });
+
+  it('shows up in template values, so the linked helper can read it', () => {
+    const values = stateTemplateValues(snapshotWith(history));
+    expect((values.memory!.summaries as { link: { status: string } }[]).map((entry) => entry.link.status)).toEqual([
+      'intact',
+      'intact',
+    ]);
   });
 });
 

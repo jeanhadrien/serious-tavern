@@ -4,7 +4,7 @@ import type { StateWrite } from './writes.js';
 /**
  * A stored write as the state view shows it. Long text is cut to `WRITE_PREVIEW_LIMIT` characters and a large
  * object becomes its JSON text, cut the same way, so the view of a long chat stays small whatever its keys hold.
- * Item ids are never cut. The stored write is not changed.
+ * Item ids are never cut, and neither is an item that links to messages. The stored write is not changed.
  */
 export function previewWrite(write: StateWrite): { write: StateWrite; truncated: boolean } {
   let truncated = false;
@@ -18,7 +18,8 @@ export function previewWrite(write: StateWrite): { write: StateWrite; truncated:
     const value = shorten(write.value);
     return { write: truncated ? { ...write, value } : write, truncated };
   }
-  if (write.op === 'add') {
+  // A linked item is kept whole (summaries are few, and a cut text or link would be wrong to show).
+  if (write.op === 'add' && !write.item.messages) {
     const item = Object.fromEntries(
       Object.entries(write.item).map(([name, value]) => [name, name === 'id' ? value : shorten(value)]),
     ) as typeof write.item;

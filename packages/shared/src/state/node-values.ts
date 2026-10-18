@@ -26,6 +26,13 @@ export function parseDecimal(text: string): number | undefined {
 
 type ItemFieldType = NonNullable<CollectionKeyDef['fields']>[string];
 
+/**
+ * Item properties that belong to the system: the link a State Write `messages` input sets and the computed `link` a
+ * run's snapshot adds. A value's own `messages` or `link` is never stored, even when an old definition declares a
+ * field called that.
+ */
+export const RESERVED_ITEM_FIELDS: ReadonlySet<string> = new Set(['messages', 'link']);
+
 /** What a declared item field of each type has to be, in words ("must be a number"). */
 export const itemFieldNeeds: Record<ItemFieldType, string> = {
   text: 'text',
@@ -54,7 +61,9 @@ export type ItemFit =
 export function collectionItem(def: CollectionKeyDef, value: unknown): ItemFit {
   if (typeof value === 'string') return { item: { text: value }, ignored: [] };
   if (!isPlainObject(value) || typeof value.text !== 'string') return { problem: { kind: 'shape' } };
-  const declared = def.fields ?? {};
+  const declared = Object.fromEntries(
+    Object.entries(def.fields ?? {}).filter(([name]) => !RESERVED_ITEM_FIELDS.has(name)),
+  );
   const item: { text: string } & Record<string, unknown> = { text: value.text };
   for (const [name, type] of Object.entries(declared)) {
     const field = Object.hasOwn(value, name) ? value[name] : undefined;

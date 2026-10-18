@@ -1,3 +1,5 @@
+import { withItemLinks } from '../links/analyze.js';
+import type { LinkMessage } from '../links/fingerprint.js';
 import type { PortDataType } from '../ports.js';
 import { keyDefault, stateKeyPortType, type StateDefinition, type StateKeyDef } from './definition.js';
 import { foldStoryState } from './fold.js';
@@ -24,20 +26,33 @@ export type StateSnapshot = {
   nodes: Record<string, Record<string, StateKeyView>>;
 };
 
-const views = (keys: Record<string, FoldedKey>): Record<string, StateKeyView> =>
+const views = (keys: Record<string, FoldedKey>, history?: readonly LinkMessage[]): Record<string, StateKeyView> =>
   Object.fromEntries(
     Object.entries(keys).map(([key, { value, meta, itemTurns }]) => [
       key,
-      { value, meta, ...(itemTurns && { itemTurns }) },
+      {
+        // Collection items that link to messages carry a computed, read-only `link` (never stored).
+        value: history && meta.count !== undefined && Array.isArray(value) ? withItemLinks(value, history) : value,
+        meta,
+        ...(itemTurns && { itemTurns }),
+      },
     ]),
   );
 
-export function stateSnapshot(story: StoryState, definitions: readonly StateDefinition[]): StateSnapshot {
+/**
+ * What a run reads. With `history` (the history messages the run's nodes see) collection items that link to messages
+ * get `link: { status, ids, first }` (see `withItemLinks`); without it items are left as they are.
+ */
+export function stateSnapshot(
+  story: StoryState,
+  definitions: readonly StateDefinition[],
+  history?: readonly LinkMessage[],
+): StateSnapshot {
   return {
     turn: story.turn,
     definitions: structuredClone([...definitions]),
-    keys: Object.fromEntries(story.definitions.map((folded) => [folded.definitionId, views(folded.keys)])),
-    nodes: Object.fromEntries(story.nodes.map((folded) => [folded.nodeId, views(folded.keys)])),
+    keys: Object.fromEntries(story.definitions.map((folded) => [folded.definitionId, views(folded.keys, history)])),
+    nodes: Object.fromEntries(story.nodes.map((folded) => [folded.nodeId, views(folded.keys, history)])),
   };
 }
 

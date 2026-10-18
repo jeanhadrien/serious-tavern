@@ -128,6 +128,16 @@ describe('stateDefinitionSchema', () => {
     ['a fractional cap', { name: 'x', keys: { a: { type: 'collection', cap: 1.5 } } }, 'keys.a.cap'],
     ['a field named id', { name: 'x', keys: { a: { type: 'collection', fields: { id: 'text' } } } }, 'keys.a.fields'],
     [
+      'a field named messages (the built-in link)',
+      { name: 'x', keys: { a: { type: 'collection', fields: { messages: 'text' } } } },
+      'keys.a.fields',
+    ],
+    [
+      'a field named link (the computed link)',
+      { name: 'x', keys: { a: { type: 'collection', fields: { link: 'text' } } } },
+      'keys.a.fields',
+    ],
+    [
       'a field named text',
       { name: 'x', keys: { a: { type: 'collection', fields: { text: 'text' } } } },
       'keys.a.fields',
@@ -144,6 +154,11 @@ describe('stateDefinitionSchema', () => {
     const parsed = stateDefinitionWriteSchema.safeParse(input);
     expect(parsed.success).toBe(false);
     expect(parsed.error?.issues[0]?.path.join('.')).toBe(path);
+  });
+
+  it('accepts a stored definition that already declares a field called messages or link (only writes refuse it)', () => {
+    const keys = { a: { type: 'collection', fields: { messages: 'text', link: 'number' } } };
+    expect(stateDefinitionSchema.safeParse({ ...stored, name: 'old', keys }).success).toBe(true);
   });
 
   it('reads like `invalid state definition: keys.tension.max: ...` for a reversed range', () => {

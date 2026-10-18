@@ -202,3 +202,33 @@ describe('node implicit keys', () => {
     expect(story.definitions).toEqual([]);
   });
 });
+
+describe('linked items', () => {
+  const messages = { ids: ['m1', 'm2'], fingerprint: 'f' };
+  const summary = (id: string) => addWrite('log', item(id, `summary ${id}`, { messages }));
+
+  it('carry their link through the fold unchanged, like any other item property', () => {
+    const story = foldTurns([turnEntry('a', [summary('s1')]), turnEntry('b', [addWrite('log', item('plain'))])]);
+    expect(valueAt(story, 'log')).toEqual([
+      { id: 'plain', text: 'plain' },
+      { id: 's1', text: 'summary s1', messages },
+    ]);
+  });
+
+  it('live and die with the turn that wrote them (and with the writes appended by its post run)', () => {
+    const turns = [turnEntry('a', [summary('s1')]), turnEntry('b', [], { postStatus: 'completed' })];
+    turns[1]!.writes.push(summary('s2'));
+    expect(idsOf(foldTurns(turns), 'log')).toEqual(['s2', 's1']);
+    expect(idsOf(foldTurns(turns, { gone: ['b'] }), 'log')).toEqual(['s1']);
+    expect(idsOf(foldTurns(turns, { gone: ['a'] }), 'log')).toEqual(['s2']);
+  });
+
+  it('keep their own link, and removing one leaves the others', () => {
+    const story = foldTurns([
+      turnEntry('a', [summary('s1'), summary('s2')]),
+      turnEntry('b', [removeWrite('log', 's1'), summary('s3')]),
+    ]);
+    expect(idsOf(story, 'log')).toEqual(['s3', 's2']);
+    expect(keyOf(story, 'log').itemTurns).toEqual([2, 1]);
+  });
+});

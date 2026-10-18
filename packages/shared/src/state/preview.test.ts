@@ -52,6 +52,21 @@ describe('previewWrite', () => {
     });
   });
 
+  it('keeps an item that links to messages whole: its text and its link', () => {
+    const messages = {
+      ids: Array.from({ length: 30 }, (_, index) => `m-${index}-${'i'.repeat(36)}`),
+      fingerprint: 'f'.repeat(32),
+    };
+    const write = add({ id: 'e:n:1', text: LONG.repeat(5), note: LONG, messages });
+    const preview = previewWrite(write);
+    expect(preview).toEqual({ write, truncated: false });
+    expect(preview.write).toBe(write);
+  });
+
+  it('still cuts an item whose link is not there', () => {
+    expect(previewWrite(add({ id: 'e:n:1', text: LONG })).truncated).toBe(true);
+  });
+
   it('does not change the stored write', () => {
     const write = set(LONG);
     previewWrite(write);

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { describeSettingValue, isSettingKey } from '../chat-settings.js';
 import type { PortDataType } from '../ports.js';
 import { isPlainObject } from './helpers.js';
+import { RESERVED_ITEM_FIELDS } from './node-values.js';
 
 /**
  * State definitions: the names and typed keys a chat remembers between turns (`data/state/definitions/`).
@@ -95,13 +96,27 @@ export const stateDefinitionFieldsSchema = z
   .passthrough()
   .superRefine(checkKeys);
 
+// What a client may not declare: the built-in item properties (see `RESERVED_ITEM_FIELDS`). Checked on writes only, so
+// a stored definition that already has such a field stays valid (its values are simply not stored).
+function checkReservedFields(definition: { keys: Record<string, StateKeyDef> }, ctx: z.RefinementCtx) {
+  for (const [key, def] of Object.entries(definition.keys))
+    if (def.type === 'collection')
+      for (const field of [...RESERVED_ITEM_FIELDS].filter((name) => def.fields && Object.hasOwn(def.fields, name)))
+        ctx.addIssue({
+          code: 'custom',
+          message: `${key}: "${field}" is a built-in property of items; pick another field name`,
+          path: ['keys', key, 'fields'],
+        });
+}
+
 /**
  * What a client writes: everything but identity and timestamps. `keys` is required here, because a write
  * replaces the keys and a body that left them out would silently erase them.
  */
 export const stateDefinitionWriteSchema = stateDefinitionFieldsSchema
   .safeExtend({ keys: z.record(templateName, stateKeyDefSchema) })
-  .passthrough();
+  .passthrough()
+  .superRefine(checkReservedFields);
 export type StateDefinitionFields = z.input<typeof stateDefinitionWriteSchema>;
 
 /** A stored definition (`data/state/definitions/*.yaml`). */

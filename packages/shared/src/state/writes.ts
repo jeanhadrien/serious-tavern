@@ -6,8 +6,29 @@ import { z } from 'zod';
  * This file must not import `models.ts` (the session schema imports it).
  */
 
-/** A collection item: an `id`, the `text`, and the key's declared fields as extra properties. */
-export const collectionItemSchema = z.object({ id: z.string().min(1), text: z.string() }).passthrough();
+/**
+ * Which chat messages an item is about: their ids in chat order and a fingerprint of what they said (see
+ * `fingerprintMessages`). The `fingerprint` is absent only between a run and the commit check that takes it (State Write
+ * can link by id alone); a stored link without one cannot be verified and reads as `changed`.
+ */
+export const itemLinkSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1),
+  fingerprint: z.string().min(1).optional(),
+});
+export type ItemLink = z.infer<typeof itemLinkSchema>;
+
+/**
+ * A collection item: an `id`, the `text`, the key's declared fields as extra properties, and the built-in `messages`
+ * link that any item may have (never a declared field; only State Write's `messages` input sets it). A value that is
+ * not a link reads as no link rather than losing the item.
+ */
+export const collectionItemSchema = z
+  .object({
+    id: z.string().min(1),
+    text: z.string(),
+    messages: itemLinkSchema.optional().catch(undefined),
+  })
+  .passthrough();
 export type CollectionItem = z.infer<typeof collectionItemSchema>;
 
 /** A definition's key, or the writing node's own implicit key (Draw's `draws`): see the fold. */

@@ -60,6 +60,16 @@ describe('collectionItem', () => {
     expect(problem).toMatchObject({ kind: 'field', name, type });
   });
 
+  it('never stores a messages or link property of the value, even when the definition declares such a field', () => {
+    const value = { text: 't', level: 1, messages: { ids: ['m1'], fingerprint: 'f' }, link: { status: 'intact' } };
+    expect(collectionItem(def, value)).toEqual({ item: { text: 't', level: 1 }, ignored: ['messages', 'link'] });
+    const odd: CollectionKeyDef = { type: 'collection', fields: { messages: 'text', link: 'number' } };
+    expect(collectionItem(odd, { text: 't', messages: 'x', link: 2 })).toEqual({
+      item: { text: 't' },
+      ignored: ['messages', 'link'],
+    });
+  });
+
   it('says what each field type needs', () => {
     expect(itemFieldNeeds).toEqual({ text: 'text', number: 'a number', boolean: 'true or false' });
   });
