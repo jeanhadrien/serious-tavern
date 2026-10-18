@@ -1,9 +1,9 @@
 # State and creativity implementation: handoff
 
-First written 2026-10-16 (after phase 3), updated 2026-10-18 after phase 6. It is everything a fresh
+First written 2026-10-16 (after phase 3), updated 2026-10-19 after phase 6b. It is everything a fresh
 orchestrator needs to finish the plan in [STATE-DESIGN-PROPOSAL-3.md](../STATE-DESIGN-PROPOSAL-3.md).
 Start a new session on this repository and tell it: *"Read docs/explorations/state-impl/HANDOFF.md and
-continue with phase 6b."*
+continue with phase 7."*
 
 ## The mandate
 
@@ -40,7 +40,8 @@ the user:
 | `claude/state-impl-phase-4a` | Checkpoint after phase 4a |
 | `claude/state-impl-phase-4b` | Checkpoint after phase 4b |
 | `claude/state-impl-phase-5` | Checkpoint after phase 5 |
-| `claude/state-impl-phase-6` | Checkpoint after phase 6 |
+| `claude/state-impl-phase-6` | Checkpoint after phase 6 (the separate summary store, superseded by 6b) |
+| `claude/state-impl-phase-6b` | Checkpoint after phase 6b |
 
 After each phase, push the working branch and create the next checkpoint:
 `git push origin HEAD:refs/heads/claude/state-impl-phase-<N>`.
@@ -60,6 +61,7 @@ story state and post-turn runs.
 | 4b. Story state, web | State definitions editor in L (`left=stateDefinition:<id>`, phone menu under Setup, disk sync, reactive name lock with "Duplicate as"); `state.*` hints; **State Read**/**State Write** panels with pickers and a typed fixed-value editor; one shared state-view fetch per chat feeding a "Story state" section in the chat panel (sparklines, "written at turn k", node memory), per-reply chips and a delete confirmation listing what is undone (shared fold); `useFileSync` shared by the provider, collection and definition editors | 2303 |
 | 5. Post-turn runs | The **After Reply** node and the reply/post partition (`PreparedWorkflow.parts`; a Chat Output depending on After Reply is a validation issue); the post part runs after the reply is delivered, inside the turn's queue slot (the next message waits; Stop stops it; a queued message can be cancelled); seed `${seed}:post`; its writes join the turn's entry (undone with its replies), and nodes that also ran in the reply part write nothing in the post part; `postStatus`/`postError` per turn (a stored `running` the server no longer holds reads as "interrupted by a server restart", computed on read); status row above the composer, one failure toast, post details on the chip and failed runs listed in the Story state panel | 2541 |
 | 6. History summaries | `session.summaries` per set (tolerant read, additive), a pure fingerprint/validity/chunk planner/composer in `packages/shared/src/summaries/` (the engine's seed hash moved to `shared/src/hash.ts`, output unchanged); **Next Chunk** (one chunk per run: the first invalid summary re-planned, else the next `chunkSize` uncovered messages outside `rawWindow`; optional `after` input for After Reply) and **Save Summary** (a sink; buffered like state writes via `SummaryRun`, `summaryWrites` on the result and on failures); Memory `summarySet` (a summary is used only when valid and wholly before the last-N raw part); commit in `settleTurn`/`settlePostRun` with a commit-time fingerprint re-check (dropped writes become `summaryWarnings` on the turn entry, shown on the turn chip), `replaces`, pruning of summaries with no message left; summaries are not turn state; `summaries` in `GET /api/sessions/:id/state`; a "Summaries" section in the chat panel (valid/invalid badge, markdown text, click scrolls to the first covered message via `data-message-id`) | 2768 |
+| 6b. Message links; summaries as story state | Per [amendment 1](../STATE-DESIGN-AMENDMENT-1.md): the phase 6 store removed; collection items may carry `messages: { ids, fingerprint }` (only through State Write's new `messages` input on `add`: a link, a message or a list of messages); link status `intact/changed/partial/gone` computed on read (`packages/shared/src/links/`), with the shared `replaced` and chat-order (`repeated`) rules; commit-time link check in `settleTurn`/`settlePostRun` (`linkWarnings` on the turn entry and chip); snapshot items carry a read-only `link`; generic **Next Chunk** (collection key) and new **Unlinked Messages**; the `linked` template helper and State Read's `linked` mode; Memory restored plus `all`; Save Summary dropped; linked items, message markers ("Show in Story state"), edit/delete notes and the cap note in the web; checkbox hints in the generic form | 2881 |
 
 How to try each one, written for the user: [howto/](howto/).
 
@@ -70,8 +72,7 @@ phase 5 for 7, with a 6b addendum); re-read the AGENTS.md sections it names and 
 
 | Phase | Spec | UI | Notes |
 | --- | --- | --- | --- |
-| 4a, 4b, 5, 6 (**done**) | [phase-4a.md](specs/phase-4a.md), [phase-4b.md](specs/phase-4b.md), [phase-5.md](specs/phase-5.md), [phase-6.md](specs/phase-6.md) | | |
-| 6b. Message links; summaries as story state | [phase-6b.md](specs/phase-6b.md) | yes | Built-in `messages` link on collection items (State Write `add` gains a `messages` input), computed link status, commit-time link check (`linkWarnings`), the `linked` helper and State Read mode; Next Chunk retargeted to a state key with the "replaced" rule; new Unlinked Messages node; Memory restored, Save Summary dropped; remove `session.summaries` and `SummaryRun` (no migration: phase 6 never reached `main`); linked items, message markers and the edit note in the web |
+| 4a–6b (**done**) | [phase-4a.md](specs/phase-4a.md), [phase-4b.md](specs/phase-4b.md), [phase-5.md](specs/phase-5.md), [phase-6.md](specs/phase-6.md), [phase-6b.md](specs/phase-6b.md) | | |
 | 7. Trigger + example + guide | [phase-7.md](specs/phase-7.md) | yes | Trigger node (implicit node state like Draw's); seeded "Fresh texture" example (collection, preset, workflow; idempotent seeds; seeded-workflows test; decide how `scene` is seeded for users who already have definitions); user guide `docs/STATE-AND-LORE.md` folding in the howto files |
 
 Then finish with a summary for the user: what is testable and how (`npm run dev`), the checkpoint
@@ -128,8 +129,13 @@ Either way:
 - Known limitations carried forward from phase 5: a message waiting behind a post run gets no response
   bytes until the run ends; nodes needed by both parts run (and cost) twice; there is no retry for a
   failed or interrupted post run.
-- Phase 6's summary store (`session.summaries`, summary sets) is replaced in phase 6b: its how-to,
-  README and AGENTS.md sections describe code that 6b changes.
+- Phase 6's summary store was replaced in phase 6b (README, AGENTS.md and the how-tos describe 6b; the
+  phase 6 how-to carries a "superseded" note).
+- Known limitations from phase 6b (details in [howto/phase-6b-howto.md](howto/phase-6b-howto.md)):
+  deleting or regenerating the turn that wrote a summary removes it (the next turn redoes it); linked items
+  can't be edited by hand; the cap note can't check workflows; linked text is sent whole in the state view.
+  Pre-existing issues seen in the 6b live check, not fixed: a fresh LLM node toasts "Preset (none) not
+  found", and Validate saves an invalid draft first (the chat then fails with "Workflow is invalid").
 - Known limitations from phase 6 (details in [howto/phase-6-howto.md](howto/phase-6-howto.md)): Memory with a
   summary set sends older, not-yet-summarized history raw (Last N bounds only the raw part); chunks lag one
   turn (the post part sees the reply part's history); a failed post run stays listed in the panel after a
