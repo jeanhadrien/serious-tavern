@@ -2,8 +2,9 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ChangeHub } from './services/change-events.js';
+import { JsonRepository } from './storage/repository.js';
 import { postHarness, stateView, waitForPostRun } from './test-support/post.js';
-import { assistantRows, entriesOf, readSession, send } from './test-support/story.js';
+import { assistantRows, entriesOf, readSession, send, turn } from './test-support/story.js';
 
 // What happens to a post run when the chat changes under it, and when the server shuts down.
 
@@ -65,5 +66,30 @@ describe('closing the app', () => {
       await readFile(join(directory, 'executions', `${stored.state.turns[0].postExecutionId}.json`), 'utf8'),
     );
     expect(log.warnings).toContain('The after-reply run ended because the server shut down before it finished.');
+  });
+});
+
+describe('the state view while a post run settles', () => {
+  it('never reports a run that finished just after the view read the chat as interrupted', async () => {
+    const { app, session, gate } = await setup();
+    await send(app, session.id);
+    await gate.started;
+    // What a read a moment before the settle sees: the entry still says running.
+    const stale = await readSession(app, session.id);
+    gate.release();
+    await waitForPostRun(app, session.id, 'completed');
+    // The next message waits for the server to let go of the run, so it is no longer held when the view reads.
+    await turn(app, session.id);
+    const original = JsonRepository.prototype.get;
+    let served = false;
+    vi.spyOn(JsonRepository.prototype, 'get').mockImplementation(function (this: unknown, ...args: unknown[]) {
+      if (!served && args[0] === session.id) {
+        served = true;
+        return Promise.resolve(stale as never);
+      }
+      return (original as (...rest: unknown[]) => Promise<never>).apply(this, args);
+    } as never);
+    expect((await stateView(app, session.id)).turns[0]).toMatchObject({ postStatus: 'completed' });
+    expect(served).toBe(true);
   });
 });

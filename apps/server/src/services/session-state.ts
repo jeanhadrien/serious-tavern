@@ -4,9 +4,11 @@ import {
   NODE_ITEMS_LIMIT,
   nodeDisplayName,
   previewWrite,
+  readTurnEntries,
   type ApiResponse,
   type FoldedKey,
   type StateWrite,
+  type TurnEntry,
 } from '@st/shared';
 import type { AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
@@ -45,7 +47,14 @@ function nodeKeyViews(keys: Record<string, FoldedKey>) {
  * count, and what each turn wrote. Read-only: it is the same fold the next turn starts from.
  */
 export async function sessionStateView(context: AppContext, sessionId: string): Promise<View> {
-  const session = await requireEntity(context.sessions, sessionId, 'Session');
+  // The server holds the run while it settles (`TurnRegistry.hasPostRun`); a restart loses it.
+  const isLive = (entry: TurnEntry) =>
+    entry.postExecutionId !== undefined && context.turns.hasPostRun(sessionId, entry.postExecutionId);
+  let session = await requireEntity(context.sessions, sessionId, 'Session');
+  // A run is committed to the entry before the server lets go of it, so a stored `running` that the server does not
+  // hold may only be a run that finished after this read: read again, and only a second sighting is a lost run.
+  if (readTurnEntries(session.state).some((entry) => entry.postStatus === 'running' && !isLive(entry)))
+    session = await requireEntity(context.sessions, sessionId, 'Session');
   const { definitions, story } = await loadStoryState(context.stateDefinitions, session);
   const workflow = await context.workflows.get(session.workflowId);
   // Names only for nodes the chat's workflow still has; a deleted node's writes keep their data, not a name.
@@ -79,10 +88,7 @@ export async function sessionStateView(context: AppContext, sessionId: string): 
     }),
     turns: story.turns.map(({ entry, turn }) => {
       // A run stored as `running` that this server does not hold is one a restart cut short: it reads as an error.
-      const post = effectivePostRun(
-        entry,
-        entry.postExecutionId !== undefined && context.turns.hasPostRun(sessionId, entry.postExecutionId),
-      );
+      const post = effectivePostRun(entry, isLive(entry));
       return {
         executionId: entry.executionId,
         at: entry.at,
