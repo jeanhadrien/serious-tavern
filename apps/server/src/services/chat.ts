@@ -30,6 +30,7 @@ export type TurnOptions = {
 const stopWarnings: Record<TurnStop, string> = {
   user: 'The turn was stopped by the user before it finished.',
   disconnect: 'The turn ended because the client disconnected before it finished.',
+  shutdown: 'The turn ended because the server shut down before it finished.',
 };
 
 export function sendMessage(

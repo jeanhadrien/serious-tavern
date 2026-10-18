@@ -50,6 +50,9 @@ export async function createApp(
   registerImports(app, context);
   registerEvents(app, context);
   registerErrors(app);
+  // Post-turn runs outlive their HTTP response: stop them and wait for them, or they would write after the server
+  // is gone (and a test that removes its data directory right after would find the files back).
+  app.addHook('onClose', () => context.turns.close());
   // Watching is opt-in (the server entry point enables it) so ordinary tests do not spawn watchers.
   if (options.watch) {
     const watchers = [
