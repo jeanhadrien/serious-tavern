@@ -10,6 +10,7 @@ import { migrateJsonPresets } from './storage/preset-migration.js';
 import { SecretStore } from './secrets/store.js';
 import { seed } from './seed.js';
 import { seedStateDefinitions } from './seed-state.js';
+import { seedExamples } from './seed-examples.js';
 import { TurnRegistry } from './services/turns.js';
 import { ModelCatalog } from './services/provider-models.js';
 import { ChangeHub, NotifyingRepository, type RecordResource } from './services/change-events.js';
@@ -40,7 +41,10 @@ export interface AppContext {
   changes: ChangeHub;
 }
 
-export async function createContext(dataDir: string, options: { seed?: boolean }): Promise<AppContext> {
+export async function createContext(
+  dataDir: string,
+  options: { seed?: boolean; examples?: boolean },
+): Promise<AppContext> {
   const changes = new ChangeHub();
   // Records are wrapped so every write announces itself to the open event streams.
   const notifying = <T extends { id: string }>(name: RecordResource) =>
@@ -55,11 +59,14 @@ export async function createContext(dataDir: string, options: { seed?: boolean }
     await seed(workflows, presets);
     await seedStateDefinitions(stateDefinitions);
   }
+  // Examples are added for existing data too (see `seedExamples`); the server turns them on, tests ask for them.
+  const collections = new CollectionRepository(join(dataDir, 'collections'));
+  if (options.examples) await seedExamples({ collections, stateDefinitions, presets, workflows }, dataDir);
   return {
     workflows,
     presets,
     providers: new ProviderRepository(join(dataDir, 'providers')),
-    collections: new CollectionRepository(join(dataDir, 'collections')),
+    collections,
     stateDefinitions,
     sessions: notifying<Session>('sessions'),
     executions: new JsonRepository<ExecutionLog>(join(dataDir, 'executions')),

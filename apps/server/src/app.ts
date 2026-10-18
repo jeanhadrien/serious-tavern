@@ -21,7 +21,7 @@ import { watchResourceFiles } from './services/change-events.js';
 
 export async function createApp(
   dataDir = join(process.cwd(), 'data'),
-  options: { seed?: boolean; watch?: boolean } = {},
+  options: { seed?: boolean; watch?: boolean; examples?: boolean } = {},
 ) {
   const app = Fastify({ logger: false, bodyLimit: MAX_UPLOAD_BYTES + 256 * 1024 });
   const parseJson = app.getDefaultJsonParser('error', 'error');

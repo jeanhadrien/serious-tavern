@@ -3,10 +3,11 @@ import type { Workflow, NodeInstance, Edge, Preset } from '@st/shared';
 import { registry } from '@st/engine';
 import type { Repository } from './storage/repository.js';
 
-function makeWorkflow(
+/** A workflow from node specs and `[source, sourceHandle, target, targetHandle]` connections (`at` places a node). */
+export function makeWorkflow(
   id: string,
   name: string,
-  specs: { id: string; type: string; config?: Record<string, unknown> }[],
+  specs: { id: string; type: string; config?: Record<string, unknown>; at?: [x: number, y: number] }[],
   connections: [string, string, string, string][],
 ): Workflow {
   const now = new Date().toISOString();
@@ -20,7 +21,9 @@ function makeWorkflow(
         id: spec.id,
         type: spec.type,
         config: { ...registry.get(spec.type)!.defaultConfig, ...spec.config },
-        position: { x: 100 + (index % 3) * 310, y: 100 + Math.floor(index / 3) * 230 },
+        position: spec.at
+          ? { x: spec.at[0], y: spec.at[1] }
+          : { x: 100 + (index % 3) * 310, y: 100 + Math.floor(index / 3) * 230 },
       }),
     ),
     edges: connections.map(
