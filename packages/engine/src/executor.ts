@@ -122,7 +122,12 @@ export async function executeWorkflow(
       return next();
     };
   };
-  const stateRun = new StateRun(options.state, execution);
+  // The after-reply run does not repeat the state writes of nodes the reply run already ran (they are in both parts).
+  const stateRun = new StateRun(
+    options.state,
+    execution,
+    part === 'post' ? { ids: parts.reply, nameOf: (id) => nodeDisplayName(workflow.nodes, labelOf, id) } : undefined,
+  );
   let wave = 0;
   const resolved = new Map<string, { output: Record<string, unknown>; skipped: boolean }>();
   const replies = new Map<string, ChatReply>();
