@@ -1,3 +1,5 @@
+> **Superseded by phase 6b.** Summaries are no longer a separate store: they are ordinary story state (a collection key whose items link to the messages they cover), Save Summary and Memory's summary set are gone, and deleting the turn that wrote a summary now removes it. See `phase-6b-howto.md` and `docs/explorations/STATE-DESIGN-AMENDMENT-1.md`. This page describes the phase 6 build only.
+
 # Phase 6: history summaries (Next Chunk, Save Summary, Memory with a summary set), how to try it
 
 Long chats outgrow the model's context. This phase lets a chat send the **most recent messages as they are** and **older history as short summaries of fixed chunks**. Summaries belong to the messages they cover, not to the turn that wrote them:
