@@ -92,6 +92,7 @@ function withViewLinks(value: unknown, history: readonly ChatMessage[]): unknown
     const link: ItemLinkView = {
       status: found.status,
       replaced: found.replaced,
+      repeated: found.repeated,
       count: found.link.ids.length,
       missing: found.link.ids.length - found.survivors.length,
       ...(found.first !== undefined && {

@@ -64,7 +64,7 @@ export const nextChunk: NodeDefinition = {
       .int()
       .min(0)
       .default(16)
-      .describe('The most recent messages, never planned. Keep it at least as big as the Last N that feeds the prompt'),
+      .describe('The newest messages, never planned: they stay raw in the prompt until they are older than this'),
   }),
   defaultConfig: { definitionId: '', key: '', chunkSize: 20, rawWindow: 16 },
   // The ports never change; resolving them checks the target, so an unset or mistaken key shows as "not set up".

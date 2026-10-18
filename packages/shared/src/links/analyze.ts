@@ -1,4 +1,5 @@
 import { indexById, type LinkMessage } from './fingerprint.js';
+import { chatOrder } from './order.js';
 import { linkStatus, type LinkStatus } from './status.js';
 import type { ItemLink } from '../state/writes.js';
 
@@ -22,6 +23,11 @@ export type LinkedEntry<T extends LinkableItem = LinkableItem> = {
    * was for is covered again, so readers skip it. A `gone` item has nothing left to cover and is never replaced.
    */
   replaced: boolean;
+  /**
+   * An INTACT item that links exactly the same messages as an earlier intact item in chat order (see `chatOrder`): readers
+   * use the earlier one. Never true for a broken item.
+   */
+  repeated: boolean;
 };
 
 /**
@@ -54,10 +60,14 @@ export function analyzeLinks<T extends LinkableItem>(
           ? {}
           : { first: position.get(first)!, last: position.get(last)!, firstId: first, lastId: last }),
         replaced: false,
+        repeated: false,
       },
     ];
   });
   const covered = new Set(entries.filter(({ status }) => status === 'intact').flatMap(({ link }) => link.ids));
+  const intact = entries.filter((entry) => entry.status === 'intact' && entry.first !== undefined);
+  const { repeated } = chatOrder(intact.map((entry) => ({ first: entry.first!, key: entry.link.ids.join('\u0000') })));
+  for (const index of repeated) intact[index]!.repeated = true;
   for (const entry of entries)
     entry.replaced =
       entry.status !== 'intact' && entry.survivors.length > 0 && entry.survivors.every((id) => covered.has(id));

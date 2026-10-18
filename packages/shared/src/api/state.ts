@@ -28,6 +28,10 @@ export const itemLinkViewSchema = z.object({
   // A broken item (not intact) whose surviving messages intact items of the same key link again: readers skip it and
   // the panel collapses it. Never true for an intact or a `gone` item.
   replaced: z.boolean(),
+  // An intact item linking exactly the same messages as an earlier intact one in chat order (an edit that was
+  // reverted next to the summary written meanwhile): readers use the earlier one, the panel collapses this one. Computed
+  // with the same shared rule as `linked` and State Read's linked mode. Never true for a broken item.
+  repeated: z.boolean(),
   // How many messages the item linked when it was written, and how many of those are no longer in the chat.
   count: z.number(),
   missing: z.number(),

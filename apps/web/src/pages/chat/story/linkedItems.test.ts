@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ItemLinkView } from '@st/shared';
-import { groupLinked, itemLinkOf, linkLabel, plainPreview } from './linkedItems.js';
+import { groupLinked, itemLinkOf, linkLabel } from './linkedItems.js';
 
 const view = (patch: Partial<ItemLinkView> = {}): ItemLinkView => ({
   status: 'intact',
   replaced: false,
+  repeated: false,
   count: 2,
   missing: 0,
   firstIndex: 1,
@@ -61,11 +62,19 @@ describe('groupLinked', () => {
     expect(ids(groupLinked(items).used)).toEqual(['newer', 'older']);
   });
 
-  it('hides an intact copy of an earlier item (an edit that was reverted)', () => {
-    const items = [item('redone', { messageIds: ['a', 'b'] }), item('first', { messageIds: ['a', 'b'] })];
+  it('hides the item the view marks as a repeat, and decides nothing about repeats itself', () => {
+    const items = [
+      item('redone', { messageIds: ['a', 'b'] }),
+      item('first', { messageIds: ['a', 'b'], repeated: true }),
+    ];
     const groups = groupLinked(items);
     expect(ids(groups.used)).toEqual(['redone']);
     expect(ids(groups.hidden)).toEqual(['first']);
+    // Same messages but no mark: both stay in use.
+    expect(ids(groupLinked([item('x', { messageIds: ['a'] }), item('y', { messageIds: ['a'] })]).used)).toEqual([
+      'x',
+      'y',
+    ]);
   });
 
   it('separates broken items waiting to be redone from the ones an intact item replaced', () => {
@@ -83,20 +92,5 @@ describe('groupLinked', () => {
 
   it('handles no items', () => {
     expect(groupLinked([])).toEqual({ used: [], broken: [], hidden: [] });
-  });
-});
-
-describe('plainPreview', () => {
-  it.each([
-    [
-      '## Scene so far\n\n- They talked for **4 lines**\n- Starting with: user: Question 1',
-      'Scene so far They talked for 4 lines Starting with: user: Question 1',
-    ],
-    ['1. first\n2. second', 'first second'],
-    ['> quoted `code` and _emphasis_', 'quoted code and emphasis'],
-    ['plain text', 'plain text'],
-    ['   ', ''],
-  ])('%j', (text, expected) => {
-    expect(plainPreview(text)).toBe(expected);
   });
 });

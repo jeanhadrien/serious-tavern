@@ -276,6 +276,7 @@ it("describes the items a turn could not store and the link of a state view's it
   const link = {
     status: 'partial',
     replaced: false,
+    repeated: false,
     count: 20,
     missing: 2,
     firstIndex: 3,
@@ -286,11 +287,12 @@ it("describes the items a turn could not store and the link of a state view's it
   };
   expect(itemLinkViewSchema.parse(link)).toEqual(link);
   // A gone item has no positions.
-  const gone = { status: 'gone', replaced: false, count: 2, missing: 2, messageIds: [] };
+  const gone = { status: 'gone', replaced: false, repeated: false, count: 2, missing: 2, messageIds: [] };
   expect(itemLinkViewSchema.parse(gone)).toEqual(gone);
   for (const bad of [
     { ...link, status: 'broken' },
     { ...link, replaced: 'no' },
+    { ...link, repeated: undefined },
     { ...link, messageIds: 'm3' },
     { status: 'intact' },
   ])

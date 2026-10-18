@@ -2,28 +2,14 @@ import { isPlainObject, itemLinkViewSchema, type ItemLinkView, type LinkStatus }
 
 // The view model of linked collection items (items that link to chat messages): everything the Story state section
 // and the message markers say about a link, worked out from the `link` the server's state view computed. Nothing
-// here looks at the chat's messages or recomputes a status; the only rules of its own are how items are grouped
-// and ordered for display, which follow the shared chat-order rule (`linkedInChatOrder`: by first linked message,
-// an item linking the same messages as an earlier one is a duplicate).
+// here looks at the chat's messages or recomputes a status, a replacement or a repeat (the view carries them, from the
+// shared rules); the only thing decided here is the display order, by first linked message.
 
 /** The `link` of a raw view item, or undefined when it has none or it does not parse (then it is a plain item). */
 export function itemLinkOf(raw: unknown): ItemLinkView | undefined {
   if (!isPlainObject(raw)) return undefined;
   const parsed = itemLinkViewSchema.safeParse(raw.link);
   return parsed.success ? parsed.data : undefined;
-}
-
-/**
- * The text as a one-line preview: markdown markers (headings, emphasis, list dashes, code ticks) are dropped and
- * whitespace collapsed, so a summary starting "## Scene so far" reads as words in the collapsed line (the open
- * text is rendered as markdown).
- */
-export function plainPreview(text: string): string {
-  return text
-    .replace(/^\s{0,3}(#{1,6}|[-*+]|\d+\.|>)\s+/gm, '')
-    .replace(/[*_`~]+/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 /** How each status reads on the badge. */
@@ -66,24 +52,16 @@ const positionOrder = (a: LinkedEntry, b: LinkedEntry) =>
   (a.link.firstIndex ?? Number.POSITIVE_INFINITY) - (b.link.firstIndex ?? Number.POSITIVE_INFINITY);
 
 /**
- * Splits the linked items of one key for display. `items` come newest first (the collection's order), which the
- * stable sorts keep as the tie-break, like the shared rule does.
+ * Splits the linked items of one key for display, by what the server's view says about each (`link.status`,
+ * `replaced`, `repeated`: the rules live in shared, nothing is decided here). The lists are shown in chat order by
+ * `firstIndex`; `items` come newest first, which the stable sort keeps for ties.
  */
 export function groupLinked<T extends LinkedEntry>(items: readonly T[]): LinkGroups<T> {
-  const intact = items.filter((item) => item.link.status === 'intact').sort(positionOrder);
-  const seen = new Set<string>();
-  const used: T[] = [];
-  const hidden: T[] = [];
-  for (const item of intact) {
-    const same = item.link.messageIds.join('\u0000');
-    if (seen.has(same)) hidden.push(item);
-    else {
-      seen.add(same);
-      used.push(item);
-    }
+  const groups: LinkGroups<T> = { used: [], broken: [], hidden: [] };
+  for (const item of [...items].sort(positionOrder)) {
+    const { link } = item;
+    if (link.status === 'intact') (link.repeated ? groups.hidden : groups.used).push(item);
+    else (link.replaced ? groups.hidden : groups.broken).push(item);
   }
-  const broken: T[] = [];
-  for (const item of items.filter((candidate) => candidate.link.status !== 'intact').sort(positionOrder))
-    (item.link.replaced ? hidden : broken).push(item);
-  return { used, broken, hidden };
+  return groups;
 }

@@ -10,6 +10,7 @@ import {
 import { renderPreset } from '@st/engine';
 import type { AppContext } from '../context.js';
 import { errorMessage, HttpError, notFound } from '../errors.js';
+import { historyMessages } from './settle-turn.js';
 import { foldSession, listDefinitions } from './story-state.js';
 
 export async function previewPreset(
@@ -26,9 +27,12 @@ export async function previewPreset(
     ? workflowSettings((await workflows.get(session.workflowId)) ?? {})
     : settingsCatalog(await workflows.list());
   const settings = resolveChatSettings(declarations, session?.settings).values;
-  // The story state the session's next turn would see; a new chat sees every key at its default, turn 1.
+  // The story state the session's next turn would see; a new chat sees every key at its default, turn 1. The history
+  // the next turn would get gives linked items their `link` (what `linked` and `{{link.status}}` read).
   const definitions = await listDefinitions(stateDefinitions);
-  const state = session ? foldSession(definitions, session).snapshot : emptyStateSnapshot(definitions);
+  const state = session
+    ? foldSession(definitions, session, undefined, historyMessages(session.messages)).snapshot
+    : emptyStateSnapshot(definitions);
   const values: Record<string, unknown> = { ...inputs };
   const sample = [
     { role: 'user', content: 'Hello!' },

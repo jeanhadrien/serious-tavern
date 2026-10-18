@@ -105,6 +105,12 @@ describe('commitItemLinks', () => {
     expect(commit([linked(['zz'], undefined, '  a\n\n b ')]).warnings[0]).toContain('"a b"');
   });
 
+  it('quotes a markdown item as plain words, like the panel and the delete dialog do', () => {
+    expect(
+      commit([linked(['zz'], undefined, '## Scene so far\n\n- They talked for **4 lines**')]).warnings[0],
+    ).toContain('"Scene so far They talked for 4 lines"');
+  });
+
   it('does not change its input', () => {
     const write = linked(['m1']);
     const before = structuredClone(write);

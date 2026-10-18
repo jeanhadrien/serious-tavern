@@ -60,14 +60,20 @@ describe('collectionItem', () => {
     expect(problem).toMatchObject({ kind: 'field', name, type });
   });
 
-  it('never stores a messages or link property of the value, even when the definition declares such a field', () => {
+  it('never stores a messages property of the value, nor an undeclared link, even for a field called messages', () => {
     const value = { text: 't', level: 1, messages: { ids: ['m1'], fingerprint: 'f' }, link: { status: 'intact' } };
     expect(collectionItem(def, value)).toEqual({ item: { text: 't', level: 1 }, ignored: ['messages', 'link'] });
-    const odd: CollectionKeyDef = { type: 'collection', fields: { messages: 'text', link: 'number' } };
-    expect(collectionItem(odd, { text: 't', messages: 'x', link: 2 })).toEqual({
-      item: { text: 't' },
-      ignored: ['messages', 'link'],
+    const odd: CollectionKeyDef = { type: 'collection', fields: { messages: 'text' } };
+    expect(collectionItem(odd, { text: 't', messages: 'x' })).toEqual({ item: { text: 't' }, ignored: ['messages'] });
+  });
+
+  it('keeps the value of a field called link that an existing definition declares', () => {
+    const old: CollectionKeyDef = { type: 'collection', fields: { link: 'text' } };
+    expect(collectionItem(old, { text: 't', link: 'https://example.test' })).toEqual({
+      item: { text: 't', link: 'https://example.test' },
+      ignored: [],
     });
+    expect(collectionItem(old, { text: 't', link: 2 }).problem).toMatchObject({ kind: 'field', name: 'link' });
   });
 
   it('says what each field type needs', () => {

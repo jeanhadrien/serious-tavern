@@ -1,10 +1,11 @@
 import { fingerprintMessages, indexById, type LinkMessage } from './fingerprint.js';
+import { plainPreview } from './preview.js';
 import type { StateWrite } from '../state/writes.js';
 
 const EXCERPT = 40;
 
 const excerpt = (text: string) => {
-  const flat = text.replace(/\s+/g, ' ').trim();
+  const flat = plainPreview(text);
   return flat.length > EXCERPT ? `${flat.slice(0, EXCERPT)}…` : flat;
 };
 

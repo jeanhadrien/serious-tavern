@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeLinks, withItemLinks } from './analyze.js';
+import { linkedInChatOrder } from './order.js';
 import { chat, linkedItem, range, withEdit } from './test-fixtures.js';
 
 const history = chat(40);
@@ -18,6 +19,7 @@ describe('analyzeLinks', () => {
       firstId: 'm21',
       lastId: 'm40',
       replaced: false,
+      repeated: false,
     });
     expect(entries[0]!.survivors).toEqual(range(21, 40));
   });
@@ -81,6 +83,31 @@ describe('analyzeLinks', () => {
   });
 });
 
+describe('analyzeLinks: repeated', () => {
+  it('marks the later item (in chat order, ties newest first) of intact items linking the same messages', () => {
+    const copy = linkedItem(history, range(1, 20), 'copy');
+    const entries = analyzeLinks([copy, second, first], history);
+    expect(entries.map((entry) => [entry.item.id, entry.repeated])).toEqual([
+      ['copy', false],
+      ['b', false],
+      ['a', true],
+    ]);
+  });
+
+  it('agrees with the order the linked helper uses, and never marks a broken item', () => {
+    const copy = linkedItem(history, range(1, 20), 'copy');
+    const edited = withEdit(history, 'm3', 'changed');
+    const [brokenCopy, brokenFirst] = analyzeLinks([copy, first], edited);
+    expect(brokenCopy!.repeated).toBe(false);
+    expect(brokenFirst!.repeated).toBe(false);
+    const items = withItemLinks([copy, first, second], history);
+    const used = linkedInChatOrder(items).map((item) => (item as { id: string }).id);
+    const repeats = analyzeLinks([copy, first, second], history).filter((entry) => entry.repeated);
+    expect(used).toEqual(['copy', 'b']);
+    expect(repeats.map((entry) => entry.item.id)).toEqual(['a']);
+  });
+});
+
 describe('withItemLinks', () => {
   it('adds a link view to items that have messages and leaves the others (and the originals) alone', () => {
     const plain = { id: 'p', text: 'plain' };
@@ -90,6 +117,13 @@ describe('withItemLinks', () => {
     expect(out[1]).toMatchObject({ link: { status: 'changed', ids: range(21, 40), first: 21 } });
     expect(out[2]).toBe(plain);
     expect(first).not.toHaveProperty('link');
+  });
+
+  it('replaces a stored field called link only on items that have messages', () => {
+    const mine = { id: 'u', text: 'x', link: 'https://example.test' };
+    const out = withItemLinks([{ ...first, link: 'https://stored.test' }, mine], history);
+    expect(out[0]).toMatchObject({ link: { status: 'intact' } });
+    expect(out[1]).toBe(mine);
   });
 
   it('reports a gone item without a position', () => {

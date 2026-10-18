@@ -2,6 +2,7 @@ import {
   foldStoryState,
   isPlainObject,
   oldestFirst,
+  plainPreview,
   type ChatMessage,
   type FoldedKey,
   type SessionStateView,
@@ -11,7 +12,6 @@ import {
   type TurnEntry,
 } from '@st/shared';
 import { formatValue, itemText, quote } from './format.js';
-import { plainPreview } from './linkedItems.js';
 
 // What deleting a reply would undo, for the confirmation. The answer comes from the SHARED fold, run twice over the
 // chat's messages (with and without the reply) and the turn entries rebuilt from the state view; nothing here

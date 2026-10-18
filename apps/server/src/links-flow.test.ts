@@ -148,4 +148,35 @@ describe('definitions used by the link nodes', () => {
     expect(error.code).toBe('STATE_DEFINITION_IN_USE');
     expect(stateDefinitionInUseDetailsSchema.parse(error.details).workflows).toEqual(['Only unlinked']);
   });
+
+  it('shows the intact summaries through `linked` in the preset preview, and not a broken one', async () => {
+    const { app, session } = await harness.chat();
+    for (const text of ['u1', 'u2', 'u3']) await say(app, session, text);
+    const preset = {
+      id: '4c8f7d0e-34a3-4c7b-9b1f-6a3f0f2bb0a1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      name: 'p',
+      inputs: [],
+      entries: [
+        {
+          id: 'e',
+          displayName: 'E',
+          kind: 'message',
+          role: 'system',
+          enabled: true,
+          content: '{{#each (linked state.memory.summaries)}}{{text}}:{{link.status}};{{/each}}',
+        },
+      ],
+    };
+    const preview = async () =>
+      (
+        await app.inject({ method: 'POST', url: '/api/presets/preview', payload: { preset, sessionId: session.id } })
+      ).json().messages;
+    expect(await preview()).toEqual([{ role: 'system', content: 'S[user: u1]:intact;' }]);
+    const { session: stored } = await storedItems(app, session.id);
+    await patchMessage(app, session.id, stored.messages[0]!.id, 'edited');
+    // Nothing intact is left, so the entry renders empty and is dropped.
+    expect(await preview()).toEqual([]);
+  });
 });

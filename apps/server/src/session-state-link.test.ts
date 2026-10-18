@@ -26,6 +26,7 @@ describe('the state view of linked items', () => {
     expect(item!.link).toEqual({
       status: 'intact',
       replaced: false,
+      repeated: false,
       count: 2,
       missing: 0,
       firstIndex: 1,
@@ -48,6 +49,7 @@ describe('the state view of linked items', () => {
     expect((await linkedItems(app, session.id))[0]!.link).toEqual({
       status: 'partial',
       replaced: false,
+      repeated: false,
       count: 2,
       missing: 1,
       firstIndex: 1,
@@ -58,7 +60,7 @@ describe('the state view of linked items', () => {
     });
     await deleteMessage(app, session.id, messages[1]!.id);
     const gone = (await linkedItems(app, session.id))[0]!.link!;
-    expect(gone).toEqual({ status: 'gone', replaced: false, count: 2, missing: 2, messageIds: [] });
+    expect(gone).toEqual({ status: 'gone', replaced: false, repeated: false, count: 2, missing: 2, messageIds: [] });
     expect(gone).not.toHaveProperty('firstIndex');
     expect(gone).not.toHaveProperty('firstMessageId');
   });
@@ -157,5 +159,23 @@ describe('withLinkViews', () => {
   it('reads a link without a fingerprint as changed', () => {
     const [out] = withLinkViews([{ id: 's', text: 's', messages: { ids: ['a'] } }], history);
     expect(out!.link).toMatchObject({ status: 'changed', count: 1, missing: 0 });
+  });
+
+  it('marks an intact item that links the same messages as an earlier one as a repeat, and nothing else', () => {
+    const earlier = item('earlier', ['a', 'b']);
+    const later = item('later', ['c']);
+    // Newest first: `copy` was written after `earlier`, but the earlier one in the list comes first in a tie.
+    const views = withLinkViews([later, item('copy', ['a', 'b']), earlier], history).map((entry) => [
+      entry.id,
+      entry.link?.repeated,
+    ]);
+    expect(views).toEqual([
+      ['later', false],
+      ['copy', false],
+      ['earlier', true],
+    ]);
+    // A broken item is never a repeat: it is replaced or waiting, not a copy.
+    const [broken] = withLinkViews([item('broken', ['a', 'b'], { fingerprint: 'stale' })], history);
+    expect(broken!.link).toMatchObject({ status: 'changed', repeated: false });
   });
 });

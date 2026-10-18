@@ -18,6 +18,7 @@ export function withLinkViews<T extends LinkableItem>(
       link: {
         status: entry.status,
         replaced: entry.replaced,
+        repeated: entry.repeated,
         count: entry.link.ids.length,
         missing: entry.link.ids.length - entry.survivors.length,
         ...(entry.first === undefined

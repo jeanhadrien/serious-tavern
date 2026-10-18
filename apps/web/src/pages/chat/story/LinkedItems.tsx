@@ -1,5 +1,5 @@
 import { CircleCheck, CircleSlash } from 'lucide-react';
-import type { ItemLinkView } from '@st/shared';
+import { plainPreview, type ItemLinkView } from '@st/shared';
 import { MessageContent } from '../MessageContent.js';
 import { shortText } from './format.js';
 import {
@@ -8,7 +8,6 @@ import {
   REPLACED_EXPLANATION,
   STATUS_LABELS,
   linkLabel,
-  plainPreview,
   type LinkGroups,
 } from './linkedItems.js';
 import type { LinkedItem } from './storyModel.js';
