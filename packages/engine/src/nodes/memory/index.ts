@@ -3,7 +3,7 @@ import type { NodeDefinition } from '../../types.js';
 export const memory: NodeDefinition = {
   type: 'memory',
   label: 'Memory',
-  description: 'Recent conversation history',
+  description: 'Recent conversation history, or all of it',
   category: 'Chat',
   inputs: [],
   outputs: [
@@ -15,12 +15,18 @@ export const memory: NodeDefinition = {
     },
   ],
   configSchema: z.object({
-    lastN: z.number().int().min(0).default(10),
+    lastN: z.number().int().min(0).default(10).describe('How many of the latest messages to include; 0 includes none'),
     format: z.enum(['text', 'messages']).default('text'),
+    all: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Include the whole history; Last N is then ignored. Use it before a node that drops what is already summarized',
+      ),
   }),
-  defaultConfig: { lastN: 10, format: 'text' },
+  defaultConfig: { lastN: 10, format: 'text', all: false },
   async execute({ history, config }) {
-    const recent = config.lastN === 0 ? [] : history.slice(-Number(config.lastN));
+    const recent = config.all === true ? history : config.lastN === 0 ? [] : history.slice(-Number(config.lastN));
     return { history: config.format === 'messages' ? recent : recent.map((m) => `${m.role}: ${m.content}`).join('\n') };
   },
 };
