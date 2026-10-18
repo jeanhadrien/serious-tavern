@@ -25,6 +25,7 @@ chosen by the user"). Written October 2026 from web sources; see the caveats at 
 | [STATE-DESIGN-PROPOSAL-2.md](STATE-DESIGN-PROPOSAL-2.md) | State design rewritten after review 1, user side first | Per-chat definitions; a turn's stored values live as long as its replies; post-turn runs and shared scopes (outbox) later |
 | [STATE-DESIGN-REVIEW-2.md](STATE-DESIGN-REVIEW-2.md) | Product review of state proposal 2 against the creativity goal | Go with changes: sound memory layer, but add seed decks with a Draw node, the harness, user-owned editable keys, per-message visibility and a Trigger node |
 | [STATE-DESIGN-PROPOSAL-3.md](STATE-DESIGN-PROPOSAL-3.md) | Current state design, after both reviews and the user's decisions (supersedes 1 and 2) | Chat settings (user-owned), story state (follows replies), summaries tied to the messages they cover, authored collections read by Recall and Draw, post-turn runs, a Trigger node |
+| [STATE-DESIGN-AMENDMENT-1.md](STATE-DESIGN-AMENDMENT-1.md) | Amendment to proposal 3 after phase 6 | Any collection item can link to chat messages; summaries become linked story state items, written by State Write and read through generic nodes (Next Chunk, Unlinked Messages, a `linked` helper) |
 
 ## Legend: verification tags
 
