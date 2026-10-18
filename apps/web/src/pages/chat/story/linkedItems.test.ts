@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ItemLinkView } from '@st/shared';
-import { groupLinked, itemLinkOf, linkLabel } from './linkedItems.js';
+import { groupLinked, itemLinkOf, linkLabel, plainPreview } from './linkedItems.js';
 
 const view = (patch: Partial<ItemLinkView> = {}): ItemLinkView => ({
   status: 'intact',
@@ -83,5 +83,20 @@ describe('groupLinked', () => {
 
   it('handles no items', () => {
     expect(groupLinked([])).toEqual({ used: [], broken: [], hidden: [] });
+  });
+});
+
+describe('plainPreview', () => {
+  it.each([
+    [
+      '## Scene so far\n\n- They talked for **4 lines**\n- Starting with: user: Question 1',
+      'Scene so far They talked for 4 lines Starting with: user: Question 1',
+    ],
+    ['1. first\n2. second', 'first second'],
+    ['> quoted `code` and _emphasis_', 'quoted code and emphasis'],
+    ['plain text', 'plain text'],
+    ['   ', ''],
+  ])('%j', (text, expected) => {
+    expect(plainPreview(text)).toBe(expected);
   });
 });

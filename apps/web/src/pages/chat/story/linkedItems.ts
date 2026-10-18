@@ -13,6 +13,19 @@ export function itemLinkOf(raw: unknown): ItemLinkView | undefined {
   return parsed.success ? parsed.data : undefined;
 }
 
+/**
+ * The text as a one-line preview: markdown markers (headings, emphasis, list dashes, code ticks) are dropped and
+ * whitespace collapsed, so a summary starting "## Scene so far" reads as words in the collapsed line (the open
+ * text is rendered as markdown).
+ */
+export function plainPreview(text: string): string {
+  return text
+    .replace(/^\s{0,3}(#{1,6}|[-*+]|\d+\.|>)\s+/gm, '')
+    .replace(/[*_`~]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /** How each status reads on the badge. */
 export const STATUS_LABELS: Record<LinkStatus, string> = {
   intact: 'intact',
@@ -23,7 +36,8 @@ export const STATUS_LABELS: Record<LinkStatus, string> = {
 
 /** Said for an item that readers skip. */
 export const BROKEN_EXPLANATION =
-  'Not used while its messages differ from when it was written. It is used again if they are restored, and a Next Chunk node redoes it.';
+  'Not used until its messages match again (an edit undone) or a Next Chunk node redoes it.';
+export const REPLACED_EXPLANATION = 'Replaced: intact items link every message of it that is left, so readers skip it.';
 export const GONE_EXPLANATION = 'Not used: none of its messages is in the chat any more.';
 
 /** "messages 21–40 (20)"; "message 7"; with deletions "messages 21–38 (18 of 20 left)"; none left "all 20 messages deleted". */

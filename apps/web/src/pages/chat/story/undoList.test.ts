@@ -135,6 +135,19 @@ describe('collections', () => {
     expect(undo('m-e1')).toEqual(["scene.injected (forgets 'a bell on a lost animal, ring…')"]);
   });
 
+  it('names a linked item by its words, without the markdown markers, and says how many messages it links', () => {
+    const { undo } = chat([
+      [
+        addWrite('injected', 'a', '## Scene so far\n\n- They talked', {
+          messages: { ids: ['u1', 'm-e1'], fingerprint: 'f' },
+        }),
+      ],
+    ]);
+    expect(undo('m-e1')).toEqual(["scene.injected (forgets 'Scene so far They talked' (linked to 2 messages))"]);
+    const one = chat([[addWrite('injected', 'a', 'a **bell**', { messages: { ids: ['u1'] } })]]);
+    expect(one.undo('m-e1')).toEqual(["scene.injected (forgets 'a bell' (linked to 1 message))"]);
+  });
+
   it('lists three items and counts the rest', () => {
     const { undo } = chat([
       [addWrite('injected', 'x', 'old')],

@@ -1,5 +1,5 @@
 import type { LinkStatus, SessionStateView } from '@st/shared';
-import { groupLinked, linkLabel } from './linkedItems.js';
+import { linkLabel, plainPreview } from './linkedItems.js';
 import { shortText } from './format.js';
 import { definitionBlocks } from './storyModel.js';
 
@@ -38,7 +38,7 @@ export function messageLinks(view: SessionStateView | undefined): MessageLinks {
         const note: MessageLinkNote = {
           key: `${block.name}.${row.key}`,
           range: linkLabel(item.link),
-          preview: shortText(item.text, PREVIEW_MAX),
+          preview: shortText(plainPreview(item.text), PREVIEW_MAX),
           status: item.link.status,
         };
         for (const id of item.link.messageIds) found.set(id, [...(found.get(id) ?? []), note]);

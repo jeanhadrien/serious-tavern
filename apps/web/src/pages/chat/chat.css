@@ -396,7 +396,25 @@ button.stop-generation:hover {
   color: #f2c98b;
 }
 
-/* Story state items that link to a message: the marker (a `.message-story` button) and the note before an edit or delete. */
+/* Story state items that link to a message: the marker next to the speaker, its card, and the note before an edit or delete. */
+.message-link-button {
+  padding: 3px;
+  color: #a7adbd;
+}
+.message-link-button[aria-expanded="true"] {
+  color: #c3ceff;
+  background: #3d4560;
+  border-color: #6f7fd8;
+}
+.message-link-button svg {
+  width: 16px;
+  height: 16px;
+}
+@media (max-width: 700px), (pointer: coarse) {
+  .message-link-button {
+    padding: 9px;
+  }
+}
 .message-link-note {
   margin: 8px 0 0;
   font-size: 0.85rem;

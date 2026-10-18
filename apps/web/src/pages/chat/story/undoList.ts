@@ -11,6 +11,7 @@ import {
   type TurnEntry,
 } from '@st/shared';
 import { formatValue, itemText, quote } from './format.js';
+import { plainPreview } from './linkedItems.js';
 
 // What deleting a reply would undo, for the confirmation. The answer comes from the SHARED fold, run twice over the
 // chat's messages (with and without the reply) and the turn entries rebuilt from the state view; nothing here
@@ -25,7 +26,7 @@ const TEXT_MAX = 40;
 const ITEM_MAX = 30;
 const ITEMS_LISTED = 3;
 
-type Item = { id: string; text: string };
+type Item = { id: string; text: string; linked?: number };
 type Turn = SessionStateView['turns'][number];
 
 const sameTarget = (a: StateTarget, b: StateTarget) =>
@@ -66,12 +67,26 @@ function cutMayHide(turns: readonly Turn[], deleted: Turn, target: StateTarget):
   return writes.at(-1)?.turn === deleted && writes.some(({ cut }) => cut);
 }
 
+/** How many messages a stored item links to (its `messages`), when it links to any. */
+function linkedCount(raw: Record<string, unknown>): { linked?: number } {
+  const ids = isPlainObject(raw.messages) ? raw.messages.ids : undefined;
+  return Array.isArray(ids) && ids.length > 0 ? { linked: ids.length } : {};
+}
+
 const itemsOf = (value: unknown): Item[] =>
   Array.isArray(value)
     ? value.flatMap((raw): Item[] =>
-        isPlainObject(raw) && typeof raw.id === 'string' ? [{ id: raw.id, text: itemText(raw) }] : [],
+        isPlainObject(raw) && typeof raw.id === 'string'
+          ? [{ id: raw.id, text: itemText(raw), ...linkedCount(raw) }]
+          : [],
       )
     : [];
+
+/** An item by its words and, when it links to chat messages, how many (a linked item's text is often markdown: its markers are dropped). */
+const describeItem = ({ text, linked }: Item) =>
+  linked
+    ? `${quote(plainPreview(text), ITEM_MAX)} (linked to ${linked === 1 ? '1 message' : `${linked} messages`})`
+    : quote(text, ITEM_MAX);
 
 /** What an item list change reads as: the items it forgets and the ones it brings back, at most three in all. */
 function itemChange(before: unknown, after: unknown): string {
@@ -83,7 +98,7 @@ function itemChange(before: unknown, after: unknown): string {
   const forgotten = gone.slice(0, ITEMS_LISTED);
   const restored = back.slice(0, ITEMS_LISTED - forgotten.length);
   const more = gone.length - forgotten.length + (back.length - restored.length);
-  const list = (items: Item[]) => items.map((item) => quote(item.text, ITEM_MAX)).join(', ');
+  const list = (items: Item[]) => items.map(describeItem).join(', ');
   return [
     forgotten.length && `forgets ${list(forgotten)}`,
     restored.length && `brings back ${list(restored)}`,

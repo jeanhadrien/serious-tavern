@@ -1,11 +1,23 @@
 import { CircleCheck, CircleSlash } from 'lucide-react';
+import type { ItemLinkView } from '@st/shared';
 import { MessageContent } from '../MessageContent.js';
 import { shortText } from './format.js';
-import { BROKEN_EXPLANATION, GONE_EXPLANATION, STATUS_LABELS, linkLabel, type LinkGroups } from './linkedItems.js';
+import {
+  BROKEN_EXPLANATION,
+  GONE_EXPLANATION,
+  REPLACED_EXPLANATION,
+  STATUS_LABELS,
+  linkLabel,
+  plainPreview,
+  type LinkGroups,
+} from './linkedItems.js';
 import type { LinkedItem } from './storyModel.js';
 import './linked.css';
 
 const PREVIEW_MAX = 80;
+
+const explanation = ({ status, replaced }: ItemLinkView) =>
+  replaced ? REPLACED_EXPLANATION : status === 'gone' ? GONE_EXPLANATION : BROKEN_EXPLANATION;
 
 function LinkedRow({ item, onJumpMessage }: { item: LinkedItem; onJumpMessage?(messageId: string): void }) {
   const { link } = item;
@@ -32,11 +44,9 @@ function LinkedRow({ item, onJumpMessage }: { item: LinkedItem; onJumpMessage?(m
           {STATUS_LABELS[link.status]}
         </span>
       </div>
-      {!intact && (
-        <p className="hint warning linked-why">{link.status === 'gone' ? GONE_EXPLANATION : BROKEN_EXPLANATION}</p>
-      )}
+      {!intact && <p className="hint warning linked-why">{explanation(link)}</p>}
       <details className="linked-text">
-        <summary>{shortText(item.text, PREVIEW_MAX) || '(empty)'}</summary>
+        <summary>{shortText(plainPreview(item.text), PREVIEW_MAX) || '(empty)'}</summary>
         <MessageContent content={item.text} />
         {item.extras.length > 0 && (
           <small className="story-item-fields">

@@ -6,7 +6,7 @@ import { ExecutionDetails } from './ExecutionDetails.js';
 import { MessageContent } from './MessageContent.js';
 import { MessageActions } from './MessageActions.js';
 import { MessageEditor } from './MessageEditor.js';
-import { LinkMarker } from './story/LinkMarker.js';
+import { useLinkMarker } from './story/LinkMarker.js';
 import { changeNote, type MessageLinkNote } from './story/linkMarkers.js';
 import { TurnChip } from './story/TurnChip.js';
 import type { StoryChip } from './story/turnChips.js';
@@ -50,6 +50,7 @@ export function ChatMessageView({
 }: ChatMessageViewProps) {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const marker = useLinkMarker(links);
   const bubble = useRef<HTMLElement>(null);
   const restoreFocus = useRef(false);
   useLayoutEffect(() => {
@@ -89,6 +90,7 @@ export function ChatMessageView({
           )}
           <strong>{name}</strong>
           <small>{user ? 'User' : 'Assistant'}</small>
+          {!editing && marker.button}
         </div>
         {onEdit && onDelete && (
           <MessageActions
@@ -101,6 +103,7 @@ export function ChatMessageView({
           />
         )}
       </div>
+      {!editing && marker.card}
       {(editing || deleting) && <LinkNote note={changeNote(links, editing ? 'edit' : 'delete')} />}
       {editing && onEdit ? (
         <MessageEditor
@@ -126,7 +129,6 @@ export function ChatMessageView({
           {message.status === 'partial' && <small className="message-stopped">Stopped before it finished</small>}
         </>
       )}
-      {links && links.length > 0 && !editing && <LinkMarker notes={links} />}
       {storyChip && !editing && <TurnChip chip={storyChip} />}
       {message.executionId && <ExecutionDetails id={message.executionId} cached={execution} />}
     </article>

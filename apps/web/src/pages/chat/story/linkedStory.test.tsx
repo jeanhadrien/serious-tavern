@@ -55,7 +55,7 @@ describe('linked items in the Story state section', () => {
   it('says what an edited message did to its item', () => {
     const html = render(played(edited('u2')));
     expect(html).toContain('covers an edited message');
-    expect(html).toContain('Not used while its messages differ');
+    expect(html).toContain('Not used until its messages match again');
   });
 
   it('says what a deleted message did, and when all of them are gone', () => {
@@ -80,6 +80,7 @@ describe('linked items in the Story state section', () => {
     });
     const html = render(view);
     expect(html).toContain('Replaced or repeated (1)');
+    expect(html).toContain('Replaced: intact items link every message of it that is left');
     const hidden = html.slice(html.indexOf('linked-hidden'));
     expect(hidden).toContain('old summary');
     expect(html.slice(0, html.indexOf('linked-hidden'))).toContain('new summary');
