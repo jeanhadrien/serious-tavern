@@ -159,7 +159,7 @@ After-reply part:
 | Deletes the turn that wrote the replacing summary | The old (broken) item is no longer replaced: Next Chunk re-plans it again |
 | Deletes a turn in the middle that wrote a summary | That summary is gone; its messages are unlinked, so B shows them and Next Chunk summarizes them again |
 | Regenerates the latest reply, which wrote a summary | The regenerated turn's post run summarizes the chunk again |
-| Edits message 5, then reverts the edit | The old summary's link is intact again; if a replacement exists too, both are intact and the first in chat order is used by `linked` (the other is collapsed as a duplicate in the panel) |
+| Edits message 5, then reverts the edit | The old summary's link is intact again and it is used again. If a replacement was written meanwhile, it was fingerprinted on the edited text, so it is now `changed`, and since the intact old item covers its messages it counts as replaced: nothing is re-planned |
 
 ## What changes in the code (phase 6b)
 
