@@ -5,12 +5,21 @@ import { CharacterPanel } from './panels/character.js';
 import { LlmPanel } from './panels/llm.js';
 import { RecallPanel } from './panels/recall.js';
 import { DrawPanel } from './panels/draw.js';
+import { StateKeyPicker } from './panels/StateKeyPicker.js';
 import { StateReadPanel } from './panels/stateRead.js';
 import { StateWritePanel } from './panels/stateWrite.js';
 import { supportsKeyValueArray, isKeyValueRows, numberFieldValue, type Field } from './fields.js';
 export type { NodePanelContext, NodeConfigPanelProps } from './panels/types.js';
 
-function GenericPanel({ descriptor, config, onChange, context }: Props) {
+/** `lead` is shown first; `hidden` fields are left to it (Next Chunk's key picker replaces the two id fields). */
+function GenericPanel({
+  descriptor,
+  config,
+  onChange,
+  context,
+  lead,
+  hidden = [],
+}: Props & { lead?: React.ReactNode; hidden?: readonly string[] }) {
   const configRef = useRef(config);
   configRef.current = config;
   const focused = useRef<{
@@ -18,7 +27,11 @@ function GenericPanel({ descriptor, config, onChange, context }: Props) {
     element: HTMLInputElement | HTMLTextAreaElement;
     update(value: string): void;
   } | null>(null);
-  const fields = (descriptor.configSchema.properties ?? {}) as Record<string, Field>;
+  const fields = Object.fromEntries(
+    Object.entries((descriptor.configSchema.properties ?? {}) as Record<string, Field>).filter(
+      ([key]) => !hidden.includes(key),
+    ),
+  );
   const update = (key: string, value: unknown) => onChange({ ...configRef.current, [key]: value });
   const updateRow = (key: string, index: number, property: 'key' | 'value', value: string) => {
     const rows = (configRef.current[key] ?? []) as { key: string; value: string }[];
@@ -69,6 +82,7 @@ function GenericPanel({ descriptor, config, onChange, context }: Props) {
     );
   return (
     <div className="config-fields">
+      {lead}
       {Object.entries(fields).map(([key, field]) => {
         const value = config[key] ?? field.default ?? '';
         const label = key.replace(/([A-Z])/g, ' $1');
@@ -203,6 +217,18 @@ function ConditionPanel(props: Props) {
     </>
   );
 }
+/** Next Chunk and Unlinked Messages: a list key of a state definition (the State Read picker), then the generic form. */
+function CollectionKeyPanel(props: Props) {
+  return (
+    <GenericPanel
+      {...props}
+      hidden={['definitionId', 'key']}
+      lead={
+        <StateKeyPicker kind="collection" config={props.config} onChange={props.onChange} context={props.context} />
+      }
+    />
+  );
+}
 // Optional overrides are registered only here; all other node types use the schema-driven form.
 export const customPanels: Record<string, (props: Props) => React.JSX.Element> = {
   condition: ConditionPanel,
@@ -212,6 +238,8 @@ export const customPanels: Record<string, (props: Props) => React.JSX.Element> =
   draw: DrawPanel,
   'state-read': StateReadPanel,
   'state-write': StateWritePanel,
+  'next-chunk': CollectionKeyPanel,
+  'unlinked-messages': CollectionKeyPanel,
 };
 export function NodeConfigPanel(props: Props) {
   const Panel = customPanels[props.descriptor.type] ?? GenericPanel;

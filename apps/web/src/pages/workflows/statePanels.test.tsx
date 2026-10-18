@@ -271,3 +271,56 @@ describe('State Write panel', () => {
     expect(html).toContain(`href="/state-definitions?id=${scene.id}"`);
   });
 });
+
+const listNode = (type: string, defaultConfig: Record<string, unknown>, properties: Record<string, unknown> = {}) =>
+  nodeTypeDescriptorSchema.parse({
+    type,
+    label: type,
+    description: type,
+    category: 'History',
+    dynamicPorts: false,
+    inputs: [],
+    outputs: [],
+    configSchema: { type: 'object', properties },
+    defaultConfig,
+  });
+const nextChunk = listNode(
+  'next-chunk',
+  { definitionId: '', key: '', chunkSize: 20, rawWindow: 16 },
+  {
+    definitionId: { type: 'string' },
+    key: { type: 'string' },
+    chunkSize: { type: 'integer', default: 20 },
+    rawWindow: { type: 'integer', default: 16 },
+  },
+);
+const unlinked = listNode(
+  'unlinked-messages',
+  { definitionId: '', key: '' },
+  { definitionId: { type: 'string' }, key: { type: 'string' } },
+);
+
+describe('Next Chunk and Unlinked Messages panels', () => {
+  it('pick a list key of a definition, with the state-definition link, and keep the other settings', () => {
+    const html = panel(nextChunk, { definitionId: scene.id, key: 'injected', chunkSize: 8, rawWindow: 2 }, [scene]);
+    expect(html).toContain('<option value="injected" selected="">injected (collection)</option>');
+    expect(html).not.toContain('tension (number)');
+    expect(html).toContain(`href="/state-definitions?id=${scene.id}"`);
+    expect(html).toContain('value="8"');
+    expect(html).toContain('value="2"');
+    // The ids are picked, never typed.
+    expect(html).not.toContain('definitionId');
+  });
+
+  it('tell a new node what to pick, and a definition with no list what is missing', () => {
+    expect(panel(unlinked, { definitionId: '', key: '' }, [scene])).toContain('Select a state definition.');
+    expect(panel(unlinked, { definitionId: scene.id, key: '' }, [scene])).toContain('Select a key.');
+    const flat = definition({ keys: { place: { type: 'text' } } });
+    expect(panel(unlinked, { definitionId: flat.id, key: '' }, [flat])).toContain('no list (collection) key');
+  });
+
+  it('show a key that is no list as such', () => {
+    const html = panel(unlinked, { definitionId: scene.id, key: 'tension' }, [scene]);
+    expect(html).toContain('<option value="tension" selected="">tension (number: not a list)</option>');
+  });
+});

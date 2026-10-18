@@ -1,21 +1,24 @@
 import type { NodePanelContext } from './types.js';
-import { definitionOptions, keyOptions, pickDefinition, pickKey, pickerHint } from './stateConfig.js';
+import { definitionOptions, keyOptions, pickDefinition, pickKey, pickerHint, type PickerKind } from './stateConfig.js';
 
 interface StateKeyPickerProps {
-  /** State Write also fits its operation to the key and drops its fixed value when the target changes. */
-  kind: 'read' | 'write';
+  /**
+   * State Write also fits its operation to the key and drops its fixed value when the target changes; a node that
+   * works on a list (`collection`) only offers collection keys.
+   */
+  kind: PickerKind;
   config: Record<string, unknown>;
   onChange(config: Record<string, unknown>): void;
   context?: NodePanelContext;
 }
 
-/** The state definition and key a State Read or State Write node targets, picked from the catalog. */
+/** The state definition and key a State Read, State Write, Next Chunk or Unlinked Messages node targets. */
 export function StateKeyPicker({ kind, config, onChange, context }: StateKeyPickerProps) {
   const catalog = context?.stateDefinitions ?? [];
   const definitionId = typeof config.definitionId === 'string' ? config.definitionId : '';
   const key = typeof config.key === 'string' ? config.key : '';
   const definition = catalog.find((item) => item.id === definitionId);
-  const hint = pickerHint(config, catalog);
+  const hint = pickerHint(config, catalog, kind);
   const link = () => {
     const to = `/state-definitions?id=${encodeURIComponent(definitionId)}`;
     return context?.renderLink ? context.renderLink(to, 'Edit definition ↗') : <a href={to}>Edit definition ↗</a>;
@@ -46,7 +49,7 @@ export function StateKeyPicker({ kind, config, onChange, context }: StateKeyPick
           onChange={(event) => onChange(pickKey(config, event.target.value, catalog, kind))}
         >
           <option value="">Choose a key</option>
-          {keyOptions(definition, key).map((option) => (
+          {keyOptions(definition, key, kind).map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>

@@ -249,3 +249,51 @@ describe('pickerHint', () => {
     expect(pickerHint({ definitionId: 'gone', key: 'x' }, catalog)).toBeUndefined();
   });
 });
+
+describe('the picker for nodes that work on a list (Next Chunk, Unlinked Messages)', () => {
+  it('offers only the collection keys', () => {
+    expect(keyOptions(scene, 'injected', 'collection')).toEqual([
+      { value: 'injected', label: 'injected (collection)' },
+    ]);
+    expect(keyOptions(other, '', 'collection')).toEqual([]);
+  });
+
+  it('shows a configured key that is not a list as what it is, and an absent key as unknown', () => {
+    expect(keyOptions(scene, 'tension', 'collection')[0]).toEqual({
+      value: 'tension',
+      label: 'tension (number: not a list)',
+    });
+    expect(keyOptions(scene, 'gone', 'collection')[0]).toEqual({ value: 'gone', label: 'Unknown key (gone)' });
+  });
+
+  it('keeps the current key when the new definition has it as a list, else clears it', () => {
+    const twin = definition('d-twin', 'twin', { injected: { type: 'collection' }, plain: { type: 'text' } });
+    expect(pickDefinition({ definitionId: 'd-scene', key: 'injected' }, 'd-twin', [scene, twin], 'collection')).toEqual(
+      {
+        definitionId: 'd-twin',
+        key: 'injected',
+      },
+    );
+    const text = definition('d-text', 'text', { injected: { type: 'text' } });
+    expect(
+      pickDefinition({ definitionId: 'd-scene', key: 'injected' }, 'd-text', [scene, text], 'collection').key,
+    ).toBe('');
+  });
+
+  it('touches nothing but the target (no read or op)', () => {
+    const config = { definitionId: '', key: '', chunkSize: 8, rawWindow: 2 };
+    expect(pickKey({ ...config, definitionId: 'd-scene' }, 'injected', catalog, 'collection')).toEqual({
+      ...config,
+      definitionId: 'd-scene',
+      key: 'injected',
+    });
+  });
+
+  it('tells what to pick next, including a definition without a list', () => {
+    expect(pickerHint({}, catalog, 'collection')).toBe('Select a state definition.');
+    expect(pickerHint({ definitionId: 'd-scene' }, catalog, 'collection')).toBe('Select a key.');
+    expect(pickerHint({ definitionId: 'd-other' }, catalog, 'collection')).toContain('no list (collection) key');
+    expect(pickerHint({ definitionId: 'd-other' }, catalog, 'read')).toBe('Select a key.');
+    expect(pickerHint({ definitionId: 'd-scene', key: 'injected' }, catalog, 'collection')).toBeUndefined();
+  });
+});

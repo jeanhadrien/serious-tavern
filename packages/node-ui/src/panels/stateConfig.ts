@@ -11,6 +11,12 @@ import {
 
 export type Option = { value: string; label: string };
 
+/**
+ * What the picker is for: a State Read or State Write (any key), or a node that works on a list (`collection`:
+ * Next Chunk, Unlinked Messages), which only offers collection keys and leaves `read`/`op` alone.
+ */
+export type PickerKind = 'read' | 'write' | 'collection';
+
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
 /**
@@ -18,9 +24,16 @@ const text = (value: unknown): string => (typeof value === 'string' ? value : ''
  * then the key. Nothing when both are chosen. (The node's ports cannot resolve until then, which is not reported
  * as an error: this is where it is said.)
  */
-export function pickerHint(config: Record<string, unknown>, catalog: readonly StateDefinition[]): string | undefined {
+export function pickerHint(
+  config: Record<string, unknown>,
+  catalog: readonly StateDefinition[],
+  kind?: PickerKind,
+): string | undefined {
   if (!catalog.length) return 'Create a state definition in the State definitions list first.';
   if (!text(config.definitionId)) return 'Select a state definition.';
+  const definition = catalog.find((item) => item.id === text(config.definitionId));
+  if (kind === 'collection' && definition && !Object.values(definition.keys).some((key) => key.type === 'collection'))
+    return 'This definition has no list (collection) key. Add one in the definitions editor.';
   if (!text(config.key)) return 'Select a key.';
   return undefined;
 }
@@ -34,14 +47,19 @@ export function definitionOptions(current: unknown, catalog: readonly StateDefin
 }
 
 /** The keys of a definition (`name (type)`); a configured key it does not have comes first as an unknown entry. */
-export function keyOptions(definition: StateDefinition | undefined, current: unknown): Option[] {
-  const options = Object.entries(definition?.keys ?? {}).map(([name, def]) => ({
-    value: name,
-    label: `${name} (${def.type})`,
-  }));
+export function keyOptions(definition: StateDefinition | undefined, current: unknown, kind?: PickerKind): Option[] {
+  const options = Object.entries(definition?.keys ?? {})
+    .filter(([, def]) => kind !== 'collection' || def.type === 'collection')
+    .map(([name, def]) => ({
+      value: name,
+      label: `${name} (${def.type})`,
+    }));
   const key = text(current);
   if (!key || options.some((option) => option.value === key)) return options;
-  return [{ value: key, label: `Unknown key (${key})` }, ...options];
+  const other = definition && Object.hasOwn(definition.keys, key) ? definition.keys[key] : undefined;
+  // A key that exists but is not a list (the picker is for lists): said as what it is, not as unknown.
+  const label = other ? `${key} (${other.type}: not a list)` : `Unknown key (${key})`;
+  return [{ value: key, label }, ...options];
 }
 
 /**
@@ -65,9 +83,10 @@ export function retarget(
   config: Record<string, unknown>,
   next: { definitionId: string; key: string },
   catalog: readonly StateDefinition[],
-  kind: 'read' | 'write',
+  kind: PickerKind,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...config, definitionId: next.definitionId, key: next.key };
+  if (kind === 'collection') return result;
   const def = catalog.find((definition) => definition.id === next.definitionId)?.keys[next.key];
   if (kind === 'read') {
     const read = text(config.read) || 'value';
@@ -88,21 +107,20 @@ export function pickDefinition(
   config: Record<string, unknown>,
   definitionId: string,
   catalog: readonly StateDefinition[],
-  kind: 'read' | 'write',
+  kind: PickerKind,
 ): Record<string, unknown> {
   const definition = catalog.find((item) => item.id === definitionId);
   const key = text(config.key);
-  return retarget(
-    config,
-    { definitionId, key: definition && Object.hasOwn(definition.keys, key) ? key : '' },
-    catalog,
-    kind,
-  );
+  const fits =
+    definition &&
+    Object.hasOwn(definition.keys, key) &&
+    (kind !== 'collection' || definition.keys[key]?.type === 'collection');
+  return retarget(config, { definitionId, key: fits ? key : '' }, catalog, kind);
 }
 
 export const pickKey = (
   config: Record<string, unknown>,
   key: string,
   catalog: readonly StateDefinition[],
-  kind: 'read' | 'write',
+  kind: PickerKind,
 ): Record<string, unknown> => retarget(config, { definitionId: text(config.definitionId), key }, catalog, kind);
