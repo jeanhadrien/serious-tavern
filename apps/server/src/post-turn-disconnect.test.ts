@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
-import { afterEach, describe, expect, it } from 'vitest';
-import { postHarness, waitFor, waitForPostRun } from './test-support/post.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { clientsGone, postHarness, waitFor, waitForPostRun, watchQueue } from './test-support/post.js';
 import {
   assistantRows,
   edge,
@@ -19,12 +19,12 @@ import {
 const harness = postHarness('post-turn-disconnect');
 const listening: App[] = [];
 afterEach(async () => {
+  vi.restoreAllMocks();
   // fetch keeps its connection alive, which would make `app.close()` wait for the idle timeout.
   for (const app of listening.splice(0)) app.server.closeAllConnections();
   await harness.cleanup();
 });
 
-const pause = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
 const contents = async (app: App, sessionId: string) =>
   (await readSession(app, sessionId)).messages.map((message) => message.content);
 
@@ -50,16 +50,18 @@ describe('a message waiting behind a post run', () => {
     async (_name, path) => {
       const { app, session, gate } = await harness.setup();
       const base = await listen(app);
+      const queue = watchQueue();
       await send(app, session.id, 'one');
       await gate.started;
       const leaving = new AbortController();
       const queued = post(`${base}/api/sessions/${session.id}${path}`, 'two', leaving.signal);
-      await pause();
-      // It waits: nothing of it is stored while the post run holds the slot.
+      // The request has reached the turn queue (`one` was the first job) and waits behind the post run.
+      await queue.reached(2);
       expect(await contents(app, session.id)).toEqual(['one', 'n=0 turn=1']);
       leaving.abort();
       expect(await queued).toBeInstanceOf(Error);
-      await pause();
+      // The server has seen the client go before the run lets the message start.
+      await clientsGone(app);
       gate.release();
       await waitForPostRun(app, session.id, 'completed');
       // The cancelled message went through the queue without running: `three` is turn 2 and sees the post writes.
@@ -86,7 +88,7 @@ describe('a plain request that already runs', () => {
     await gate.started;
     leaving.abort();
     await running;
-    await pause();
+    await clientsGone(app);
     gate.release();
     const saved = await waitFor(async () => {
       const session = await readSession(app, plain.id);

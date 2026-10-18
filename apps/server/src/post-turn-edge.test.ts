@@ -2,8 +2,9 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ChangeHub } from './services/change-events.js';
+import { TurnRegistry } from './services/turns.js';
 import { JsonRepository } from './storage/repository.js';
-import { postHarness, stateView, waitForPostRun } from './test-support/post.js';
+import { isRepository, postHarness, stateView, waitFor, waitForPostRun } from './test-support/post.js';
 import { assistantRows, entriesOf, readSession, send, turn } from './test-support/story.js';
 
 // What happens to a post run when the chat changes under it, and when the server shuts down.
@@ -71,7 +72,7 @@ describe('closing the app', () => {
 
 describe('the state view while a post run settles', () => {
   it('never reports a run that finished just after the view read the chat as interrupted', async () => {
-    const { app, session, gate } = await setup();
+    const { app, directory, session, gate } = await setup();
     await send(app, session.id);
     await gate.started;
     // What a read a moment before the settle sees: the entry still says running.
@@ -83,7 +84,7 @@ describe('the state view while a post run settles', () => {
     const original = JsonRepository.prototype.get;
     let served = false;
     vi.spyOn(JsonRepository.prototype, 'get').mockImplementation(function (this: unknown, ...args: unknown[]) {
-      if (!served && args[0] === session.id) {
+      if (!served && isRepository(this, directory, 'sessions') && args[0] === session.id) {
         served = true;
         return Promise.resolve(stale as never);
       }
@@ -91,5 +92,37 @@ describe('the state view while a post run settles', () => {
     } as never);
     expect((await stateView(app, session.id)).turns[0]).toMatchObject({ postStatus: 'completed' });
     expect(served).toBe(true);
+  });
+
+  it('judges which runs are live when it reads the chat, not later while it builds the view', async () => {
+    const { app, session, gate } = await setup();
+    await send(app, session.id);
+    await gate.started;
+    const postExecutionId = entriesOf(await readSession(app, session.id))[0]!.postExecutionId!;
+    // The registry that holds the run, picked up from the view's own question to it.
+    let registry: TurnRegistry | undefined;
+    const held = TurnRegistry.prototype.hasPostRun;
+    vi.spyOn(TurnRegistry.prototype, 'hasPostRun').mockImplementation(function (this: TurnRegistry, ...args) {
+      registry = this;
+      return held.apply(this, args);
+    });
+    const original = JsonRepository.prototype.get;
+    let released = false;
+    vi.spyOn(JsonRepository.prototype, 'get').mockImplementation(async function (this: unknown, ...args: unknown[]) {
+      const result = await (original as (...rest: unknown[]) => Promise<never>).apply(this, args);
+      // The view has read the chat (the run is held) and moves on to the workflow: the run now finishes, and the
+      // server lets go of it, before the view is done.
+      if (registry && !released && args[0] === session.workflowId) {
+        released = true;
+        gate.release();
+        await waitFor(async () => (registry?.hasPostRun(session.id, postExecutionId) ? undefined : true));
+      }
+      return result;
+    } as never);
+    const [first] = (await stateView(app, session.id)).turns;
+    expect(released).toBe(true);
+    // Running when it was read: not "interrupted by a server restart" because the run ended a moment later.
+    expect(first).toMatchObject({ postStatus: 'running' });
+    expect(first!.postError).toBeUndefined();
   });
 });

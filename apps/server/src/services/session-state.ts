@@ -8,7 +8,6 @@ import {
   type ApiResponse,
   type FoldedKey,
   type StateWrite,
-  type TurnEntry,
 } from '@st/shared';
 import type { AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
@@ -43,18 +42,34 @@ function nodeKeyViews(keys: Record<string, FoldedKey>) {
 }
 
 /**
+ * The session, and which of its post-turn runs the server holds, judged right when the session was read. A run
+ * commits its result to the entry before the server lets go of it, so a `running` entry the server does not hold
+ * can only be a lost run, or a run that finished after this read: then read again. Deciding liveness later than the
+ * read (while the view is still being built) would let a run that finishes meanwhile show up as interrupted.
+ */
+async function readSessionWithLiveRuns(context: AppContext, sessionId: string) {
+  for (let attempt = 1; ; attempt++) {
+    const session = await requireEntity(context.sessions, sessionId, 'Session');
+    const entries = readTurnEntries(session.state);
+    const live = new Set(
+      entries
+        .filter(
+          (entry) => entry.postExecutionId !== undefined && context.turns.hasPostRun(sessionId, entry.postExecutionId),
+        )
+        .map((entry) => entry.executionId),
+    );
+    const lost = entries.some((entry) => entry.postStatus === 'running' && !live.has(entry.executionId));
+    // Each read is an event-loop turn apart: a run that was only finishing has settled by the next one.
+    if (!lost || attempt === 3) return { session, live };
+  }
+}
+
+/**
  * A chat's computed story state, for the web: the values every key reads as right now, which stored turns still
  * count, and what each turn wrote. Read-only: it is the same fold the next turn starts from.
  */
 export async function sessionStateView(context: AppContext, sessionId: string): Promise<View> {
-  // The server holds the run while it settles (`TurnRegistry.hasPostRun`); a restart loses it.
-  const isLive = (entry: TurnEntry) =>
-    entry.postExecutionId !== undefined && context.turns.hasPostRun(sessionId, entry.postExecutionId);
-  let session = await requireEntity(context.sessions, sessionId, 'Session');
-  // A run is committed to the entry before the server lets go of it, so a stored `running` that the server does not
-  // hold may only be a run that finished after this read: read again, and only a second sighting is a lost run.
-  if (readTurnEntries(session.state).some((entry) => entry.postStatus === 'running' && !isLive(entry)))
-    session = await requireEntity(context.sessions, sessionId, 'Session');
+  const { session, live } = await readSessionWithLiveRuns(context, sessionId);
   const { definitions, story } = await loadStoryState(context.stateDefinitions, session);
   const workflow = await context.workflows.get(session.workflowId);
   // Names only for nodes the chat's workflow still has; a deleted node's writes keep their data, not a name.
@@ -88,7 +103,7 @@ export async function sessionStateView(context: AppContext, sessionId: string): 
     }),
     turns: story.turns.map(({ entry, turn }) => {
       // A run stored as `running` that this server does not hold is one a restart cut short: it reads as an error.
-      const post = effectivePostRun(entry, isLive(entry));
+      const post = effectivePostRun(entry, live.has(entry.executionId));
       return {
         executionId: entry.executionId,
         at: entry.at,

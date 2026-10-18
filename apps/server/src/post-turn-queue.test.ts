@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { turnEventSchema } from '@st/shared';
 import type { ChatRequest, StreamOptions } from '@st/engine';
 import { restoreAdapter, useAdapter } from './test-support/adapter.js';
@@ -10,6 +10,7 @@ import {
   stateView,
   waitFor,
   waitForPostRun,
+  watchQueue,
 } from './test-support/post.js';
 import {
   assistantRows,
@@ -30,6 +31,7 @@ import { parseEventStream } from './test-support/event-stream.js';
 const harness = postHarness('post-turn-queue');
 const { setup } = harness;
 afterEach(async () => {
+  vi.restoreAllMocks();
   restoreAdapter();
   await harness.cleanup();
 });
@@ -41,11 +43,14 @@ const stop = (app: Awaited<ReturnType<typeof setup>>['app'], sessionId: string) 
 describe('the next message', () => {
   it('waits for the post run of the previous turn and then sees its writes', async () => {
     const { app, session, gate } = await setup();
+    const queue = watchQueue();
     await send(app, session.id, 'one');
     await gate.started;
     const second = send(app, session.id, 'two');
+    await queue.reached(2);
+    // Give a message that wrongly started time to show: it has not, nothing of it is stored, and the post run is
+    // still the only run.
     await pause();
-    // The second message has not started: nothing of it is stored, and the post run is still the only run.
     expect((await readSession(app, session.id)).messages.map((message) => message.content)).toEqual([
       'one',
       'n=0 turn=1',
@@ -68,8 +73,10 @@ describe('the next message', () => {
 
   it('waits too when it was queued before the first reply was settled', async () => {
     const { app, session, gate } = await setup();
+    const queue = watchQueue();
     const first = send(app, session.id, 'one');
     const second = send(app, session.id, 'two');
+    await queue.reached(2);
     expect((await first).statusCode).toBe(200);
     await gate.started;
     await pause();

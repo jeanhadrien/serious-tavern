@@ -1,6 +1,10 @@
+import { join } from 'node:path';
+import { vi } from 'vitest';
 import { z } from 'zod';
 import { registry } from '@st/engine';
 import { apiContract, type PostStatus } from '@st/shared';
+import { ChangeHub } from '../services/change-events.js';
+import { TurnRegistry } from '../services/turns.js';
 import { define, edge, makeSession, makeWorkflow, node, tempApps, type App } from './story.js';
 
 // Helpers of the after-reply (post-turn run) tests: a node that holds the run, the workflow it sits in, and waiting.
@@ -96,6 +100,51 @@ export async function waitFor<T>(read: () => Promise<T | undefined>, attempts = 
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
   throw new Error('Timed out waiting for the condition');
+}
+
+/**
+ * Whether `self` (the `this` of a spied repository method) is the repository `name` ('sessions', 'workflows') of the
+ * app whose data directory is `directory`. Spies on the repository class are global to the process, so a test that
+ * makes writes fail scopes them to its own app's repository: nothing else can use up the failures.
+ */
+export const isRepository = (self: unknown, directory: string, name: string): boolean =>
+  (self as { directory?: string }).directory === join(directory, name);
+
+/** Counts the jobs sent to the turn queue, so a test can wait until a request has really reached it. */
+export function watchQueue() {
+  const run = vi.spyOn(TurnRegistry.prototype, 'run');
+  return { reached: (jobs: number) => waitFor(async () => (run.mock.calls.length >= jobs ? true : undefined)) };
+}
+
+/**
+ * Watches the chat's `sessions.changed`, which the server publishes right after it has written a settled turn or
+ * post run: `first` resolves with the next one, so a test can wait for the settle itself rather than poll for what it
+ * left behind, and `count` is how many there were. Install it BEFORE what is to settle.
+ */
+export function watchSettles(sessionId: string) {
+  const publish = ChangeHub.prototype.publish;
+  let count = 0;
+  let announce!: () => void;
+  const first = new Promise<void>((resolve) => {
+    announce = resolve;
+  });
+  vi.spyOn(ChangeHub.prototype, 'publish').mockImplementation(function (this: ChangeHub, event) {
+    publish.call(this, event);
+    if (event.type !== 'sessions.changed' || event.id !== sessionId) return;
+    count++;
+    announce();
+  });
+  return { first, count: () => count };
+}
+
+/** Waits until the server has no open client connection, so it has also seen every client that left. */
+export async function clientsGone(app: App) {
+  await waitFor(async () =>
+    (await new Promise<number>((resolve) => app.server.getConnections((_error, count) => resolve(count)))) === 0
+      ? true
+      : undefined,
+  );
+  await new Promise((resolve) => setImmediate(resolve));
 }
 
 /** The state view of a chat (what the web reads). */
