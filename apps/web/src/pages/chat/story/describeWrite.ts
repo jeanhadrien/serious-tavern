@@ -17,6 +17,8 @@ const valueText = (value: unknown) => (typeof value === 'string' ? quote(value, 
 
 function extras(item: Record<string, unknown>): string {
   const fields = itemFields(item).map(({ name, value }) => `${name} ${value}`);
+  const linked = (item.messages as { ids?: unknown[] } | undefined)?.ids?.length;
+  if (linked) fields.push(linked === 1 ? 'linked to 1 message' : `linked to ${linked} messages`);
   return fields.length ? ` (${fields.join(', ')})` : '';
 }
 

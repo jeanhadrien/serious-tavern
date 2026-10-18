@@ -395,3 +395,13 @@ button.stop-generation:hover {
   font-size: 0.8rem;
   color: #f2c98b;
 }
+
+/* Story state items that link to a message: the marker (a `.message-story` button) and the note before an edit or delete. */
+.message-link-note {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: #f2c98b;
+}
+.link-note-key {
+  font-weight: 600;
+}

@@ -12,10 +12,25 @@ interface MessageActionsProps {
    * while rendering). Lines mean the delete is confirmed with a dialog that lists them, instead of the inline step.
    */
   undoOnDelete?: () => readonly string[] | undefined;
+  /** Told when the inline "Delete message?" step opens or closes (the message shows what the delete affects). */
+  onConfirming?: (confirming: boolean) => void;
+  /** What the delete stops using (linked story state): added to the dialog of a delete that undoes stored state. */
+  deleteNote?: string;
 }
 
-export function MessageActions({ disabled, onEdit, onDelete, undoOnDelete }: MessageActionsProps) {
-  const [confirming, setConfirming] = useState(false);
+export function MessageActions({
+  disabled,
+  onEdit,
+  onDelete,
+  undoOnDelete,
+  onConfirming,
+  deleteNote,
+}: MessageActionsProps) {
+  const [confirming, setConfirmingState] = useState(false);
+  const setConfirming = (value: boolean) => {
+    setConfirmingState(value);
+    onConfirming?.(value);
+  };
   return (
     <div className={`message-actions${confirming ? ' confirming' : ''}`}>
       {confirming ? (
@@ -39,7 +54,9 @@ export function MessageActions({ disabled, onEdit, onDelete, undoOnDelete }: Mes
             label="Delete message"
             disabled={disabled}
             onClick={() => {
-              const click = deleteClick(undoOnDelete?.(), (text) => window.confirm(text));
+              const click = deleteClick(undoOnDelete?.(), (text) =>
+                window.confirm(deleteNote ? `${text}\n\n${deleteNote}` : text),
+              );
               if (click === 'inline') setConfirming(true);
               else if (click === 'delete') void onDelete();
             }}

@@ -15,7 +15,15 @@ import './story.css';
  * The chat panel's Story state section: what this chat's workflow nodes have stored, per state definition, read
  * from the server's computed view. `onJump` scrolls the thread to the last reply of a turn.
  */
-export function StorySection({ story, onJump }: { story: StoryPanelData; onJump(executionId: string): void }) {
+export function StorySection({
+  story,
+  onJump,
+  onJumpMessage,
+}: {
+  story: StoryPanelData;
+  onJump(executionId: string): void;
+  onJumpMessage(messageId: string): void;
+}) {
   const { view, failed } = story;
   const { openEditor, selectTab } = useLayoutActions();
   const blocks = useMemo(() => (view ? definitionBlocks(view) : []), [view]);
@@ -70,7 +78,7 @@ export function StorySection({ story, onJump }: { story: StoryPanelData; onJump(
           ))}
           <ul className="story-keys">
             {block.keys.map((row) => (
-              <StateKeyRow key={row.key} row={row} onJump={jump} />
+              <StateKeyRow key={row.key} row={row} onJump={jump} onJumpMessage={onJumpMessage} />
             ))}
           </ul>
         </div>

@@ -4,7 +4,8 @@ import { StorySection } from './StorySection.js';
 import { addWrite, buildView, drawWrite, entry, reply, scene, setWrite, userMessage } from './test-fixtures.js';
 import type { StoryPanelData } from './useStoryState.js';
 
-const render = (story: StoryPanelData) => renderToStaticMarkup(<StorySection story={story} onJump={() => {}} />);
+const render = (story: StoryPanelData) =>
+  renderToStaticMarkup(<StorySection story={story} onJump={() => {}} onJumpMessage={() => {}} />);
 
 const played = () =>
   buildView({

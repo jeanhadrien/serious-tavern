@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import type { Workflow } from '@st/shared';
 import { IconButton } from '../../components/IconButton.js';
 import { SettingsSection, type SaveSettings } from './panel/SettingsSection.js';
-import { panelCoversThread, scrollToTurn } from './story/scrollToTurn.js';
+import { panelCoversThread, scrollToMessage, scrollToTurn } from './story/scrollToTurn.js';
 import { StorySection } from './story/StorySection.js';
 import type { StoryPanelData } from './story/useStoryState.js';
 import './chatPanel.css';
@@ -36,6 +36,12 @@ export const ChatPanel = memo(function ChatPanel({
     },
     [onClose],
   );
+  const jumpToMessage = useCallback(
+    (messageId: string) => {
+      if (scrollToMessage(messageId) && panelCoversThread(panel.current)) onClose();
+    },
+    [onClose],
+  );
   return (
     <aside ref={panel} className="chat-panel" aria-label="Chat panel">
       <div className="chat-panel-header">
@@ -48,7 +54,7 @@ export const ChatPanel = memo(function ChatPanel({
       </section>
       <section aria-labelledby={`chat-story-${sessionId}`}>
         <h3 id={`chat-story-${sessionId}`}>Story state</h3>
-        <StorySection story={story} onJump={jump} />
+        <StorySection story={story} onJump={jump} onJumpMessage={jumpToMessage} />
       </section>
     </aside>
   );

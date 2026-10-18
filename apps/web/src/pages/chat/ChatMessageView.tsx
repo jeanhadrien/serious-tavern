@@ -6,6 +6,8 @@ import { ExecutionDetails } from './ExecutionDetails.js';
 import { MessageContent } from './MessageContent.js';
 import { MessageActions } from './MessageActions.js';
 import { MessageEditor } from './MessageEditor.js';
+import { LinkMarker } from './story/LinkMarker.js';
+import { changeNote, type MessageLinkNote } from './story/linkMarkers.js';
 import { TurnChip } from './story/TurnChip.js';
 import type { StoryChip } from './story/turnChips.js';
 
@@ -16,11 +18,22 @@ interface ChatMessageViewProps {
   execution?: ExecutionLog;
   /** What the message's turn stored in the chat's story state (only on the last reply of a turn that stored any). */
   storyChip?: StoryChip;
+  /** The story state items that link to this message (see `messageLinks`). */
+  links?: readonly MessageLinkNote[];
   /** What deleting the message would undo of the story state (see `MessageActions`). */
   undoOnDelete?: () => readonly string[] | undefined;
   disabled?: boolean;
   onEdit?: (id: string, content: string) => Promise<boolean>;
   onDelete?: (id: string) => Promise<boolean>;
+}
+
+/** What an edit or delete of this message stops, said before it is saved (information, not a confirmation step). */
+function LinkNote({ note }: { note?: string }) {
+  return note ? (
+    <p className="hint warning message-link-note" role="status">
+      {note}
+    </p>
+  ) : null;
 }
 
 export function ChatMessageView({
@@ -29,12 +42,14 @@ export function ChatMessageView({
   persona,
   execution,
   storyChip,
+  links,
   undoOnDelete,
   disabled = false,
   onEdit,
   onDelete,
 }: ChatMessageViewProps) {
   const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const bubble = useRef<HTMLElement>(null);
   const restoreFocus = useRef(false);
   useLayoutEffect(() => {
@@ -81,9 +96,12 @@ export function ChatMessageView({
             onEdit={() => setEditing(true)}
             onDelete={() => onDelete(message.id)}
             undoOnDelete={undoOnDelete}
+            onConfirming={setDeleting}
+            deleteNote={changeNote(links, 'delete')}
           />
         )}
       </div>
+      {(editing || deleting) && <LinkNote note={changeNote(links, editing ? 'edit' : 'delete')} />}
       {editing && onEdit ? (
         <MessageEditor
           content={message.content}
@@ -108,6 +126,7 @@ export function ChatMessageView({
           {message.status === 'partial' && <small className="message-stopped">Stopped before it finished</small>}
         </>
       )}
+      {links && links.length > 0 && !editing && <LinkMarker notes={links} />}
       {storyChip && !editing && <TurnChip chip={storyChip} />}
       {message.executionId && <ExecutionDetails id={message.executionId} cached={execution} />}
     </article>

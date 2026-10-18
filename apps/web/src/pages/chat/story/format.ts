@@ -35,9 +35,10 @@ export function fullText(value: unknown): string {
   }
 }
 
-// What a stored collection item holds besides what the user declared: its `id` and `text`, and a node memory's
-// `entryKey`. Both the panel and the chip cards leave these out of an item's fields.
-const ITEM_BOOKKEEPING: ReadonlySet<string> = new Set(['id', 'text', 'entryKey']);
+// What a stored collection item holds besides what the user declared: its `id` and `text`, a node memory's
+// `entryKey`, and the link to chat messages (`messages` stored, `link` computed by the view). Both the panel and the
+// chip cards leave these out of an item's fields.
+const ITEM_BOOKKEEPING: ReadonlySet<string> = new Set(['id', 'text', 'entryKey', 'messages', 'link']);
 
 /** The text of a stored item: its `text` field, or whatever that holds in words. */
 export const itemText = (item: Record<string, unknown>): string =>

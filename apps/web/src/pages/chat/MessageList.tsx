@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { Character, ChatMessage, ExecutionLog, Persona, SessionStateView } from '@st/shared';
 import { ChatMessageView } from './ChatMessageView.js';
+import { messageLinks } from './story/linkMarkers.js';
 import { runningPostRun } from './story/postRuns.js';
 import { POST_WAITING_LABEL } from './story/postRunText.js';
 import { chipsFor, describeTurns } from './story/turnChips.js';
@@ -39,6 +40,8 @@ export function MessageList({
   // The lines are described once per loaded view; placing the chips is one pass over the messages.
   const turns = useMemo(() => describeTurns(story), [story]);
   const chips = chipsFor(turns, messages);
+  // Which messages state items link to: also once per loaded view.
+  const links = useMemo(() => messageLinks(story), [story]);
   // Once a reply row is streaming the text itself is the progress indicator.
   const waiting = busy && !messages.some((message) => message.status === 'streaming');
   // A message sent while the previous turn's after-reply run works is queued behind it by the server.
@@ -55,6 +58,7 @@ export function MessageList({
             persona={persona}
             execution={message.executionId ? logs[message.executionId] : undefined}
             storyChip={chips.get(message.id)}
+            links={links.get(message.id)}
             undoOnDelete={undoOnDelete && (() => undoOnDelete(message.id))}
             disabled={disabled}
             onEdit={onEdit}

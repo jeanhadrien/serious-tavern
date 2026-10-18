@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { formatValue, fullText, shortText } from './format.js';
+import { LinkedItems } from './LinkedItems.js';
 import { Sparkline } from './Sparkline.js';
 import type { Item, KeyRow } from './storyModel.js';
 
@@ -34,11 +35,14 @@ export const StateKeyRow = memo(function StateKeyRow({
   row,
   older = 0,
   onJump,
+  onJumpMessage,
 }: {
   row: KeyRow;
   /** Node memory: items the view does not list. */
   older?: number;
   onJump(turn: number): void;
+  /** Scrolls the thread to a chat message by id (the first message a linked item covers). */
+  onJumpMessage?(messageId: string): void;
 }) {
   const list = row.kind === 'list';
   const text = list ? undefined : formatValue(row.value);
@@ -57,7 +61,8 @@ export const StateKeyRow = memo(function StateKeyRow({
       {list && (
         <details className="story-list" open={row.items.length <= OPEN_UP_TO || undefined}>
           <summary>{row.items.length === 1 ? '1 item' : `${row.items.length} items`}</summary>
-          <Items items={row.items} />
+          {row.linked && <LinkedItems groups={row.linked} onJumpMessage={onJumpMessage} />}
+          {row.plain.length > 0 && <Items items={row.plain} />}
         </details>
       )}
       {/* Outside the details: the note stays visible while the list is collapsed. */}

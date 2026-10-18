@@ -1,5 +1,13 @@
-import { isPlainObject, type HistoryPoint, type KeyMeta, type SessionStateView, type StateWarning } from '@st/shared';
+import {
+  isPlainObject,
+  type HistoryPoint,
+  type ItemLinkView,
+  type KeyMeta,
+  type SessionStateView,
+  type StateWarning,
+} from '@st/shared';
 import { formatValue, itemFields, itemText } from './format.js';
+import { groupLinked, itemLinkOf, type LinkGroups } from './linkedItems.js';
 import { sparklinePoints, type Sparkline } from './sparklinePoints.js';
 
 // The view model of the Story state section: pure functions over the `GET /api/sessions/:id/state` answer. The
@@ -7,8 +15,12 @@ import { sparklinePoints, type Sparkline } from './sparklinePoints.js';
 
 export type KeyKind = 'number' | 'boolean' | 'text' | 'object' | 'list';
 
-/** One item of a collection: its text and the declared extra fields (never the bookkeeping `id` and `entryKey`). */
-export type Item = { id: string; text: string; extras: { name: string; value: string }[] };
+/**
+ * One item of a collection: its text and the declared extra fields (never the bookkeeping `id`, `entryKey`, `messages`
+ * and `link`), and the link to chat messages the server computed for it when it has one.
+ */
+export type Item = { id: string; text: string; extras: { name: string; value: string }[]; link?: ItemLinkView };
+export type LinkedItem = Item & { link: ItemLinkView };
 
 export type KeyRow = {
   key: string;
@@ -20,6 +32,10 @@ export type KeyRow = {
   jumpable: boolean;
   /** Lists only, newest first. */
   items: Item[];
+  /** Lists with items that link to chat messages: those items grouped for display (`items` still holds all). */
+  linked?: LinkGroups<LinkedItem>;
+  /** Lists only: the items without a link, newest first. */
+  plain: Item[];
   /** Lists only: items the definition's cap cut off. */
   dropped: number;
   /** Numeric keys with at least two numeric history points. */
@@ -52,8 +68,16 @@ export function kindOf(value: unknown): KeyKind {
 
 function itemOf(raw: unknown, index: number): Item {
   if (!isPlainObject(raw)) return { id: String(index), text: formatValue(raw), extras: [] };
-  return { id: typeof raw.id === 'string' ? raw.id : String(index), text: itemText(raw), extras: itemFields(raw) };
+  const link = itemLinkOf(raw);
+  return {
+    id: typeof raw.id === 'string' ? raw.id : String(index),
+    text: itemText(raw),
+    extras: itemFields(raw),
+    ...(link && { link }),
+  };
 }
+
+const isLinked = (item: Item): item is LinkedItem => item.link !== undefined;
 
 type KeyViews = {
   values: Record<string, unknown>;
@@ -73,6 +97,8 @@ function keyRows({ values, meta, history }: KeyViews, replied: ReadonlySet<numbe
     const kind = kindOf(value);
     const facts = meta[key];
     const spark = kind === 'number' ? sparklinePoints(history[key] ?? []) : undefined;
+    const items = Array.isArray(value) ? value.map(itemOf) : [];
+    const linkedItems = items.filter(isLinked);
     const writtenAtTurn = facts?.writtenAtTurn ?? null;
     return {
       key,
@@ -81,7 +107,9 @@ function keyRows({ values, meta, history }: KeyViews, replied: ReadonlySet<numbe
       written: facts?.written ?? false,
       writtenAtTurn,
       jumpable: writtenAtTurn !== null && replied.has(writtenAtTurn),
-      items: Array.isArray(value) ? value.map(itemOf) : [],
+      items,
+      plain: items.filter((item) => !isLinked(item)),
+      ...(linkedItems.length > 0 && { linked: groupLinked(linkedItems) }),
       dropped: facts?.droppedByCap ?? 0,
       ...(spark && { spark }),
     };
@@ -115,6 +143,7 @@ export function nodeMemory(view: SessionStateView): NodeMemoryBlock[] {
         return {
           ...row,
           items: row.items.slice(0, NODE_ITEMS_SHOWN),
+          plain: row.plain.slice(0, NODE_ITEMS_SHOWN),
           older: omitted + Math.max(0, row.items.length - NODE_ITEMS_SHOWN),
         };
       }),

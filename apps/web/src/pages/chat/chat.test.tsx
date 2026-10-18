@@ -187,6 +187,18 @@ it('marks every message with its id, either role, so the chat panel and the link
     ).toContain('data-message-id="m-7"');
 });
 
+it('shows a link marker on a message that state items link to, and none otherwise', () => {
+  const message = { id: 'a', role: 'user' as const, content: 'Hi', createdAt: '' };
+  const note = { key: 'memory.summaries', range: 'messages 1–2 (2)', preview: 'A summary', status: 'intact' as const };
+  const html = renderToStaticMarkup(<ChatMessageView message={message} links={[note, note]} />);
+  expect(html).toContain('aria-label="2 state items link to this message"');
+  expect(renderToStaticMarkup(<ChatMessageView message={message} links={[note]} />)).toContain(
+    'aria-label="1 state item links to this message"',
+  );
+  expect(renderToStaticMarkup(<ChatMessageView message={message} />)).not.toContain('link to this message');
+  expect(renderToStaticMarkup(<ChatMessageView message={message} links={[]} />)).not.toContain('link to this message');
+});
+
 it('shows the story chip on a message only when it is given one, and puts it on the last reply of a turn', () => {
   const base = { role: 'assistant' as const, content: 'Hi', createdAt: '' };
   const chip = { turnNumber: 2, lines: ['scene.tension → 7'], editedAfter: false };

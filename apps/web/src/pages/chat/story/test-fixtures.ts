@@ -1,11 +1,15 @@
 import {
   DRAW_STATE_KEY,
+  analyzeLinks,
   effectivePostRun,
+  fingerprintMessages,
   foldStoryState,
   oldestFirst,
   previewWrite,
   type ChatMessage,
   type FoldedKey,
+  type ItemLink,
+  type ItemLinkView,
   type SessionStateView,
   type StateDefinition,
   type StateWrite,
@@ -33,6 +37,14 @@ export const addWrite = (key: string, id: string, text: string, extra: Record<st
   target: target(key),
   nodeId: 'note',
   item: { id, text, ...extra },
+});
+/** An add that links the item to chat messages (State Write's `messages` input, fingerprint filled in at commit). */
+export const linkedWrite = (key: string, id: string, text: string, link: ItemLink): StateWrite =>
+  addWrite(key, id, text, { messages: link });
+/** A link to the messages with these ids, with the fingerprint they have in `messages`. */
+export const linkTo = (messages: readonly ChatMessage[], ids: string[]): ItemLink => ({
+  ids,
+  fingerprint: fingerprintMessages(ids.map((id) => messages.find((message) => message.id === id) as ChatMessage)),
 });
 export const removeWrite = (key: string, itemId: string): StateWrite => ({
   op: 'remove',
@@ -70,10 +82,34 @@ export const userMessage = (id = 'u1'): ChatMessage => ({
   createdAt: '2026-01-01T00:00:00.000Z',
 });
 
-const keyViews = (keys: Record<string, FoldedKey>) => {
+/** The items of a list as the server's view shows them: those that link to messages get the computed `link`. */
+function withViewLinks(value: unknown, history: readonly ChatMessage[]): unknown {
+  if (!Array.isArray(value)) return value;
+  const byItem = new Map(analyzeLinks(value, history).map((found) => [found.item, found]));
+  return value.map((item) => {
+    const found = byItem.get(item);
+    if (!found) return item;
+    const link: ItemLinkView = {
+      status: found.status,
+      replaced: found.replaced,
+      count: found.link.ids.length,
+      missing: found.link.ids.length - found.survivors.length,
+      ...(found.first !== undefined && {
+        firstIndex: found.first,
+        lastIndex: found.last,
+        firstMessageId: found.firstId,
+        lastMessageId: found.lastId,
+      }),
+      messageIds: found.survivors,
+    };
+    return { ...item, link };
+  });
+}
+
+const keyViews = (keys: Record<string, FoldedKey>, history: readonly ChatMessage[] = []) => {
   const entries = Object.entries(keys);
   return {
-    values: Object.fromEntries(entries.map(([key, folded]) => [key, folded.value])),
+    values: Object.fromEntries(entries.map(([key, folded]) => [key, withViewLinks(folded.value, history)])),
     meta: Object.fromEntries(entries.map(([key, folded]) => [key, folded.meta])),
     history: Object.fromEntries(entries.map(([key, folded]) => [key, folded.history])),
   };
@@ -94,12 +130,13 @@ export function buildView({
   const ordered = oldestFirst(definitions);
   const story = foldStoryState({ definitions: ordered, messages, state: { turns: entries } });
   const names = new Map(ordered.map((item) => [item.id, item.name]));
+  const history = messages.filter((message) => !message.status || message.status === 'final');
   return {
     turn: story.turn,
     definitions: story.definitions.map((folded) => ({
       definitionId: folded.definitionId,
       name: folded.name,
-      ...keyViews(folded.keys),
+      ...keyViews(folded.keys, history),
       warnings: folded.warnings,
     })),
     nodes: story.nodes.map((folded) => {

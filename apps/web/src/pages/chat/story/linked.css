@@ -1,0 +1,100 @@
+/* Linked collection items in the Story state section (320px wide, 360px as an overlay). */
+.linked-items,
+.linked-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+.linked-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.linked-item {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #363b46;
+  border-radius: 6px;
+}
+.linked-item.broken {
+  border-color: #6b5a2e;
+}
+.linked-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+/* The jump label is also `.story-turn-link` (`font: inherit`): the doubled class wins whatever the CSS order. */
+.linked-range,
+.linked-range.story-turn-link {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+}
+.linked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.linked-badge.intact {
+  background: #1f3a2b;
+  color: #8fd6a9;
+}
+.linked-badge.stale {
+  background: #3d3419;
+  color: #e6c36a;
+}
+.linked-why {
+  margin: 0;
+  font-size: 0.8rem;
+}
+.linked-text summary,
+.linked-hidden > summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #a7adbd;
+  overflow-wrap: anywhere;
+}
+.linked-hidden[open] {
+  display: grid;
+  gap: 4px;
+}
+/* The text is markdown, rendered like a reply (`MessageContent`), at panel size. */
+.linked-text .message-content {
+  margin: 6px 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.linked-text .message-content p {
+  margin: 6px 0;
+}
+.linked-text .message-content pre {
+  overflow: auto;
+}
+.chat-panel .linked-text .message-content :is(h1, h2, h3, h4, h5, h6) {
+  margin: 8px 0 4px;
+  font-size: 0.9rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: inherit;
+}
+@media (max-width: 700px), (pointer: coarse) {
+  .linked-text summary,
+  .linked-hidden > summary {
+    /* 36px target, and the disclosure marker stays (display:flex would hide it). */
+    box-sizing: border-box;
+    min-height: 36px;
+    padding-block: 9px;
+  }
+}

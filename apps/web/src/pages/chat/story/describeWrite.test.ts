@@ -26,6 +26,14 @@ it.each([
     addWrite('injected', 'i1', 'a bell', { level: 2, mood: 'calm', entryKey: 'x' }),
     "scene.injected + 'a bell' (level 2, mood calm)",
   ],
+  [
+    addWrite('injected', 'i1', 'chunk', { messages: { ids: ['a', 'b', 'c'], fingerprint: 'f' } }),
+    "scene.injected + 'chunk' (linked to 3 messages)",
+  ],
+  [
+    addWrite('injected', 'i1', 'one', { level: 1, messages: { ids: ['a'] } }),
+    "scene.injected + 'one' (level 1, linked to 1 message)",
+  ],
 ])('words a definition write: %#', (write, expected) => {
   expect(describeWrite(named(write), texts)).toBe(expected);
 });
