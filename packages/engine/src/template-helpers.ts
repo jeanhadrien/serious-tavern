@@ -1,4 +1,5 @@
 import Handlebars from 'handlebars';
+import { linkedInChatOrder } from '@st/shared';
 
 // Handlebars appends its options object to every helper call; operands are the arguments before it.
 const operands = (args: unknown[]): unknown[] => args.slice(0, -1);
@@ -22,6 +23,8 @@ export function createTemplateEnvironment(): typeof Handlebars {
     and: (...args: unknown[]) => operands(args).every(isTruthy),
     or: (...args: unknown[]) => operands(args).some(isTruthy),
     not: (value: unknown) => !isTruthy(value),
+    // The intact items of a collection that link to chat messages, in chat order: `{{#each (linked state.memory.summaries)}}`.
+    linked: (value: unknown) => linkedInChatOrder(value),
   });
   return environment;
 }

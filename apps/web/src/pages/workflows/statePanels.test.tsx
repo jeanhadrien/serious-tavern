@@ -112,6 +112,20 @@ describe('State Read panel', () => {
     expect(done).not.toContain('Select a');
   });
 
+  it('offers the linked read only for a collection key', () => {
+    const number = read({ definitionId: scene.id, key: 'tension', read: 'value' });
+    expect(number).not.toContain('Linked items, in chat order');
+    const collection = read({ definitionId: scene.id, key: 'injected', read: 'linked' });
+    expect(collection).toContain('<option value="linked" selected="">Linked items, in chat order</option>');
+    expect(collection).toContain('<option value="value">Its value</option>');
+  });
+
+  it('keeps a linked read on a key that cannot do it visible, instead of silently showing another', () => {
+    expect(read({ definitionId: scene.id, key: 'tension', read: 'linked' })).toContain(
+      '<option value="linked" selected="">Linked items, in chat order</option>',
+    );
+  });
+
   it('keeps a read value it does not know visible', () => {
     expect(read({ definitionId: scene.id, key: 'tension', read: 'bogus' })).toContain('Unknown read (bogus)');
   });

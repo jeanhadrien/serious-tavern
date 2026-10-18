@@ -1,16 +1,35 @@
 import { z } from 'zod';
-import { stateKeyPortType, stateReads, type PortDef, type StateRead } from '@st/shared';
+import {
+  linkedInChatOrder,
+  stateKeyPortType,
+  stateReads,
+  stateReadsFor,
+  type PortDef,
+  type StateRead,
+} from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { locateConfigured, shown, type LocatedKey } from '../state-key.js';
 
-const readOf = (config: Record<string, unknown>): StateRead => {
+const readOf = (config: Record<string, unknown>, found: LocatedKey): StateRead => {
   const read = config.read ?? 'value';
   if (!stateReads.includes(read as StateRead)) throw new Error(`Unknown read "${String(read)}"`);
+  if (!stateReadsFor(found.def.type).includes(read as StateRead))
+    throw new Error(`${found.label} is a ${found.def.type} key; "${String(read)}" needs a collection key`);
   return read as StateRead;
 };
 
 /** What the node outputs: the key's value, or facts about it (collections also report their size). */
 function outputsFor({ def }: LocatedKey, read: StateRead): PortDef[] {
+  if (read === 'linked')
+    return [
+      {
+        name: 'value',
+        label: 'Linked items',
+        dataType: 'array',
+        description:
+          'The items that link to chat messages and are still intact, in chat order (not newest first), as at the start of this turn',
+      },
+    ];
   if (read === 'value')
     return [
       {
@@ -59,20 +78,29 @@ export const stateRead: NodeDefinition = {
     read: z
       .enum(stateReads)
       .default('value')
-      .describe('The value, or facts about it: written, turns since write, count'),
+      .describe(
+        'The value, facts about it (written, turns since write, count), or for a list the intact items linked to chat messages in chat order',
+      ),
   }),
   defaultConfig: { definitionId: '', key: '', read: 'value' },
   async resolvePorts(config, resources) {
     const found = await locateConfigured(config, (id) => resources.stateDefinitions?.get(id));
-    return { inputs: [], outputs: outputsFor(found, readOf(config)) };
+    return { inputs: [], outputs: outputsFor(found, readOf(config, found)) };
   },
   async execute(ctx) {
     const found = await locateConfigured(ctx.config, (id) => ctx.state.definition(id));
     const view = ctx.state.read(found.definition.id, found.key);
     if (!view) throw new Error(`State definition "${found.definition.name}" has no key "${found.key}"`);
-    if (readOf(ctx.config) === 'value') {
+    const read = readOf(ctx.config, found);
+    if (read === 'value') {
       ctx.log(`${found.label} = ${shown(view.value)}`);
       return { value: view.value };
+    }
+    if (read === 'linked') {
+      const items = linkedInChatOrder(view.value);
+      const held = Array.isArray(view.value) ? view.value.length : 0;
+      ctx.log(`${found.label}: ${items.length} of ${held} items are linked and intact`);
+      return { value: items };
     }
     const { written, turnsSinceWrite, writtenAtTurn, count } = view.meta;
     ctx.log(

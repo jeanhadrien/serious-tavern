@@ -1,4 +1,4 @@
-import type { CollectionKeyDef } from './definition.js';
+import type { CollectionKeyDef, StateKeyType } from './definition.js';
 import { isPlainObject } from './helpers.js';
 
 /**
@@ -7,9 +7,17 @@ import { isPlainObject } from './helpers.js';
  * typed as text) is UI-side only: the panels and the definitions editor use it; the engine never parses text.
  */
 
-/** The ways a State Read node reads a key: its value, or facts about when it was written. */
-export const stateReads = ['value', 'meta'] as const;
+/**
+ * The ways a State Read node reads a key: its value, facts about when it was written, or (collections only) the
+ * items that link to chat messages and are still intact, in chat order.
+ */
+export const stateReads = ['value', 'meta', 'linked'] as const;
 export type StateRead = (typeof stateReads)[number];
+
+/** The reads a key type has: every one for a collection, `linked` makes no sense for the others. */
+export function stateReadsFor(type: StateKeyType): StateRead[] {
+  return type === 'collection' ? [...stateReads] : stateReads.filter((read) => read !== 'linked');
+}
 
 const DECIMAL = /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i;
 

@@ -1,6 +1,13 @@
 // Pure helpers of the State Read and State Write panels. The operations a key allows come from the shared
 // `stateOpsFor`, never from a list written here.
-import { stateOpsFor, type StateDefinition } from '@st/shared';
+import {
+  stateOpsFor,
+  stateReads,
+  stateReadsFor,
+  type StateDefinition,
+  type StateKeyType,
+  type StateRead,
+} from '@st/shared';
 
 export type Option = { value: string; label: string };
 
@@ -38,9 +45,21 @@ export function keyOptions(definition: StateDefinition | undefined, current: unk
 }
 
 /**
- * The config after the user picks a definition and key. A State Write (`write`) also fits `op` to the key's type
- * (the first operation it allows when the current one is not allowed) and drops its fixed `value` when the
- * definition or key changed, because that value was typed for another key.
+ * The reads State Read offers for the picked key's type (`linked` only for a collection; with no key picked yet, the
+ * ones every key has). A read already configured stays in the list even when the key cannot do it, so it is visible.
+ */
+export function readOptions(type: StateKeyType | undefined, current: string): StateRead[] {
+  const allowed = type ? stateReadsFor(type) : stateReadsFor('text');
+  return allowed.some((read) => read === current) || !stateReads.some((read) => read === current)
+    ? allowed
+    : [...allowed, current as StateRead];
+}
+
+/**
+ * The config after the user picks a definition and key. A State Read (`read`) goes back to `value` when its read
+ * does not fit the new key's type (`linked` is for collections). A State Write (`write`) also fits `op` to the
+ * key's type (the first operation it allows when the current one is not allowed) and drops its fixed `value` when
+ * the definition or key changed, because that value was typed for another key.
  */
 export function retarget(
   config: Record<string, unknown>,
@@ -49,9 +68,13 @@ export function retarget(
   kind: 'read' | 'write',
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...config, definitionId: next.definitionId, key: next.key };
-  if (kind === 'read') return result;
-  if (config.definitionId !== next.definitionId || config.key !== next.key) delete result.value;
   const def = catalog.find((definition) => definition.id === next.definitionId)?.keys[next.key];
+  if (kind === 'read') {
+    const read = text(config.read) || 'value';
+    if (def && !stateReadsFor(def.type).some((candidate) => candidate === read)) result.read = 'value';
+    return result;
+  }
+  if (config.definitionId !== next.definitionId || config.key !== next.key) delete result.value;
   if (def) {
     const allowed = stateOpsFor(def.type);
     const op = text(config.op) || 'set';

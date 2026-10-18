@@ -149,6 +149,24 @@ renders as a list: iterate it with `#each` (newest item first) and use `{{else}}
 
 `{{state}}` alone (or `{{state.scene}}`) renders the values as compact JSON, handy while debugging.
 
+**Items that link to chat messages.** A State Write can link a collection item to the chat messages it is about (its
+**Link to messages** input), which is how summaries of older history are kept (see the README's "Message links and
+summaries"). Every such item has a read-only `link` in templates (`{{this.link.status}}`: `intact`, `changed`,
+`partial` or `gone`, computed from the chat as it is now). Collections list newest item first, which is the wrong
+order for these (a summary redone later is stored after the summaries of newer messages), so the `linked` helper
+gives only the **intact** linked items, **in chat order**, and nothing for anything that is not such a list:
+
+```hbs
+{{#each (linked state.memory.summaries)}}
+- {{text}}
+{{else}}
+(No summaries yet.)
+{{/each}}
+```
+
+An item whose messages were edited or deleted is left out until it is made again, so the prompt never carries a
+summary of text that is no longer there.
+
 **Reads are the values at the start of the turn.** What a State Write node stores in this turn is not visible to
 any template or State Read node until the next turn. To use a value you just wrote in the same turn, connect the
 State Write node's `value` output where you need it. Because state belongs to the replies that stored it,

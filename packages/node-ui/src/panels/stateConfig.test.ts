@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { stateOpsFor, type StateDefinition, type StateKeyType } from '@st/shared';
-import { definitionOptions, keyOptions, pickDefinition, pickerHint, pickKey, retarget } from './stateConfig.js';
+import {
+  definitionOptions,
+  keyOptions,
+  pickDefinition,
+  pickerHint,
+  pickKey,
+  readOptions,
+  retarget,
+} from './stateConfig.js';
 
 const definition = (id: string, name: string, keys: StateDefinition['keys']): StateDefinition => ({
   id,
@@ -85,6 +93,50 @@ describe('retarget (read)', () => {
     const config = { definitionId: 'd-scene', key: 'tension', read: 'value' };
     retarget(config, { definitionId: 'd-other', key: 'note' }, catalog, 'read');
     expect(config).toEqual({ definitionId: 'd-scene', key: 'tension', read: 'value' });
+  });
+});
+
+describe('retarget (read) and the linked read', () => {
+  const linked = { definitionId: 'd-scene', key: 'injected', read: 'linked' };
+
+  it('keeps `linked` while the key is a collection', () => {
+    expect(retarget(linked, { definitionId: 'd-scene', key: 'injected' }, catalog, 'read')).toEqual(linked);
+  });
+
+  it('goes back to the value when the new key is not a collection', () => {
+    expect(retarget(linked, { definitionId: 'd-scene', key: 'tension' }, catalog, 'read').read).toBe('value');
+    expect(retarget(linked, { definitionId: 'd-other', key: 'note' }, catalog, 'read').read).toBe('value');
+  });
+
+  it('leaves the read alone when the target is not known or not picked yet', () => {
+    expect(retarget(linked, { definitionId: 'd-scene', key: '' }, catalog, 'read').read).toBe('linked');
+    expect(retarget(linked, { definitionId: 'missing', key: 'x' }, catalog, 'read').read).toBe('linked');
+  });
+
+  it('keeps `meta` for every type', () => {
+    expect(
+      retarget({ ...linked, read: 'meta' }, { definitionId: 'd-scene', key: 'tension' }, catalog, 'read').read,
+    ).toBe('meta');
+  });
+});
+
+describe('readOptions', () => {
+  it('offers linked items only for a collection', () => {
+    expect(readOptions('collection', 'value')).toEqual(['value', 'meta', 'linked']);
+    for (const type of ['number', 'boolean', 'enum', 'text', 'object'] as const)
+      expect(readOptions(type, 'value')).toEqual(['value', 'meta']);
+  });
+
+  it('offers the reads every key has while no key is picked', () => {
+    expect(readOptions(undefined, 'value')).toEqual(['value', 'meta']);
+  });
+
+  it('keeps a read that is configured but not possible for the key, so it stays visible', () => {
+    expect(readOptions('text', 'linked')).toEqual(['value', 'meta', 'linked']);
+  });
+
+  it('does not invent an entry for a read it does not know (the panel shows that one itself)', () => {
+    expect(readOptions('text', 'bogus')).toEqual(['value', 'meta']);
   });
 });
 

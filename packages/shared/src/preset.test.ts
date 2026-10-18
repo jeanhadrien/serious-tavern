@@ -495,6 +495,29 @@ describe('story state macros', () => {
     expect(hints.filter((hint) => hint.expression.startsWith('{{#each state.')).length).toBe(1);
   });
 
+  it('hints the linked loop for collections, and the helper is valid in a preset', () => {
+    const hints = macroHints([], [], stateHints([scene]));
+    expect(hints.filter((hint) => hint.expression.startsWith('{{#each (linked'))).toEqual([
+      expect.objectContaining({ expression: '{{#each (linked state.scene.injected)}}{{/each}}', type: 'array' }),
+    ]);
+    const parsed = presetSchema.parse({
+      ...base(),
+      inputs: [],
+      entries: [
+        {
+          id: 'summaries',
+          kind: 'message',
+          enabled: true,
+          displayName: 'Summaries',
+          role: 'system',
+          content:
+            '{{#each (linked state.scene.injected)}}{{text}} {{/each}}{{#if (linked state.scene.injected)}}!{{/if}}',
+        },
+      ],
+    });
+    expect(presetWarnings(parsed)).toEqual([]);
+  });
+
   it('hints no state path without definitions, and the first definition of a repeated name', () => {
     expect(macroHints([]).some((hint) => hint.expression.startsWith('{{state.'))).toBe(false);
     expect(macroHints([], [], []).some((hint) => hint.expression.startsWith('{{state.'))).toBe(false);

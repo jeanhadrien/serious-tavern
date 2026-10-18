@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CollectionKeyDef } from './definition.js';
-import { collectionItem, itemFieldNeeds, parseDecimal, stateReads } from './node-values.js';
+import { collectionItem, itemFieldNeeds, parseDecimal, stateReads, stateReadsFor } from './node-values.js';
 
 describe('parseDecimal', () => {
   it.each<[string, number]>([
@@ -75,6 +75,9 @@ describe('collectionItem', () => {
   });
 });
 
-it('lists the read modes of State Read', () => {
-  expect([...stateReads]).toEqual(['value', 'meta']);
+it('lists the read modes of State Read, and `linked` only for collections', () => {
+  expect([...stateReads]).toEqual(['value', 'meta', 'linked']);
+  expect(stateReadsFor('collection')).toEqual(['value', 'meta', 'linked']);
+  for (const type of ['number', 'boolean', 'enum', 'text', 'object'] as const)
+    expect(stateReadsFor(type)).toEqual(['value', 'meta']);
 });

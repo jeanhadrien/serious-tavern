@@ -251,5 +251,13 @@ export function macroHints(
       description: 'Repeats for each stored item, newest first (this.text, this.id and the declared fields)',
       type: hint.type,
     }));
-  return [...hints, ...loops, ...stateLoops, ...templateSnippets];
+  const linkedLoops = state
+    .filter((hint) => hint.type === 'array')
+    .map((hint) => ({
+      expression: `{{#each (linked state.${hint.path})}}{{/each}}`,
+      description:
+        'Repeats for each item that links to chat messages and is still intact, in chat order (this.text, this.link)',
+      type: hint.type,
+    }));
+  return [...hints, ...loops, ...stateLoops, ...linkedLoops, ...templateSnippets];
 }

@@ -16,6 +16,7 @@ export const templateHelperNames = [
   'and',
   'or',
   'not',
+  'linked',
 ] as const;
 
 const helperNames = new Set<string>(templateHelperNames);
