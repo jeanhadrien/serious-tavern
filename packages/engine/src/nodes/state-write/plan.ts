@@ -7,6 +7,7 @@ import {
   keyDefault,
   keyValueProblem,
   type CollectionKeyDef,
+  type ItemLink,
   type NumberKeyDef,
   type ScalarKeyDef,
   type StateNodeOp,
@@ -92,7 +93,13 @@ function planDelete(found: LocatedKey, ctx: Inputs): WritePlan {
   };
 }
 
-type Inputs = { connected: boolean; value: unknown; current: unknown };
+type Inputs = {
+  connected: boolean;
+  value: unknown;
+  current: unknown;
+  /** The link a connected `messages` input stands for (an `add` only); parsed by the caller. */
+  link?: ItemLink;
+};
 
 /** The item an `add` stores (see `collectionItem`), or an error that says what is wrong with the value. */
 function itemOf({ label, def }: LocatedKey & { def: CollectionKeyDef }, value: unknown) {
@@ -111,10 +118,11 @@ function planCollection(found: LocatedKey & { def: CollectionKeyDef }, op: State
   if (op === 'delete') return planDelete(found, ctx);
   if (op === 'add') {
     const { item, ignored } = itemOf(found, ctx.value);
+    const { link } = ctx;
     return {
-      request: { target: keyOf(found), op: 'add', item },
+      request: { target: keyOf(found), op: 'add', item: link ? { ...item, messages: link } : item },
       logs: [
-        `${label}: adding ${shown(item.text, 80)}`,
+        `${label}: adding ${shown(item.text, 80)}${link ? ` (linked to ${link.ids.length === 1 ? '1 message' : `${link.ids.length} messages`})` : ''}`,
         ...(ignored.length ? [`Left out fields the key doesn't declare: ${ignored.join(', ')}`] : []),
       ],
     };

@@ -23,7 +23,7 @@ describe('State Write ports', () => {
     ['note', 'set', ['value:text!', 'when:any~'], ['value:text']],
     ['note', 'delete', ['when:any~'], ['value:text']],
     ['data', 'set', ['value:object!', 'when:any~'], ['value:object']],
-    ['injected', 'add', ['value:any!', 'when:any~'], ['value:object']],
+    ['injected', 'add', ['value:any!', 'messages:any~', 'when:any~'], ['value:object']],
     ['injected', 'remove', ['value:text!', 'when:any~'], ['value:object?']],
     ['injected', 'delete', ['when:any~'], ['value:array']],
   ])('%s %s takes %j and gives %j', async (key, op, inputs, outputs) => {

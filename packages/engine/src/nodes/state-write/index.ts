@@ -2,13 +2,15 @@ import { z } from 'zod';
 import { stateNodeOps } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { locateConfigured } from '../state-key.js';
+import { messageLink } from './link.js';
 import { planWrite } from './plan.js';
 import { checkOp, fixedValue, writePorts } from './ports.js';
 
 export const stateWrite: NodeDefinition = {
   type: 'state-write',
   label: 'State Write',
-  description: "Store a value in the chat's story state; it applies when this turn's reply stays in the chat",
+  description:
+    "Store a value in the chat's story state; it applies when this turn's reply stays in the chat. An item can link to chat messages",
   category: 'State',
   // Like Chat Output, it runs every turn once its inputs are ready, whether or not a reply depends on it.
   // The optional `when` input (every operation) lets a branch decide whether the write runs at all.
@@ -40,10 +42,13 @@ export const stateWrite: NodeDefinition = {
     // A connected value wins; otherwise the node's fixed one stands in for it, checked the same way.
     const connected = Object.hasOwn(ctx.inputs, 'value');
     const fixed = fixedValue(ctx.config);
+    // Only an `add` has the input (`resolvePorts`); a value's own `messages` property never links anything.
+    const linked = op === 'add' && Object.hasOwn(ctx.inputs, 'messages');
     const plan = planWrite(found, op, {
       connected: connected || fixed !== undefined,
       value: connected ? ctx.inputs.value : fixed,
       current,
+      ...(linked && { link: messageLink(found.label, ctx.inputs.messages) }),
     });
     for (const line of plan.logs) ctx.log(line);
     if (!plan.request) return {};

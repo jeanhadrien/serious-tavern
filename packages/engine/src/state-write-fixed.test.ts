@@ -41,7 +41,7 @@ describe('State Write fixed value: ports', () => {
     ['note', 'set', '', ['value:text~', 'when:any~']],
     ['data', 'set', {}, ['value:object~', 'when:any~']],
     ['tension', 'increment', 2, ['value:number~', 'when:any~']],
-    ['injected', 'add', 'a storm', ['value:any~', 'when:any~']],
+    ['injected', 'add', 'a storm', ['value:any~', 'messages:any~', 'when:any~']],
     ['injected', 'remove', 'b', ['value:text~', 'when:any~']],
     ['tension', 'delete', 5, ['when:any~']],
   ])('%s %s with the fixed value %j takes %j', async (key, op, value, inputs) => {
@@ -51,7 +51,7 @@ describe('State Write fixed value: ports', () => {
 
   it.each([
     ['tension', 'set', ['value:number!', 'when:any~']],
-    ['injected', 'add', ['value:any!', 'when:any~']],
+    ['injected', 'add', ['value:any!', 'messages:any~', 'when:any~']],
     ['injected', 'remove', ['value:text!', 'when:any~']],
   ])('%s %s still needs the Value input without one', async (key, op, inputs) => {
     expect((await stateWrite.resolvePorts!(config(key, op), resources)).inputs.map(mark)).toEqual(inputs);

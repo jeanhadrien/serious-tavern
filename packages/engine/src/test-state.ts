@@ -86,8 +86,17 @@ export const newChat = (definitions: StateDefinition[], resources: Partial<NodeR
   state: { turns: [] },
 });
 
-/** Runs one turn; its replies become assistant messages (as `settleTurn` stores them) and its entry is appended. */
-export async function playTurn(chat: Chat, workflow: Workflow, executionId: string, message = 'go') {
+/**
+ * Runs one turn; its replies become assistant messages (as `settleTurn` stores them) and its entry is appended.
+ * `history` is what the run's nodes see (and what links in the snapshot are judged against); it defaults to none.
+ */
+export async function playTurn(
+  chat: Chat,
+  workflow: Workflow,
+  executionId: string,
+  message = 'go',
+  history: ChatMessage[] = [],
+) {
   const story = foldStoryState({
     definitions: oldestFirst(chat.definitions),
     messages: chat.messages,
@@ -96,11 +105,11 @@ export async function playTurn(chat: Chat, workflow: Workflow, executionId: stri
   const result = await executeWorkflow(workflow, {
     message,
     sessionId: 'session',
-    history: [],
+    history,
     secrets: { get: async () => undefined },
     resources: chat.resources,
     executionId,
-    state: stateSnapshot(story, chat.definitions),
+    state: stateSnapshot(story, chat.definitions, history),
   });
   chat.messages.push(
     ...result.replies.map((reply, index) => ({
@@ -131,6 +140,7 @@ export async function playPost(
   workflow: Workflow,
   turn: Awaited<ReturnType<typeof playTurn>>,
   message = 'go',
+  history: ChatMessage[] = [],
 ) {
   const story = foldStoryState({
     definitions: oldestFirst(chat.definitions),
@@ -144,12 +154,12 @@ export async function playPost(
   const result = await executeWorkflow(workflow, {
     message,
     sessionId: 'session',
-    history: [],
+    history,
     secrets: { get: async () => undefined },
     resources: chat.resources,
     executionId: `${turn.execution.id}-post`,
     seed: postRunSeed(turn.execution.seed!),
-    state: stateSnapshot(story, chat.definitions),
+    state: stateSnapshot(story, chat.definitions, history),
     part: 'post',
     afterReply: { replies, text: replies.map((reply) => reply.content).join('\n\n'), turn: turn.turn },
   });

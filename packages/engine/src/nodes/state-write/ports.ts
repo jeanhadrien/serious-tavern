@@ -89,6 +89,24 @@ function valueInput(def: StateKeyDef, op: StateNodeOp, fixed: boolean): PortDef[
   }
 }
 
+/**
+ * The optional `messages` input of an `add` on a collection key: the messages the item is about. `requiredIfConnected`,
+ * so a branch that is not taken (a skipped source) skips the write instead of storing an unlinked item.
+ */
+function linkInput(def: StateKeyDef, op: StateNodeOp): PortDef[] {
+  if (def.type !== 'collection' || op !== 'add') return [];
+  return [
+    {
+      name: 'messages',
+      label: 'Link to messages',
+      dataType: 'any',
+      requiredIfConnected: true,
+      description:
+        "Optional. Links the item to chat messages: a link ({ ids, fingerprint }, e.g. Next Chunk's link), a message or a list of messages (e.g. After Reply's replies). The item stops being used when one of them is edited or deleted.",
+    },
+  ];
+}
+
 const outputType = (def: StateKeyDef, op: StateNodeOp): PortDataType =>
   def.type === 'collection' && (op === 'add' || op === 'remove') ? 'object' : stateKeyPortType(def.type);
 
@@ -107,7 +125,7 @@ export function writePorts(
   fixed = false,
 ): { inputs: PortDef[]; outputs: PortDef[] } {
   return {
-    inputs: [...valueInput(def, op, fixed), gate],
+    inputs: [...valueInput(def, op, fixed), ...linkInput(def, op), gate],
     outputs: [
       {
         name: 'value',
