@@ -9,6 +9,8 @@ import { definitionBlocks } from './storyModel.js';
 
 /** One item that links to a message. */
 export type MessageLinkNote = {
+  /** The item's id: the Story state section marks its row with it (`data-item-id`). */
+  itemId: string;
   /** `memory.summaries`. */
   key: string;
   /** "messages 1–20 (20)", the item's range. */
@@ -36,6 +38,7 @@ export function messageLinks(view: SessionStateView | undefined): MessageLinks {
       const { used, broken } = row.linked;
       for (const item of [...used, ...broken]) {
         const note: MessageLinkNote = {
+          itemId: item.id,
           key: `${block.name}.${row.key}`,
           range: linkLabel(item.link),
           preview: shortText(plainPreview(item.text), PREVIEW_MAX),
@@ -64,7 +67,9 @@ export function changeNote(
 ): string | undefined {
   const active = inUse(notes ?? []);
   if (!active.length) return undefined;
-  const count = active.length === 1 ? '1 item' : `${active.length} items`;
+  const many = active.length > 1;
+  const count = many ? `${active.length} items` : '1 item';
   const what = action === 'edit' ? 'Changing this message' : 'Deleting this message';
-  return `${count} of ${keys(active)} link${active.length === 1 ? 's' : ''} to this message. ${what} stops ${active.length === 1 ? 'it' : 'them'} being used until ${active.length === 1 ? 'it is' : 'they are'} made again.`;
+  const ranges = active.map((note) => note.range).join(', ');
+  return `${count} of ${keys(active)} ${many ? 'link' : 'links'} to this message: ${ranges}. ${what} stops ${many ? 'them' : 'it'} being used until ${many ? 'they are' : 'it is'} made again.`;
 }

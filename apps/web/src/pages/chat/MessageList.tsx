@@ -21,6 +21,8 @@ interface MessageListProps {
   disabled: boolean;
   onEdit: (id: string, content: string) => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
+  /** "Show in Story state" on a message's marker: the id of the state item to show. */
+  onShowLinked?: (itemId: string) => void;
 }
 
 export function MessageList({
@@ -35,6 +37,7 @@ export function MessageList({
   disabled,
   onEdit,
   onDelete,
+  onShowLinked,
 }: MessageListProps) {
   const { viewport, content, onScroll } = useStickToBottom(sessionId, messages);
   // The lines are described once per loaded view; placing the chips is one pass over the messages.
@@ -63,6 +66,7 @@ export function MessageList({
             disabled={disabled}
             onEdit={onEdit}
             onDelete={onDelete}
+            onShowLinked={onShowLinked}
           />
         ))}
         {waiting && (

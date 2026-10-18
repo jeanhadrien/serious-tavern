@@ -4,7 +4,7 @@ import type { ChatState } from './chat/useChat.js';
 import { ChatHeader } from './chat/ChatHeader.js';
 import { MessageList } from './chat/MessageList.js';
 import { Composer } from './chat/Composer.js';
-import { ChatPanel } from './chat/ChatPanel.js';
+import { ChatPanel, type Reveal } from './chat/ChatPanel.js';
 import { PostRunStatus } from './chat/story/PostRunStatus.js';
 import { runningPostRun } from './chat/story/postRuns.js';
 import { undoneByDelete } from './chat/story/undoList.js';
@@ -19,6 +19,14 @@ export function Chat({ chat }: { chat: ChatState }) {
   const locked = chat.busy || chat.mutating;
   const [panelOpen, setPanelOpen] = useState(false);
   const closePanel = useCallback(() => setPanelOpen(false), []);
+  // A message marker's "Show in Story state": open the panel and let it scroll to the item. Both callbacks keep their
+  // identity, so the thread and the panel are not re-rendered by them.
+  const [reveal, setReveal] = useState<Reveal>();
+  const showLinked = useCallback((itemId: string) => {
+    setPanelOpen(true);
+    setReveal((current) => ({ itemId, n: (current?.n ?? 0) + 1 }));
+  }, []);
+  const revealed = useCallback(() => setReveal(undefined), []);
   // One fetch of the chat's story state; it reloads when a turn or a message change finishes, never per token.
   const story = useStoryState(session?.id, !locked);
   // The after-reply run of the latest turn: a quiet status row while it works, one toast if it fails.
@@ -66,6 +74,7 @@ export function Chat({ chat }: { chat: ChatState }) {
                 disabled={locked}
                 onEdit={chat.editMessage}
                 onDelete={chat.deleteMessage}
+                onShowLinked={showLinked}
               />
               <PostRunStatus key={`post-${session.id}`} sessionId={session.id} run={postRun} onStopped={story.reload} />
               <Composer
@@ -86,6 +95,8 @@ export function Chat({ chat }: { chat: ChatState }) {
                 stored={session.settings}
                 sessionId={session.id}
                 story={story.panel}
+                reveal={reveal}
+                onRevealed={revealed}
                 onSave={chat.updateSettings}
                 onClose={closePanel}
               />

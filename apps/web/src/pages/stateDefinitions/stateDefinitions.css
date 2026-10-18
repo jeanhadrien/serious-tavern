@@ -166,6 +166,6 @@
 .state-banner a {
   color: #aab4ff;
 }
-.state-form small.warning {
-  color: #f2c98b;
+.state-form small.state-info {
+  color: #9fb0ff;
 }

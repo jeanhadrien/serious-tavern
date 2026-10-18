@@ -10,6 +10,21 @@ export interface ReplyRoot {
   replies(): Iterable<ReplyElement>;
 }
 
+/** An element of the Story state section that carries `data-item-id`, and what it sits in (to open the folds). */
+export interface ItemElement extends ReplyElement {
+  parentElement?: ItemParent | null;
+}
+interface ItemParent {
+  tagName?: string;
+  open?: boolean;
+  parentElement?: ItemParent | null;
+}
+
+/** Where to look for a state item's row: every row of the panel that has a `data-item-id`. */
+export interface ItemRoot {
+  items(): Iterable<ItemElement>;
+}
+
 /** Where to look for a message by id: every message of the thread, either role. */
 export interface MessageRoot {
   messages(): Iterable<ReplyElement>;
@@ -67,6 +82,26 @@ export function scrollToMessage(
   return false;
 }
 
+const documentItems: ItemRoot = {
+  items: () => document.querySelectorAll<HTMLElement>('[data-item-id]'),
+};
+
+/**
+ * Scrolls the chat panel to the row of a state item (found by `data-item-id`), opens the folds it sits in (the key's
+ * list, "Replaced or repeated") and flashes it. Returns whether the row exists: the view may not have loaded yet, or
+ * the item may be gone.
+ */
+export function scrollToItem(itemId: string, root: ItemRoot = documentItems, calm = reducedMotion()): boolean {
+  for (const candidate of root.items()) {
+    if (candidate.dataset.itemId !== itemId) continue;
+    for (let parent = candidate.parentElement; parent; parent = parent.parentElement)
+      if (parent.tagName?.toUpperCase() === 'DETAILS') parent.open = true;
+    reveal(candidate, calm);
+    return true;
+  }
+  return false;
+}
+
 function reveal(target: ReplyElement, calm: boolean): void {
   target.scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' });
   if (!calm && typeof target.animate === 'function')
@@ -74,6 +109,18 @@ function reveal(target: ReplyElement, calm: boolean): void {
       [{ boxShadow: '0 0 0 2px #9fb0ff, 0 0 18px rgba(159, 176, 255, 0.55)' }, { boxShadow: '0 0 0 0 transparent' }],
       { duration: 1400, easing: 'ease-out' },
     );
+}
+
+/**
+ * Whether a jump from the chat panel closes it: only when it did scroll to something and the panel covers the thread
+ * (see `panelCoversThread`); next to the thread it stays open.
+ */
+export function closesPanelAfter(
+  scrolled: boolean,
+  panel: Element | null,
+  positionOf?: (element: Element) => string,
+): boolean {
+  return scrolled && panelCoversThread(panel, positionOf);
 }
 
 /**

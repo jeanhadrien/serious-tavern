@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import { lastReplyOf, panelCoversThread, scrollToMessage, scrollToTurn, type ReplyElement } from './scrollToTurn.js';
+import {
+  closesPanelAfter,
+  lastReplyOf,
+  panelCoversThread,
+  scrollToItem,
+  scrollToMessage,
+  scrollToTurn,
+  type ItemElement,
+  type ReplyElement,
+} from './scrollToTurn.js';
 
 const element = (executionId: string | undefined) => ({
   dataset: executionId === undefined ? {} : { executionId },
@@ -87,5 +96,52 @@ describe('panelCoversThread', () => {
 
   it('is false without a panel', () => {
     expect(panelCoversThread(null, () => 'absolute')).toBe(false);
+  });
+});
+
+describe('scrollToItem', () => {
+  const details = () => ({ tagName: 'DETAILS', open: false, parentElement: null as null | object });
+  const row = (
+    itemId: string,
+    parent: object | null = null,
+  ): ItemElement & { scrollIntoView: ReturnType<typeof vi.fn> } => ({
+    dataset: { itemId },
+    scrollIntoView: vi.fn<ReplyElement['scrollIntoView']>(),
+    animate: vi.fn(),
+    parentElement: parent as ItemElement['parentElement'],
+  });
+  const rootOf = (...items: ItemElement[]) => ({ items: () => items });
+
+  it('opens every fold the row sits in, scrolls to it and flashes it', () => {
+    const outer = details();
+    const inner = { tagName: 'DIV', parentElement: outer };
+    const folded = { ...details(), parentElement: inner };
+    const target = row('i2', folded);
+    expect(scrollToItem('i2', rootOf(row('i1'), target), false)).toBe(true);
+    expect([outer.open, folded.open]).toEqual([true, true]);
+    expect(target.scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' });
+    expect(target.animate).toHaveBeenCalledOnce();
+  });
+
+  it('answers false and touches nothing when the row is not there (the view has not loaded, or the item is gone)', () => {
+    const other = row('i1');
+    expect(scrollToItem('i2', rootOf(other), false)).toBe(false);
+    expect(other.scrollIntoView).not.toHaveBeenCalled();
+    expect(scrollToItem('i2', rootOf(), false)).toBe(false);
+  });
+});
+
+describe('closesPanelAfter', () => {
+  const panel = {} as Element;
+  it.each([
+    ['scrolled, panel over the thread', true, 'absolute', true],
+    ['scrolled, panel beside the thread', true, 'static', false],
+    ['nothing to scroll to, panel over the thread', false, 'absolute', false],
+  ])('%s', (_name, scrolled, position, expected) => {
+    expect(closesPanelAfter(scrolled, panel, () => position)).toBe(expected);
+  });
+
+  it('never closes when there is no panel', () => {
+    expect(closesPanelAfter(true, null)).toBe(false);
   });
 });

@@ -61,9 +61,10 @@ it('renders the name, the description and one row per key with the fields of its
   expect(html).not.toContain('x-note');
 });
 
-it('warns about a cap on a list only while it has a value', () => {
-  const warning = 'Leave the cap empty for a list that items link to chat messages in';
+it('notes what a cap does to linked items, neutrally, only while it has a value', () => {
+  const warning = 'If items in this list link to messages (such as summaries), a cap drops the oldest';
   expect(render()).toContain(warning);
+  expect(render()).not.toMatch(/class="[^"]*warning/);
   const uncapped = { ...saved, keys: saved.keys.map((key) => (key.type === 'collection' ? { ...key, cap: '' } : key)) };
   expect(render({ draft: uncapped })).not.toContain(warning);
 });

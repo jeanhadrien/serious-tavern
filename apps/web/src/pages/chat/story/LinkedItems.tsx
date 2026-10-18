@@ -24,7 +24,7 @@ function LinkedRow({ item, onJumpMessage }: { item: LinkedItem; onJumpMessage?(m
   const label = linkLabel(link);
   const jumpTo = link.firstMessageId;
   return (
-    <li className={`linked-item${intact ? '' : ' broken'}`}>
+    <li className={`linked-item${intact ? '' : ' broken'}`} data-item-id={item.id}>
       <div className="linked-head">
         {jumpTo && onJumpMessage ? (
           <button

@@ -1,12 +1,15 @@
-import { memo, useCallback, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import type { Workflow } from '@st/shared';
 import { IconButton } from '../../components/IconButton.js';
 import { SettingsSection, type SaveSettings } from './panel/SettingsSection.js';
-import { panelCoversThread, scrollToMessage, scrollToTurn } from './story/scrollToTurn.js';
+import { closesPanelAfter, scrollToItem, scrollToMessage, scrollToTurn } from './story/scrollToTurn.js';
 import { StorySection } from './story/StorySection.js';
 import type { StoryPanelData } from './story/useStoryState.js';
 import './chatPanel.css';
+
+/** A request to show a state item in the panel; a new object (`n` counts) each time, so asking again repeats it. */
+export type Reveal = { itemId: string; n: number };
 
 /**
  * The chat's side panel, inside the chat view (not a layout view). It holds per-chat sections: chat settings and
@@ -18,6 +21,8 @@ export const ChatPanel = memo(function ChatPanel({
   stored,
   sessionId,
   story,
+  reveal,
+  onRevealed,
   onSave,
   onClose,
 }: {
@@ -25,6 +30,9 @@ export const ChatPanel = memo(function ChatPanel({
   stored?: Record<string, unknown>;
   sessionId: string;
   story: StoryPanelData;
+  /** A state item to scroll to once the panel shows it (a "Show in Story state" click on a message's marker). */
+  reveal?: Reveal;
+  onRevealed(): void;
   onSave: SaveSettings;
   onClose(): void;
 }) {
@@ -32,16 +40,21 @@ export const ChatPanel = memo(function ChatPanel({
   // Over a narrow chat the panel covers the messages: close it after the jump so the reply is visible.
   const jump = useCallback(
     (executionId: string) => {
-      if (scrollToTurn(executionId) && panelCoversThread(panel.current)) onClose();
+      if (closesPanelAfter(scrollToTurn(executionId), panel.current)) onClose();
     },
     [onClose],
   );
   const jumpToMessage = useCallback(
     (messageId: string) => {
-      if (scrollToMessage(messageId) && panelCoversThread(panel.current)) onClose();
+      if (closesPanelAfter(scrollToMessage(messageId), panel.current)) onClose();
     },
     [onClose],
   );
+  // The view may still be loading when the panel opens, so it tries again when the view arrives; once it has scrolled
+  // the request is cleared, so reopening the panel later does not repeat it.
+  useEffect(() => {
+    if (reveal && scrollToItem(reveal.itemId)) onRevealed();
+  }, [reveal, story.view, onRevealed]);
   return (
     <aside ref={panel} className="chat-panel" aria-label="Chat panel">
       <div className="chat-panel-header">

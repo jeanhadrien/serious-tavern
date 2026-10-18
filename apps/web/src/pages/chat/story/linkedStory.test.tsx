@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ChatMessage } from '@st/shared';
+import { LinkNote } from '../ChatMessageView.js';
+import { LinkCard } from './LinkMarker.js';
 import { messageLinks, changeNote } from './linkMarkers.js';
 import { definitionBlocks } from './storyModel.js';
 import { StorySection } from './StorySection.js';
@@ -105,7 +107,7 @@ describe('message links', () => {
   it('only warns before a change about items that are in use', () => {
     const intact = messageLinks(played()).get('u1');
     expect(changeNote(intact, 'edit')).toBe(
-      '1 item of scene.injected links to this message. Changing this message stops it being used until it is made again.',
+      '1 item of scene.injected links to this message: messages 1–2 (2). Changing this message stops it being used until it is made again.',
     );
     expect(changeNote(intact, 'delete')).toContain('Deleting this message stops it being used');
     expect(changeNote(messageLinks(played(edited('u2'))).get('m-e2'), 'edit')).toBeUndefined();
@@ -113,8 +115,16 @@ describe('message links', () => {
   });
 
   it('counts several items', () => {
-    const note = (range: string) => ({ key: 'scene.injected', range, preview: '', status: 'intact' as const });
-    expect(changeNote([note('a'), note('b')], 'edit')).toContain('2 items of scene.injected link to this message');
+    const note = (range: string) => ({
+      itemId: range,
+      key: 'scene.injected',
+      range,
+      preview: '',
+      status: 'intact' as const,
+    });
+    expect(changeNote([note('messages 1–4 (4)'), note('messages 5–8 (4)')], 'edit')).toBe(
+      '2 items of scene.injected link to this message: messages 1–4 (4), messages 5–8 (4). Changing this message stops them being used until they are made again.',
+    );
   });
 });
 
@@ -138,4 +148,40 @@ describe('the model', () => {
     expect(row?.linked?.used.map((item) => item.text)).toEqual(['linked']);
     expect(row?.items).toHaveLength(2);
   });
+});
+
+describe('what the thread shows around a linked message', () => {
+  const notes = messageLinks(played()).get('u1')!;
+
+  it('lists each item on the marker card with a way to show it in the Story state section', () => {
+    const html = renderToStaticMarkup(<LinkCard notes={notes} id="card" onShow={() => {}} />);
+    expect(html).toContain('Linked state');
+    expect(html).toContain('<span class="link-note-key">scene.injected</span>: messages 1–2 (2)');
+    expect(html).toContain('>Show in Story state</button>');
+    expect(html).not.toContain('Show in Story state</button><button');
+  });
+
+  it('shows no action when nothing can open the panel, and says a broken item is not used', () => {
+    expect(renderToStaticMarkup(<LinkCard notes={notes} />)).not.toContain('Show in Story state');
+    const broken = messageLinks(played(edited('u2'))).get('m-e2')!;
+    expect(renderToStaticMarkup(<LinkCard notes={broken} />)).toContain('(covers an edited message, not used)');
+  });
+
+  it('carries the item id the panel row is found by', () => {
+    expect(notes[0]?.itemId).toBe('e3:note:0');
+    expect(render()).toContain('data-item-id="e3:note:0"');
+    expect(render()).toContain('data-item-id="e4:note:0"');
+  });
+
+  it('shows the note before an edit or delete, and nothing when no item in use links to the message', () => {
+    const edit = renderToStaticMarkup(<LinkNote note={changeNote(notes, 'edit')} />);
+    expect(edit).toContain('role="status"');
+    expect(edit).toContain('Changing this message stops it being used');
+    expect(renderToStaticMarkup(<LinkNote note={changeNote(notes, 'delete')} />)).toContain('Deleting this message');
+    expect(renderToStaticMarkup(<LinkNote note={changeNote(undefined, 'edit')} />)).toBe('');
+  });
+});
+
+it('words the list line of a key as the last write, since a list has many writes', () => {
+  expect(render()).toContain('last written at');
 });

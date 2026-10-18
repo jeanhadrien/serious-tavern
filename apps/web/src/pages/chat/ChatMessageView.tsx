@@ -25,10 +25,11 @@ interface ChatMessageViewProps {
   disabled?: boolean;
   onEdit?: (id: string, content: string) => Promise<boolean>;
   onDelete?: (id: string) => Promise<boolean>;
+  onShowLinked?: (itemId: string) => void;
 }
 
 /** What an edit or delete of this message stops, said before it is saved (information, not a confirmation step). */
-function LinkNote({ note }: { note?: string }) {
+export function LinkNote({ note }: { note?: string }) {
   return note ? (
     <p className="hint warning message-link-note" role="status">
       {note}
@@ -47,10 +48,11 @@ export function ChatMessageView({
   disabled = false,
   onEdit,
   onDelete,
+  onShowLinked,
 }: ChatMessageViewProps) {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const marker = useLinkMarker(links);
+  const marker = useLinkMarker(links, onShowLinked);
   const bubble = useRef<HTMLElement>(null);
   const restoreFocus = useRef(false);
   useLayoutEffect(() => {

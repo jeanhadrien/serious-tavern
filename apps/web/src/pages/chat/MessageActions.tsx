@@ -14,7 +14,7 @@ interface MessageActionsProps {
   undoOnDelete?: () => readonly string[] | undefined;
   /** Told when the inline "Delete message?" step opens or closes (the message shows what the delete affects). */
   onConfirming?: (confirming: boolean) => void;
-  /** What the delete stops using (linked story state): added to the dialog of a delete that undoes stored state. */
+  /** What the delete stops using (linked story state): put before the question in the dialog of a delete that undoes stored state. */
   deleteNote?: string;
 }
 
@@ -54,9 +54,7 @@ export function MessageActions({
             label="Delete message"
             disabled={disabled}
             onClick={() => {
-              const click = deleteClick(undoOnDelete?.(), (text) =>
-                window.confirm(deleteNote ? `${text}\n\n${deleteNote}` : text),
-              );
+              const click = deleteClick(undoOnDelete?.(), (text) => window.confirm(text), deleteNote);
               if (click === 'inline') setConfirming(true);
               else if (click === 'delete') void onDelete();
             }}

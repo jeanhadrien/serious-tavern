@@ -126,9 +126,9 @@ export function KeyTypeFields({ keyDraft: key, position, onChange }: KeyTypeFiel
             />
             <small>Only this many of the newest items are kept when read.</small>
             {key.cap.trim() !== '' && (
-              <small className="hint warning" role="note">
-                Leave the cap empty for a list that items link to chat messages in (such as summaries): the oldest items
-                are dropped, and the messages they stood for reach the prompt raw again.
+              <small className="state-info">
+                If items in this list link to messages (such as summaries), a cap drops the oldest, and their messages
+                reach the prompt raw again.
               </small>
             )}
           </label>

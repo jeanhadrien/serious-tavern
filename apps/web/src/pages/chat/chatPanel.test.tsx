@@ -23,6 +23,7 @@ const render = (target: Workflow | undefined, stored?: Record<string, unknown>) 
         stored={stored}
         sessionId="s1"
         story={{ failed: false }}
+        onRevealed={() => {}}
         onSave={async () => {}}
         onClose={() => {}}
       />

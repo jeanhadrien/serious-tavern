@@ -79,7 +79,7 @@ export const StateKeyRow = memo(function StateKeyRow({
           'written'
         ) : (
           <>
-            written at{' '}
+            {list ? 'last written at' : 'written at'}{' '}
             {row.jumpable ? (
               <button type="button" className="story-turn-link" onClick={() => onJump(turn)}>
                 turn {turn}
