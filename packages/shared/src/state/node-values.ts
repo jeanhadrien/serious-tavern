@@ -3,7 +3,8 @@ import { isPlainObject } from './helpers.js';
 
 /**
  * What the State nodes take and give, as one rule for the engine (which runs it), the node panels and the web
- * editors (which warn about it before a run): the read modes, plain numbers typed as text, and collection items.
+ * editors (which warn about it before a run): the read modes and collection items. `parseDecimal` (plain numbers
+ * typed as text) is UI-side only: the panels and the definitions editor use it; the engine never parses text.
  */
 
 /** The ways a State Read node reads a key: its value, or facts about when it was written. */
