@@ -107,6 +107,56 @@ describe('commitSummaryWrites', () => {
     expect(Object.keys(result.summaries)).toEqual(['main', 'detail']);
     expect((result.summaries.main as { id: string }[]).map((s) => s.id)).toEqual(['w-m1', 'w-m5']);
   });
+  it.each(['constructor', 'toString', '__proto__', 'hasOwnProperty'])(
+    'handles a set named like an Object.prototype member: %s',
+    (set) => {
+      const first = commit(undefined, [writeOf(range(1, 4), { set })]);
+      expect(first.saved).toBe(1);
+      expect(Object.hasOwn(first.summaries, set)).toBe(true);
+      // Stored (as JSON would hold it), the set is read back, overlap-checked and extended.
+      const stored: unknown = JSON.parse(JSON.stringify(first.summaries));
+      expect(Object.getPrototypeOf(stored)).toBe(Object.prototype);
+      const overlap = commit(stored, [writeOf(range(3, 6), { set })]);
+      expect(overlap.saved).toBe(0);
+      expect(overlap.warnings).toHaveLength(1);
+      const next = commit(stored, [writeOf(range(5, 8), { set })]);
+      expect(next.saved).toBe(1);
+      expect(
+        Object.entries(next.summaries).flatMap(([name, items]) => (name === set ? (items as unknown[]) : [])),
+      ).toHaveLength(2);
+    },
+  );
+  it('a set name that only exists on the prototype is an empty set, not an error', () => {
+    const result = commit({ main: [summaryOf(history, range(1, 4))] }, [writeOf(range(5, 8), { set: 'constructor' })]);
+    expect(result.saved).toBe(1);
+    expect(result.warnings).toEqual([]);
+  });
+  it("removes the set's readable summaries with no covered message left, and keeps the rest", () => {
+    const gone = summaryOf(history, range(1, 4));
+    const alive = summaryOf(history, range(5, 6));
+    const partly = summaryOf(history, range(7, 8));
+    const now = history.filter((m) => !['m1', 'm2', 'm3', 'm4', 'm8'].includes(m.id));
+    const raw = { main: ['junk', gone, alive, partly], other: [gone] };
+    const result = commit(raw, [writeOf(['m9', 'm10'], {}, now)], now);
+    expect(result.saved).toBe(1);
+    const main = result.summaries.main as ({ id: string } | string)[];
+    expect(main.map((item) => (typeof item === 'string' ? item : item.id))).toEqual([
+      'junk',
+      alive.id,
+      partly.id,
+      'w-m9',
+    ]);
+    // Another set is only cleaned when something is stored into it.
+    expect((result.summaries.other as unknown[]).length).toBe(1);
+  });
+  it('removes nothing when the write is dropped', () => {
+    const gone = summaryOf(history, range(1, 4));
+    const now = history.slice(4);
+    const edited = now.map((m) => (m.id === 'm9' ? { ...m, content: 'edited' } : m));
+    const result = commit({ main: [gone] }, [writeOf(['m9', 'm10'], {}, now)], edited);
+    expect(result.saved).toBe(0);
+    expect(result.summaries.main).toEqual([gone]);
+  });
   it('does nothing without writes', () => {
     const raw = { main: [] };
     const result = commit(raw, []);

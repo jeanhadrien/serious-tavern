@@ -21,7 +21,14 @@ export const memory: NodeDefinition = {
     },
   ],
   configSchema: z.object({
-    lastN: z.number().int().min(0).default(10).describe('How many of the latest messages to include as they are'),
+    lastN: z
+      .number()
+      .int()
+      .min(0)
+      .default(10)
+      .describe(
+        'How many of the latest messages to include as they are. With a summary set, older messages that are not summarized yet are still sent in full',
+      ),
     format: z.enum(['text', 'messages']).default('text'),
     summarySet: z
       .string()
@@ -29,7 +36,7 @@ export const memory: NodeDefinition = {
       .regex(SET_PATTERN, 'Use 1-40 letters, digits, "_" or "-", or leave it empty')
       .default('')
       .describe(
-        'A summary set (see Next Chunk). When set, older messages covered by a valid summary of the set are replaced by it; empty means no summaries',
+        'A summary set (see Next Chunk). When set, older messages covered by a valid summary of the set are replaced by it; empty means no summaries. Older messages that are not summarized yet are still sent in full, so the history only shrinks as summaries are written: wire After Reply, Next Chunk, an LLM and Save Summary to write them',
       ),
   }),
   defaultConfig: { lastN: 10, format: 'text', summarySet: '' },

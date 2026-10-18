@@ -9,6 +9,16 @@ import { waitForPostRun } from './post.js';
 
 const SUMMARIZER = 'summary-test-llm';
 const FAILER = 'summary-test-fail';
+const HOLDER = 'summary-test-hold';
+
+/** Resolved by the holder node when it starts (see `holdStarted`). */
+const holding: { resolve?: () => void } = {};
+/** Resolves when the next holder node begins executing. */
+export function holdStarted(): Promise<void> {
+  return new Promise((resolve) => {
+    holding.resolve = resolve;
+  });
+}
 
 /** Registers the test node types; call `dispose` in `afterEach`. */
 function summaryNodes() {
@@ -40,8 +50,29 @@ function summaryNodes() {
       throw new Error('the failer failed');
     },
   });
+  // A sink that holds the run until it is aborted (stopped).
+  registry.set(HOLDER, {
+    type: HOLDER,
+    label: 'Holder',
+    description: '',
+    category: 'Tests',
+    sink: true,
+    inputs: [{ name: 'value', label: 'Value', dataType: 'any' }],
+    outputs: [],
+    configSchema: z.object({}),
+    defaultConfig: {},
+    async execute(ctx) {
+      await new Promise<void>((resolve) => {
+        holding.resolve?.();
+        if (ctx.signal.aborted) resolve();
+        ctx.signal.addEventListener('abort', () => resolve(), { once: true });
+      });
+      return {};
+    },
+  });
   return {
     dispose() {
+      registry.delete(HOLDER);
       registry.delete(SUMMARIZER);
       registry.delete(FAILER);
     },
@@ -53,8 +84,10 @@ export type SummaryWorkflowOptions = {
   via?: { type: string; id?: string };
   /** Run Next Chunk and Save Summary in the reply part instead of after the reply. */
   inReply?: boolean;
-  /** A node that fails once Save Summary has completed (after-reply only). */
+  /** A node that fails once Save Summary has completed (in the part that holds it). */
   failAfterSave?: boolean;
+  /** A sink that holds the run (until it is stopped) once Save Summary has completed. */
+  holdAfterSave?: boolean;
 };
 
 /**
@@ -75,6 +108,7 @@ function summaryWorkflow(options: SummaryWorkflowOptions = {}) {
       node(viaId, via.type),
       node('save', 'save-summary'),
       ...(options.failAfterSave ? [node('fail', FAILER)] : []),
+      ...(options.holdAfterSave ? [node('hold', HOLDER)] : []),
     ],
     edges: [
       edge('mem', 'history', 'output', 'value'),
@@ -83,6 +117,7 @@ function summaryWorkflow(options: SummaryWorkflowOptions = {}) {
       edge('next', 'chunk', 'save', 'chunk'),
       edge(viaId, 'value', 'save', 'text'),
       ...(options.failAfterSave ? [edge('save', 'summary', 'fail', 'value')] : []),
+      ...(options.holdAfterSave ? [edge('save', 'summary', 'hold', 'value')] : []),
     ],
   };
 }

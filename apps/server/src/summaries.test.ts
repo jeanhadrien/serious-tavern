@@ -119,7 +119,7 @@ describe('the summary chain after the reply', () => {
     expect(after.find((summary) => summary.messageIds.length === 1)?.messageIds).toEqual([old.messageIds[0]]);
   });
 
-  it('a chunk whose messages are all deleted stays stored (invalid, no position) and is simply ignored', async () => {
+  it('a chunk whose messages are all deleted stays listed (invalid, no position) until the set saves its next summary', async () => {
     const { app, session } = await harness.chat();
     for (const text of ['u1', 'u2', 'u3', 'u4']) await say(app, session, text);
     const old = (await storedSummaries(app, session.id)).summaries[0]!;
@@ -128,7 +128,9 @@ describe('the summary chain after the reply', () => {
     expect(gone).toMatchObject({ id: old.id, valid: false, missing: 2 });
     expect(gone).not.toHaveProperty('firstIndex');
     await say(app, session, 'u5');
-    expect((await storedSummaries(app, session.id)).summaries.some((summary) => summary.id === old.id)).toBe(true);
+    const after = (await storedSummaries(app, session.id)).summaries;
+    expect(after.length).toBeGreaterThan(0);
+    expect(after.some((summary) => summary.id === old.id)).toBe(false);
   });
 
   it('lists chats without their summaries', async () => {

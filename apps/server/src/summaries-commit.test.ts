@@ -3,7 +3,7 @@ import { fingerprintMessages, type ChatMessage } from '@st/shared';
 import { gateNode } from './test-support/post.js';
 import { postRunOf, waitForPostRun } from './test-support/post.js';
 import { readExecution, send } from './test-support/story.js';
-import { patchMessage, say, storedSummaries, summaryHarness } from './test-support/summaries.js';
+import { holdStarted, patchMessage, say, storedSummaries, summaryHarness } from './test-support/summaries.js';
 import { summaryViews } from './services/summary-view.js';
 
 // The commit happens at settle time, under the session lock, against the chat as it is THEN.
@@ -17,26 +17,34 @@ afterEach(async () => {
 });
 
 describe('a summary whose messages changed while it was being written', () => {
-  it('after the reply: is dropped, the run completes, and its log says so', async () => {
-    gate = gateNode();
-    const { app, session } = await harness.chat({ via: { type: 'post-gate-test', id: 'gate' } });
-    await say(app, session, 'u1');
-    await say(app, session, 'u2');
-    // Turn 3's after-reply run plans the chunk m1 m2 and waits at the gate.
-    const response = await send(app, session.id, 'u3');
-    expect(response.statusCode).toBe(200);
-    await gate.started;
-    const { session: held } = await storedSummaries(app, session.id);
-    expect((await patchMessage(app, session.id, held.messages[0]!.id, 'u1 changed')).statusCode).toBe(200);
-    gate.release('a summary of the old u1');
-    const done = await waitForPostRun(app, session.id, 'completed');
-    expect((await storedSummaries(app, session.id)).summaries).toEqual([]);
-    const log = await readExecution(app, done.postExecutionId!);
-    expect(log.status).toBe('completed');
-    expect(log.warnings).toEqual([
-      'The summary for set "main" was not saved: a message it covers was edited or deleted while it was being written.',
-    ]);
-  });
+  it.each(['edited', 'deleted'] as const)(
+    'after the reply, %s: is dropped, the run completes, and its log says so',
+    async (change) => {
+      gate = gateNode();
+      const { app, session } = await harness.chat({ via: { type: 'post-gate-test', id: 'gate' } });
+      await say(app, session, 'u1');
+      await say(app, session, 'u2');
+      // Turn 3's after-reply run plans the chunk m1 m2 and waits at the gate.
+      const response = await send(app, session.id, 'u3');
+      expect(response.statusCode).toBe(200);
+      await gate.started;
+      const { session: held } = await storedSummaries(app, session.id);
+      const first = held.messages[0]!.id;
+      const changed =
+        change === 'edited'
+          ? await patchMessage(app, session.id, first, 'u1 changed')
+          : await app.inject({ method: 'DELETE', url: `/api/sessions/${session.id}/messages/${first}` });
+      expect(changed.statusCode).toBe(change === 'edited' ? 200 : 204);
+      gate.release('a summary of the old u1');
+      const done = await waitForPostRun(app, session.id, 'completed');
+      expect((await storedSummaries(app, session.id)).summaries).toEqual([]);
+      const log = await readExecution(app, done.postExecutionId!);
+      expect(log.status).toBe('completed');
+      expect(log.warnings).toEqual([
+        'The summary for set "main" was not saved: a message it covers was edited or deleted while it was being written.',
+      ]);
+    },
+  );
 
   it('in the reply: is dropped, and the warning is in the reply log, the response and the stored log', async () => {
     gate = gateNode();
@@ -74,6 +82,57 @@ describe('summaries written in the reply part', () => {
     });
     expect(summaries[0]!.executionId).toBe(stored.state!.turns.at(-1)!.executionId);
     expect(await postRunOf(app, session.id)).toEqual({});
+  });
+});
+
+describe('a failed or stopped reply turn', () => {
+  it('keeps the summary a completed Save Summary node stored when the turn fails', async () => {
+    const { app, session } = await harness.chat({ inReply: true, failAfterSave: true });
+    for (const text of ['u1', 'u2']) await say(app, session, text, false);
+    const failed = await send(app, session.id, 'u3');
+    expect(failed.statusCode).toBe(500);
+    expect(failed.body).toContain('the failer failed');
+    expect((await storedSummaries(app, session.id)).summaries.map((s) => s.text)).toEqual(['S[user: u1]']);
+  });
+
+  it('keeps it when the turn is stopped after Save Summary completed', async () => {
+    const { app, session } = await harness.chat({ inReply: true, holdAfterSave: true });
+    const held = holdStarted();
+    // The first chunk exists at turn 3; the holder only runs once a Save Summary has completed.
+    for (const text of ['u1', 'u2']) {
+      const turn = app.inject({
+        method: 'POST',
+        url: `/api/sessions/${session.id}/messages`,
+        payload: { content: text },
+      });
+      expect((await turn).statusCode).toBe(200);
+    }
+    const turn = app.inject({
+      method: 'POST',
+      url: `/api/sessions/${session.id}/messages/stream`,
+      payload: { content: 'u3' },
+    });
+    await held;
+    expect((await app.inject({ method: 'POST', url: `/api/sessions/${session.id}/stop` })).statusCode).toBe(204);
+    expect((await turn).body).toContain('TURN_STOPPED');
+    expect((await storedSummaries(app, session.id)).summaries.map((s) => s.text)).toEqual(['S[user: u1]']);
+  });
+});
+
+describe('summaries of a set whose covered messages are all gone', () => {
+  it('are removed when the set stores its next summary, and not before', async () => {
+    const { app, session } = await harness.chat({});
+    for (const text of ['u1', 'u2', 'u3']) await say(app, session, text);
+    const first = (await storedSummaries(app, session.id)).summaries;
+    expect(first.map((s) => s.text)).toEqual(['S[user: u1]']);
+    // Delete the whole covered chunk: the summary stays stored (and listed) until the set saves again.
+    for (const id of first[0]!.messageIds)
+      await app.inject({ method: 'DELETE', url: `/api/sessions/${session.id}/messages/${id}` });
+    expect((await storedSummaries(app, session.id)).summaries).toHaveLength(1);
+    for (const text of ['u4', 'u5', 'u6']) await say(app, session, text);
+    const after = (await storedSummaries(app, session.id)).summaries;
+    expect(after.length).toBeGreaterThan(0);
+    expect(after.map((s) => s.id)).not.toContain(first[0]!.id);
   });
 });
 
@@ -119,6 +178,13 @@ describe('summaryViews', () => {
     );
     expect(views.map((set) => set.set)).toEqual(['b', 'a']);
     expect(views[0]!.summaries.map((item) => item.id)).toEqual(['early', 'late']);
+  });
+  it.each(['constructor', '__proto__', 'toString'])('lists a set called %s like any other', (set) => {
+    const stored: unknown = JSON.parse(`{ ${JSON.stringify(set)}: ${JSON.stringify([summary('s', ['a', 'b'])])} }`);
+    const views = summaryViews(stored, messages);
+    expect(views).toHaveLength(1);
+    expect(views[0]!.set).toBe(set);
+    expect(views[0]!.summaries[0]).toMatchObject({ id: 's', valid: true, firstIndex: 1, lastIndex: 2 });
   });
   it('does not count partial or streaming rows as positions', () => {
     const rows = [message('a', 'one'), message('p', 'half', { status: 'partial' }), message('b', 'two')];
