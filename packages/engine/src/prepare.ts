@@ -209,7 +209,7 @@ export async function prepareWorkflow(
       }),
     };
   }
-  // Sinks (Chat Output, State Write, later summary writers) decide what runs: they and their upstream nodes.
+  // Sinks (Chat Output, State Write) decide what runs: they and their upstream nodes.
   const reachable = new Set([...parts.reply, ...parts.post]);
   return { errors: [], prepared: { workflow, resources, definitions, ports, incoming, upstream, reachable, parts } };
 }

@@ -9,7 +9,7 @@ type DescribedTurn = {
   turnNumber: number;
   lines: string[];
   post?: PostNote;
-  /** Summaries the turn's runs lost at commit time (a covered message changed meanwhile). */
+  /** Items the turn's runs lost at commit time (a linked message changed meanwhile). */
   warnings?: string[];
 };
 
@@ -21,8 +21,8 @@ export type StoryChip = DescribedTurn & {
 
 /**
  * The turns of a view that still count and stored something, or whose after-reply run has ended (the chip is how
- * its log is reached, whatever came of it), or that lost a summary at commit time, by execution id, described once per view. `lines` is one plain-words
- * line per write, in write order.
+ * its log is reached, whatever came of it), or that lost an item at commit time, by execution id, described once per view. `lines` is one plain-words line per
+ * write, in write order.
  */
 export type DescribedTurns = ReadonlyMap<string, DescribedTurn>;
 
@@ -41,7 +41,7 @@ export function describeTurns(view: SessionStateView | undefined): DescribedTurn
             ...(run.executionId !== undefined && { executionId: run.executionId }),
           }
         : undefined;
-    const warnings = turn.summaryWarnings ?? [];
+    const warnings = turn.linkWarnings ?? [];
     if (turn.writes.length || post || warnings.length)
       described.set(turn.executionId, {
         turnNumber: turn.turnNumber,

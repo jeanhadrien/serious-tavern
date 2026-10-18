@@ -4,7 +4,7 @@ import type { NodeDefinition } from '../../types.js';
 export const AFTER_REPLY_TYPE = 'after-reply';
 
 /**
- * Marks work that runs after the reply: every sink that depends on this node (a State Write, later Save Summary)
+ * Marks work that runs after the reply: every sink that depends on this node (a State Write)
  * runs in a second run once the turn has settled (see `parts.ts`). Its outputs only have values in that run.
  */
 export const afterReply: NodeDefinition = {

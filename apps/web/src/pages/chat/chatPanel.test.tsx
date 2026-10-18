@@ -46,13 +46,6 @@ it('has a Story state section under Settings, loading until the state arrives', 
   expect(html).toContain('Loading story state…');
 });
 
-it('has a Summaries section after Story state, loading until the state arrives', () => {
-  const html = render(workflow());
-  expect(html.indexOf('>Story state</h3>')).toBeLessThan(html.indexOf('>Summaries</h3>'));
-  expect(html).toContain('aria-labelledby="chat-summaries-s1"');
-  expect(html).toContain('Loading summaries…');
-});
-
 it('renders one control per declaration with the stored value or the default, resets and issues', () => {
   const html = render(
     workflow([

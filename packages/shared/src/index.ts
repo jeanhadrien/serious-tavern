@@ -8,7 +8,7 @@ export * from './provider.js';
 export * from './provider-models.js';
 export * from './collection.js';
 export * from './state/index.js';
-export * from './summaries/index.js';
+export * from './links/index.js';
 export * from './hash.js';
 export * from './imports.js';
 export * from './character.js';

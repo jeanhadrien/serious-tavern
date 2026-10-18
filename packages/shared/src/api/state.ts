@@ -73,34 +73,11 @@ export const turnStateSchema = z.object({
   postStatus: postStatusSchema.optional(),
   postExecutionId: z.string().optional(),
   postError: z.string().optional(),
-  // Summaries the turn's runs (reply or after-reply) asked to store and that were dropped at commit time, in plain
-  // words (at most a few, each cut); absent when none were. The run's execution log has them too.
-  summaryWarnings: z.array(z.string()).optional(),
+  // Items the turn's runs (reply or after-reply) asked to store with a link to chat messages and that were dropped at
+  // commit time because those messages changed, in plain words (at most a few, each cut); absent when none were. The
+  // run's execution log has them too.
+  linkWarnings: z.array(z.string()).optional(),
 });
-// One stored summary as the chat panel shows it. Positions count the chat's history messages (final or without a
-// status; partial and streaming rows do not count) from 1, user and assistant alike, and only the covered messages
-// that are still in the chat: a summary whose messages were all deleted has none of the four position fields.
-export const summaryViewSchema = z.object({
-  id: z.string(),
-  text: z.string(),
-  createdAt: z.string(),
-  // The run (reply or after-reply) that wrote it.
-  executionId: z.string(),
-  // Every covered message is still in the chat and unchanged, so Memory can use the summary.
-  valid: z.boolean(),
-  // How many messages it covered when it was written, and how many of those are no longer in the chat.
-  covered: z.number(),
-  missing: z.number(),
-  firstIndex: z.number().optional(),
-  lastIndex: z.number().optional(),
-  // The first and last covered message that is still in the chat (the first is where the panel scrolls to).
-  firstMessageId: z.string().optional(),
-  lastMessageId: z.string().optional(),
-});
-// A summary set: its summaries in chat order (those without a message left last). Sets in stored order.
-export const summarySetViewSchema = z.object({ set: z.string(), summaries: z.array(summaryViewSchema) });
-export type SummaryView = z.infer<typeof summaryViewSchema>;
-export type SummarySetView = z.infer<typeof summarySetViewSchema>;
 export const sessionStateViewSchema = z.object({
   // The turn the next message will be.
   turn: z.number(),
@@ -109,9 +86,6 @@ export const sessionStateViewSchema = z.object({
   nodes: z.array(nodeStateSchema),
   // Every stored turn entry in order, including those that no longer count.
   turns: z.array(turnStateSchema),
-  // The chat's history summaries by set, valid or not (an invalid one is kept until a new summary replaces it).
-  // Summaries belong to the messages they cover, not to a turn: they are not in `turns`.
-  summaries: z.array(summarySetViewSchema),
 });
 export type SessionStateView = z.infer<typeof sessionStateViewSchema>;
 

@@ -18,14 +18,10 @@ import type { ExecutionContext, NodeResources } from './types.js';
 
 // Fixtures for tests that build an `ExecutionContext` by hand or need a story state to run against.
 
-/** The state and summary members of a context for a run that tracks none: reads find nothing, writes vanish. */
-export const stateless = (
-  nodeId: string,
-): Pick<ExecutionContext, 'state' | 'writeState' | 'summaries' | 'writeSummary'> => ({
+/** The state members of a context for a run that tracks no story state: reads find nothing, writes vanish. */
+export const stateless = (nodeId: string): Pick<ExecutionContext, 'state' | 'writeState'> => ({
   state: createStateAccess(undefined, nodeId),
   writeState: () => ({}),
-  summaries: {},
-  writeSummary: () => ({ id: '' }),
 });
 
 type Override = Partial<Omit<StateKeyView, 'meta'>> & { meta?: Partial<StateKeyView['meta']> };

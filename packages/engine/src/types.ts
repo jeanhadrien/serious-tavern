@@ -9,8 +9,6 @@ import type {
   Provider,
   StateDefinition,
   StateKeyView,
-  Summary,
-  SummaryWrite,
   WireExchange,
 } from '@st/shared';
 import type { z } from 'zod';
@@ -50,9 +48,6 @@ export type StateWriteRequest =
   | { target: StateWriteTarget; op: 'remove'; itemId: string }
   | { target: StateWriteTarget; op: 'delete' }
   | { target: Extract<StateWriteTarget, { kind: 'definition' }>; op: 'increment'; by: number };
-// What a Save Summary node asks to store. Like state writes it is buffered and only counts when the node completes;
-// the run mints the summary's id (`<execution>:<node>:<n>`) and the session stamps `createdAt` at settle time.
-export type SummaryWriteRequest = Pick<SummaryWrite, 'set' | 'messageIds' | 'fingerprint' | 'text' | 'replaces'>;
 // Read access to the story state as it was when the turn started. Writes made during the run are never
 // visible here.
 export type StateAccess = {
@@ -100,13 +95,6 @@ export type ExecutionContext = {
   // stored writes are returned with its result (and with `ExecutionFailure`). `add` returns the item with
   // the id it will be stored under.
   writeState(request: StateWriteRequest): { item?: CollectionItem };
-  // The chat's history summaries as they were when the run started, by set name (read-only, all sets, frozen).
-  // `history` holds every history message, so a node can check which of them a summary still covers.
-  summaries: Readonly<Record<string, readonly Summary[]>>;
-  // Asks to store a summary of a chunk. Buffered: nothing is stored unless this node completes; the run's stored
-  // writes are returned with its result (and with `ExecutionFailure`), and the caller commits them at settle time
-  // (see `commitSummaryWrites`). Returns the id the summary will be stored under.
-  writeSummary(request: SummaryWriteRequest): { id: string };
   // Stores the node's HTTP exchange in the execution log (`wire`); each call replaces the previous one.
   recordWire(exchange: WireExchange): void;
   emit(event: EngineEvent): void;

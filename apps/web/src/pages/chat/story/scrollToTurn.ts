@@ -10,11 +10,6 @@ export interface ReplyRoot {
   replies(): Iterable<ReplyElement>;
 }
 
-/** Where to look for a message by id: every message of the thread, either role. */
-export interface MessageRoot {
-  messages(): Iterable<ReplyElement>;
-}
-
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 const documentReplies: ReplyRoot = {
   replies: () => document.querySelectorAll<HTMLElement>('.message.assistant'),
@@ -42,38 +37,13 @@ export function lastReplyOf<T extends { dataset: DOMStringMap }>(
 export function scrollToTurn(executionId: string, root: ReplyRoot = documentReplies, calm = reducedMotion()): boolean {
   const target = lastReplyOf(root.replies(), executionId);
   if (!target) return false;
-  reveal(target, calm);
-  return true;
-}
-
-const documentMessages: MessageRoot = {
-  messages: () => document.querySelectorAll<HTMLElement>('.message[data-message-id]'),
-};
-
-/**
- * Scrolls the thread to a message (either role, found by its `data-message-id`) and flashes it, like
- * `scrollToTurn`. Returns whether it is on screen: a message deleted since the view loaded does nothing.
- */
-export function scrollToMessage(
-  messageId: string,
-  root: MessageRoot = documentMessages,
-  calm = reducedMotion(),
-): boolean {
-  for (const candidate of root.messages()) {
-    if (candidate.dataset.messageId !== messageId) continue;
-    reveal(candidate, calm);
-    return true;
-  }
-  return false;
-}
-
-function reveal(target: ReplyElement, calm: boolean): void {
   target.scrollIntoView({ block: 'center', behavior: calm ? 'auto' : 'smooth' });
   if (!calm && typeof target.animate === 'function')
     target.animate(
       [{ boxShadow: '0 0 0 2px #9fb0ff, 0 0 18px rgba(159, 176, 255, 0.55)' }, { boxShadow: '0 0 0 0 transparent' }],
       { duration: 1400, easing: 'ease-out' },
     );
+  return true;
 }
 
 /**

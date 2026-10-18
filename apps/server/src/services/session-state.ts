@@ -12,7 +12,6 @@ import {
 import type { AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
 import { loadStoryState } from './story-state.js';
-import { summaryViews } from './summary-view.js';
 
 type View = ApiResponse<'getSessionState'>;
 
@@ -115,9 +114,8 @@ export async function sessionStateView(context: AppContext, sessionId: string): 
         ...(post && { postStatus: post.status }),
         ...(post?.executionId !== undefined && { postExecutionId: post.executionId }),
         ...(post?.error !== undefined && { postError: post.error }),
-        ...(entry.summaryWarnings?.length && { summaryWarnings: entry.summaryWarnings }),
+        ...(entry.linkWarnings?.length && { linkWarnings: entry.linkWarnings }),
       };
     }),
-    summaries: summaryViews(session.summaries, session.messages),
   };
 }

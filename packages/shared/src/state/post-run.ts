@@ -22,8 +22,8 @@ export function effectivePostRun(
   return { status, ...executionId, ...(status === 'error' && postError ? { error: postError } : {}) };
 }
 
-/** The entry keeps at most this many dropped-summary warnings, each cut to this many characters. */
-export const SUMMARY_WARNING_LIMITS = { count: 5, length: 300 };
+/** The entry keeps at most this many dropped-link warnings, each cut to this many characters. */
+export const LINK_WARNING_LIMITS = { count: 5, length: 300 };
 
 export type PostRunResult = {
   status: Exclude<PostStatus, 'running'>;
@@ -31,8 +31,8 @@ export type PostRunResult = {
   error?: string;
   /** The post run's resolved writes, also of a failed or stopped run (the nodes that completed). */
   writes: StateWrite[];
-  /** Warnings of summary writes this run lost at commit time; appended to the entry's (see `SUMMARY_WARNING_LIMITS`). */
-  summaryWarnings?: string[];
+  /** Warnings of linked writes this run lost at commit time; appended to the entry's (see `LINK_WARNING_LIMITS`). */
+  linkWarnings?: string[];
 };
 
 /**
@@ -50,11 +50,11 @@ export function withPostRun(state: unknown, executionId: string, result: PostRun
       postStatus: result.status,
       ...(result.status === 'error' && result.error ? { postError: result.error.slice(0, POST_ERROR_LIMIT) } : {}),
       writes: [...stored, ...result.writes],
-      ...(result.summaryWarnings?.length && {
-        summaryWarnings: [
-          ...(Array.isArray(raw.summaryWarnings) ? raw.summaryWarnings : []),
-          ...result.summaryWarnings.map((text) => text.slice(0, SUMMARY_WARNING_LIMITS.length)),
-        ].slice(-SUMMARY_WARNING_LIMITS.count),
+      ...(result.linkWarnings?.length && {
+        linkWarnings: [
+          ...(Array.isArray(raw.linkWarnings) ? raw.linkWarnings : []),
+          ...result.linkWarnings.map((text) => text.slice(0, LINK_WARNING_LIMITS.length)),
+        ].slice(-LINK_WARNING_LIMITS.count),
       }),
     };
   });

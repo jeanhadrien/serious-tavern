@@ -182,33 +182,8 @@ it("describes a chat's computed story state: keys by name, turns with their writ
       },
       { executionId: 'e2', at: 'b', completed: false, replies: 0, turnNumber: null, writes: [] },
     ],
-    summaries: [
-      {
-        set: 'main',
-        summaries: [
-          {
-            id: 's1',
-            text: 'The party met Borin.',
-            createdAt: 'a',
-            executionId: 'e3',
-            valid: true,
-            covered: 20,
-            missing: 0,
-            firstIndex: 1,
-            lastIndex: 20,
-            firstMessageId: 'm1',
-            lastMessageId: 'm20',
-          },
-          { id: 's2', text: 't', createdAt: 'b', executionId: 'e4', valid: false, covered: 2, missing: 2 },
-        ],
-      },
-    ],
   };
   expect(apiContract.getSessionState.response.parse(view)).toEqual(view);
-  const { summaries: _summaries, ...withoutSummaries } = view;
-  expect(apiContract.getSessionState.response.safeParse(withoutSummaries).success).toBe(false);
-  const bad = [{ set: 'main', summaries: [{ id: 's', text: 't', createdAt: 'a', executionId: 'e', valid: 'yes' }] }];
-  expect(apiContract.getSessionState.response.safeParse({ ...view, summaries: bad }).success).toBe(false);
   expect(apiContract.getSessionState.params.safeParse({ id: 'not-a-uuid' }).success).toBe(false);
   // A turn number is a number or null, never missing; a node's label may be left out.
   const { turnNumber: _turnNumber, ...unnumbered } = view.turns[1]!;
@@ -258,7 +233,7 @@ it('takes chat settings as a partial map with null resets, and keeps workflow de
 
 it("describes a turn's post-turn run in the state view and in execution logs, all additive", () => {
   const turn = { executionId: 'e1', at: 'a', completed: true, replies: 1, turnNumber: 1, writes: [] };
-  const view = { turn: 2, definitions: [], nodes: [], turns: [turn], summaries: [] };
+  const view = { turn: 2, definitions: [], nodes: [], turns: [turn] };
   expect(apiContract.getSessionState.response.parse(view)).toEqual(view);
   for (const postStatus of ['running', 'completed', 'error', 'stopped']) {
     const post = { ...turn, postStatus, postExecutionId: 'p1', postError: 'boom' };

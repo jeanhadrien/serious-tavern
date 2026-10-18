@@ -1,5 +1,5 @@
 // Pure 32-bit integer math, so it gives the same words in a browser. Pinned by the golden test of `createRandom`
-// (engine): changing it breaks reproducing old runs from their seed, and invalidates stored summary fingerprints.
+// (engine): changing it breaks reproducing old runs from their seed, and invalidates the fingerprints stored in message links.
 
 /** cyrb128: hashes a string into four 32-bit words (the generator state). */
 export function hashSeed(text: string): [number, number, number, number] {

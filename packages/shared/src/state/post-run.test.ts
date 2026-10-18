@@ -4,7 +4,7 @@ import {
   POST_ERROR_LIMIT,
   POST_INTERRUPTED_MESSAGE,
   type PostRun,
-  SUMMARY_WARNING_LIMITS,
+  LINK_WARNING_LIMITS,
   withPostRun,
 } from './post-run.js';
 import { item, nodeAddWrite, setWrite, turnEntry } from './test-fixtures.js';
@@ -83,24 +83,24 @@ describe('withPostRun', () => {
     expect(readTurnEntries(result)[0]?.writes).toEqual([reply, post, memory]);
   });
 
-  it('appends dropped-summary warnings to the entry, cut and capped, and adds nothing without them', () => {
-    const first = withPostRun({ turns: [{ ...running, summaryWarnings: ['reply part'] }] }, 't1', {
+  it('appends dropped-link warnings to the entry, cut and capped, and adds nothing without them', () => {
+    const first = withPostRun({ turns: [{ ...running, linkWarnings: ['reply part'] }] }, 't1', {
       status: 'completed',
       writes: [],
-      summaryWarnings: ['post part'],
+      linkWarnings: ['post part'],
     });
-    expect(readTurnEntries(first)[0]?.summaryWarnings).toEqual(['reply part', 'post part']);
+    expect(readTurnEntries(first)[0]?.linkWarnings).toEqual(['reply part', 'post part']);
     const many = withPostRun(first, 't1', {
       status: 'completed',
       writes: [],
-      summaryWarnings: Array.from({ length: 9 }, (_, index) => `w${index}`.padEnd(400, 'x')),
+      linkWarnings: Array.from({ length: 9 }, (_, index) => `w${index}`.padEnd(400, 'x')),
     });
-    const kept = readTurnEntries(many)[0]?.summaryWarnings ?? [];
-    expect(kept).toHaveLength(SUMMARY_WARNING_LIMITS.count);
-    expect(kept.every((text) => text.length === SUMMARY_WARNING_LIMITS.length)).toBe(true);
+    const kept = readTurnEntries(many)[0]?.linkWarnings ?? [];
+    expect(kept).toHaveLength(LINK_WARNING_LIMITS.count);
+    expect(kept.every((text) => text.length === LINK_WARNING_LIMITS.length)).toBe(true);
     expect(kept.at(-1)?.startsWith('w8')).toBe(true);
-    const none = withPostRun({ turns: [running] }, 't1', { status: 'completed', writes: [], summaryWarnings: [] });
-    expect(none.turns[0]).not.toHaveProperty('summaryWarnings');
+    const none = withPostRun({ turns: [running] }, 't1', { status: 'completed', writes: [], linkWarnings: [] });
+    expect(none.turns[0]).not.toHaveProperty('linkWarnings');
   });
 
   it('never changes postExecutionId and leaves the other fields as they are', () => {

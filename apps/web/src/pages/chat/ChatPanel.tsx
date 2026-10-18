@@ -3,17 +3,15 @@ import { X } from 'lucide-react';
 import type { Workflow } from '@st/shared';
 import { IconButton } from '../../components/IconButton.js';
 import { SettingsSection, type SaveSettings } from './panel/SettingsSection.js';
-import { panelCoversThread, scrollToMessage, scrollToTurn } from './story/scrollToTurn.js';
-import { SummariesSection } from './story/SummariesSection.js';
+import { panelCoversThread, scrollToTurn } from './story/scrollToTurn.js';
 import { StorySection } from './story/StorySection.js';
 import type { StoryPanelData } from './story/useStoryState.js';
 import './chatPanel.css';
 
 /**
- * The chat's side panel, inside the chat view (not a layout view). It holds per-chat sections: chat settings, story
- * state and history summaries (both read the one state view in `story`). Memoized because the chat re-renders on
- * every streamed token: every prop keeps its identity between tokens (`story` is only replaced when the loaded view
- * changes).
+ * The chat's side panel, inside the chat view (not a layout view). It holds per-chat sections: chat settings and
+ * story state. Memoized because the chat re-renders on every streamed token: every prop keeps
+ * its identity between tokens (`story` is only replaced when the loaded view changes).
  */
 export const ChatPanel = memo(function ChatPanel({
   workflow,
@@ -38,12 +36,6 @@ export const ChatPanel = memo(function ChatPanel({
     },
     [onClose],
   );
-  const jumpToMessage = useCallback(
-    (messageId: string) => {
-      if (scrollToMessage(messageId) && panelCoversThread(panel.current)) onClose();
-    },
-    [onClose],
-  );
   return (
     <aside ref={panel} className="chat-panel" aria-label="Chat panel">
       <div className="chat-panel-header">
@@ -57,10 +49,6 @@ export const ChatPanel = memo(function ChatPanel({
       <section aria-labelledby={`chat-story-${sessionId}`}>
         <h3 id={`chat-story-${sessionId}`}>Story state</h3>
         <StorySection story={story} onJump={jump} />
-      </section>
-      <section aria-labelledby={`chat-summaries-${sessionId}`}>
-        <h3 id={`chat-summaries-${sessionId}`}>Summaries</h3>
-        <SummariesSection story={story} onJump={jumpToMessage} />
       </section>
     </aside>
   );

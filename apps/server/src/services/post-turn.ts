@@ -1,13 +1,5 @@
-import type {
-  Character,
-  ChatMessage,
-  ExecutionLog,
-  Persona,
-  PostRunResult,
-  StateDefinition,
-  SummaryWrite,
-} from '@st/shared';
-import { POST_INTERRUPTED_MESSAGE, readSummaries, readTurnEntries, turnPresence } from '@st/shared';
+import type { Character, ChatMessage, ExecutionLog, Persona, PostRunResult, StateDefinition } from '@st/shared';
+import { POST_INTERRUPTED_MESSAGE, readTurnEntries, turnPresence } from '@st/shared';
 import { executeWorkflow, ExecutionFailure } from '@st/engine';
 import type { PreparedWorkflow } from '@st/engine';
 import type { AppContext } from '../context.js';
@@ -38,8 +30,7 @@ export type PostTurn = {
   replies: ChatMessage[];
 };
 
-/** How the run ended: the entry's result, the summaries it wrote, and its log (absent when it never ran). */
-type Outcome = { result: PostRunResult; execution?: ExecutionLog; summaryWrites?: SummaryWrite[] };
+type Outcome = { result: PostRunResult; execution?: ExecutionLog };
 
 /**
  * Runs the after-reply part of a settled turn and records how it ended on the turn's entry. It runs in the turn's
@@ -62,15 +53,7 @@ export async function runPostTurn(
       // A log that cannot be written must not leave the entry `running`.
       console.warn(`Could not save the after-reply execution log of session ${sessionId}:`, error);
     });
-  const warnings = await settle(context, sessionId, post, outcome);
-  // A summary dropped at commit time (its messages changed during the run) is said in the log, which was saved
-  // before the commit: save it again with the warning.
-  if (outcome.execution && warnings.length) {
-    outcome.execution.warnings.push(...warnings);
-    await context.executions.save(outcome.execution).catch((error) => {
-      console.warn(`Could not save the after-reply execution log of session ${sessionId}:`, error);
-    });
-  }
+  await settle(context, sessionId, post.turnExecutionId, outcome.result);
 }
 
 const SETTLE_RETRY_MS = 100;
@@ -80,33 +63,23 @@ const SETTLE_RETRY_MS = 100;
  * fails too, a minimal write records an honest error (without the writes), because an entry left `running` would later
  * read as a restart's casualty and lose the real outcome. Only when even that fails is it left to a warning.
  */
-async function settle(
-  context: AppContext,
-  sessionId: string,
-  post: PostTurn,
-  { result, summaryWrites }: Outcome,
-): Promise<string[]> {
-  const write = async (settlement: PostRunResult, summaries?: SummaryWrite[]) => {
-    let warnings: string[] = [];
+async function settle(context: AppContext, sessionId: string, turnExecutionId: string, result: PostRunResult) {
+  const write = async (settlement: PostRunResult) => {
     const updated = await context.sessions.silent.update(sessionId, (current) => {
-      warnings = settlePostRun(current, {
-        turnExecutionId: post.turnExecutionId,
-        executionId: post.executionId,
-        summaryWrites: summaries,
-        ...settlement,
-      });
+      settlePostRun(current, { turnExecutionId, ...settlement });
       return current;
     });
     if (updated) context.changes.publish({ type: 'sessions.changed', id: sessionId });
-    return warnings;
   };
   try {
-    return await write(result, summaryWrites);
+    await write(result);
+    return;
   } catch {
     await new Promise((resolve) => setTimeout(resolve, SETTLE_RETRY_MS));
   }
   try {
-    return await write(result, summaryWrites);
+    await write(result);
+    return;
   } catch (error) {
     try {
       await write({
@@ -118,7 +91,6 @@ async function settle(
       console.warn(`Could not record the after-reply run of session ${sessionId}:`, last);
     }
   }
-  return [];
 }
 
 async function execute(
@@ -136,12 +108,9 @@ async function execute(
     presence.find(({ entry }) => entry.executionId === post.turnExecutionId)?.turn ??
     presence.filter((item) => item.turn !== null).length;
   const story = foldSession(post.definitions, session, turn);
-  // The summaries as the reply run left them (its commit is already in the session).
-  const summaries = readSummaries(session.summaries);
   const { replies } = post;
   let execution: ExecutionLog;
   let result: PostRunResult;
-  let summaryWrites: SummaryWrite[] = [];
   try {
     const done = await executeWorkflow(post.prepared, {
       part: 'post',
@@ -154,21 +123,18 @@ async function execute(
       persona: post.persona,
       settings: post.settings,
       state: story.snapshot,
-      summaries,
       seed: post.seed,
       executionId: post.executionId,
       signal: run.controller.signal,
     });
     execution = done.execution;
     result = { status: 'completed', writes: done.writes };
-    summaryWrites = done.summaryWrites;
   } catch (error) {
     if (!(error instanceof ExecutionFailure))
       return { result: { status: 'error', error: errorMessage(error), writes: [] } };
     // The nodes that completed keep their writes, like in a failed turn. A user's stop is not an error; a shutdown
     // cut the run short like a restart would, and reads the same.
     execution = error.execution;
-    summaryWrites = error.summaryWrites;
     result =
       run.stoppedBy === 'shutdown'
         ? { status: 'error', error: POST_INTERRUPTED_MESSAGE, writes: error.writes }
@@ -179,5 +145,5 @@ async function execute(
   }
   execution.turnExecutionId = post.turnExecutionId;
   execution.warnings.push(...story.issues);
-  return { result, execution, summaryWrites };
+  return { result, execution };
 }

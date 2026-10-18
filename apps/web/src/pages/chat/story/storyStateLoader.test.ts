@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ChangeEvent, SessionStateView } from '@st/shared';
 import { startStoryLoader, type StoryLoad } from './storyStateLoader.js';
 
-const view = (turn: number): SessionStateView => ({ turn, definitions: [], nodes: [], turns: [], summaries: [] });
+const view = (turn: number): SessionStateView => ({ turn, definitions: [], nodes: [], turns: [] });
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());

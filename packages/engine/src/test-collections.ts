@@ -8,7 +8,7 @@ import {
 } from '@st/shared';
 import { createStateAccess } from './state-access.js';
 import { StateWriteBuffer } from './state-writes.js';
-import type { ExecutionContext, NodeDefinition, NodeResources, SummaryWriteRequest } from './types.js';
+import type { ExecutionContext, NodeDefinition, NodeResources } from './types.js';
 
 // Fixtures shared by the Recall and Draw tests.
 
@@ -38,7 +38,6 @@ export async function runNode(
     inputs?: Record<string, unknown>;
     message?: string;
     history?: ExecutionContext['history'];
-    summaries?: ExecutionContext['summaries'];
     draws?: number[];
     // The story state the node runs against; its writes come back resolved, as the executor would store them.
     state?: StateSnapshot;
@@ -48,7 +47,6 @@ export async function runNode(
   const queue = options.draws ? [...options.draws] : undefined;
   let drawn = 0;
   const writes = new StateWriteBuffer(options.state, 'run');
-  const summaryWrites: SummaryWriteRequest[] = [];
   const ctx: ExecutionContext = {
     nodeId: definition.type,
     inputs: options.inputs ?? {},
@@ -62,11 +60,6 @@ export async function runNode(
     log: (line) => logs.push(line),
     state: createStateAccess(options.state, definition.type),
     writeState: writes.writer(definition.type),
-    summaries: options.summaries ?? {},
-    writeSummary: (request) => {
-      summaryWrites.push(request);
-      return { id: `s${summaryWrites.length}` };
-    },
     random: () => {
       drawn++;
       if (!queue) return 0;
@@ -78,7 +71,7 @@ export async function runNode(
   };
   const output = await definition.execute(ctx);
   writes.commit(definition.type, 1);
-  return { output, logs, drawn, summaryWrites, ...writes.resolve() };
+  return { output, logs, drawn, ...writes.resolve() };
 }
 
 export const node = (id: string, type: string, config: Record<string, unknown> = {}) => ({

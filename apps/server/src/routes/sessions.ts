@@ -11,7 +11,7 @@ export function registerSessions(app: FastifyInstance, context: AppContext) {
   const { workflows, characters, personas, sessions } = context;
   app.get<ApiRoute<'listSessions'>>('/api/sessions', async () =>
     // The turn entries are the session's own business: a list carries neither messages nor state.
-    (await sessions.list()).map(({ messages, state: _state, summaries: _summaries, ...session }) => ({
+    (await sessions.list()).map(({ messages, state: _state, ...session }) => ({
       ...session,
       messageCount: messages.length,
     })),

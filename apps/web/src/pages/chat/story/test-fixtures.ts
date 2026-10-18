@@ -9,7 +9,6 @@ import {
   type SessionStateView,
   type StateDefinition,
   type StateWrite,
-  type SummaryView,
   type TurnEntry,
 } from '@st/shared';
 import { definition } from '../../stateDefinitions/test-fixtures.js';
@@ -119,7 +118,7 @@ export function buildView({
         ...(post && { postStatus: post.status }),
         ...(post?.executionId !== undefined && { postExecutionId: post.executionId }),
         ...(post?.error !== undefined && { postError: post.error }),
-        ...(stored.summaryWarnings?.length && { summaryWarnings: stored.summaryWarnings }),
+        ...(stored.linkWarnings?.length && { linkWarnings: stored.linkWarnings }),
         writes: stored.writes.map((write) => {
           const definitionName = write.target.kind === 'definition' ? names.get(write.target.definitionId) : undefined;
           const nodeLabel = nodeLabels[write.nodeId];
@@ -133,22 +132,5 @@ export function buildView({
         }),
       };
     }),
-    summaries: [],
   };
 }
-
-/** One summary as the state view reports it: a valid one covering messages 21-40 of the chat. */
-export const summary = (extra: Partial<SummaryView> = {}): SummaryView => ({
-  id: 's1',
-  text: 'They met at the inn.',
-  createdAt: '2026-01-01T10:00:00.000Z',
-  executionId: 'e1',
-  valid: true,
-  covered: 20,
-  missing: 0,
-  firstIndex: 21,
-  lastIndex: 40,
-  firstMessageId: 'm21',
-  lastMessageId: 'm40',
-  ...extra,
-});

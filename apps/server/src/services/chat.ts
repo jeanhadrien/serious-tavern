@@ -7,11 +7,9 @@ import type {
   Persona,
   StateSnapshot,
   StateWrite,
-  Summary,
-  SummaryWrite,
   WorkflowInvalidDetails,
 } from '@st/shared';
-import { readSummaries, resolveChatSettings, workflowSettings } from '@st/shared';
+import { resolveChatSettings, workflowSettings } from '@st/shared';
 import type { StateDefinition } from '@st/shared';
 import { executeWorkflow, ExecutionFailure, postRunSeed, prepareWorkflow } from '@st/engine';
 import type { ChatReply, PreparedWorkflow } from '@st/engine';
@@ -20,8 +18,7 @@ import { HttpError, notFound, requireEntity } from '../errors.js';
 import { failureMessage, stopWarning } from './failure.js';
 import { nodeResources } from './node-resources.js';
 import { runPostTurn } from './post-turn.js';
-import { settleTurn } from './settle-turn.js';
-import { historyMessages } from './summaries.js';
+import { historyMessages, settleTurn } from './settle-turn.js';
 import { foldSession, listDefinitions } from './story-state.js';
 import { TurnStream, type TurnFrame } from './turn-stream.js';
 import type { RunningTurn } from './turns.js';
@@ -72,8 +69,6 @@ async function startTurn(context: AppContext, sessionId: string, content: string
       definitions: StateDefinition[];
       userMessage?: ChatMessage;
       history: ChatMessage[];
-      // The chat's summaries when the turn started (what Memory and Next Chunk read).
-      summaries: Record<string, Summary[]>;
       character?: Character;
       persona?: Persona;
       settings: Record<string, unknown>;
@@ -111,7 +106,6 @@ async function startTurn(context: AppContext, sessionId: string, content: string
       definitions,
       userMessage,
       history: historyMessages(current.messages),
-      summaries: readSummaries(current.summaries),
       character,
       persona,
       settings: settings.values,
@@ -140,7 +134,6 @@ async function executeTurn(
     definitions,
     userMessage,
     history,
-    summaries,
     character,
     persona,
     settings,
@@ -153,9 +146,7 @@ async function executeTurn(
     ? new TurnStream({ sessions: sessions.silent, sessionId, executionId, prepared, emit: options.emit })
     : undefined;
   options.emit?.({ type: 'turn.start', executionId });
-  let outcome:
-    | { replies: ChatReply[]; execution: ExecutionLog; writes: StateWrite[]; summaryWrites: SummaryWrite[] }
-    | undefined;
+  let outcome: { replies: ChatReply[]; execution: ExecutionLog; writes: StateWrite[] } | undefined;
   let failure: unknown;
   try {
     outcome = await executeWorkflow(prepared, {
@@ -167,7 +158,6 @@ async function executeTurn(
       persona,
       settings,
       state,
-      summaries,
       signal: turn.controller.signal,
       executionId,
       onEvent: stream?.onEvent,
@@ -180,7 +170,6 @@ async function executeTurn(
   const replies = outcome?.replies ?? (failure instanceof ExecutionFailure ? failure.replies : []);
   // The writes of every node that completed, even when the turn failed or was stopped.
   const writes = outcome?.writes ?? (failure instanceof ExecutionFailure ? failure.writes : []);
-  const summaryWrites = outcome?.summaryWrites ?? (failure instanceof ExecutionFailure ? failure.summaryWrites : []);
   // A stored value that no longer fits its declaration is ignored (the default runs); say so in the log.
   execution?.warnings.push(...settingIssues, ...stateIssues);
   if (!outcome && turn.stoppedBy && execution) execution.warnings.push(stopWarning('turn', turn.stoppedBy));
@@ -189,9 +178,7 @@ async function executeTurn(
   // (`running`) by the settle below, and its id is on the RunningTurn first, so a state read can tell it is live.
   const postExecutionId = outcome && prepared.parts.postSinks.length ? randomUUID() : undefined;
   if (postExecutionId) turn.postExecutionId = postExecutionId;
-  const settled: {
-    value?: { userMessage?: ChatMessage; assistantMessages: ChatMessage[]; summaryWarnings: string[] };
-  } = {};
+  const settled: { value?: { userMessage?: ChatMessage; assistantMessages: ChatMessage[] } } = {};
   // Everything a turn writes is silent; the settled turn announces itself once (success, failure or stop).
   const session = await sessions.silent.update(sessionId, (current) => {
     settled.value = settleTurn(current, {
@@ -201,20 +188,13 @@ async function executeTurn(
       streamed,
       interrupted: !outcome,
       writes,
-      summaryWrites,
       postExecutionId,
     });
     return current;
   });
   if (!session) throw notFound('Session');
   context.changes.publish({ type: 'sessions.changed', id: sessionId });
-  const { userMessage: saved, assistantMessages, summaryWarnings } = settled.value!;
-  // A summary dropped at commit time (its messages changed during the run) is said in the log, which was saved
-  // before the commit: save it again with the warning.
-  if (execution && summaryWarnings.length) {
-    execution.warnings.push(...summaryWarnings);
-    await executions.save(execution);
-  }
+  const { userMessage: saved, assistantMessages } = settled.value!;
   // The reply is complete for the client. The after-reply run follows in this turn's queue slot, after the
   // caller has its result.
   if (postExecutionId && outcome)

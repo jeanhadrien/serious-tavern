@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import type { SessionStateView } from '@st/shared';
 import { becameIdle, currentSlot, nextSlot, type Slot } from './storySlot.js';
 
-const view = (turn: number): SessionStateView => ({ turn, definitions: [], nodes: [], turns: [], summaries: [] });
+const view = (turn: number): SessionStateView => ({ turn, definitions: [], nodes: [], turns: [] });
 
 it('stores a loaded view for its chat', () => {
   expect(nextSlot(undefined, 's1', { view: view(1) })).toEqual({ sessionId: 's1', view: view(1), failed: false });

@@ -1,10 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import type { ChatMessage, Session, StateWrite, SummaryWrite } from '@st/shared';
-import { SUMMARY_WARNING_LIMITS, withTurnEntry } from '@st/shared';
+import type { ChatMessage, Session, StateWrite } from '@st/shared';
+import { withTurnEntry } from '@st/shared';
 import type { ChatReply } from '@st/engine';
 import { now } from '../context.js';
-import { commitSummaries } from './summaries.js';
 import type { StreamedRow } from './turn-stream.js';
+
+/** Messages a turn may read as history. Streaming and partial rows never enter it. */
+export function historyMessages(messages: ChatMessage[]): ChatMessage[] {
+  return messages.filter((message) => message.status === undefined || message.status === 'final');
+}
 
 export type Settlement = {
   executionId: string;
@@ -14,9 +18,6 @@ export type Settlement = {
   interrupted: boolean;
   // The story state writes of the nodes that completed; stored with the turn's entry.
   writes?: StateWrite[];
-  // The summaries the nodes that completed asked to store. Committed against the chat as it is at settle time, and not
-  // tied to the turn: deleting its replies later keeps them.
-  summaryWrites?: SummaryWrite[];
   // The after-reply run this turn leaves behind: the entry says `running` from the moment it is saved, so the
   // run never has a gap in which the chat shows none.
   postExecutionId?: string;
@@ -29,16 +30,7 @@ export type Settlement = {
  */
 export function settleTurn(
   current: Session,
-  {
-    executionId,
-    userMessage,
-    replies,
-    streamed,
-    interrupted,
-    writes = [],
-    summaryWrites = [],
-    postExecutionId,
-  }: Settlement,
+  { executionId, userMessage, replies, streamed, interrupted, writes = [], postExecutionId }: Settlement,
 ) {
   const streamedIds = new Set(streamed.map((row) => row.id));
   const streamedByOutput = new Map(streamed.map((row) => [row.outputId, row]));
@@ -80,7 +72,6 @@ export function settleTurn(
   const saved = userMessage && (current.messages.find((message) => message.id === userMessage.id) ?? userMessage);
   if (saved) saved.executionId = executionId;
   current.messages.push(...assistantMessages);
-  const summaryWarnings = commitSummaries(current, summaryWrites, executionId);
   // Every settled turn leaves an entry, with or without writes, so turn counting is stable. Whether it still
   // counts later depends on its replies (see `turnPresence`); `completed` is "ran to the end, no error or stop".
   current.state = withTurnEntry(current.state, {
@@ -89,13 +80,8 @@ export function settleTurn(
     completed: !interrupted,
     replies: assistantMessages.length,
     writes,
-    ...(summaryWarnings.length && {
-      summaryWarnings: summaryWarnings
-        .map((text) => text.slice(0, SUMMARY_WARNING_LIMITS.length))
-        .slice(-SUMMARY_WARNING_LIMITS.count),
-    }),
     ...(postExecutionId ? { postExecutionId, postStatus: 'running' as const } : {}),
   });
   current.updatedAt = now();
-  return { userMessage: saved, assistantMessages, summaryWarnings };
+  return { userMessage: saved, assistantMessages };
 }
