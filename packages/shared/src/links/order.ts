@@ -1,4 +1,4 @@
-import type { ItemLinkView } from './analyze.js';
+import type { RunItemLink } from './analyze.js';
 import { isPlainObject } from '../state/helpers.js';
 
 /**
@@ -11,7 +11,7 @@ import { isPlainObject } from '../state/helpers.js';
 export function linkedInChatOrder(value: unknown): unknown[] {
   if (!Array.isArray(value)) return [];
   const linked = value.flatMap((item, index) => {
-    const link = isPlainObject(item) && isPlainObject(item.link) ? (item.link as Partial<ItemLinkView>) : undefined;
+    const link = isPlainObject(item) && isPlainObject(item.link) ? (item.link as Partial<RunItemLink>) : undefined;
     if (link?.status !== 'intact' || typeof link.first !== 'number' || !Array.isArray(link.ids)) return [];
     return [{ item, first: link.first, key: link.ids.join('\u0000'), index }];
   });

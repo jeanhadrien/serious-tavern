@@ -6,20 +6,28 @@ import {
   previewWrite,
   readTurnEntries,
   type ApiResponse,
+  type ChatMessage,
   type FoldedKey,
   type StateWrite,
 } from '@st/shared';
 import type { AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
+import { withLinkViews } from './link-view.js';
+import { historyMessages } from './settle-turn.js';
 import { loadStoryState } from './story-state.js';
 
 type View = ApiResponse<'getSessionState'>;
 
-/** The folded keys as the three parallel records of the API. */
-function keyViews(keys: Record<string, FoldedKey>) {
+/**
+ * The folded keys as the three parallel records of the API. With `history`, the items of a collection key that link to
+ * messages carry their `link` (see `itemLinkViewSchema`).
+ */
+function keyViews(keys: Record<string, FoldedKey>, history?: readonly ChatMessage[]) {
   const entries = Object.entries(keys);
+  const viewOf = ({ value, meta }: FoldedKey) =>
+    history && meta.count !== undefined && Array.isArray(value) ? withLinkViews(value, history) : value;
   return {
-    values: Object.fromEntries(entries.map(([key, folded]) => [key, folded.value])),
+    values: Object.fromEntries(entries.map(([key, folded]) => [key, viewOf(folded)])),
     meta: Object.fromEntries(entries.map(([key, folded]) => [key, folded.meta])),
     history: Object.fromEntries(entries.map(([key, folded]) => [key, folded.history])),
   };
@@ -78,6 +86,7 @@ export async function sessionStateView(context: AppContext, sessionId: string): 
       ? nodeDisplayName(workflow.nodes, (type) => registry.get(type)?.label ?? type, nodeId)
       : undefined;
   const names = new Map(definitions.map((definition) => [definition.id, definition.name]));
+  const history = historyMessages(session.messages);
   const view = (write: StateWrite) => {
     const definitionName = write.target.kind === 'definition' ? names.get(write.target.definitionId) : undefined;
     const label = nodeLabel(write.nodeId);
@@ -94,7 +103,7 @@ export async function sessionStateView(context: AppContext, sessionId: string): 
     definitions: story.definitions.map((folded) => ({
       definitionId: folded.definitionId,
       name: folded.name,
-      ...keyViews(folded.keys),
+      ...keyViews(folded.keys, history),
       warnings: folded.warnings,
     })),
     nodes: story.nodes.map((folded) => {

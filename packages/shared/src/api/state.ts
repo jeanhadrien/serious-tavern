@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { linkStatuses } from '../links/status.js';
 import { stateDefinitionSchema, stateDefinitionWriteSchema } from '../state/definition.js';
 import { historyPointSchema, keyMetaSchema, stateWarningSchema } from '../state/fold-types.js';
 import { postStatusSchema, stateWriteSchema } from '../state/writes.js';
@@ -6,14 +7,39 @@ import { endpoint, idParamsSchema, noContentSchema } from './common.js';
 
 /**
  * `details` of `STATE_DEFINITION_IN_USE`: the chats that hold story state under the definition (renaming
- * and deleting are refused while a present turn wrote it) and, for a delete, the workflows whose State Read
- * or State Write nodes use it. Either list may be empty.
+ * and deleting are refused while a present turn wrote it) and, for a delete, the workflows whose State Read,
+ * State Write, Next Chunk or Unlinked Messages nodes use it. Either list may be empty.
  */
 export const stateDefinitionInUseDetailsSchema = z.object({
   sessions: z.array(z.object({ id: z.string(), title: z.string() })),
   workflows: z.array(z.string()),
 });
 export type StateDefinitionInUseDetails = z.infer<typeof stateDefinitionInUseDetailsSchema>;
+
+/**
+ * The `link` the view adds to an item of a definition's collection key that links to chat messages (items of node keys
+ * and items without a link carry none; `values` stays `unknown` per key, this is the shape of that property). Computed
+ * from the chat as it is when the view is built, never stored. Positions count the chat's history messages (final or
+ * without a status; partial and streaming rows do not count) from 1, user and assistant alike, and only the linked
+ * messages that are still in the chat: an item whose messages were all deleted has none of the four position fields.
+ */
+export const itemLinkViewSchema = z.object({
+  status: z.enum(linkStatuses),
+  // A broken item (not intact) whose surviving messages intact items of the same key link again: readers skip it and
+  // the panel collapses it. Never true for an intact or a `gone` item.
+  replaced: z.boolean(),
+  // How many messages the item linked when it was written, and how many of those are no longer in the chat.
+  count: z.number(),
+  missing: z.number(),
+  firstIndex: z.number().optional(),
+  lastIndex: z.number().optional(),
+  // The first and last linked message that is still in the chat (the first is where the panel jumps to).
+  firstMessageId: z.string().optional(),
+  lastMessageId: z.string().optional(),
+  // Every linked message that is still in the chat, in chat order (what the message markers list).
+  messageIds: z.array(z.string()),
+});
+export type ItemLinkView = z.infer<typeof itemLinkViewSchema>;
 
 // A key's folded facts, by key name. `values` has every key of the CURRENT definition (the default when nothing
 // valid is stored); `history` has a point per present turn that wrote the key (newest 100, oldest first), with

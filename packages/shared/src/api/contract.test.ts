@@ -1,6 +1,12 @@
 import { expect, it } from 'vitest';
 import { executionLogSchema, messageSchema } from '../models.js';
-import { apiContract, changeEventTypes, errorEnvelopeSchema, stateDefinitionInUseDetailsSchema } from './index.js';
+import {
+  apiContract,
+  changeEventTypes,
+  errorEnvelopeSchema,
+  itemLinkViewSchema,
+  stateDefinitionInUseDetailsSchema,
+} from './index.js';
 
 it('preserves existing entity defaults, including defaults on partial updates', () => {
   expect(apiContract.createCharacter.body.parse({ name: '  Alice  ' })).toMatchObject({
@@ -249,4 +255,44 @@ it("describes a turn's post-turn run in the state view and in execution logs, al
   expect(executionLogSchema.parse(post)).toMatchObject({ part: 'post', turnExecutionId: 'e1' });
   expect(executionLogSchema.parse({ ...log, part: 'reply' }).part).toBe('reply');
   expect(executionLogSchema.safeParse({ ...log, part: 'later' }).success).toBe(false);
+});
+
+it("describes the items a turn could not store and the link of a state view's items, all additive", () => {
+  const turn = { executionId: 'e1', at: 'a', completed: true, replies: 1, turnNumber: 1, writes: [] };
+  const view = { turn: 2, definitions: [], nodes: [], turns: [turn] };
+  const warned = {
+    ...turn,
+    linkWarnings: ['memory.summaries: the item "x" was not saved: a message it links to was edited.'],
+  };
+  expect(apiContract.getSessionState.response.parse({ ...view, turns: [warned] }).turns[0]).toEqual(warned);
+  expect(
+    apiContract.getSessionState.response.safeParse({ ...view, turns: [{ ...turn, linkWarnings: 'x' }] }).success,
+  ).toBe(false);
+  // The removed phase 6 fields are not part of the contract any more.
+  expect(Object.keys(apiContract.getSessionState.response.parse({ ...view, summaries: [] }))).not.toContain(
+    'summaries',
+  );
+
+  const link = {
+    status: 'partial',
+    replaced: false,
+    count: 20,
+    missing: 2,
+    firstIndex: 3,
+    lastIndex: 20,
+    firstMessageId: 'm3',
+    lastMessageId: 'm20',
+    messageIds: ['m3', 'm20'],
+  };
+  expect(itemLinkViewSchema.parse(link)).toEqual(link);
+  // A gone item has no positions.
+  const gone = { status: 'gone', replaced: false, count: 2, missing: 2, messageIds: [] };
+  expect(itemLinkViewSchema.parse(gone)).toEqual(gone);
+  for (const bad of [
+    { ...link, status: 'broken' },
+    { ...link, replaced: 'no' },
+    { ...link, messageIds: 'm3' },
+    { status: 'intact' },
+  ])
+    expect(itemLinkViewSchema.safeParse(bad).success).toBe(false);
 });

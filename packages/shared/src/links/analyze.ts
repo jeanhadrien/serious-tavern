@@ -65,7 +65,7 @@ export function analyzeLinks<T extends LinkableItem>(
 }
 
 /** The link as templates and nodes see it on a turn-start snapshot item. */
-export type ItemLinkView = {
+export type RunItemLink = {
   status: LinkStatus;
   /** The stored ids. */
   ids: string[];
@@ -80,7 +80,7 @@ export type ItemLinkView = {
 export function withItemLinks<T extends LinkableItem>(
   items: readonly T[],
   history: readonly LinkMessage[],
-): (T & { link?: ItemLinkView })[] {
+): (T & { link?: RunItemLink })[] {
   const byItem = new Map(analyzeLinks(items, history).map((entry) => [entry.item, entry]));
   return items.map((item) => {
     const entry = byItem.get(item);
