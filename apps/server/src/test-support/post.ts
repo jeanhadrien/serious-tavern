@@ -131,16 +131,22 @@ export function postHarness(prefix: string) {
     opened.push(app);
     return { app, directory, definition: await define(app) };
   }
+  /** The gate node, registered for the test (disposed by `cleanup`); `setup` wires one into the after-reply work. */
+  function gate() {
+    held.gate?.dispose();
+    held.gate = gateNode();
+    return held.gate;
+  }
   return {
     bare,
+    gate,
     /** A chat on the After Reply workflow; its post run is held at the gate until `gate.release()`. */
     async setup() {
       const context = await bare();
-      const gate = gateNode();
-      held.gate = gate;
+      const hold = gate();
       const { nodes, edges } = afterReplyWorkflow(context.definition.id, true);
       const workflow = await makeWorkflow(context.app, nodes, edges);
-      return { ...context, gate, workflow, session: await makeSession(context.app, workflow.id) };
+      return { ...context, gate: hold, workflow, session: await makeSession(context.app, workflow.id) };
     },
     async cleanup() {
       held.gate?.dispose();

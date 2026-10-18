@@ -1,5 +1,5 @@
 import type { Character, ChatMessage, ExecutionLog, Persona, PostRunResult, StateDefinition } from '@st/shared';
-import { readTurnEntries, turnPresence } from '@st/shared';
+import { POST_INTERRUPTED_MESSAGE, readTurnEntries, turnPresence } from '@st/shared';
 import { executeWorkflow, ExecutionFailure } from '@st/engine';
 import type { PreparedWorkflow } from '@st/engine';
 import type { AppContext } from '../context.js';
@@ -53,14 +53,43 @@ export async function runPostTurn(
       // A log that cannot be written must not leave the entry `running`.
       console.warn(`Could not save the after-reply execution log of session ${sessionId}:`, error);
     });
-  try {
+  await settle(context, sessionId, post.turnExecutionId, outcome.result);
+}
+
+const SETTLE_RETRY_MS = 100;
+
+/**
+ * Records the run's result on the turn's entry and announces it once. A write that fails is tried once more; if that
+ * fails too, a minimal write records an honest error (without the writes), because an entry left `running` would later
+ * read as a restart's casualty and lose the real outcome. Only when even that fails is it left to a warning.
+ */
+async function settle(context: AppContext, sessionId: string, turnExecutionId: string, result: PostRunResult) {
+  const write = async (settlement: PostRunResult) => {
     const updated = await context.sessions.silent.update(sessionId, (current) => {
-      settlePostRun(current, { turnExecutionId: post.turnExecutionId, ...outcome.result });
+      settlePostRun(current, { turnExecutionId, ...settlement });
       return current;
     });
     if (updated) context.changes.publish({ type: 'sessions.changed', id: sessionId });
+  };
+  try {
+    await write(result);
+    return;
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_RETRY_MS));
+  }
+  try {
+    await write(result);
+    return;
   } catch (error) {
-    console.warn(`Could not record the after-reply run of session ${sessionId}:`, error);
+    try {
+      await write({
+        status: 'error',
+        error: `The result of the after-reply run could not be saved: ${errorMessage(error)}`,
+        writes: [],
+      });
+    } catch (last) {
+      console.warn(`Could not record the after-reply run of session ${sessionId}:`, last);
+    }
   }
 }
 
@@ -103,11 +132,15 @@ async function execute(
   } catch (error) {
     if (!(error instanceof ExecutionFailure))
       return { result: { status: 'error', error: errorMessage(error), writes: [] } };
-    // The nodes that completed keep their writes, like in a failed turn; a stop is not an error.
+    // The nodes that completed keep their writes, like in a failed turn. A user's stop is not an error; a shutdown
+    // cut the run short like a restart would, and reads the same.
     execution = error.execution;
-    result = run.stoppedBy
-      ? { status: 'stopped', writes: error.writes }
-      : { status: 'error', error: failureMessage(error), writes: error.writes };
+    result =
+      run.stoppedBy === 'shutdown'
+        ? { status: 'error', error: POST_INTERRUPTED_MESSAGE, writes: error.writes }
+        : run.stoppedBy
+          ? { status: 'stopped', writes: error.writes }
+          : { status: 'error', error: failureMessage(error), writes: error.writes };
     if (run.stoppedBy) execution.warnings.push(stopWarning('after-reply run', run.stoppedBy));
   }
   execution.turnExecutionId = post.turnExecutionId;

@@ -15,15 +15,16 @@ afterEach(async () => {
 });
 
 describe('a chat changed during its post run', () => {
-  it('is not resurrected when it was deleted: the settle is a no-op', async () => {
+  it('is not resurrected when it was deleted: the run is stopped and its settle is a no-op', async () => {
     const { app, directory, session, gate } = await setup();
     await send(app, session.id);
     await gate.started;
-    expect((await app.inject({ method: 'DELETE', url: `/api/sessions/${session.id}` })).statusCode).toBe(204);
     const publish = vi.spyOn(ChangeHub.prototype, 'publish');
-    gate.release();
-    // The next message waits for the post run to end, then finds no chat.
+    expect((await app.inject({ method: 'DELETE', url: `/api/sessions/${session.id}` })).statusCode).toBe(204);
+    publish.mockClear();
+    // The gate is never released: deleting the chat stopped the run, which is why the next message gets through.
     expect((await send(app, session.id)).statusCode).toBe(404);
+    expect(gate.runs).toBe(1);
     expect((await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).statusCode).toBe(404);
     expect(await readdir(join(directory, 'sessions'))).toEqual([]);
     expect(publish.mock.calls.filter(([event]) => event.type === 'sessions.changed')).toEqual([]);
@@ -48,13 +49,18 @@ describe('a chat changed during its post run', () => {
 });
 
 describe('closing the app', () => {
-  it('stops a running post run and records it before returning', async () => {
+  it('stops a running post run and records it, as an interrupted run, before returning', async () => {
     const { app, directory, session, gate } = await setup();
     await send(app, session.id);
     await gate.started;
     await app.close();
     const stored = JSON.parse(await readFile(join(directory, 'sessions', `${session.id}.json`), 'utf8'));
-    expect(stored.state.turns[0]).toMatchObject({ completed: true, postStatus: 'stopped' });
+    // Like a restart that cut it short, not like a Stop: nothing says the steps should be run again otherwise.
+    expect(stored.state.turns[0]).toMatchObject({
+      completed: true,
+      postStatus: 'error',
+      postError: 'The run was interrupted by a server restart.',
+    });
     const log = JSON.parse(
       await readFile(join(directory, 'executions', `${stored.state.turns[0].postExecutionId}.json`), 'utf8'),
     );

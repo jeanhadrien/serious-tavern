@@ -26,16 +26,19 @@ import type { RunningTurn } from './turns.js';
 export type TurnOptions = {
   // Receives the turn's events. Passing it streams passthrough Chat Outputs live.
   emit?: (frame: TurnFrame) => void;
-  // Aborts the turn when the stream's client disconnects.
+  // Aborts the turn when the client disconnects, also one still waiting in the queue (it then stores nothing).
   signal?: AbortSignal;
+  // Only a turn that has not started is cancelled by `signal`: one that runs finishes (the plain endpoint).
+  keepRunning?: boolean;
 };
 
 export function sendMessage(
   context: AppContext,
   sessionId: string,
   content: string,
+  signal?: AbortSignal,
 ): Promise<ApiResponse<'sendMessage'>> {
-  return runTurn(context, sessionId, content);
+  return runTurn(context, sessionId, content, { signal, keepRunning: true });
 }
 
 // One turn per session, in order. The session's storage lock is only held for short writes, never across the engine run.
@@ -48,7 +51,7 @@ export function runTurn(
   return context.turns.run(sessionId, async (turn) => {
     if (options.signal?.aborted) throw new HttpError(409, 'TURN_STOPPED', 'The turn was cancelled before it started');
     const disconnected = () => turn.stop('disconnect');
-    options.signal?.addEventListener('abort', disconnected, { once: true });
+    if (!options.keepRunning) options.signal?.addEventListener('abort', disconnected, { once: true });
     try {
       return await executeTurn(context, sessionId, content, turn, options);
     } finally {

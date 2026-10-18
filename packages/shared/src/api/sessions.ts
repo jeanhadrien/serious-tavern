@@ -33,7 +33,7 @@ export const sendMessageResultSchema = z.object({
 });
 // `details` of a failed or stopped turn (`WORKFLOW_EXECUTION_FAILED`, `TURN_STOPPED`): what was saved before it ended.
 export const turnFailureDetailsSchema = sendMessageResultSchema.extend({
-  aborted: z.enum(['user', 'disconnect']).optional(),
+  aborted: z.enum(['user', 'disconnect', 'shutdown']).optional(),
 });
 export type TurnFailureDetails = z.infer<typeof turnFailureDetailsSchema>;
 // One Server-Sent Event per item of `streamTurn`; the event name is the `type` field.

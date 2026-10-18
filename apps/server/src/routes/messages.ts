@@ -9,8 +9,21 @@ import type { ApiRoute } from './types.js';
 
 type EventStream = { send(frame: TurnFrame): void; end(): void };
 
+/**
+ * Aborts when the client goes away before its response is done. It listens from the moment the request arrives,
+ * not from the first turn event: a message waiting in the queue (behind another turn or an after-reply run) has
+ * sent nothing yet, and its client leaving must still cancel it.
+ */
+function clientLifetime({ raw }: FastifyReply): AbortController {
+  const lifetime = new AbortController();
+  raw.on('close', () => {
+    if (!raw.writableFinished) lifetime.abort();
+  });
+  return lifetime;
+}
+
 // Opened lazily, on the first turn event, so failures before the turn starts are plain JSON errors.
-function openEventStream(reply: FastifyReply, lifetime: AbortController): EventStream {
+function openEventStream(reply: FastifyReply): EventStream {
   reply.hijack();
   const { raw } = reply;
   raw.writeHead(200, {
@@ -18,10 +31,6 @@ function openEventStream(reply: FastifyReply, lifetime: AbortController): EventS
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
-  });
-  // Closing before the response ends means the client went away: the turn is aborted and settled as a disconnect.
-  raw.on('close', () => {
-    if (!raw.writableFinished) lifetime.abort();
   });
   return {
     send(frame) {
@@ -37,15 +46,16 @@ export function registerMessages(app: FastifyInstance, context: AppContext) {
   app.post<ApiRoute<'sendMessage'>>('/api/sessions/:id/messages', async (request, reply) => {
     const { id } = apiContract.sendMessage.params.parse(request.params);
     const { content } = apiContract.sendMessage.body.parse(request.body);
-    return reply.send(await sendMessage(context, id, content));
+    // The plain endpoint only cancels a message that has not started: once it runs, it finishes whoever waits.
+    return reply.send(await sendMessage(context, id, content, clientLifetime(reply).signal));
   });
   app.post<ApiRoute<'streamTurn'>>('/api/sessions/:id/messages/stream', async (request, reply) => {
     const { id } = apiContract.streamTurn.params.parse(request.params);
     const { content } = apiContract.streamTurn.body.parse(request.body);
-    const lifetime = new AbortController();
+    const lifetime = clientLifetime(reply);
     const sse: { stream?: EventStream } = {};
     const emit = (frame: TurnFrame) => {
-      sse.stream ??= openEventStream(reply, lifetime);
+      sse.stream ??= openEventStream(reply);
       sse.stream.send(frame);
     };
     try {
