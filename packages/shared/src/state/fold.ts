@@ -53,6 +53,11 @@ export type FoldInput = {
   messages: readonly PresenceMessage[];
   /** The stored `session.state`; any shape (older sessions have none). */
   state: unknown;
+  /**
+   * Read the state as of this turn instead of the next one (present turns + 1): a post-turn run reads at the turn
+   * it follows, so `turnsSinceWrite` of a key that turn wrote is 0.
+   */
+  turn?: number;
 };
 
 /**
@@ -67,9 +72,9 @@ export type FoldInput = {
  *   a key the definition no longer has, or for another key type, are ignored (and reported); writes for a
  *   definition that no longer exists are ignored silently. Restoring the definition brings them back.
  */
-export function foldStoryState({ definitions, messages, state }: FoldInput): StoryState {
+export function foldStoryState({ definitions, messages, state, turn: readAt }: FoldInput): StoryState {
   const turns = turnPresence(messages, readTurnEntries(state));
-  const turn = turns.filter((presence) => presence.turn !== null).length + 1;
+  const turn = readAt ?? turns.filter((presence) => presence.turn !== null).length + 1;
   const { byDefinition, byNode } = collectWrites(turns);
   return {
     turn,

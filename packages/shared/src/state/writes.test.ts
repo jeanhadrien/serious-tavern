@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { sessionSchema } from '../models.js';
 import { item, nodeAddWrite, setWrite, turnEntry } from './test-fixtures.js';
-import { readTurnEntries, stateWriteSchema, turnEntrySchema, withTurnEntry } from './writes.js';
+import {
+  postStatusSchema,
+  readTurnEntries,
+  stateWriteSchema,
+  turnEntrySchema,
+  withTurnEntry,
+  withUpdatedTurnEntry,
+} from './writes.js';
 
 describe('stateWriteSchema', () => {
   const target = { kind: 'definition', definitionId: 'd', key: 'k' };
@@ -58,6 +65,46 @@ describe('turnEntrySchema', () => {
     expect(turnEntrySchema.safeParse({ executionId: 'e', at: 't', completed: true, replies: 0, ...over }).success).toBe(
       false,
     );
+  });
+});
+
+describe('the post-turn run fields of an entry', () => {
+  const base = { executionId: 'e', at: 't', completed: true, replies: 1 };
+
+  it.each(postStatusSchema.options)('keeps the fields of a run that is %s', (postStatus) => {
+    const entry = { ...base, writes: [], postExecutionId: 'p', postStatus, postError: 'boom' };
+    expect(turnEntrySchema.parse(entry)).toStrictEqual(entry);
+  });
+
+  it('parses an entry without them to an object without those keys', () => {
+    expect(turnEntrySchema.parse({ ...base, writes: [] })).toStrictEqual({ ...base, writes: [] });
+    expect(readTurnEntries({ turns: [{ ...base, writes: [] }] })).toStrictEqual([{ ...base, writes: [] }]);
+  });
+
+  it.each([
+    ['a status that is not one', { postStatus: 'paused' }],
+    ['a status that is a number', { postStatus: 7 }],
+    ['an error that is an object', { postError: {} }],
+    ['an error that is a number', { postError: 3 }],
+    ['an empty execution id', { postExecutionId: '' }],
+    ['an execution id that is a list', { postExecutionId: ['p'] }],
+  ])('drops %s and still reads the turn', (_, over) => {
+    const [name] = Object.keys(over);
+    const [entry] = readTurnEntries({ turns: [{ ...base, writes: [setWrite('n', 1)], ...over }] });
+    expect(entry).toMatchObject({ executionId: 'e', completed: true, replies: 1, writes: [setWrite('n', 1)] });
+    expect(entry?.[name as 'postStatus']).toBeUndefined();
+  });
+
+  it('keeps the good fields next to a bad one', () => {
+    const [entry] = readTurnEntries({ turns: [{ ...base, postExecutionId: 'p', postStatus: 'bogus' }] });
+    expect(entry?.postExecutionId).toBe('p');
+    expect(entry?.postStatus).toBeUndefined();
+  });
+
+  it('accepts a session that stores them', () => {
+    const state = { turns: [{ ...base, writes: [], postExecutionId: 'p', postStatus: 'running' }] };
+    const session = { id: 's', title: 'T', workflowId: 'w', messages: [], createdAt: '', updatedAt: '', state };
+    expect(sessionSchema.parse(session)).toEqual(session);
   });
 });
 
@@ -125,6 +172,46 @@ describe('withTurnEntry', () => {
     const copy = structuredClone(state);
     withTurnEntry(state, entry);
     expect(state).toEqual(copy);
+  });
+});
+
+describe('withUpdatedTurnEntry', () => {
+  const mark = (raw: Record<string, unknown>) => ({ ...raw, marked: true });
+
+  it('replaces only the first item with that execution id and keeps everything else as it is', () => {
+    const a = turnEntry('a');
+    const b = turnEntry('b');
+    const twin = turnEntry('b', [setWrite('n', 1)]);
+    const state = { turns: [a, 'junk', b, twin], summaries: { main: [] } };
+    const result = withUpdatedTurnEntry(state, 'b', mark);
+    expect(result).toEqual({ turns: [a, 'junk', { ...b, marked: true }, twin], summaries: { main: [] } });
+    expect(result.turns[0]).toBe(a);
+    expect(result.turns[3]).toBe(twin);
+  });
+
+  it('hands update the raw item, including a hand-edited one this version cannot read', () => {
+    const odd = { executionId: 'x', replies: 'many', writes: 'nope' };
+    const result = withUpdatedTurnEntry({ turns: [odd] }, 'x', mark);
+    expect(result.turns[0]).toEqual({ ...odd, marked: true });
+  });
+
+  it.each([
+    ['an unknown execution id', { turns: [turnEntry('a')] }, 'zzz'],
+    ['an item without an execution id', { turns: [{ id: 'a' }] }, 'a'],
+    ['a list item', { turns: [['a']] }, 'a'],
+    ['no state', undefined, 'a'],
+    ['null', null, 'a'],
+    ['text', 'x', 'a'],
+    ['a list', [turnEntry('a')], 'a'],
+    ['turns that are not a list', { turns: 'x' }, 'a'],
+  ])('gives the state back unchanged for %s', (_, state, executionId) => {
+    expect(withUpdatedTurnEntry(state, executionId, mark)).toBe(state);
+  });
+
+  it('never changes the state it is given', () => {
+    const state = Object.freeze({ turns: Object.freeze([Object.freeze(turnEntry('a'))]) });
+    expect(() => withUpdatedTurnEntry(state, 'a', mark)).not.toThrow();
+    expect(state.turns[0]).not.toHaveProperty('marked');
   });
 });
 

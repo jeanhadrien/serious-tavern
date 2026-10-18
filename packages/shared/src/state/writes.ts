@@ -28,6 +28,10 @@ export const stateWriteSchema = z.discriminatedUnion('op', [
 ]);
 export type StateWrite = z.infer<typeof stateWriteSchema>;
 
+/** How a turn's post-turn run (After Reply) stands. `running` is only believed while the server holds the run: see `effectivePostRun`. */
+export const postStatusSchema = z.enum(['running', 'completed', 'error', 'stopped']);
+export type PostStatus = z.infer<typeof postStatusSchema>;
+
 /**
  * One settled turn. An entry exists for EVERY settled turn, with or without writes, so turn counting is
  * stable. Passthrough on purpose: later phases add fields.
@@ -41,6 +45,12 @@ export const turnEntrySchema = z
     /** Assistant messages saved for the turn when it settled (partial rows included). */
     replies: z.number().int().nonnegative(),
     writes: z.array(stateWriteSchema).default([]),
+    // The post-turn run this turn left behind. Tolerant on purpose (`.catch`): a hand-edited bad value drops
+    // the field, never the turn.
+    /** Execution id of the post-turn run (After Reply); absent when the workflow has none. */
+    postExecutionId: z.string().min(1).optional().catch(undefined),
+    postStatus: postStatusSchema.optional().catch(undefined),
+    postError: z.string().optional().catch(undefined),
   })
   .passthrough();
 export type TurnEntry = z.infer<typeof turnEntrySchema>;
@@ -81,4 +91,30 @@ export function readTurnEntries(state: unknown): TurnEntry[] {
 export function withTurnEntry(state: unknown, entry: TurnEntry): SessionState {
   const rest = typeof state === 'object' && state !== null && !Array.isArray(state) ? state : {};
   return { ...rest, turns: [...rawTurns(state), entry] } as SessionState;
+}
+
+/**
+ * `state` with the first stored item whose `executionId` is the given one replaced by `update(item)`. The rest is kept
+ * as stored, like `withTurnEntry` (other items are the same objects, unknown keys of the state survive, and nothing
+ * is repaired). No such item, or a state that is not a list of turns, gives the state back unchanged. `update` gets the
+ * RAW item, which may hold things this version cannot read, and must keep what it does not change.
+ */
+export function withUpdatedTurnEntry(
+  state: unknown,
+  executionId: string,
+  update: (raw: Record<string, unknown>) => Record<string, unknown>,
+): SessionState {
+  const turns = rawTurns(state);
+  const index = turns.findIndex(
+    (raw) =>
+      typeof raw === 'object' &&
+      raw !== null &&
+      !Array.isArray(raw) &&
+      (raw as { executionId?: unknown }).executionId === executionId,
+  );
+  if (index < 0) return state as SessionState;
+  return {
+    ...(state as object),
+    turns: turns.map((raw, at) => (at === index ? update(raw as Record<string, unknown>) : raw)),
+  } as SessionState;
 }

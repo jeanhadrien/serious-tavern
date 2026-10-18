@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { stateDefinitionSchema, stateDefinitionWriteSchema } from '../state/definition.js';
 import { historyPointSchema, keyMetaSchema, stateWarningSchema } from '../state/fold-types.js';
-import { stateWriteSchema } from '../state/writes.js';
+import { postStatusSchema, stateWriteSchema } from '../state/writes.js';
 import { endpoint, idParamsSchema, noContentSchema } from './common.js';
 
 /**
@@ -67,6 +67,12 @@ export const turnStateSchema = z.object({
   // 1-based among the turns that still count; null when its replies were deleted (it no longer counts).
   turnNumber: z.number().nullable(),
   writes: z.array(stateWriteViewSchema),
+  // The turn's post-turn run (After Reply), absent when the workflow had none. A run stored as `running` that the
+  // server no longer holds (it restarted) is reported as `error`. `postExecutionId` names the run's execution log;
+  // `postError` is cut to a few hundred characters (the log has the full text).
+  postStatus: postStatusSchema.optional(),
+  postExecutionId: z.string().optional(),
+  postError: z.string().optional(),
 });
 export const sessionStateViewSchema = z.object({
   // The turn the next message will be.

@@ -17,7 +17,7 @@ export type StateKeyView = {
  * what nodes and templates may read. `keys` is by definition id, `nodes` by node id (implicit keys).
  */
 export type StateSnapshot = {
-  /** The turn being run. */
+  /** The turn being run (in an after-reply run: the turn that just finished). */
   turn: number;
   definitions: StateDefinition[];
   keys: Record<string, Record<string, StateKeyView>>;

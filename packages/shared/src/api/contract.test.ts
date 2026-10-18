@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { messageSchema } from '../models.js';
+import { executionLogSchema, messageSchema } from '../models.js';
 import { apiContract, changeEventTypes, errorEnvelopeSchema, stateDefinitionInUseDetailsSchema } from './index.js';
 
 it('preserves existing entity defaults, including defaults on partial updates', () => {
@@ -229,4 +229,24 @@ it('takes chat settings as a partial map with null resets, and keeps workflow de
     { key: 'a', type: 'text', default: '' },
   ]);
   expect(apiContract.createWorkflow.body.parse({ name: 'W', settings: [] })).toEqual({ name: 'W', settings: [] });
+});
+
+it("describes a turn's post-turn run in the state view and in execution logs, all additive", () => {
+  const turn = { executionId: 'e1', at: 'a', completed: true, replies: 1, turnNumber: 1, writes: [] };
+  const view = { turn: 2, definitions: [], nodes: [], turns: [turn] };
+  expect(apiContract.getSessionState.response.parse(view)).toEqual(view);
+  for (const postStatus of ['running', 'completed', 'error', 'stopped']) {
+    const post = { ...turn, postStatus, postExecutionId: 'p1', postError: 'boom' };
+    expect(apiContract.getSessionState.response.parse({ ...view, turns: [post] }).turns[0]).toEqual(post);
+  }
+  expect(
+    apiContract.getSessionState.response.safeParse({ ...view, turns: [{ ...turn, postStatus: 'paused' }] }).success,
+  ).toBe(false);
+
+  const log = { id: 'p1', workflowId: 'w', sessionId: 's', status: 'completed', startedAt: 'a', nodes: {} };
+  expect(executionLogSchema.parse(log)).toEqual({ ...log, warnings: [] });
+  const post = { ...log, part: 'post', turnExecutionId: 'e1' };
+  expect(executionLogSchema.parse(post)).toMatchObject({ part: 'post', turnExecutionId: 'e1' });
+  expect(executionLogSchema.parse({ ...log, part: 'reply' }).part).toBe('reply');
+  expect(executionLogSchema.safeParse({ ...log, part: 'later' }).success).toBe(false);
 });

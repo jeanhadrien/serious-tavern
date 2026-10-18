@@ -47,7 +47,7 @@ export type FoldedDefinition = {
 export type FoldedNode = { nodeId: string; keys: Record<string, FoldedKey> };
 
 export type StoryState = {
-  /** The turn being run: present turns + 1. */
+  /** The turn the state is read at: the turn being run (present turns + 1), unless the fold was given one. */
   turn: number;
   /** Every stored entry, present or not, in stored order. */
   turns: TurnPresence[];
