@@ -3,6 +3,7 @@ import {
   foldStoryState,
   oldestFirst,
   stateSnapshot,
+  type ChatMessage,
   type Session,
   type StateDefinition,
   type StateSnapshot,
@@ -29,18 +30,20 @@ export async function listDefinitions(repository: Pick<StateDefinitionRepository
  * Folds a session's stored turns against `definitions`: what its state is right now, and the snapshot its
  * next turn runs on. Never throws and writes nothing; a stored value that doesn't fit its definition reads as
  * the default and shows up in `issues`. `atTurn` reads the state as of that turn instead of the next one (an
- * after-reply run reads at the turn it follows).
+ * after-reply run reads at the turn it follows). `history` is the history messages the run's nodes see: with it, items
+ * that link to messages carry their computed `link` in the snapshot (the SAME history the nodes judge links by).
  */
 export function foldSession(
   definitions: StateDefinition[],
   session: Pick<Session, 'messages' | 'state'>,
   atTurn?: number,
+  history?: readonly ChatMessage[],
 ): SessionStory {
   const story = foldStoryState({ definitions, messages: session.messages, state: session.state, turn: atTurn });
   return {
     definitions,
     story,
-    snapshot: stateSnapshot(story, definitions),
+    snapshot: stateSnapshot(story, definitions, history),
     issues: [
       ...story.definitions.flatMap(({ warnings }) =>
         warnings.map(({ definition, key, message }) => `State "${definition}.${key}": ${message}.`),

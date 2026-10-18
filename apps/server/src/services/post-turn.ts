@@ -53,7 +53,15 @@ export async function runPostTurn(
       // A log that cannot be written must not leave the entry `running`.
       console.warn(`Could not save the after-reply execution log of session ${sessionId}:`, error);
     });
-  await settle(context, sessionId, post.turnExecutionId, outcome.result);
+  const warnings = await settle(context, sessionId, post, outcome.result);
+  // A write dropped at commit time (its messages changed during the run) is said in the log, which was saved before the
+  // commit: save it again with the warning.
+  if (outcome.execution && warnings.length) {
+    outcome.execution.warnings.push(...warnings);
+    await context.executions.save(outcome.execution).catch((error) => {
+      console.warn(`Could not save the after-reply execution log of session ${sessionId}:`, error);
+    });
+  }
 }
 
 const SETTLE_RETRY_MS = 100;
@@ -63,23 +71,32 @@ const SETTLE_RETRY_MS = 100;
  * fails too, a minimal write records an honest error (without the writes), because an entry left `running` would later
  * read as a restart's casualty and lose the real outcome. Only when even that fails is it left to a warning.
  */
-async function settle(context: AppContext, sessionId: string, turnExecutionId: string, result: PostRunResult) {
+async function settle(
+  context: AppContext,
+  sessionId: string,
+  post: PostTurn,
+  result: PostRunResult,
+): Promise<string[]> {
   const write = async (settlement: PostRunResult) => {
+    let warnings: string[] = [];
     const updated = await context.sessions.silent.update(sessionId, (current) => {
-      settlePostRun(current, { turnExecutionId, ...settlement });
+      warnings = settlePostRun(current, {
+        turnExecutionId: post.turnExecutionId,
+        definitions: post.definitions,
+        ...settlement,
+      });
       return current;
     });
     if (updated) context.changes.publish({ type: 'sessions.changed', id: sessionId });
+    return warnings;
   };
   try {
-    await write(result);
-    return;
+    return await write(result);
   } catch {
     await new Promise((resolve) => setTimeout(resolve, SETTLE_RETRY_MS));
   }
   try {
-    await write(result);
-    return;
+    return await write(result);
   } catch (error) {
     try {
       await write({
@@ -91,6 +108,7 @@ async function settle(context: AppContext, sessionId: string, turnExecutionId: s
       console.warn(`Could not record the after-reply run of session ${sessionId}:`, last);
     }
   }
+  return [];
 }
 
 async function execute(
@@ -107,7 +125,7 @@ async function execute(
   const turn =
     presence.find(({ entry }) => entry.executionId === post.turnExecutionId)?.turn ??
     presence.filter((item) => item.turn !== null).length;
-  const story = foldSession(post.definitions, session, turn);
+  const story = foldSession(post.definitions, session, turn, post.history);
   const { replies } = post;
   let execution: ExecutionLog;
   let result: PostRunResult;

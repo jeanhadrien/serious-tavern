@@ -100,12 +100,13 @@ async function startTurn(context: AppContext, sessionId: string, content: string
     // The values are snapshotted here: a settings change during the run applies from the next turn.
     const settings = resolveChatSettings(workflowSettings(workflow), current.settings);
     // The state the turn starts from: the turns still present, folded against the definitions as they are now.
-    const story = foldSession(definitions, current);
+    const history = historyMessages(current.messages);
+    const story = foldSession(definitions, current, undefined, history);
     started.value = {
       prepared,
       definitions,
       userMessage,
-      history: historyMessages(current.messages),
+      history,
       character,
       persona,
       settings: settings.values,
@@ -178,7 +179,9 @@ async function executeTurn(
   // (`running`) by the settle below, and its id is on the RunningTurn first, so a state read can tell it is live.
   const postExecutionId = outcome && prepared.parts.postSinks.length ? randomUUID() : undefined;
   if (postExecutionId) turn.postExecutionId = postExecutionId;
-  const settled: { value?: { userMessage?: ChatMessage; assistantMessages: ChatMessage[] } } = {};
+  const settled: {
+    value?: { userMessage?: ChatMessage; assistantMessages: ChatMessage[]; linkWarnings: string[] };
+  } = {};
   // Everything a turn writes is silent; the settled turn announces itself once (success, failure or stop).
   const session = await sessions.silent.update(sessionId, (current) => {
     settled.value = settleTurn(current, {
@@ -188,13 +191,20 @@ async function executeTurn(
       streamed,
       interrupted: !outcome,
       writes,
+      definitions,
       postExecutionId,
     });
     return current;
   });
   if (!session) throw notFound('Session');
   context.changes.publish({ type: 'sessions.changed', id: sessionId });
-  const { userMessage: saved, assistantMessages } = settled.value!;
+  const { userMessage: saved, assistantMessages, linkWarnings } = settled.value!;
+  // A write dropped at commit time (the messages it links to changed during the run) is said in the log, which was saved
+  // before the commit: save it again with the warning.
+  if (execution && linkWarnings.length) {
+    execution.warnings.push(...linkWarnings);
+    await executions.save(execution);
+  }
   // The reply is complete for the client. The after-reply run follows in this turn's queue slot, after the
   // caller has its result.
   if (postExecutionId && outcome)

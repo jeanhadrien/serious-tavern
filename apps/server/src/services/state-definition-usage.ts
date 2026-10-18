@@ -4,7 +4,7 @@ import { now, type AppContext } from '../context.js';
 import { nodeResources } from './node-resources.js';
 
 // The node types whose `definitionId` config reads or writes a definition.
-const stateNodeTypes = new Set(['state-read', 'state-write']);
+const stateNodeTypes = new Set(['state-read', 'state-write', 'next-chunk', 'unlinked-messages']);
 
 /**
  * Chats (sorted by title) that hold story state under the definition: those with a PRESENT turn that wrote it. Writes of turns
@@ -24,7 +24,7 @@ export async function sessionsUsing(
 const usesDefinition = (workflow: Workflow, id: string) =>
   workflow.nodes.some((node) => stateNodeTypes.has(node.type) && node.config?.definitionId === id);
 
-/** Workflows with a State Read or State Write node that uses the definition (names, sorted). */
+/** Workflows with a node that reads or writes the definition (State Read/Write, Next Chunk, Unlinked Messages; names, sorted). */
 export async function workflowsUsing({ workflows }: AppContext, id: string): Promise<string[]> {
   return (await workflows.list())
     .filter((workflow) => usesDefinition(workflow, id))

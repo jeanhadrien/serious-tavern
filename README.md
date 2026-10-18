@@ -147,6 +147,8 @@ Any collection item can **link to chat messages**; summaries are one use of that
 
 **Memory** is plain recent history again (`lastN`, `format`), plus `all` (default false): the whole history, `lastN` ignored (`lastN: 0` still means none). Use it before Unlinked Messages, since a Last N would cut messages that no summary covers yet.
 
+**Settle-time check (server).** A linked `add` is judged when the run settles, inside the same `sessions.silent.update` that stores the turn (`settleTurn` for the reply part, `settlePostRun` for the after-reply part, through `commitLinks` in `services/links.ts`), against the chat's history messages as they are THEN (the turn's own messages are in by then). A linked id that is no longer a history message drops the write ("a message it links to is not in the chat any more"); a fingerprint that no longer matches drops it ("was edited while it was being written", the chat changed while the summary was made); a write with no fingerprint takes it from the messages as they are. Everything else is stored as it is. A dropped write is listed on the turn's entry as `linkWarnings` (at most 5, 300 characters each), shown on the turn's chip, and added to the run's execution log (which is saved again). Completed nodes of a failed or stopped run still commit; the minimal-error fallback of a post run that could not save its result drops them like other writes. The check does not look at `remove` writes: a separate State Write node writes those.
+
 **Summaries, wired.** Declare a collection key (for example definition `memory`, key `summaries`) **without a `cap`** (a cap drops the oldest summaries and their messages reach the prompt raw again). Several summary sets are several keys.
 
 ```
