@@ -1,5 +1,6 @@
 import type { Collection, CollectionEntry, Preset, Workflow, WorkflowSetting } from '@st/shared';
 import { makeWorkflow } from '../seed.js';
+import { message, narratorIntro, slot } from './preset-parts.js';
 import { sceneDefinition } from '../seed-state.js';
 import type { ExamplePack } from '../seed-examples.js';
 
@@ -83,15 +84,6 @@ const TEXTURE_WORDING =
 
 function narratorPreset(): Preset {
   const date = new Date().toISOString();
-  const message = (id: string, displayName: string, content: string) => ({
-    id,
-    displayName,
-    enabled: true,
-    kind: 'message' as const,
-    role: 'system' as const,
-    content,
-    placement: { mode: 'ordered' as const },
-  });
   return {
     id: NARRATOR_PRESET_ID,
     name: 'Fresh texture narrator (example)',
@@ -104,33 +96,13 @@ function narratorPreset(): Preset {
       { id: 'level', key: 'level', dataType: 'text' },
     ],
     entries: [
-      message(
-        'main-prompt',
-        'Main prompt',
-        'Write a natural, in-character reply in this fictional chat.\n{{character.system_prompt}}',
-      ),
-      message('character-description', 'Character description', '{{character.description}}'),
-      message('persona', 'Persona', '{{persona.description}}'),
-      {
-        id: 'history-slot',
-        displayName: 'Chat history',
-        enabled: true,
-        kind: 'slot',
-        inputKey: 'history',
-        role: 'user',
-      },
+      ...narratorIntro(),
+      slot('history-slot', 'Chat history', 'history'),
       {
         ...message('texture', 'Fresh texture (worded by level)', TEXTURE_WORDING),
         placement: { mode: 'depth', entryId: 'history-slot', depth: 2 },
       },
-      {
-        id: 'message-slot',
-        displayName: 'User message',
-        enabled: true,
-        kind: 'slot',
-        inputKey: 'message',
-        role: 'user',
-      },
+      slot('message-slot', 'User message', 'message'),
     ],
     createdAt: date,
     updatedAt: date,
