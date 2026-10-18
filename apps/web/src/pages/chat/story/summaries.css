@@ -80,8 +80,6 @@
 }
 @media (max-width: 700px), (pointer: coarse) {
   .summary-text summary {
-    display: flex;
-    align-items: center;
-    min-height: 36px;
+    padding-block: 9px;
   }
 }
