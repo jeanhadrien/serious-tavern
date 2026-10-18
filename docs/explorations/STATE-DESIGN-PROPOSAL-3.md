@@ -7,13 +7,18 @@ fit against [CREATIVITY.md](CREATIVITY.md)), and records the decisions the user 
 supersedes proposals 1 and 2. It is the reference for the coding briefs; anything it leaves open is
 listed at the end.
 
+> **Amended** by [STATE-DESIGN-AMENDMENT-1.md](STATE-DESIGN-AMENDMENT-1.md) (after phase 6): collection
+> items can link to chat messages, and summaries are story state (linked items of a collection key)
+> instead of a separate store. Where Part 3, D3 or the summaries rows below disagree with it, the
+> amendment wins.
+
 ## Decisions taken
 
 | # | Decision | Source |
 | --- | --- | --- |
 | D1 | Values the user sets (dials, notes) are **chat settings**: declared by the workflow, set per chat, passed to the run, never undone by editing the chat | User, after REVIEW-2 §3.4 |
 | D2 | Values a turn writes are **story state**: declared in state definitions, stored per chat, and they live as long as the turn's replies | PROPOSAL-2, REVIEW-1 §6, REVIEW-2 §3.3 |
-| D3 | Summaries are **tied to the messages they cover**, not to the turn that wrote them. The prompt gets the most recent messages raw and older history as summarized chunks | User |
+| D3 | Summaries are **tied to the messages they cover**, not to the turn that wrote them. The prompt gets the most recent messages raw and older history as summarized chunks. *Amended (A2, A3): summaries are validated by the messages they cover and live with the turn that wrote them* | User |
 | D4 | Lorebooks and decks are one thing: **authored collections**, written and edited by the user, read-only for workflows. Two ways to read them: **Recall** (by relevance) and **Draw** (by chance) | User, REVIEW-2 §6 |
 | D5 | Story state is **per chat** first. Shared writable state (a character's memory across chats, campaigns) comes later, through an outbox | REVIEW-1 §6.2, REVIEW-2 §7.1 |
 | D6 | Expensive work after the reply (summaries, extraction) runs as a **separate post-turn run** on the chat's queue, never inside the reply's run | REVIEW-1 §3.6 |
@@ -29,7 +34,7 @@ happens when the user edits the chat.
 | --- | --- | --- | --- | --- | --- |
 | **Chat settings** | The user, in the chat | Workflows | Until the user changes it | One chat | Volatility dial, author's note, max intensity |
 | **Story state** | Workflow turns | Workflows | As long as the writing turn's replies | One chat | Tension, turns since last injection, injected items |
-| **Summaries** | Workflow (post-turn) | Workflows | As long as the messages they cover are unchanged | One chat | Summary of messages 1–20 |
+| **Summaries** | Workflow (post-turn) | Workflows | *Amended: story state (linked collection items); used while the messages they cover are unchanged* | One chat | Summary of messages 1–20 |
 | **Authored collections** | The user, in an editor | Workflows | Until the user edits them | Global records | Lorebook of the Northern Wastes, a deck of forest textures |
 | **Run trace** | The engine | The user | With the execution log | One turn | What was read, written, rolled and drawn |
 
@@ -218,6 +223,11 @@ Within one turn:
 Story state is read-only in the panel at first. Manual corrections come later (Part 7).
 
 ## Part 3: History summaries
+
+> The storage model below (summary sets in `session.summaries`, summaries surviving the deletion of the
+> turn that wrote them) was built in phase 6 and then replaced by
+> [amendment 1](STATE-DESIGN-AMENDMENT-1.md): summaries are linked items of a story state collection key.
+> Chunks, validity, the raw window and the nodes' behaviour stay as described here.
 
 ### What the user gets
 
@@ -462,7 +472,9 @@ In rough order of value:
 6. **Search over collections:** keyword (BM25) first, semantic (embeddings, similarity band) only when
    there's evidence it beats a good prompt.
 7. **Regenerate and swipes**, with "keep the rolls".
-8. **Form editors** for state definitions and collections; a seeded "Fresh texture" example (a scene
+8. **From amendment 1:** summaries of summaries over linked items, discarding a linked item from the
+   panel (with manual corrections), per-message extraction recipes.
+9. **Form editors** for state definitions and collections; a seeded "Fresh texture" example (a scene
    definition, a small self-written texture deck, a workflow with Trigger → Draw → preset, and a
    level-worded preset).
 
@@ -483,6 +495,8 @@ Nodes: Chat Settings, LLM (rating), Parse JSON, State Write, LLM (classifier), T
 usual LLM and Chat Output. Delete the reply and the draw, the cooldown and the mood all go back.
 
 ### Rolling summaries
+
+(Amendment 1: "summary set `main`" is now a collection key such as `memory.summaries`.)
 
 1. Memory with summary set `main`, raw window 16.
 2. Post-turn: After Reply → Next Chunk (set `main`, chunk size 20, raw window 16) → LLM (the user's
@@ -512,7 +526,7 @@ All additive and backward compatible (AGENTS.md "Data compatibility"):
 | Chat settings values | Session record | `settings: Record<string, unknown>`, default `{}` |
 | State definitions | `data/state/definitions/<slug>.yaml` | YAML records, `YamlRepository` |
 | Story state | Session record | `state: { turns: TurnEntry[] }`, default empty. `TurnEntry = { executionId, at, completed, writes, seed }`; scalar writes store the value **after** the write, collections store `add`/`remove` with item ids |
-| Summaries | Session record | `summaries: { [set]: Summary[] }`, `Summary = { id, messageIds, fingerprint, text, createdAt, executionId, valid? }` (validity is computed, not stored) |
+| Summaries | ~~Session record~~ Story state (amendment 1) | ~~`summaries: { [set]: Summary[] }`~~ Items `{ id, text, messages: { ids, fingerprint } }` of a collection key; link status is computed, not stored |
 | Authored collections | `data/collections/<slug>.yaml` | YAML records, `YamlRepository`, live reload |
 | Execution traces | Execution log | Per node: `stateReads`, `stateWrites`, `roll`, `draw`, `reason`; per run: `seed`, `settings` |
 
@@ -565,6 +579,7 @@ Unknown paths keep the existing behaviour: they render empty, with a warning in 
 5. **Post-turn runs:** After Reply node, second run on the chat queue, its own log, failure reporting.
 6. **History summaries:** summary sets in the session, validity, Next Chunk, Save Summary, Memory
    summary option, panel section.
+   6b. **Amendment 1:** message links on collection items; summaries moved into story state.
 7. **Trigger node.**
 8. Part 7, in its order.
 

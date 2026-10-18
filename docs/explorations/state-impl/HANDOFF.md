@@ -3,7 +3,7 @@
 First written 2026-10-16 (after phase 3), updated 2026-10-18 after phase 6. It is everything a fresh
 orchestrator needs to finish the plan in [STATE-DESIGN-PROPOSAL-3.md](../STATE-DESIGN-PROPOSAL-3.md).
 Start a new session on this repository and tell it: *"Read docs/explorations/state-impl/HANDOFF.md and
-continue with phase 7."*
+continue with phase 6b."*
 
 ## The mandate
 
@@ -20,6 +20,9 @@ the user:
   and Draw (weighted random).
 - Draw and Trigger keep their own bookkeeping as implicit per-node state.
 - No variations view or divergence harness in this plan.
+- **After phase 6 (amendment 1):** any collection item can link to chat messages, and summaries are
+  story state (linked items of a collection key), not a separate store. The design is
+  [STATE-DESIGN-AMENDMENT-1.md](../STATE-DESIGN-AMENDMENT-1.md); phase 6b implements it.
 - Sub-agents are Sonnet; the pipeline is the lean one in [agent-briefs/](agent-briefs/README.md)
   (4 agents per phase, 5 with UI), not the 12-agent one phases 1–4b used.
 
@@ -62,12 +65,13 @@ How to try each one, written for the user: [howto/](howto/).
 
 ## Remaining work, in order
 
-Specs are in [specs/](specs/). Each starts with a "Context from phases …" note written at the phase 5
-checkpoint; re-read the AGENTS.md sections it names and adjust it to what the code actually holds.
+Specs are in [specs/](specs/). Each starts with a context note written at a checkpoint (phase 6 for 6b,
+phase 5 for 7, with a 6b addendum); re-read the AGENTS.md sections it names and adjust it to what the code actually holds.
 
 | Phase | Spec | UI | Notes |
 | --- | --- | --- | --- |
 | 4a, 4b, 5, 6 (**done**) | [phase-4a.md](specs/phase-4a.md), [phase-4b.md](specs/phase-4b.md), [phase-5.md](specs/phase-5.md), [phase-6.md](specs/phase-6.md) | | |
+| 6b. Message links; summaries as story state | [phase-6b.md](specs/phase-6b.md) | yes | Built-in `messages` link on collection items, computed link status, commit-time link check (`linkWarnings`); Next Chunk / Save Summary / Memory retargeted to a state key, Memory's split outputs (`summaries`, `recent`, `unsummarized`); remove `session.summaries` and `SummaryRun` (no migration: phase 6 never reached `main`); linked items, message markers and the edit note in the web |
 | 7. Trigger + example + guide | [phase-7.md](specs/phase-7.md) | yes | Trigger node (implicit node state like Draw's); seeded "Fresh texture" example (collection, preset, workflow; idempotent seeds; seeded-workflows test; decide how `scene` is seeded for users who already have definitions); user guide `docs/STATE-AND-LORE.md` folding in the howto files |
 
 Then finish with a summary for the user: what is testable and how (`npm run dev`), the checkpoint
@@ -124,6 +128,8 @@ Either way:
 - Known limitations carried forward from phase 5: a message waiting behind a post run gets no response
   bytes until the run ends; nodes needed by both parts run (and cost) twice; there is no retry for a
   failed or interrupted post run.
+- Phase 6's summary store (`session.summaries`, summary sets) is replaced in phase 6b: its how-to,
+  README and AGENTS.md sections describe code that 6b changes.
 - Known limitations from phase 6 (details in [howto/phase-6-howto.md](howto/phase-6-howto.md)): Memory with a
   summary set sends older, not-yet-summarized history raw (Last N bounds only the raw part); chunks lag one
   turn (the post part sees the reply part's history); a failed post run stays listed in the panel after a
