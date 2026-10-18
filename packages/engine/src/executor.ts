@@ -13,11 +13,12 @@ import type {
 } from '@st/shared';
 import { labelOf, prepareWorkflow, type PreparedWorkflow } from './prepare.js';
 export { validateWorkflow } from './prepare.js';
-import type { ChatReply, EngineEvent, ExecutionContext, NodeResources } from './types.js';
+import type { AfterReply, ChatReply, EngineEvent, ExecutionContext, NodeResources } from './types.js';
 import { stringify, coerceValue } from './text.js';
 import { orderReplies } from './replies.js';
 import { createRandom } from './seeded-random.js';
 import { StateRun } from './state-writes.js';
+import { skippedNodes } from './parts.js';
 
 class NodeExecutionError extends Error {
   constructor(
@@ -66,8 +67,17 @@ export async function executeWorkflow(
     // The story state the turn starts from (`foldStoryState` + `stateSnapshot`): what `ctx.state` reads and
     // `trigger.turn` reports. Writes nodes ask for are returned as `writes`, never visible during the run.
     state?: StateSnapshot;
+    // Which part of the workflow to run (see `WorkflowParts`): the `reply` part while the turn is answered
+    // (default), or the `post` part, the after-reply run of the sinks that depend on After Reply. The caller
+    // passes the post run its own `seed` (`postRunSeed`) and `executionId`.
+    part?: 'reply' | 'post';
+    // What After Reply outputs. Required for `part: 'post'`.
+    afterReply?: AfterReply;
   },
 ): Promise<{ replies: ChatReply[]; execution: ExecutionLog; writes: StateWrite[] }> {
+  const part = options.part ?? 'reply';
+  if (part === 'post' && !options.afterReply)
+    throw new Error('executeWorkflow: part "post" needs the afterReply payload');
   // NB: Workflow is a passthrough (loose) object for forward compatibility, so `in`
   // narrowing does not discriminate it from PreparedWorkflow; check the prepared marker instead.
   const isPrepared = (value: Workflow | PreparedWorkflow): value is PreparedWorkflow =>
@@ -77,7 +87,7 @@ export async function executeWorkflow(
     : await prepareWorkflow(input, options.resources);
   if (!preparation.prepared)
     throw new Error(`Invalid workflow: ${preparation.errors.map((issue) => issue.message).join('; ')}`);
-  const { workflow, resources, definitions, ports, incoming, upstream, reachable } = preparation.prepared;
+  const { workflow, resources, definitions, ports, incoming, upstream, parts } = preparation.prepared;
   const seed = options.seed ?? randomUUID();
   const settings = Object.freeze({ ...options.settings });
   const execution: ExecutionLog = {
@@ -86,6 +96,7 @@ export async function executeWorkflow(
     sessionId: options.sessionId,
     seed,
     settings: { ...settings },
+    ...(part === 'post' ? { part } : {}),
     status: 'running',
     startedAt: new Date().toISOString(),
     nodes: {},
@@ -115,12 +126,12 @@ export async function executeWorkflow(
   let wave = 0;
   const resolved = new Map<string, { output: Record<string, unknown>; skipped: boolean }>();
   const replies = new Map<string, ChatReply>();
-  const pending = new Set(workflow.nodes.filter((node) => reachable.has(node.id)).map((node) => node.id));
-  for (const node of workflow.nodes.filter((item) => !reachable.has(item.id))) {
+  const pending = new Set(workflow.nodes.filter((node) => parts[part].has(node.id)).map((node) => node.id));
+  for (const { nodeId, detail } of skippedNodes(parts, part, workflow)) {
     const timestamp = new Date().toISOString();
-    execution.nodes[node.id] = { status: 'skipped', startedAt: timestamp, finishedAt: timestamp, durationMs: 0 };
-    resolved.set(node.id, { output: {}, skipped: true });
-    emit({ type: 'node:skipped', nodeId: node.id, detail: 'not needed by any output' });
+    execution.nodes[nodeId] = { status: 'skipped', startedAt: timestamp, finishedAt: timestamp, durationMs: 0 };
+    resolved.set(nodeId, { output: {}, skipped: true });
+    emit({ type: 'node:skipped', nodeId, detail });
   }
   try {
     while (pending.size) {
@@ -198,6 +209,7 @@ export async function executeWorkflow(
                 settings,
                 secrets: options.secrets,
                 resources,
+                afterReply: part === 'post' ? options.afterReply : undefined,
                 signal: nodeSignal,
                 log: (message) => {
                   if (!callbacksActive) return;
@@ -254,7 +266,8 @@ export async function executeWorkflow(
               durationMs: Date.now() - start,
               output,
             };
-            if (node.type === 'chat-output') {
+            // The after-reply run never writes replies, even when a Chat Output feeds its nodes.
+            if (node.type === 'chat-output' && part === 'reply') {
               const character = inputs.character as Character | undefined;
               const name = character?.name || String(node.config.name ?? '');
               replies.set(node.id, {
@@ -340,7 +353,8 @@ export async function executeWorkflow(
       stateRun.finish(),
     );
   } finally {
-    if (!replies.size) execution.warnings.push('No Chat Output nodes ran; this turn produced no assistant messages.');
+    if (part === 'reply' && !replies.size)
+      execution.warnings.push('No Chat Output nodes ran; this turn produced no assistant messages.');
     for (const [nodeId, node] of Object.entries(execution.nodes))
       node.name = nodeDisplayName(workflow.nodes, labelOf, nodeId);
     execution.finishedAt = new Date().toISOString();

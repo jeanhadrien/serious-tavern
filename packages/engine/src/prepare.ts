@@ -1,6 +1,7 @@
 import { findBuiltInProvider, nodeDisplayName, workflowSettingIssues } from '@st/shared';
 import { canConnect } from '@st/shared/ports';
 import type { Edge, PortDef, ValidationIssue, Workflow } from '@st/shared';
+import { partitionWorkflow, type WorkflowParts } from './parts.js';
 import { registry } from './registry.js';
 import type { NodeDefinition, NodeResources } from './types.js';
 
@@ -11,8 +12,10 @@ export type PreparedWorkflow = {
   ports: Map<string, { inputs: PortDef[]; outputs: PortDef[] }>;
   incoming: Map<string, Edge[]>;
   upstream: Map<string, string[]>;
-  // Nodes some sink depends on, sinks included: the only nodes that run.
+  // Nodes some sink depends on, sinks included: the only nodes that run (the union of both parts).
   reachable: Set<string>;
+  // The reply part and the post-turn part, computed once: see `WorkflowParts`.
+  parts: WorkflowParts;
 };
 
 export const labelOf = (type: string) => registry.get(type)?.label ?? type;
@@ -193,6 +196,8 @@ export async function prepareWorkflow(
   if (visited !== workflow.nodes.length)
     errors.push({ message: 'The connections form a loop; a workflow cannot contain a cycle.' });
   errors.push(...workflowSettingIssues(workflow.settings).map(({ message }) => ({ message })));
+  const { parts, issues } = partitionWorkflow(workflow, definitions, upstream, nameOf);
+  errors.push(...issues);
   if (errors.length) {
     const seen = new Set<string>();
     return {
@@ -204,16 +209,9 @@ export async function prepareWorkflow(
       }),
     };
   }
-  const reachable = new Set<string>();
-  // Sinks (Chat Output, later state and summary writers) decide what runs: they and their upstream nodes.
-  const visit = workflow.nodes.filter((node) => definitions.get(node.id)?.sink).map((node) => node.id);
-  while (visit.length) {
-    const id = visit.pop()!;
-    if (reachable.has(id)) continue;
-    reachable.add(id);
-    visit.push(...(upstream.get(id) ?? []));
-  }
-  return { errors: [], prepared: { workflow, resources, definitions, ports, incoming, upstream, reachable } };
+  // Sinks (Chat Output, State Write, later summary writers) decide what runs: they and their upstream nodes.
+  const reachable = new Set([...parts.reply, ...parts.post]);
+  return { errors: [], prepared: { workflow, resources, definitions, ports, incoming, upstream, reachable, parts } };
 }
 
 export async function validateWorkflow(workflow: Workflow, resources?: NodeResources): Promise<ValidationIssue[]> {

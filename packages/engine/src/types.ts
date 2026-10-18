@@ -63,6 +63,9 @@ export type StateAccess = {
   // This node's own implicit key; undefined when it was never written.
   own(key: string): StateKeyView | undefined;
 };
+// What the after-reply run knows of the turn it follows (see `parts.ts`): its saved assistant messages, their
+// contents joined by a blank line, and the turn's number.
+export type AfterReply = { replies: ChatMessage[]; text: string; turn: number };
 export type ChatReply = { nodeId: string; content: string; name?: string; characterId?: string };
 export type ExecutionContext = {
   nodeId: string;
@@ -78,6 +81,8 @@ export type ExecutionContext = {
   settings: Readonly<Record<string, unknown>>;
   secrets: { get(name: string): Promise<string | undefined> };
   resources: NodeResources;
+  // Only in the after-reply run (After Reply reads it). Read-only.
+  afterReply?: AfterReply;
   signal: AbortSignal;
   // Appends a line to the node's `logs` in the execution log, e.g. the input behind a failure.
   log(message: string): void;

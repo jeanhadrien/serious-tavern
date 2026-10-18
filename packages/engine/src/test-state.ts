@@ -3,6 +3,7 @@ import {
   foldStoryState,
   oldestFirst,
   stateSnapshot,
+  withPostRun,
   withTurnEntry,
   type ChatMessage,
   type StateDefinition,
@@ -11,6 +12,7 @@ import {
   type Workflow,
 } from '@st/shared';
 import { executeWorkflow } from './executor.js';
+import { postRunSeed } from './parts.js';
 import { createStateAccess } from './state-access.js';
 import type { ExecutionContext, NodeResources } from './types.js';
 
@@ -117,6 +119,42 @@ export async function playTurn(chat: Chat, workflow: Workflow, executionId: stri
     writes: result.writes,
   });
   return { ...result, turn: story.turn };
+}
+
+/**
+ * Runs the after-reply part of the turn `playTurn` just played, the way the server does: the state is folded
+ * from the chat as it stands (the turn's own writes included) read at that turn, the seed is derived with
+ * `postRunSeed` and the run's writes join the turn's entry. A failing run throws before the entry changes.
+ */
+export async function playPost(
+  chat: Chat,
+  workflow: Workflow,
+  turn: Awaited<ReturnType<typeof playTurn>>,
+  message = 'go',
+) {
+  const story = foldStoryState({
+    definitions: oldestFirst(chat.definitions),
+    messages: chat.messages,
+    state: chat.state,
+    turn: turn.turn,
+  });
+  const replies = chat.messages.filter(
+    (reply) => reply.role === 'assistant' && reply.executionId === turn.execution.id,
+  );
+  const result = await executeWorkflow(workflow, {
+    message,
+    sessionId: 'session',
+    history: [],
+    secrets: { get: async () => undefined },
+    resources: chat.resources,
+    executionId: `${turn.execution.id}-post`,
+    seed: postRunSeed(turn.execution.seed!),
+    state: stateSnapshot(story, chat.definitions),
+    part: 'post',
+    afterReply: { replies, text: replies.map((reply) => reply.content).join('\n\n'), turn: turn.turn },
+  });
+  chat.state = withPostRun(chat.state, turn.execution.id, { status: 'completed', writes: result.writes });
+  return result;
 }
 
 /** "Delete the reply": removes the assistant messages of a turn. */

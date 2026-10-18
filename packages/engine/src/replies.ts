@@ -2,7 +2,7 @@ import type { Workflow } from '@st/shared';
 import type { ChatReply } from './types.js';
 
 /** Transitive upstream of a node (the node itself excluded). */
-function upstreamOf(upstream: Map<string, string[]>, id: string): Set<string> {
+export function upstreamOf(upstream: ReadonlyMap<string, string[]>, id: string): Set<string> {
   const seen = new Set<string>();
   const visit = [...(upstream.get(id) ?? [])];
   while (visit.length) {
