@@ -5,6 +5,7 @@ import { CharacterPanel } from './panels/character.js';
 import { LlmPanel } from './panels/llm.js';
 import { RecallPanel } from './panels/recall.js';
 import { DrawPanel } from './panels/draw.js';
+import { TriggerPanel } from './panels/trigger.js';
 import { StateKeyPicker } from './panels/StateKeyPicker.js';
 import { StateReadPanel } from './panels/stateRead.js';
 import { StateWritePanel } from './panels/stateWrite.js';
@@ -239,6 +240,7 @@ export const customPanels: Record<string, (props: Props) => React.JSX.Element> =
   llm: LlmPanel,
   recall: RecallPanel,
   draw: DrawPanel,
+  trigger: TriggerPanel,
   'state-read': StateReadPanel,
   'state-write': StateWritePanel,
   'next-chunk': CollectionKeyPanel,

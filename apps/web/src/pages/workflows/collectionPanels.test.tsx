@@ -113,3 +113,40 @@ it('renders without a context, explaining where collections come from', () => {
   expect(html).toContain('Unknown collection (lore)');
   expect(html).toContain('Create a collection in the Collections list');
 });
+
+it('renders the Trigger panel with its settings, a row for each level and the signals', () => {
+  const trigger = descriptor('trigger', {
+    baseChance: 0.1,
+    growthPerTurn: 0.05,
+    volatility: 0.3,
+    maxLevel: 2,
+    cooldowns: { '1': 0, '2': 2, '3': 4, '4': 8, '5': 15 },
+    levelWeights: { '1': 5, '2': 3, '3': 2, '4': 1, '5': 0.5 },
+    signals: [],
+  });
+  const html = renderToStaticMarkup(
+    <NodeConfigPanel
+      descriptor={trigger}
+      config={{
+        baseChance: 0.25,
+        cooldowns: { '3': 9 },
+        signals: [
+          { name: 'stagnation', weight: -0.5 },
+          { name: '', weight: 1 },
+        ],
+      }}
+      onChange={() => {}}
+    />,
+  );
+  expect(html).toContain('value="0.25"');
+  expect(html).toContain('value="0.05"');
+  expect(html).toMatch(/<option value="2" selected="">2<\/option>/);
+  // Level 3 shows its own cooldown, the others the defaults.
+  expect(html).toMatch(/aria-label="Cooldown of level 3"[^>]*value="9"/);
+  expect(html).toMatch(/aria-label="Cooldown of level 5"[^>]*value="15"/);
+  expect(html).toMatch(/aria-label="Weight of level 5"[^>]*value="0.5"/);
+  expect(html).toMatch(/aria-label="Signal 1 name"[^>]*value="stagnation"/);
+  expect(html).toMatch(/aria-label="Signal 1 weight"[^>]*value="-0.5"/);
+  expect(html).toContain('Name the signal: it becomes an input of the node');
+  expect(html).toContain('aria-label="Remove signal 2"');
+});

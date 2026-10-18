@@ -19,6 +19,7 @@ import { stateRead } from './nodes/state-read/index.js';
 import { stateWrite } from './nodes/state-write/index.js';
 import { nextChunk } from './nodes/next-chunk/index.js';
 import { unlinkedMessages } from './nodes/unlinked-messages/index.js';
+import { trigger } from './nodes/trigger/index.js';
 
 // Register a new backend node here; the UI uses its descriptor and generic editor automatically.
 export const registry = new Map<string, NodeDefinition>(
@@ -41,6 +42,7 @@ export const registry = new Map<string, NodeDefinition>(
     stateWrite,
     nextChunk,
     unlinkedMessages,
+    trigger,
   ].map((node) => [node.type, node]),
 );
 export function descriptors(): NodeTypeDescriptor[] {

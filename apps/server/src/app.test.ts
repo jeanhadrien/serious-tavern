@@ -49,7 +49,7 @@ it('returns payloads conforming to every shared endpoint response contract', asy
         .filter((descriptor) => descriptor.dynamicPorts)
         .map((descriptor) => descriptor.type)
         .sort(),
-    ).toEqual(['character', 'llm', 'next-chunk', 'parse-json', 'random', 'state-read', 'state-write']);
+    ).toEqual(['character', 'llm', 'next-chunk', 'parse-json', 'random', 'state-read', 'state-write', 'trigger']);
     for (const descriptor of nodeTypes) {
       expect(descriptor.dynamicPorts).toBe(!!registry.get(descriptor.type)?.resolvePorts);
       expect(descriptor.sink).toBe(!!registry.get(descriptor.type)?.sink);

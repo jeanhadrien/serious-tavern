@@ -3,6 +3,7 @@ import { DRAW_STATE_KEY } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { candidates, entryOutput, loadCollections, type Candidate } from '../../collections.js';
 import { describeValue } from '../../text.js';
+import { numberInput } from '../number-input.js';
 import { entryKey, memoryText, recentEntryKeys } from './recent.js';
 import { describeDraw, drawEntries, type DrawFilters } from './select.js';
 
@@ -14,15 +15,6 @@ type DrawConfig = DrawFilters & {
 };
 
 const level = z.number().int().min(1, 'Levels go from 1 to 5').max(5, 'Levels go from 1 to 5');
-
-/** The `maxLevel` input: a finite number, or text holding one (enum chat settings store text). */
-function levelInput(value: unknown): number {
-  const number = typeof value === 'string' && value.trim() ? Number(value) : value;
-  if (typeof number === 'number' && Number.isFinite(number)) return number;
-  throw new Error(
-    `Max level must be a number, got ${typeof value === 'string' ? `"${value.slice(0, 40)}"` : describeValue(value)}`,
-  );
-}
 
 /** The `tags` input: a list of text, or comma-separated text. */
 function tagsInput(value: unknown): string[] {
@@ -127,7 +119,7 @@ export const draw: NodeDefinition = {
       anyTags: config.anyTags,
       excludeTags: config.excludeTags,
       minLevel: config.minLevel,
-      maxLevel: Object.hasOwn(ctx.inputs, 'maxLevel') ? levelInput(ctx.inputs.maxLevel) : config.maxLevel,
+      maxLevel: Object.hasOwn(ctx.inputs, 'maxLevel') ? numberInput('Max level', ctx.inputs.maxLevel) : config.maxLevel,
     };
     const collections = await loadCollections(ctx, config.collectionIds);
     // Off (0): nothing is read or remembered. On: what this node drew in the last N turns of the chat is left
