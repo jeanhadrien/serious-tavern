@@ -3,9 +3,9 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import type { ChatMessage, Edge, Workflow } from '@st/shared';
+import { hashSeed, type ChatMessage, type Edge, type Workflow } from '@st/shared';
 import { ExecutionFailure, executeWorkflow } from './executor.js';
-import { createRandom, hashSeed } from './seeded-random.js';
+import { createRandom } from './seeded-random.js';
 import { registry } from './registry.js';
 
 const draws = (next: () => number, count: number) => Array.from({ length: count }, () => next());

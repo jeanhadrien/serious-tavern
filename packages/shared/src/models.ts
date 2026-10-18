@@ -71,6 +71,9 @@ export const sessionSchema = z
     // What the chat's settled turns stored (see state/). Absent in older files, and stored records are not
     // parsed on read: read the entries through `readTurnEntries`, never as `session.state.turns`.
     state: sessionStateSchema.optional(),
+    // The chat's history summaries by set name (see summaries/). Absent in older files. Stored records are not parsed on
+    // read: read them through `readSummaries`, never as `session.summaries`.
+    summaries: z.record(z.string(), z.unknown()).optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
