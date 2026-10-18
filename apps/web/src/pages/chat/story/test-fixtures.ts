@@ -131,5 +131,6 @@ export function buildView({
         }),
       };
     }),
+    summaries: [],
   };
 }

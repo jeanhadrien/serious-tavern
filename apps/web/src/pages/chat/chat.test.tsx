@@ -217,6 +217,7 @@ it('shows the story chip on a message only when it is given one, and puts it on 
         ],
       },
     ],
+    summaries: [],
   };
   const list = renderToStaticMarkup(
     <MessageList

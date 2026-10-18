@@ -54,7 +54,7 @@ describe('Memory without a summary set is exactly as before', () => {
   const history = chat(6);
   const summaries = { main: [summaryOf(history, 1, 4)] };
   it.each([
-    [{ lastN: 3, format: 'text' }, 'user: text 4'.replace('user', 'assistant') + '\nuser: text 5\nassistant: text 6'],
+    [{ lastN: 3, format: 'text' }, 'assistant: text 4\nuser: text 5\nassistant: text 6'],
     [{ lastN: 0, format: 'text' }, ''],
     [{ lastN: 50, format: 'text' }, history.map((m) => `${m.role}: ${m.content}`).join('\n')],
   ])('text %j', async (config, expected) => {
