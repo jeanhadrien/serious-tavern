@@ -15,7 +15,12 @@ export const memory: NodeDefinition = {
     },
   ],
   configSchema: z.object({
-    lastN: z.number().int().min(0).default(10).describe('How many of the latest messages to include; 0 includes none'),
+    lastN: z
+      .number()
+      .int()
+      .min(0)
+      .default(10)
+      .describe('How many of the latest messages to include; 0 includes none. Ignored while All is on'),
     format: z.enum(['text', 'messages']).default('text'),
     all: z
       .boolean()

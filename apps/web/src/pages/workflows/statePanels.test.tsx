@@ -324,3 +324,20 @@ describe('Next Chunk and Unlinked Messages panels', () => {
     expect(html).toContain('<option value="tension" selected="">tension (number: not a list)</option>');
   });
 });
+
+describe('the generic form', () => {
+  it('shows the description of a checkbox, such as what All does to Last N in Memory', () => {
+    const memory = listNode(
+      'memory',
+      { lastN: 10, all: false },
+      {
+        lastN: { type: 'integer', default: 10, description: 'How many. Ignored while All is on' },
+        all: { type: 'boolean', default: false, description: 'Include the whole history; Last N is then ignored.' },
+      },
+    );
+    const html = panel(memory, { lastN: 10, all: true });
+    expect(html).toMatch(/<input type="checkbox" checked=""\/>all<\/label>/);
+    expect(html).toContain('<small class="hint">Include the whole history; Last N is then ignored.</small>');
+    expect(html).toContain('Ignored while All is on');
+  });
+});

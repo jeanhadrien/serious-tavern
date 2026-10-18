@@ -155,10 +155,13 @@ function GenericPanel({
         }
         if (field.type === 'boolean')
           return (
-            <label className="check" key={key}>
-              <input type="checkbox" checked={Boolean(value)} onChange={(e) => update(key, e.target.checked)} />
-              {label}
-            </label>
+            <div className="config-field" key={key}>
+              <label className="check">
+                <input type="checkbox" checked={Boolean(value)} onChange={(e) => update(key, e.target.checked)} />
+                {label}
+              </label>
+              {help}
+            </div>
           );
         if (field.enum)
           return (
