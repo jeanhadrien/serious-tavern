@@ -227,7 +227,8 @@ Story state is read-only in the panel at first. Manual corrections come later (P
 > The storage model below (summary sets in `session.summaries`, summaries surviving the deletion of the
 > turn that wrote them) was built in phase 6 and then replaced by
 > [amendment 1](STATE-DESIGN-AMENDMENT-1.md): summaries are linked items of a story state collection key.
-> Chunks, validity, the raw window and the nodes' behaviour stay as described here.
+> Chunks, validity and the raw window stay as described here; the nodes change (Save Summary is dropped,
+> Memory loses its summary option, State Write links items, a new Unlinked Messages node).
 
 ### What the user gets
 
@@ -496,7 +497,7 @@ usual LLM and Chat Output. Delete the reply and the draw, the cooldown and the m
 
 ### Rolling summaries
 
-(Amendment 1: "summary set `main`" is now a collection key such as `memory.summaries`.)
+(Amendment 1 rewires this: see its "Summaries, wired" section. The steps below describe phase 6.)
 
 1. Memory with summary set `main`, raw window 16.
 2. Post-turn: After Reply → Next Chunk (set `main`, chunk size 20, raw window 16) → LLM (the user's
