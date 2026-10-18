@@ -181,7 +181,13 @@ describe('validation', () => {
     const { error } = errorEnvelopeSchema.parse(validation.json());
     expect(error.code).toBe('WORKFLOW_INVALID');
     expect(error.details).toMatchObject({
-      issues: [{ nodeIds: ['output', 'after'], message: expect.stringContaining("can't depend on") }],
+      issues: [
+        {
+          nodeIds: ['output', 'after'],
+          edgeId: 'after-text-output-value',
+          message: expect.stringContaining("can't depend on"),
+        },
+      ],
     });
     const session = await makeSession(app, wf.id);
     const refused = await send(app, session.id);

@@ -23,7 +23,8 @@ export const postRunSeed = (turnSeed: string): string => `${turnSeed}:post`;
 
 /**
  * Splits the sinks of a workflow into the reply part and the post part, and reports the sinks that cannot be in
- * the post part: a Chat Output that depends on After Reply could only be written after the reply is. Safe on
+ * the post part: a Chat Output that depends on After Reply could only be written after the reply is (the issue
+ * names the connection into it that leads there). Safe on
  * cyclic graphs (it runs before the cycle is reported).
  */
 export function partitionWorkflow(
@@ -45,11 +46,19 @@ export function partitionWorkflow(
     for (const id of needed) part.add(id);
     if (!afterReply) continue;
     postSinks.push(node.id);
-    if (node.type === 'chat-output')
+    if (node.type === 'chat-output') {
+      // The connection into the Chat Output that leads to After Reply, so the editor can point at it.
+      const edge = workflow.edges.find(
+        (item) =>
+          item.target === node.id &&
+          (item.source === afterReply.id || upstreamOf(upstream, item.source).has(afterReply.id)),
+      );
       issues.push({
         message: `"${nameOf(node.id)}" can't depend on "${nameOf(afterReply.id)}": replies are written before it runs.`,
+        ...(edge && { edgeId: edge.id }),
         nodeIds: [node.id, afterReply.id],
       });
+    }
   }
   return { parts: { reply, post, postSinks }, issues };
 }

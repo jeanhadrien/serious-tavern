@@ -119,6 +119,8 @@ describe('validation', () => {
     expect(errors).toEqual([
       {
         message: `"Chat Output #1 (chat-output)" can't depend on "After Reply #1 (after-reply)": replies are written before it runs.`,
+        // The connection into the Chat Output (the last edge of every case).
+        edgeId: edges.at(-1)!.id,
         nodeIds: ['n-out', 'after'],
       },
     ]);
@@ -135,7 +137,7 @@ describe('validation', () => {
     expect(issue?.message).not.toMatch(/n-out|n-in|after(?!-)/);
     expect(issue?.message).toContain('Chat Output #1 (chat-output)');
     expect(issue?.message).toContain('After Reply #1 (after-reply)');
-    expect(issue?.edgeId).toBeUndefined();
+    expect(issue?.edgeId).toBe('after-text-n-out-value');
   });
 
   it('gives one issue per offending Chat Output and leaves the others alone', async () => {
@@ -159,6 +161,7 @@ describe('validation', () => {
       ['bad1', 'after'],
       ['bad2', 'after'],
     ]);
+    expect(issues.map((issue) => issue.edgeId)).toEqual(['after-text-bad1-value', 'after-text-bad2-value']);
     expect(names(issues)[1]).toContain('Chat Output #3 (chat-output)');
   });
 
@@ -177,6 +180,7 @@ describe('validation', () => {
     );
     expect(issues).toHaveLength(1);
     expect(issues[0]?.nodeIds).toEqual(['out', 'a1']);
+    expect(issues[0]?.edgeId).toBe('both-value-out-value');
     expect(names(issues)[0]).toContain('After Reply #1 (after-reply)');
   });
 
