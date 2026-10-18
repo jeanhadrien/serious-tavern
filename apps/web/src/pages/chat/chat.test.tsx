@@ -180,6 +180,13 @@ it("shows a node's log lines in the execution details", () => {
   expect(html).toContain('<pre>Input: &lt;nope&gt;</pre>');
 });
 
+it('marks every message with its id, either role, so the Summaries section can scroll to it', () => {
+  for (const role of ['user', 'assistant'] as const)
+    expect(
+      renderToStaticMarkup(<ChatMessageView message={{ id: 'm-7', role, content: 'Hi', createdAt: '' }} />),
+    ).toContain('data-message-id="m-7"');
+});
+
 it('shows the story chip on a message only when it is given one, and puts it on the last reply of a turn', () => {
   const base = { role: 'assistant' as const, content: 'Hi', createdAt: '' };
   const chip = { turnNumber: 2, lines: ['scene.tension → 7'], editedAfter: false };

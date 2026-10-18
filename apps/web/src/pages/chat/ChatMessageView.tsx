@@ -63,6 +63,7 @@ export function ChatMessageView({
       className={`message ${message.role}${editing ? ' editing' : ''}${streaming ? ' streaming' : ''}`}
       aria-label={`${name} message`}
       data-execution-id={message.executionId}
+      data-message-id={message.id}
     >
       <div className="message-top">
         <div className="message-speaker">

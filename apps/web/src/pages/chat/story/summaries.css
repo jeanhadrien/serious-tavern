@@ -1,0 +1,87 @@
+/* The Summaries section of the chat panel (320px wide, 360px as an overlay). */
+.summaries,
+.summary-set,
+.summary-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+.summary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.chat-panel .summary-set h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+.summary-row {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #363b46;
+  border-radius: 6px;
+}
+.summary-row.invalid {
+  border-color: #6b5a2e;
+}
+.summary-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.summary-chunk {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+}
+.summary-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+.summary-badge.valid {
+  background: #1f3a2b;
+  color: #8fd6a9;
+}
+.summary-badge.stale {
+  background: #3d3419;
+  color: #e6c36a;
+}
+.summary-why {
+  margin: 0;
+  font-size: 0.8rem;
+}
+.summary-text summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #a7adbd;
+}
+.summary-text p {
+  margin: 6px 0;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.summary-text small {
+  color: #8a91a3;
+}
+.summaries-empty {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px), (pointer: coarse) {
+  .summary-text summary {
+    display: flex;
+    align-items: center;
+    min-height: 36px;
+  }
+}
