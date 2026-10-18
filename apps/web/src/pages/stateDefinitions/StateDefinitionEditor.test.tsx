@@ -61,6 +61,13 @@ it('renders the name, the description and one row per key with the fields of its
   expect(html).not.toContain('x-note');
 });
 
+it('warns about a cap on a list only while it has a value', () => {
+  const warning = 'Leave the cap empty for a list that items link to chat messages in';
+  expect(render()).toContain(warning);
+  const uncapped = { ...saved, keys: saved.keys.map((key) => (key.type === 'collection' ? { ...key, cap: '' } : key)) };
+  expect(render({ draft: uncapped })).not.toContain(warning);
+});
+
 it('keeps Save off until something changed and nothing is wrong, and says why', () => {
   expect(render()).toMatch(
     /<button type="button" class="primary" disabled="" title="No changes to save">Save<\/button>/,
