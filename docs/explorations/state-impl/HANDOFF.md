@@ -32,6 +32,7 @@ the user:
 | `claude/state-impl-phase-2` | Checkpoint after phase 2 (`4465609`) |
 | `claude/state-impl-phase-3` | Checkpoint after phase 3 (`9d852a9`) |
 | `claude/state-impl-phase-4a` | Checkpoint after phase 4a |
+| `claude/state-impl-phase-4b` | Checkpoint after phase 4b |
 
 After each phase, push the working branch and create the next checkpoint:
 `git push origin HEAD:refs/heads/claude/state-impl-phase-<N>`.
@@ -49,6 +50,7 @@ with every new contract; read its sections on sinks, randomness, chat settings a
 | 2. Chat settings | `workflow.settings` declarations and a "Chat settings" panel in the workflow editor; `session.settings` and `PATCH /api/sessions/:id` (`400 CHAT_SETTING_INVALID`, never moves `updatedAt`); `resolveChatSettings`; `{{settings.*}}` with hints; the **Chat Settings** node; the chat side panel `ChatPanel` (button in the chat header) | 1004 |
 | 3. Authored collections | YAML records under `data/collections/`, API and `collections.changed`; list and editor in the right column; the **Recall** and **Draw** nodes with custom config panels; `docs/COLLECTIONS.md` | 1206 |
 | 4a. Story state, backend | State definitions (YAML records under `data/state/definitions/`, API, `stateDefinitions.changed`, 409 rules, seeded `scene`); `session.state.turns` and the pure fold in `packages/shared/src/state/`; **State Read** and **State Write** (a sink; `when` gate input; fixed config `value`); buffered writes; `{{state.*}}`, `{{trigger.turn}}`; Draw `avoidRecent`; `GET /api/sessions/:id/state`; `editedAt`; definition edits prune workflow edges | 1894 |
+| 4b. Story state, web | State definitions editor in L (`left=stateDefinition:<id>`, phone menu under Setup, disk sync, reactive name lock with "Duplicate as"); `state.*` hints; **State Read**/**State Write** panels with pickers and a typed fixed-value editor; one shared state-view fetch per chat feeding a "Story state" section in the chat panel (sparklines, "written at turn k", node memory), per-reply chips and a delete confirmation listing what is undone (shared fold); `useFileSync` shared by the provider, collection and definition editors | 2303 |
 
 How to try each one, written for the user: [howto/](howto/).
 
@@ -61,7 +63,7 @@ earlier phases actually built (read their AGENTS.md sections and code).
 | Phase | Spec | UI | Notes |
 | --- | --- | --- | --- |
 | 4a. Story state, backend (**done**) | [phase-4a.md](specs/phase-4a.md) | no | State definitions (YAML records), `session.state.turns`, the fold in `shared`, State Read / State Write, buffered writes, `{{state.*}}`, `trigger.turn`, Draw's `avoidRecent`, `GET /api/sessions/:id/state`, `editedAt` on edits, seeded `scene` definition |
-| 4b. Story state, web | [phase-4b.md](specs/phase-4b.md) | yes | Definitions editor in L; "Story state" section in `ChatPanel` with sparklines; per-message chip; delete confirmation listing what is undone |
+| 4b. Story state, web (**done**) | [phase-4b.md](specs/phase-4b.md) | yes | Definitions editor in L; "Story state" section in `ChatPanel` with sparklines; per-message chip; delete confirmation listing what is undone |
 | 5. Post-turn runs | [phase-5.md](specs/phase-5.md) | yes | After Reply node, second run on the session's turn queue (derived seed `${seed}:post`, see AGENTS.md "Randomness"), post status on the turn, UI status and failure toast |
 | 6. History summaries | [phase-6.md](specs/phase-6.md) | yes | `session.summaries` per set, fingerprint validity, Next Chunk / Save Summary, Memory `summarySet`, panel section |
 | 7. Trigger + example + guide | [phase-7.md](specs/phase-7.md) | yes | Trigger node; seeded "Fresh texture" example (collection, preset, workflow; idempotent seeds; seeded-workflows test); user guide `docs/STATE-AND-LORE.md` folding in the howto files |
