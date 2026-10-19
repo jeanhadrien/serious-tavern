@@ -49,6 +49,10 @@ export function useWorkflowCanvas(
           ...edge,
           label: !result.ok ? 'incompatible' : result.coerce ? '→text' : undefined,
           labelStyle: { fill: highlighted || !result.ok ? '#ff8b93' : '#efcf9b', fontSize: 11 },
+          // React Flow's label background is white by default, which hid the light label text on the dark canvas.
+          labelBgStyle: { fill: '#21242c', fillOpacity: 0.95 },
+          labelBgPadding: [4, 2] as [number, number],
+          labelBgBorderRadius: 3,
           animated: highlighted || undefined,
           style: highlighted
             ? { stroke: '#ef8186', strokeWidth: 3 }
