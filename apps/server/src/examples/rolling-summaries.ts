@@ -77,19 +77,19 @@ function rollingSummariesWorkflow(definitionIds: Record<string, string>): Workfl
       // The reply: every message no intact summary stands for, plus the summaries themselves from the preset.
       { id: 'input', type: 'chat-input', at: [100, 100] },
       { id: 'history', type: 'memory', config: { all: true, format: 'messages' }, at: [100, 330] },
-      { id: 'unlinked', type: 'unlinked-messages', config: target, at: [410, 330] },
-      { id: 'llm', type: 'llm', config: { presetId: SUMMARIES_NARRATOR_PRESET_ID }, at: [720, 100] },
-      { id: 'output', type: 'chat-output', at: [1030, 100] },
+      { id: 'unlinked', type: 'unlinked-messages', config: target, at: [520, 330] },
+      { id: 'llm', type: 'llm', config: { presetId: SUMMARIES_NARRATOR_PRESET_ID }, at: [1200, 100] },
+      { id: 'output', type: 'chat-output', at: [1540, 100] },
       // After the reply: the next chunk nobody summarized yet is summarized and stored with a link to its messages.
       { id: 'after', type: 'after-reply', at: [100, 640] },
-      { id: 'chunk', type: 'next-chunk', config: { ...target, chunkSize: 20, rawWindow: 16 }, at: [410, 640] },
+      { id: 'chunk', type: 'next-chunk', config: { ...target, chunkSize: 20, rawWindow: 16 }, at: [520, 640] },
       {
         id: 'summarize',
         type: 'llm',
         config: { presetId: SUMMARIZE_PRESET_ID, temperature: 0.3, maxTokens: 400 },
-        at: [720, 640],
+        at: [1200, 560],
       },
-      { id: 'save', type: 'state-write', config: { ...target, op: 'add' }, at: [1030, 640] },
+      { id: 'save', type: 'state-write', config: { ...target, op: 'add' }, at: [1540, 640] },
     ],
     [
       ['input', 'message', 'llm', 'message'],

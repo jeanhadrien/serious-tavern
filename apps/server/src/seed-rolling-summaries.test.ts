@@ -53,7 +53,8 @@ it('summarizes the oldest chunk after the reply, uses the summary instead of tho
   await app.inject({ method: 'PUT', url: '/api/secrets/openrouter', payload: { value: 'test-key' } });
   const session = await makeSession(app, ROLLING_SUMMARIES_WORKFLOW_ID);
 
-  // 21 turns: the 18th leaves 36 messages, 20 of them older than the newest 16.
+  // 21 turns. A post run sees the history before its own turn, so the 19th turn's run is the first to see 36 messages,
+  // 20 of them older than the newest 16.
   for (let n = 1; n <= 21; n++) expect(await turn(app, session.id, `message ${n}`)).toEqual([`reply ${n}`]);
   expect(summarizer).toHaveLength(1);
   const excerpt = summarizer[0]!.messages.map((m) => m.content).join('\n');

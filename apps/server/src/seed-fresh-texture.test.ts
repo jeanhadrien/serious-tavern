@@ -36,7 +36,7 @@ const stateOf = async (id: string) =>
     (await app!.inject({ method: 'GET', url: `/api/sessions/${id}/state` })).json(),
   );
 const injected = (view: SessionStateView) =>
-  (view.definitions.find((definition) => definition.name === 'scene')?.values.injected ?? []) as { level: number }[];
+  (view.definitions.find((definition) => definition.name === 'scene')?.values.injected ?? []) as { level: number; entryId?: string }[];
 const fires = (view: SessionStateView) => view.nodes.find((node) => node.nodeId === 'trigger')?.meta.fires?.count ?? 0;
 
 it('answers every turn, injects a leveled detail now and then, and takes it back with the reply', async () => {
@@ -77,6 +77,12 @@ it('answers every turn, injects a leveled detail now and then, and takes it back
   const count = fired.filter(Boolean).length;
   expect(injected(view)).toHaveLength(count);
   expect(fires(view)).toBe(count);
+  // Each item keeps what the key declares (text, level, entryId) and nothing is logged as left out.
+  expect(injected(view)[0]!.entryId).toMatch(/^entry-\d+$/);
+  const firingTurn = stored[fired.lastIndexOf(true)]!;
+  const log = (await app.inject({ method: 'GET', url: `/api/executions/${firingTurn.executionId}` })).json();
+  expect(log.nodes.remember.status).toBe('completed');
+  expect(log.nodes.remember.logs.join('\n')).not.toContain('Left out');
   const lastLevel = view.definitions.find((definition) => definition.name === 'scene')!.values.lastInjectionLevel;
   expect(lastLevel).toBe(injected(view)[0]!.level);
 
