@@ -1,14 +1,16 @@
-import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Collection, Preset, StateDefinition, Workflow } from '@st/shared';
 import { examplePacks } from './examples/index.js';
-import { atomicWrite, type Repository } from './storage/repository.js';
+import { LEDGER_FILE, readLedger, type SeedLedger } from './seed-ledger.js';
+import type { Repository } from './storage/repository.js';
 
 /**
  * A set of example records that belong together: a workflow, the preset and collection it uses and the state
  * definitions it reads or writes. Every record has a FIXED id.
  */
 export type ExamplePack = {
+  /** Names the pack's lines in the ledger (`fresh-texture/workflow:<id>`); never changes once shipped. */
+  id: string;
   name: string;
   collections(): Collection[];
   definitions(): StateDefinition[];
@@ -28,35 +30,6 @@ export type ExampleStores = {
 };
 
 type Log = { info(message: string): void; warn(message: string): void };
-
-export const LEDGER_FILE = '.seeded.json';
-
-/**
- * The records ever seeded (`kind:id`), so one that was deleted is not created again. A missing file is an empty
- * ledger; an unreadable one is `undefined` and is never rewritten (nothing is seeded rather than guessing).
- */
-async function readLedger(path: string, log: Log): Promise<Set<string> | undefined> {
-  let text: string;
-  try {
-    text = await readFile(path, 'utf8');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return new Set();
-    log.warn(`Not seeding the examples: can't read ${path}: ${(error as Error).message}`);
-    return undefined;
-  }
-  try {
-    const parsed = JSON.parse(text) as { seeded?: unknown };
-    if (Array.isArray(parsed.seeded) && parsed.seeded.every((entry) => typeof entry === 'string'))
-      return new Set(parsed.seeded as string[]);
-  } catch {
-    // reported below
-  }
-  log.warn(`Not seeding the examples: ${path} is not a seed ledger. Fix or remove it by hand.`);
-  return undefined;
-}
-
-const writeLedger = (path: string, ledger: Set<string>) =>
-  atomicWrite(path, JSON.stringify({ version: 1, seeded: [...ledger].sort() }, null, 2));
 
 type Declared = Extract<StateDefinition['keys'][string], { type: 'collection' }>['fields'];
 const sameFields = (ours: Declared, theirs: Declared) =>
@@ -94,17 +67,40 @@ export async function seedExamples(
   const path = join(dataDir, LEDGER_FILE);
   const ledger = await readLedger(path, log);
   if (!ledger) return;
-  const before = ledger.size;
-  for (const pack of packs) await seedPack(pack, stores, ledger, log);
-  if (ledger.size !== before) await writeLedger(path, ledger);
+  // Examples are optional: a failing pack or ledger write is logged and never stops the server from starting. The
+  // ledger is written after every pack, so what was created stays recorded whatever happens to the next one.
+  for (const pack of packs) {
+    try {
+      await seedPack(pack, stores, ledger, log);
+    } catch (error) {
+      log.warn(`Example "${pack.name}" not added: ${(error as Error).message}`);
+    }
+    if (ledger.changed)
+      await ledger.write(path).catch((error: Error) => log.warn(`Could not write ${path}: ${error.message}`));
+  }
 }
 
 type Item = { key: string; found: boolean; create(): Promise<void> };
 
-async function seedPack(pack: ExamplePack, stores: ExampleStores, ledger: Set<string>, log: Log): Promise<void> {
+/** A collection key with a cap drops its oldest items; the examples expect none. */
+function capHints(ours: StateDefinition, theirs: StateDefinition, keys: string[], pack: string): string[] {
+  return keys.flatMap((key) => {
+    const want = ours.keys[key];
+    const have = theirs.keys[key];
+    if (want?.type !== 'collection' || have?.type !== 'collection' || have.cap === undefined || want.cap !== undefined)
+      return [];
+    return [
+      `Example "${pack}": "${theirs.name}.${key}" has a cap of ${have.cap}; the example expects none, so its oldest items are dropped.`,
+    ];
+  });
+}
+
+async function seedPack(pack: ExamplePack, stores: ExampleStores, ledger: SeedLedger, log: Log): Promise<void> {
   const existing = await stores.stateDefinitions.list();
   const definitionIds: Record<string, string> = {};
   const items: Item[] = [];
+  const hints: string[] = [];
+  let blocked: string | undefined;
 
   for (const definition of pack.definitions()) {
     const key = `stateDefinition:${definition.id}`;
@@ -113,17 +109,17 @@ async function seedPack(pack: ExamplePack, stores: ExampleStores, ledger: Set<st
     const sameName = existing.find(
       (candidate) => candidate.id !== definition.id && candidate.name.toLowerCase() === definition.name.toLowerCase(),
     );
-    if (!sameId && sameName) {
-      const problem = misfit(definition, sameName, pack.uses[definition.name] ?? []);
-      if (problem) {
-        log.warn(`Example "${pack.name}" not added: the state definition "${sameName.name}" exists but ${problem}.`);
-        return;
-      }
-      definitionIds[definition.name] = sameName.id;
-      continue;
+    const present = sameId ?? sameName;
+    if (present) {
+      // Ours may have been edited too, so the same-id definition has to fit the workflow as well.
+      const uses = pack.uses[definition.name] ?? [];
+      const problem = misfit(definition, present, uses);
+      if (problem) blocked ??= `the state definition "${present.name}" exists but ${problem}`;
+      else hints.push(...capHints(definition, present, uses, pack.name));
     }
-    definitionIds[definition.name] = definition.id;
-    items.push({ key, found: !!sameId, create: () => stores.stateDefinitions.save(definition) });
+    definitionIds[definition.name] = present?.id ?? definition.id;
+    if (sameId || !present)
+      items.push({ key, found: !!sameId, create: () => stores.stateDefinitions.save(definition) });
   }
   for (const collection of pack.collections())
     items.push({
@@ -143,18 +139,28 @@ async function seedPack(pack: ExamplePack, stores: ExampleStores, ledger: Set<st
     found: !!(await stores.workflows.get(workflow.id)),
     create: () => stores.workflows.save(workflow),
   };
+  const all = [...items, main];
 
+  if (blocked) {
+    // Said only while there is something to create: a pack that was seeded long ago has nothing left to say.
+    if (all.some((item) => !item.found && !ledger.has(pack.id, item.key)))
+      log.warn(`Example "${pack.name}" not added: ${blocked}.`);
+    return;
+  }
   // A record seeded earlier and since deleted is not created again, so the workflow would point at nothing:
   // a pack whose workflow is still to be created is left alone then.
-  const creating = !main.found && !ledger.has(main.key);
-  if (creating && items.some((item) => !item.found && ledger.has(item.key))) {
+  const creating = !main.found && !ledger.has(pack.id, main.key);
+  if (creating && items.some((item) => !item.found && ledger.has(pack.id, item.key))) {
     log.warn(`Example "${pack.name}" not added: a record it uses was deleted after it was first seeded.`);
     return;
   }
-  for (const item of [...items, main]) {
-    if (!item.found && ledger.has(item.key)) continue;
-    if (!item.found) await item.create();
-    ledger.add(item.key);
+  for (const item of all) {
+    // A record seeded earlier and deleted since stays deleted; its ledger line is only renamed after the pack.
+    if (!item.found && !ledger.has(pack.id, item.key)) await item.create();
+    ledger.add(pack.id, item.key);
   }
-  if (creating) log.info(`Added the example "${pack.name}".`);
+  if (creating) {
+    for (const hint of hints) log.info(hint);
+    log.info(`Added the example "${pack.name}".`);
+  }
 }

@@ -12,7 +12,8 @@ import {
   SUMMARIES_NARRATOR_PRESET_ID,
   SUMMARIZE_PRESET_ID,
 } from './examples/rolling-summaries.js';
-import { LEDGER_FILE } from './seed-examples.js';
+import { defaultPreset } from './seed.js';
+import { LEDGER_FILE } from './seed-ledger.js';
 import { SCENE_DEFINITION_ID } from './seed-state.js';
 import { nodeResources } from './services/node-resources.js';
 
@@ -64,14 +65,14 @@ describe('a fresh data directory', () => {
     for (const workflow of await context.workflows.list()) expect(await issues(context, workflow.id)).toEqual([]);
     expect((await ledger()).seeded).toEqual(
       [
-        `collection:${FOREST_COLLECTION_ID}`,
-        `preset:${NARRATOR_PRESET_ID}`,
-        `preset:${SUMMARIES_NARRATOR_PRESET_ID}`,
-        `preset:${SUMMARIZE_PRESET_ID}`,
-        `stateDefinition:${MEMORY_DEFINITION_ID}`,
-        `stateDefinition:${SCENE_DEFINITION_ID}`,
-        `workflow:${FRESH_TEXTURE_WORKFLOW_ID}`,
-        `workflow:${ROLLING_SUMMARIES_WORKFLOW_ID}`,
+        `fresh-texture/collection:${FOREST_COLLECTION_ID}`,
+        `fresh-texture/preset:${NARRATOR_PRESET_ID}`,
+        `fresh-texture/stateDefinition:${SCENE_DEFINITION_ID}`,
+        `fresh-texture/workflow:${FRESH_TEXTURE_WORKFLOW_ID}`,
+        `rolling-summaries/preset:${SUMMARIES_NARRATOR_PRESET_ID}`,
+        `rolling-summaries/preset:${SUMMARIZE_PRESET_ID}`,
+        `rolling-summaries/stateDefinition:${MEMORY_DEFINITION_ID}`,
+        `rolling-summaries/workflow:${ROLLING_SUMMARIES_WORKFLOW_ID}`,
       ].sort(),
     );
     expect(info).toHaveBeenCalledWith('Added the example "Fresh texture (example)".');
@@ -205,8 +206,8 @@ describe('a user who already has data', () => {
     );
     // Nothing was recorded, so fixing the definition lets the next start add it.
     const recorded = (await ledger()).seeded;
-    expect(recorded).not.toContain(`workflow:${FRESH_TEXTURE_WORKFLOW_ID}`);
-    expect(recorded).not.toContain(`collection:${FOREST_COLLECTION_ID}`);
+    expect(recorded.join()).not.toContain(FRESH_TEXTURE_WORKFLOW_ID);
+    expect(recorded.join()).not.toContain(FOREST_COLLECTION_ID);
     await again.stateDefinitions.delete(
       (await again.stateDefinitions.list()).find((item) => item.name === 'scene')!.id,
     );
@@ -217,7 +218,7 @@ describe('a user who already has data', () => {
     const first = await open({ seed: true });
     expect((await first.stateDefinitions.list()).map((item) => item.id)).toEqual([SCENE_DEFINITION_ID]);
     const context = await open();
-    expect((await ledger()).seeded).toContain(`stateDefinition:${SCENE_DEFINITION_ID}`);
+    expect((await ledger()).seeded).toContain(`fresh-texture/stateDefinition:${SCENE_DEFINITION_ID}`);
     for (const workflow of await context.workflows.list()) await context.workflows.delete(workflow.id);
     for (const definition of await context.stateDefinitions.list())
       await context.stateDefinitions.delete(definition.id);

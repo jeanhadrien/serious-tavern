@@ -1,7 +1,7 @@
 import type { Preset, StateDefinition, Workflow } from '@st/shared';
 import { makeWorkflow } from '../seed.js';
 import type { ExamplePack } from '../seed-examples.js';
-import { message, narratorIntro, slot } from './preset-parts.js';
+import { message, narratorIntro, narratorOutro, slot } from './preset-parts.js';
 
 export const MEMORY_DEFINITION_ID = 'e7b3c914-5a26-4f08-9d71-3c8a0b6e2f45';
 export const SUMMARIES_NARRATOR_PRESET_ID = '1f5d8a07-c3e9-4b62-8a14-7d0e9b2c6a53';
@@ -40,6 +40,7 @@ function narratorPreset(): Preset {
       ...narratorIntro(),
       message('summaries', 'Summaries of the earlier chat', SUMMARIES_ENTRY),
       slot('recent-slot', 'Messages no summary covers', 'recent'),
+      ...narratorOutro(),
       slot('message-slot', 'User message', 'message'),
     ],
     createdAt: date,
@@ -110,6 +111,7 @@ function rollingSummariesWorkflow(definitionIds: Record<string, string>): Workfl
  * a summarized message makes its summary stop being used until it is summarized again.
  */
 export const rollingSummaries: ExamplePack = {
+  id: 'rolling-summaries',
   name: 'Rolling summaries (example)',
   collections: () => [],
   definitions: () => [memoryDefinition()],

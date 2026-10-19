@@ -1,6 +1,6 @@
 import type { Collection, CollectionEntry, Preset, Workflow, WorkflowSetting } from '@st/shared';
 import { makeWorkflow } from '../seed.js';
-import { message, narratorIntro, slot } from './preset-parts.js';
+import { message, narratorIntro, narratorOutro, slot } from './preset-parts.js';
 import { sceneDefinition } from '../seed-state.js';
 import type { ExamplePack } from '../seed-examples.js';
 
@@ -102,6 +102,7 @@ function narratorPreset(): Preset {
         ...message('texture', 'Fresh texture (worded by level)', TEXTURE_WORDING),
         placement: { mode: 'depth', entryId: 'history-slot', depth: 2 },
       },
+      ...narratorOutro(),
       slot('message-slot', 'User message', 'message'),
     ],
     createdAt: date,
@@ -189,6 +190,7 @@ function freshTextureWorkflow(definitionIds: Record<string, string>): Workflow {
  * the preset words it, and the scene state remembers what was injected.
  */
 export const freshTexture: ExamplePack = {
+  id: 'fresh-texture',
   name: 'Fresh texture (example)',
   collections: () => [forestCollection()],
   definitions: () => [sceneDefinition()],
