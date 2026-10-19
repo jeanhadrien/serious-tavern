@@ -220,6 +220,22 @@ The engine returns `{ replies: Array<{ nodeId, content, name?, characterId? }>, 
 
 Error `details` uses the same shared schema as a successful message result. The chat client displays kept replies plus the error notification and execution details; named speakers show their snapshotted name and an available character avatar. Retrying sends a new user message, rather than rolling back the failed turn.
 
+### Regenerate and swipes
+
+The chat's **last turn** can be run again, and every generated alternative is kept (design: `docs/plans/frontend-ux/07e-swipes.md`).
+
+| Method and path | Request | Success |
+| --- | --- | --- |
+| `POST /api/sessions/:id/regenerate` | No body | `200` `{ assistantMessages, execution }`, the shape of a sent message without `userMessage` |
+| `POST /api/sessions/:id/regenerate/stream` | No body | SSE, the same `turnEventSchema` events as `messages/stream` |
+| `PATCH /api/sessions/:id/alternative` | JSON `{ executionId }`: the alternative to show | `200` the whole session (`updateSession` style) |
+
+- **An alternative is an ordinary turn:** its own `executionId`, `TurnEntry` (with its writes), replies and after-reply run. The alternatives of one turn are tied by the root, the `executionId` of the first one; the replies of later ones carry it as `alternativeOf`. Replies of an alternative that isn't shown carry `inactive: true`; absent means active, so every older message is active. The pure rules (`activeMessages`, `alternativesOfLastTurn`, `withActiveAlternative`, `withoutLastTurnReplies`) are in `packages/shared/src/alternatives.ts`.
+- **Regenerate** runs in the chat's queue like a message (`services/chat.ts`, `runRegenerate`), so it waits behind a running turn or after-reply run, and `POST .../stop` stops it. It stores no user message. `trigger.message` is the content of the last turn's user message (the one that shares the root's `executionId`), or `''` for an empty send. The run's history is the chat as the original run saw it (active messages without the last turn's replies and without that turn's user message), and its story state is folded with the last turn's replies left out (`regenerateTarget`, `services/regenerate.ts`), so `trigger.turn`, `{{state.*}}` and the writes are as for the original turn. `409 NOTHING_TO_REGENERATE` (plain JSON, even on the stream route) when the last turn has no assistant reply: an empty chat, a user message after the last reply, or old replies without an `executionId`.
+- **Settle** (`settleTurn`, option `regenerate: { rootId }`): in the one `sessions.silent.update` that appends the new turn entry, the new replies get `alternativeOf` and every reply of the previous alternatives gets `inactive: true`; one `sessions.changed`. A stopped or failed regenerate with at least one reply row settles the same way (its partial reply becomes the shown alternative). With no reply row the messages stay as they are and the entry is recorded as **not completed**, because a completed turn without replies counts and would apply its writes next to the alternative still shown; such a regenerate also leaves no after-reply run. `updatedAt` advances like for a sent message. Streaming rows of a regenerate carry `alternativeOf` from the start but, until the settle, the old replies are still active.
+- **Swipe** changes which alternative is active and nothing else (`services/alternatives.ts`): it runs nothing, never advances `updatedAt`, publishes one `sessions.changed`, and the story state follows through the turn presence rule. `409 TURN_RUNNING` while any job holds the chat's slot (turn, regenerate or after-reply run), `400 NOT_AN_ALTERNATIVE` when `executionId` isn't an alternative of the last turn (so a turn followed by another message can't be swiped), `404` for an unknown chat.
+- **Everything that reads "the chat" uses the active messages:** the history of a run (`historyMessages`), links, the story state view, the preset preview, and `messageCount`. Editing or deleting an inactive message answers `404 Message not found`.
+
 ## Chat settings
 
 **Chat settings** are knobs a workflow declares and each chat sets: a volatility dial, an "allow violence" toggle, a max-intensity choice, an author's note. They belong to the user: turns only read them, and editing, deleting or regenerating messages never changes them. Changing one is not a turn and adds no message; the next turn uses the new value.
@@ -562,6 +578,8 @@ A value of the wrong type or an enum option that doesn't exist is a node error n
 ### Edits and deletes
 
 Editing a message stamps `editedAt` and changes nothing else: the stored entries are never recomputed from content. Deleting a message is content-only; the fold recomputes which turns count, so deleting the last reply rewinds the state, a middle reply keeps later values and renumbers, and a user message changes nothing. Neither re-runs the workflow.
+
+**Alternatives** (see Regenerate and swipes): each alternative of the last turn is a turn of its own, and only the shown one has active replies, so only its writes apply; swiping flips which one counts, and a regenerate folds the state as if the last turn were not there (`trigger.turn` keeps its number). A regenerate that leaves no reply is stored as a not-completed entry so it never counts.
 
 ### Story state in the web
 

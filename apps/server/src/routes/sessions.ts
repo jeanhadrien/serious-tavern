@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { apiContract, type ApiResponse } from '@st/shared';
+import { activeMessages, apiContract, type ApiResponse } from '@st/shared';
 import { now, type AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
+import { setAlternative } from '../services/alternatives.js';
 import { sessionStateView } from '../services/session-state.js';
 import { updateSession } from '../services/sessions.js';
 import type { ApiRoute } from './types.js';
@@ -13,7 +14,7 @@ export function registerSessions(app: FastifyInstance, context: AppContext) {
     // The turn entries are the session's own business: a list carries neither messages nor state.
     (await sessions.list()).map(({ messages, state: _state, ...session }) => ({
       ...session,
-      messageCount: messages.length,
+      messageCount: activeMessages(messages).length,
     })),
   );
   app.post<ApiRoute<'createSession'>>('/api/sessions', async (request, reply) => {
@@ -46,6 +47,10 @@ export function registerSessions(app: FastifyInstance, context: AppContext) {
   app.patch<ApiRoute<'updateSession'>>('/api/sessions/:id', async (request) => {
     const { id } = apiContract.updateSession.params.parse(request.params);
     return updateSession(context, id, apiContract.updateSession.body.parse(request.body));
+  });
+  app.patch<ApiRoute<'setAlternative'>>('/api/sessions/:id/alternative', async (request) => {
+    const { id } = apiContract.setAlternative.params.parse(request.params);
+    return setAlternative(context, id, apiContract.setAlternative.body.parse(request.body).executionId);
   });
   app.delete<ApiRoute<'deleteSession'>>('/api/sessions/:id', async (request, reply) => {
     const { id } = apiContract.deleteSession.params.parse(request.params);

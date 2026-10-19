@@ -18,6 +18,7 @@ import { HttpError, notFound, requireEntity } from '../errors.js';
 import { failureMessage, stopWarning } from './failure.js';
 import { nodeResources } from './node-resources.js';
 import { runPostTurn } from './post-turn.js';
+import { regenerateTarget } from './regenerate.js';
 import { historyMessages, settleTurn } from './settle-turn.js';
 import { foldSession, listDefinitions } from './story-state.js';
 import { TurnStream, type TurnFrame } from './turn-stream.js';
@@ -32,6 +33,9 @@ export type TurnOptions = {
   keepRunning?: boolean;
 };
 
+/** What starts a turn: a message (possibly empty), or a regenerate of the last turn, which stores no user message. */
+type TurnRequest = { content: string; regenerate?: false } | { content?: undefined; regenerate: true };
+
 export function sendMessage(
   context: AppContext,
   sessionId: string,
@@ -41,6 +45,14 @@ export function sendMessage(
   return runTurn(context, sessionId, content, { signal, keepRunning: true });
 }
 
+export function regenerate(
+  context: AppContext,
+  sessionId: string,
+  signal?: AbortSignal,
+): Promise<ApiResponse<'regenerate'>> {
+  return runRegenerate(context, sessionId, { signal, keepRunning: true });
+}
+
 // One turn per session, in order. The session's storage lock is only held for short writes, never across the engine run.
 export function runTurn(
   context: AppContext,
@@ -48,23 +60,45 @@ export function runTurn(
   content: string,
   options: TurnOptions = {},
 ): Promise<ApiResponse<'sendMessage'>> {
+  return runRequest(context, sessionId, { content }, options);
+}
+
+// The last turn again, in the same queue as messages: Stop and a client leaving work as for a message.
+export function runRegenerate(
+  context: AppContext,
+  sessionId: string,
+  options: TurnOptions = {},
+): Promise<ApiResponse<'regenerate'>> {
+  return runRequest(context, sessionId, { regenerate: true }, options);
+}
+
+function runRequest(
+  context: AppContext,
+  sessionId: string,
+  request: TurnRequest,
+  options: TurnOptions,
+): Promise<ApiResponse<'sendMessage'>> {
   return context.turns.run(sessionId, async (turn) => {
     if (options.signal?.aborted) throw new HttpError(409, 'TURN_STOPPED', 'The turn was cancelled before it started');
     const disconnected = () => turn.stop('disconnect');
     if (!options.keepRunning) options.signal?.addEventListener('abort', disconnected, { once: true });
     try {
-      return await executeTurn(context, sessionId, content, turn, options);
+      return await executeTurn(context, sessionId, request, turn, options);
     } finally {
       options.signal?.removeEventListener('abort', disconnected);
     }
   });
 }
 
-async function startTurn(context: AppContext, sessionId: string, content: string) {
+async function startTurn(context: AppContext, sessionId: string, request: TurnRequest) {
   const { workflows, sessions, personas, stateDefinitions } = context;
   const started: {
     value?: {
       prepared: PreparedWorkflow;
+      // `trigger.message`: the sent text, or a regenerate's user message (`''` when there is none).
+      content: string;
+      // A regenerate only: the root of the alternatives its replies join.
+      rootId?: string;
       // The listing the ports were resolved with: the after-reply run folds its state against the same one.
       definitions: StateDefinition[];
       userMessage?: ChatMessage;
@@ -78,6 +112,9 @@ async function startTurn(context: AppContext, sessionId: string, content: string
     };
   } = {};
   const session = await sessions.silent.update(sessionId, async (current) => {
+    // Checked inside the queue slot, so it is judged on the chat as the regenerate finds it.
+    const target = request.regenerate ? regenerateTarget(current.messages) : undefined;
+    const content = target?.content ?? request.content ?? '';
     const workflow = await requireEntity(workflows, current.workflowId, 'Workflow');
     // One listing serves the node ports and the fold, so a definition edited mid-turn cannot split them.
     const definitions = await listDefinitions(stateDefinitions);
@@ -94,16 +131,23 @@ async function startTurn(context: AppContext, sessionId: string, content: string
     const character = current.characterId ? await prepared.resources.characters?.get(current.characterId) : undefined;
     const persona = current.personaId ? await personas.get(current.personaId) : undefined;
     // An empty send adds no user message: the turn runs on the history as it is.
-    const userMessage: ChatMessage | undefined = content.trim()
-      ? { id: randomUUID(), role: 'user', content, createdAt: now() }
-      : undefined;
+    const userMessage: ChatMessage | undefined =
+      !target && content.trim() ? { id: randomUUID(), role: 'user', content, createdAt: now() } : undefined;
     // The values are snapshotted here: a settings change during the run applies from the next turn.
     const settings = resolveChatSettings(workflowSettings(workflow), current.settings);
     // The state the turn starts from: the turns still present, folded against the definitions as they are now.
-    const history = historyMessages(current.messages);
-    const story = foldSession(definitions, current, undefined, history);
+    // A regenerate runs as if the last turn's replies (whichever alternative is shown) were not there.
+    const history = target?.history ?? historyMessages(current.messages);
+    const story = foldSession(
+      definitions,
+      target ? { ...current, messages: target.messages } : current,
+      undefined,
+      history,
+    );
     started.value = {
       prepared,
+      content,
+      rootId: target?.rootId,
       definitions,
       userMessage,
       history,
@@ -125,13 +169,15 @@ async function startTurn(context: AppContext, sessionId: string, content: string
 async function executeTurn(
   context: AppContext,
   sessionId: string,
-  content: string,
+  request: TurnRequest,
   turn: RunningTurn,
   options: TurnOptions,
 ): Promise<ApiResponse<'sendMessage'>> {
   const { sessions, executions, secrets } = context;
   const {
     prepared,
+    content,
+    rootId,
     definitions,
     userMessage,
     history,
@@ -141,10 +187,17 @@ async function executeTurn(
     settingIssues,
     state,
     stateIssues,
-  } = await startTurn(context, sessionId, content);
+  } = await startTurn(context, sessionId, request);
   const executionId = randomUUID();
   const stream = options.emit
-    ? new TurnStream({ sessions: sessions.silent, sessionId, executionId, prepared, emit: options.emit })
+    ? new TurnStream({
+        sessions: sessions.silent,
+        sessionId,
+        executionId,
+        alternativeOf: rootId,
+        prepared,
+        emit: options.emit,
+      })
     : undefined;
   options.emit?.({ type: 'turn.start', executionId });
   let outcome: { replies: ChatReply[]; execution: ExecutionLog; writes: StateWrite[] } | undefined;
@@ -177,7 +230,9 @@ async function executeTurn(
   if (execution) await executions.save(execution);
   // A turn that ran to the end leaves an after-reply run when the workflow has one. It is announced in the entry
   // (`running`) by the settle below, and its id is on the RunningTurn first, so a state read can tell it is live.
-  const postExecutionId = outcome && prepared.parts.postSinks.length ? randomUUID() : undefined;
+  // A regenerate that left no reply changes nothing in the chat: its turn is not present, so there is nothing to follow.
+  const postExecutionId =
+    outcome && prepared.parts.postSinks.length && !(rootId && !outcome.replies.length) ? randomUUID() : undefined;
   if (postExecutionId) turn.postExecutionId = postExecutionId;
   const settled: {
     value?: { userMessage?: ChatMessage; assistantMessages: ChatMessage[]; linkWarnings: string[] };
@@ -193,6 +248,7 @@ async function executeTurn(
       writes,
       definitions,
       postExecutionId,
+      ...(rootId ? { regenerate: { rootId } } : {}),
     });
     return current;
   });

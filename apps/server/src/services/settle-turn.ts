@@ -1,14 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import type { ChatMessage, Session, StateDefinition, StateWrite } from '@st/shared';
-import { LINK_WARNING_LIMITS, withTurnEntry } from '@st/shared';
+import { activeMessages, LINK_WARNING_LIMITS, withTurnEntry } from '@st/shared';
 import type { ChatReply } from '@st/engine';
 import { now } from '../context.js';
 import { commitLinks } from './links.js';
 import type { StreamedRow } from './turn-stream.js';
 
-/** Messages a turn may read as history. Streaming and partial rows never enter it. */
+/**
+ * Messages a turn may read as history: the active ones (the replies of alternatives that aren't shown are not in the
+ * chat), and never streaming or partial rows. EVERY server reader of "the chat" goes through this.
+ */
 export function historyMessages(messages: ChatMessage[]): ChatMessage[] {
-  return messages.filter((message) => message.status === undefined || message.status === 'final');
+  return activeMessages(messages).filter((message) => message.status === undefined || message.status === 'final');
 }
 
 export type Settlement = {
@@ -24,6 +27,9 @@ export type Settlement = {
   // The after-reply run this turn leaves behind: the entry says `running` from the moment it is saved, so the
   // run never has a gap in which the chat shows none.
   postExecutionId?: string;
+  // Set when the turn is a regenerate of the last turn (`rootId`: the `executionId` of its first alternative). Its
+  // replies join that turn's alternatives and, if there are any, replace the shown ones in this same write.
+  regenerate?: { rootId: string };
 };
 
 /**
@@ -42,8 +48,10 @@ export function settleTurn(
     writes = [],
     definitions = [],
     postExecutionId,
+    regenerate,
   }: Settlement,
 ) {
+  const alternativeOf = regenerate ? { alternativeOf: regenerate.rootId } : {};
   const streamedIds = new Set(streamed.map((row) => row.id));
   const streamedByOutput = new Map(streamed.map((row) => [row.outputId, row]));
   const repliedOutputs = new Set(replies.map((reply) => reply.nodeId));
@@ -57,6 +65,7 @@ export function settleTurn(
       ...(reply.characterId === undefined ? {} : { characterId: reply.characterId }),
       createdAt: live?.createdAt ?? now(),
       executionId,
+      ...alternativeOf,
       ...(live ? { nodeId: live.outputId, status: 'final' as const } : {}),
       ...(live?.reasoning ? { reasoning: live.reasoning } : {}),
     };
@@ -73,6 +82,7 @@ export function settleTurn(
             ...(row.characterId === undefined ? {} : { characterId: row.characterId }),
             createdAt: row.createdAt,
             executionId,
+            ...alternativeOf,
             nodeId: row.outputId,
             status: 'partial',
             ...(row.reasoning ? { reasoning: row.reasoning } : {}),
@@ -83,6 +93,9 @@ export function settleTurn(
   current.messages = current.messages.filter((message) => !streamedIds.has(message.id));
   const saved = userMessage && (current.messages.find((message) => message.id === userMessage.id) ?? userMessage);
   if (saved) saved.executionId = executionId;
+  // A regenerate that produced a reply row shows it: the previous alternatives of the turn go inactive in the same
+  // write. One that produced none leaves the messages as they are.
+  if (regenerate && assistantMessages.length) deactivateAlternatives(current.messages, regenerate.rootId);
   current.messages.push(...assistantMessages);
   // A write that links messages is judged against the chat as it is now, the turn's own messages included.
   const committed = commitLinks(historyMessages(current.messages), writes, definitions);
@@ -91,7 +104,9 @@ export function settleTurn(
   current.state = withTurnEntry(current.state, {
     executionId,
     at: now(),
-    completed: !interrupted,
+    // A regenerate with no reply row leaves the shown alternative in place, so its entry must not count as a turn of its
+    // own (a turn without replies counts when it completed): it is recorded as not completed.
+    completed: !interrupted && !(regenerate && !assistantMessages.length),
     replies: assistantMessages.length,
     writes: committed.writes,
     ...(committed.warnings.length && {
@@ -103,4 +118,12 @@ export function settleTurn(
   });
   current.updatedAt = now();
   return { userMessage: saved, assistantMessages, linkWarnings: committed.warnings };
+}
+
+// Every settled reply of the turn's alternatives (the root's and the regenerated ones) stops being shown.
+function deactivateAlternatives(messages: ChatMessage[], rootId: string) {
+  for (const message of messages) {
+    const inGroup = message.executionId === rootId || message.alternativeOf === rootId;
+    if (inGroup && message.role === 'assistant' && message.status !== 'streaming') message.inactive = true;
+  }
 }

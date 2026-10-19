@@ -57,6 +57,8 @@ export class TurnStream {
       sessions: Repository<Session>;
       sessionId: string;
       executionId: string;
+      // A regenerate's rows are alternatives of the turn this root started (see alternatives.ts).
+      alternativeOf?: string;
       prepared: PreparedWorkflow;
       emit: (frame: TurnFrame) => void;
     },
@@ -192,6 +194,7 @@ export class TurnStream {
         status: 'streaming',
         nodeId: stream.outputId,
         executionId: this.options.executionId,
+        ...(this.options.alternativeOf ? { alternativeOf: this.options.alternativeOf } : {}),
         createdAt: stream.createdAt,
         ...stamp,
         ...(stream.reasoning ? { reasoning: stream.reasoning } : {}),

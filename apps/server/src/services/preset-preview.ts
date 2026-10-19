@@ -1,5 +1,6 @@
 import type { ApiParsedBody, ApiResponse } from '@st/shared';
 import {
+  activeMessages,
   emptyStateSnapshot,
   presetWarnings,
   resolveChatSettings,
@@ -40,7 +41,7 @@ export async function previewPreset(
   ];
   for (const input of preset.inputs) {
     if (input.dataType === 'messages') {
-      if (!Object.hasOwn(inputs, input.key)) values[input.key] = session ? session.messages : sample;
+      if (!Object.hasOwn(inputs, input.key)) values[input.key] = session ? activeMessages(session.messages) : sample;
     } else values[input.key] ??= `<${input.key}>`;
   }
   try {
@@ -49,7 +50,7 @@ export async function previewPreset(
         inputs: values,
         templateContext: {
           trigger: { message: 'Sample message', sessionId: sessionId ?? 'sample-session', turn: state.turn },
-          history: session?.messages,
+          history: session && activeMessages(session.messages),
           character,
           persona,
           settings,

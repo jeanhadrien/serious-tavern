@@ -230,6 +230,20 @@ it('returns payloads conforming to every shared endpoint response contract', asy
       type: 'turn.complete',
       assistantMessages: [{ content: 'Contract stream' }],
     });
+    // The last turn again (plain and streamed), then a swipe back to the first alternative.
+    const regenerated = await request('regenerate', { method: 'POST', url: `/api/sessions/${session.id}/regenerate` });
+    expect(regenerated.userMessage).toBeUndefined();
+    expect(regenerated.assistantMessages[0]?.content).toBe('Contract stream');
+    const regenStream = await app.inject({ method: 'POST', url: `/api/sessions/${session.id}/regenerate/stream` });
+    expect(regenStream.statusCode).toBe(200);
+    for (const { data } of parseEventStream(regenStream.body)) apiContract.streamRegenerate.response.parse(data);
+    covered.add('streamRegenerate');
+    const swiped = await request('setAlternative', {
+      method: 'PATCH',
+      url: `/api/sessions/${session.id}/alternative`,
+      payload: { executionId: regenerated.execution.id },
+    });
+    expect(swiped.messages.filter((item) => item.inactive).length).toBe(2);
     await request('stopTurn', { method: 'POST', url: `/api/sessions/${session.id}/stop` });
     await request('updateMessage', {
       method: 'PATCH',

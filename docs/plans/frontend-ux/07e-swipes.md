@@ -88,3 +88,10 @@ This reuses the one rule story state already has (`turnPresence`): an inactive r
 - Pruning inactive replies.
 
 These are later ideas.
+
+**Implementation note (part 2, server).** Routes and contract names (`packages/shared/src/api/sessions.ts`):
+- `regenerate`: `POST /api/sessions/:id/regenerate`, no body, response `sendMessageResultSchema` (`{ assistantMessages, execution }`, never a `userMessage`). Failed and stopped runs carry `turnFailureDetailsSchema` like a send.
+- `streamRegenerate`: `POST /api/sessions/:id/regenerate/stream`, no body, SSE of `turnEventSchema` (`turn.start` ... `turn.complete` / `turn.error`), same as `messages/stream`. The stream opens on the first event, so refusals (`409 NOTHING_TO_REGENERATE`, `404`, `400 WORKFLOW_INVALID`) are plain JSON errors.
+- `setAlternative`: `PATCH /api/sessions/:id/alternative`, body `{ executionId }` (`setAlternativeSchema`), response the **whole session** (`sessionSchema`, as `PATCH /api/sessions/:id`). Errors: `409 TURN_RUNNING`, `400 NOT_AN_ALTERNATIVE`, `404`. Swiping to the shown alternative is a `200` no-op.
+- Rows of a running regenerate are streamed into the session with `status: 'streaming'` and `alternativeOf: <root>`, while the previous alternative's replies stay ACTIVE until the settle; the settle (in the `turn.complete`/`turn.error` payload's saved state, and `sessions.changed`) flips them to `inactive: true` in one write. A web client that replaces the last turn's replies locally while streaming matches that.
+- Decisions that deviate from the text above: (1) the run's history excludes the last turn's own user message (the original run saw the history from before it and got the message as `trigger.message`; including it would duplicate it); (2) a regenerate that ends with no reply row stores its entry with `completed: false` (a completed turn without replies counts and would apply its writes next to the alternative still shown) and leaves no after-reply run.

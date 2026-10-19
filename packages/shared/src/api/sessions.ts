@@ -24,6 +24,8 @@ export const updateSessionSchema = z.object({
 export const sendMessageSchema = z.object({ content: z.string().trim().default('') });
 // Editing a stored message may never leave it empty.
 export const editMessageSchema = z.object({ content: z.string().trim().min(1) });
+// Swipe: show another alternative of the chat's last turn (alternatives.ts). `executionId` is the alternative's own.
+export const setAlternativeSchema = z.object({ executionId: z.string().min(1) });
 const messageParamsSchema = idParamsSchema.extend({ messageId: z.string().uuid() });
 export const sendMessageResultSchema = z.object({
   // Absent when the turn was sent empty.
@@ -59,6 +61,11 @@ export const sessionEndpoints = {
   deleteSession: endpoint(noContentSchema, undefined, idParamsSchema),
   sendMessage: endpoint(sendMessageResultSchema, sendMessageSchema, idParamsSchema),
   streamTurn: endpoint(turnEventSchema, sendMessageSchema, idParamsSchema),
+  // Regenerate the last turn: a turn that stores no user message (same result and events as a send).
+  regenerate: endpoint(sendMessageResultSchema, undefined, idParamsSchema),
+  streamRegenerate: endpoint(turnEventSchema, undefined, idParamsSchema),
+  // Swipe: the whole session, as `updateSession` answers.
+  setAlternative: endpoint(sessionSchema, setAlternativeSchema, idParamsSchema),
   stopTurn: endpoint(noContentSchema, undefined, idParamsSchema),
   updateMessage: endpoint(messageSchema, editMessageSchema, messageParamsSchema),
   deleteMessage: endpoint(noContentSchema, undefined, messageParamsSchema),
