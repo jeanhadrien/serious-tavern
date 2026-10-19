@@ -43,13 +43,21 @@ already have workflows of your own:
 Each example comes with the records it needs: a collection, state definitions and presets. They are named
 "... (example)" and each record is created once:
 
-- **A deleted example stays deleted.** The server remembers what it has seeded (the file `data/.seeded.json`), so a
-  restart does not bring it back. To get one again, remove that example's lines from `data/.seeded.json` (the ids
-  of its records) and restart: only records that are still missing are created.
+- **A deleted example stays deleted.** The server remembers what it has seeded in the file `data/.seeded.json`, so a
+  restart does not bring a deleted record back. **To get deleted examples back**, stop the server, delete
+  `data/.seeded.json` and start it again: every record that is missing is created again, and nothing that exists is
+  touched (an example you edited is never overwritten). That also brings back every other example you deleted. To
+  bring back just one, edit the file instead: its lines look like `fresh-texture/workflow:<id>` or
+  `rolling-summaries/preset:<id>`, so remove every line that starts with that example's name (the whole example, not
+  just the line of one record). An example with some of its records still deleted and still listed in the file is left
+  out, and the server log says "a record it uses was deleted after it was first seeded".
 - **An edited example is never overwritten.** Duplicate an example before changing it if you want to keep a clean copy.
 - **Your own `scene` or `memory` definition wins.** State definition names are unique. If you already have a definition
-  with the same name, it is used when it has the keys the example needs (with the same types); otherwise the example
-  is left out and the server log says why. Nothing of an example is created in that case.
+  with the same name, it is used when it has the keys the example needs, with the same types and, for a list key, the
+  same item fields; otherwise the example is left out and the server log says why. Nothing of an example is created in
+  that case. Fresh texture needs `scene` with `lastInjectionLevel` (a number) and `injected` (a list with the item
+  fields `level:number` and `entryId:text`); Rolling summaries needs `memory` with `summaries` (a list). A list that
+  has a **Cap** is accepted but the oldest summaries are dropped by it (the server log hints at this).
 
 **Before sending a message** the examples need an LLM. Their LLM nodes use the built-in OpenRouter provider and the
 model `openai/gpt-4o-mini`. Either save an OpenRouter key under **Settings** (secret name `openrouter`), or open the
@@ -110,7 +118,7 @@ with no match the entry renders empty and is dropped.
 **Draw** picks `Count` entries (default 1) at random. Filters: Require tags, Any of tags, Exclude tags, Min level and
 Max level (once a level filter is set, entries without a level are left out). A connected `maxLevel` input replaces
 the Max level setting. It outputs `entry`, `text`, `level`, `entries` and `reason` (`drew 1 of 14 eligible (tags:
-forest; level <= 2)`). When nothing is eligible, `entry`, `text` and `level` are absent: a node that needs them is
+forest; level ≤ 2)`). When nothing is eligible, `entry`, `text` and `level` are absent: a node that needs them is
 skipped, an LLM node still runs without them.
 
 **Avoid recent draws** (a number of turns, 0 = off) makes Draw remember what it drew, per chat and per Draw node, and
@@ -241,7 +249,7 @@ turn, and the new item replaces the old). The status is computed when read and n
 A linked item lives and dies with the turn that wrote it, like all state: delete or regenerate that turn and the item
 goes, and the next turn summarizes the chunk again (one extra LLM call).
 
-**In the chat.** In the **Story state** section of the chat panel, each linked item shows as a card: `messages 1-20
+**In the chat.** In the **Story state** section of the chat panel, each linked item shows as a card: `messages 1–20
 (20)`, a badge (**intact**, **covers an edited message**, **some messages deleted**, **all messages deleted**) and the
 text collapsed to one line. Click the range and the thread scrolls to the first linked message. Broken items an intact
 one replaced, and repeats, fold under **Replaced or repeated**. In the thread, a link icon next to the speaker name
@@ -258,10 +266,11 @@ swap the deck, change the wording, or gate something else with the same Trigger.
 **The score.** Every turn it computes a chance:
 
 ```
-score = clamp01( (baseChance + growthPerTurn x turnsSinceLastFiring + sum(weight x signal)) x (0.5 + volatility) )
+score = clamp01( (baseChance + growthPerTurn × turnsSinceLastFiring + sum of weight × signal) × (0.5 + volatility) )
 ```
 
-The chance grows the longer it has been quiet (`turnsSinceLastFiring` counts any firing; before the first one it is
+`clamp01` just keeps the result between 0 and 1, and `sum of weight × signal` adds up every signal you connected
+(more below). The chance grows the longer it has been quiet (`turnsSinceLastFiring` counts any firing; before the first one it is
 the turn number), and `volatility` scales it between half (0) and one and a half times (1). It then rolls once from
 the turn's seed. It **fires** when the roll is below the score and at least one level is available. A second draw
 picks the level, only when it fires. With the defaults (and Max level 2) a firing comes about every four or five turns
@@ -274,7 +283,7 @@ not fire, whatever the roll.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Base chance | 0.1 | Chance before growth and signals (0 to 1). |
+| Base chance | 0.1 | The starting chance each turn, before growth and signals (0 to 1). |
 | Growth per turn | 0.05 | Added for each turn since the last firing. |
 | Volatility | 0.3 | Scales the score by 0.5 + volatility. A connected **Volatility** input overrides it. |
 | Max level | 2 | Highest level that can fire. A connected **Max level** input overrides it. |
@@ -283,8 +292,9 @@ not fire, whatever the roll.
 
 **Signals** are extra inputs for things you can measure, for example a classifier's "the scene is stuck" score from 0
 to 1. In the node's panel, **+ Add signal**, give it a name (a letter, then letters, digits or `_`; not `volatility`,
-`maxLevel` or `value`; unique) and a weight. The name becomes an input of the node, and `weight x signal` is added
-to the score. A negative weight lowers it. A signal that is not connected counts as 0. Renaming a signal renames its
+`maxLevel` or `value`; unique) and a weight. The name becomes an input of the node, and `weight × signal` is added
+to the score. A negative weight lowers it. A signal that is not connected, or whose source was skipped (a branch that was
+not taken), counts as 0 and never stops the Trigger from running. Renaming a signal renames its
 port, which drops the connections to the old name.
 
 **Outputs:** `Fire` (true or false), `Level` (only when it fired), `True` and `False` (branch outputs that pass the
@@ -292,8 +302,8 @@ optional `value` input through, like a Condition), `Score`, `Roll` and `Reason`,
 execution details:
 
 ```
-score 0.3 = (0.1 + 0.05x2) x 1.5; roll 0.009 < 0.3; level 1 chosen (levels above max level 2 left out)
-score 0.225 = (0.1 + 0.05x1) x 1.5; roll 0.872 >= 0.225: no firing
+score 0.3 = (0.1 + 0.05×2) × 1.5; roll 0.009 < 0.3; level 1 chosen (levels above max level 2 left out)
+score 0.225 = (0.1 + 0.05×1) × 1.5; roll 0.872 ≥ 0.225: no firing
 ```
 
 **Memory.** A firing is remembered as the Trigger's own node state (`fires`, one entry "fired at level 2" per firing),
@@ -323,7 +333,9 @@ assistant would send.
   the LLM goes to **Chat Output**.
 - Remembering: Draw's `Entry` goes through a **Pick Fields** node (it keeps `text, level, entryId`, the fields
   `scene.injected` declares) into a **State Write** that adds it to `scene.injected`, and Draw's `Level` goes into a
-  second State Write that sets `scene.lastInjectionLevel`.
+  second State Write that sets `scene.lastInjectionLevel`. Pick Fields (category Logic) keeps the listed fields of an object; you can
+  use it anywhere an object has more fields than the place it goes to. A new one has no names yet, and **Validate**
+  says so until you list some.
 - The preset "Fresh texture narrator (example)" is the Default preset plus a depth entry that renders the wording
   above by level. Its inputs `seed` and `level` are plain optional text inputs.
 
@@ -342,7 +354,7 @@ preset's entry renders empty and disappears. A `level` reaches the preset as tex
    Turn 7 stored:
    - Trigger #1 (trigger): remembered 'fired at level 1' (fires)
    - Draw #1 (draw): drew 'A beetle with a green shell crosses the path...'
-   - scene.lastInjectionLevel -> 1
+   - scene.lastInjectionLevel → 1
    - scene.injected + 'A beetle with a green shell crosses the path...' (level 1)
    ```
 
@@ -369,7 +381,7 @@ so a long chat keeps its memory with a short prompt.
 
 - The `memory` definition with one list key, `summaries`, **no cap**. A cap would drop the oldest summaries, and their
   messages would reach the prompt raw again.
-- Presets: "Narrator with summaries (example)" (inputs `recent`, a messages input, and `message`; an entry
+- Presets: "Narrator with summaries (example)" (two inputs: `recent`, the messages no summary covers, and `message`, the user's message; an entry
   `{{#each (linked state.memory.summaries)}}...{{/each}}` that renders nothing until a summary exists, then a slot for
   `recent`) and "Summarize (example)" (one text input; an instruction to condense the excerpt into notes under 150
   words, keeping names, events, decisions, promises and open threads).
@@ -391,7 +403,7 @@ chat then summarizes messages 1 to 4 after turn 4 and the next four after turn 6
 (20 and 16) for real chats, and keep the raw window at least as large as what you want sent raw.
 
 1. Chat for a few turns. After the first summary the chat panel's **Story state** shows `memory.summaries` with a card
-   `messages 1-4 (4)`, badge **intact**, and the summary text. The messages carry the link icon.
+   `messages 1–4 (4)`, badge **intact**, and the summary text. The messages carry the link icon.
 2. **Edit** one of the linked messages. The card turns **covers an edited message**: it is no longer used, and the next
    prompt carries those messages raw again.
 3. Send a message. After its reply the chunk is redone: a new summary replaces the old one (the old moves under
@@ -408,7 +420,7 @@ messages appear after later summaries until the next turn redoes it.
 | --- | --- |
 | **Chat panel > Settings** (sliders icon, **Chat panel**) | The current value of each chat setting, and issues such as a stored value that no longer fits. |
 | **Chat panel > Story state** | Per definition: every key with its current value ("never written" when nobody wrote it), a sparkline for numbers, "written at turn k" links that scroll to that turn's reply, list items (linked ones as cards), warnings, **Node memory** (Draw's `draws`, the Trigger's `fires`) and, at the bottom, failed after-reply runs. It reloads when a turn settles or you delete or edit a message, never per streamed token. |
-| **The chip under a reply** (database icon, **What this turn stored**) | The writes of that turn, including the after-reply run's: `scene.tension -> 6`, `scene.injected + 'text'`, `Draw #1 (draw): drew 'text'`, `Trigger #1 (trigger): remembered 'fired at level 2' (fires)`. A turn with several replies has it on its last reply. A warning icon means an after-reply run failed or an item was dropped. |
+| **The chip under a reply** (database icon, **What this turn stored**) | The writes of that turn, including the after-reply run's: `scene.tension → 6`, `scene.injected + 'text'`, `Draw #1 (draw): drew 'text'`, `Trigger #1 (trigger): remembered 'fired at level 2' (fires)`. A turn with several replies has it on its last reply. A warning icon means an after-reply run failed or an item was dropped. |
 | **Execution details** (under a message) | The run's log: every node with its status, timing, outputs, logs and errors (State Write's `scene.tension: 3 -> 4`, the Trigger's `Reason`, Draw's reason), the settings the turn used and the seed. For an LLM node, the exact request that went over the wire. A turn that left an after-reply run has a second log, **After-reply run details**, behind its chip. |
 | **Delete dialog** | What deleting a reply would undo, before you confirm. |
 
