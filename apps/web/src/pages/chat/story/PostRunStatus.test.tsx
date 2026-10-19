@@ -27,3 +27,10 @@ it('leaves out the turn when the run does not know it', () => {
   expect(html).toContain('Running after-reply steps…<');
   expect(html).not.toContain('(turn');
 });
+
+it('says which workflow runs when the view knows it', () => {
+  const html = renderToStaticMarkup(
+    <PostRunStatus sessionId="s" run={{ status: 'running', turnNumber: 3, workflowName: 'Memory' }} onStopped={noop} />,
+  );
+  expect(html).toContain('Running after-reply steps of Memory… (turn 3)');
+});

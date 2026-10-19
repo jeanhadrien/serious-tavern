@@ -5,6 +5,7 @@ import { messageLinks } from './story/linkMarkers.js';
 import { runningPostRun } from './story/postRuns.js';
 import { POST_WAITING_LABEL } from './story/postRunText.js';
 import { chipsFor, describeTurns } from './story/turnChips.js';
+import { messageLogId } from './turnMessages.js';
 import { useStickToBottom } from './useStickToBottom.js';
 
 interface MessageListProps {
@@ -19,6 +20,8 @@ interface MessageListProps {
   /** What deleting a message would undo of the story state; asked lazily, on the delete click. */
   undoOnDelete?: (messageId: string) => readonly string[] | undefined;
   busy: boolean;
+  /** The workflow whose run is starting, when the chat runs several (the waiting indicator names it). */
+  runningWorkflow?: string;
   disabled: boolean;
   onEdit: (id: string, content: string) => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
@@ -44,6 +47,7 @@ export function MessageList({
   story,
   undoOnDelete,
   busy,
+  runningWorkflow,
   disabled,
   onEdit,
   onDelete,
@@ -97,7 +101,7 @@ export function MessageList({
             message={message}
             character={characters.find((card) => card.id === message.characterId)}
             persona={persona}
-            execution={message.executionId ? logs[message.executionId] : undefined}
+            execution={logs[messageLogId(message) ?? '']}
             storyChip={chips.get(message.id)}
             links={links.get(message.id)}
             undoOnDelete={undoOnDelete && (() => undoOnDelete(message.id))}
@@ -126,7 +130,9 @@ export function MessageList({
               <i />
               <i />
             </span>
-            <small>{queued ? POST_WAITING_LABEL : 'Preparing a reply'}</small>
+            <small>
+              {queued ? POST_WAITING_LABEL : runningWorkflow ? `Running ${runningWorkflow}…` : 'Preparing a reply'}
+            </small>
           </div>
         )}
       </div>

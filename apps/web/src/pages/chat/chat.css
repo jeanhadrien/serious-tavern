@@ -46,9 +46,6 @@
   min-width: 8rem;
   font-weight: 600;
 }
-.chat-header select {
-  max-width: 290px;
-}
 .session-context-selectors {
   display: flex;
   align-items: center;
@@ -406,6 +403,24 @@ button.stop-generation:hover {
   margin: 8px 0 0;
   font-size: 0.8rem;
   color: #f2c98b;
+}
+/* The runs of a turn that ran several workflows. */
+.message-story-card .turn-runs-heading {
+  display: block;
+  margin-top: 8px;
+}
+.message-story-card .turn-runs {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+.message-story-card .turn-run-error {
+  color: #f0a3a3;
+}
+.message-story-card .turn-run .error,
+.message-story-card .turn-run .execution {
+  margin-top: 4px;
 }
 
 /* Story state items that link to a message: the marker next to the speaker, its card, and the note before an edit or delete. */

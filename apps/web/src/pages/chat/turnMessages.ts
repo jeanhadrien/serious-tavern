@@ -1,27 +1,46 @@
-import { alternativesOfLastTurn, type ChatMessage } from '@st/shared';
+import { alternativesOfLastTurn, type ChatMessage, type ExecutionLog } from '@st/shared';
 
-/** Appends streamed text to the row of a Chat Output, creating its row on the first delta. */
+/** One streamed fragment of a Chat Output: `runId` tells apart the runs of a reply list (absent: a single-run server). */
+export type DeltaTarget = { nodeId: string; runId?: string; textDelta?: string; reasoningDelta?: string };
+
+/**
+ * Appends streamed text to the row of a Chat Output, creating its row on the first delta. A row is one Chat Output of
+ * one run: workflows of a reply list may use the same node ids, so rows are keyed by `runId` and node id together.
+ */
 export function applyDelta(
   messages: ChatMessage[],
-  nodeId: string,
-  textDelta = '',
-  reasoningDelta = '',
+  { nodeId, runId, textDelta = '', reasoningDelta = '' }: DeltaTarget,
   fresh: () => ChatMessage = () => ({
     id: crypto.randomUUID(),
     role: 'assistant',
     content: '',
     status: 'streaming',
     nodeId,
+    ...(runId !== undefined && { runId }),
     createdAt: new Date().toISOString(),
   }),
 ): ChatMessage[] {
-  const live = (message: ChatMessage) => message.status === 'streaming' && message.nodeId === nodeId;
+  const live = (message: ChatMessage) =>
+    message.status === 'streaming' && message.nodeId === nodeId && message.runId === runId;
   const grow = (message: ChatMessage): ChatMessage => ({
     ...message,
     content: message.content + textDelta,
     ...(reasoningDelta ? { reasoning: (message.reasoning ?? '') + reasoningDelta } : {}),
   });
   return messages.some(live) ? messages.map((m) => (live(m) ? grow(m) : m)) : [...messages, grow(fresh())];
+}
+
+/** The id of the execution log a message opens: its own run's (`runId`), else the turn's (older messages). */
+export const messageLogId = (message: Pick<ChatMessage, 'runId' | 'executionId'>): string | undefined =>
+  message.runId ?? message.executionId;
+
+/**
+ * Every log a settled turn brings: each run of the reply list (`executions`), or the one `execution` of a result from
+ * before reply lists. On a failure `execution` is the failing run's, which `executions` lists too.
+ */
+export function resultLogs(result: { execution: ExecutionLog; executions?: readonly ExecutionLog[] }): ExecutionLog[] {
+  const all = result.executions ?? [];
+  return all.some((log) => log.id === result.execution.id) ? [...all] : [...all, result.execution];
 }
 
 /**

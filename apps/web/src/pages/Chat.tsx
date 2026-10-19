@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { activeMessages, alternativesOfLastTurn } from '@st/shared';
+import { activeMessages, alternativesOfLastTurn, replyWorkflows } from '@st/shared';
 import { useEscapeArea } from '../keyboard/escapeRegistry.js';
 import type { ChatState } from './chat/useChat.js';
 import { ChatHeader } from './chat/ChatHeader.js';
@@ -49,6 +49,16 @@ export function Chat({ chat }: { chat: ChatState }) {
   const stored = session?.messages;
   const messages = useMemo(() => (stored ? activeMessages(stored) : undefined), [stored]);
   const view = story.view;
+  // The chat's reply list, read only through `replyWorkflows`. It keeps its identity across streamed tokens (the session
+  // object changes every token, its list does not), so the memoized panel is not rendered again for them.
+  const triggers = session?.triggers;
+  const legacyWorkflow = session?.workflowId;
+  const replyList = useMemo(
+    () => (legacyWorkflow === undefined ? [] : replyWorkflows({ workflowId: legacyWorkflow, triggers })),
+    [triggers, legacyWorkflow],
+  );
+  // The waiting indicator names the running workflow only when there is more than one to tell apart.
+  const several = replyList.filter((entry) => entry.enabled).length > 1;
   const undoOnDelete = useMemo(
     () =>
       messages && view ? (messageId: string) => undoneByDelete({ messageId, messages, view, definitions }) : undefined,
@@ -64,10 +74,8 @@ export function Chat({ chat }: { chat: ChatState }) {
           <ChatHeader
             key={`header-${session.id}`}
             title={session.title}
-            workflowId={session.workflowId}
             characterId={session.characterId}
             personaId={session.personaId}
-            workflows={chat.workflows}
             characters={chat.characters}
             personas={chat.personas}
             disabled={locked}
@@ -87,6 +95,7 @@ export function Chat({ chat }: { chat: ChatState }) {
                 story={story.view}
                 undoOnDelete={undoOnDelete}
                 busy={chat.busy}
+                runningWorkflow={several ? chat.runningWorkflow : undefined}
                 disabled={locked}
                 onEdit={chat.editMessage}
                 onDelete={chat.deleteMessage}
@@ -110,13 +119,15 @@ export function Chat({ chat }: { chat: ChatState }) {
             {panelOpen && (
               <ChatPanel
                 key={`panel-${session.id}`}
-                workflow={chat.workflows.find((item) => item.id === session.workflowId)}
+                workflows={chat.workflows}
+                replyList={replyList}
                 stored={session.settings}
                 sessionId={session.id}
                 story={story.panel}
                 reveal={reveal}
                 onRevealed={revealed}
                 onSave={chat.updateSettings}
+                onSaveReply={chat.updateReplyList}
                 onClose={closePanel}
               />
             )}

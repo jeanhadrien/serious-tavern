@@ -36,7 +36,7 @@ export const PostRunStatus = memo(function PostRunStatus({
       <span className="spinning" aria-hidden="true">
         <Loader2 size={16} />
       </span>
-      <span className="post-run-label">{postRunningLabel(run.turnNumber)}</span>
+      <span className="post-run-label">{postRunningLabel(run.turnNumber, run.workflowName)}</span>
       <IconButton icon={Square} label={POST_STOP_LABEL} onClick={() => stop(sessionId, onStopped)} />
     </div>
   );

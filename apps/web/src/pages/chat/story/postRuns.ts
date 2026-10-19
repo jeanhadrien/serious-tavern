@@ -2,18 +2,51 @@ import type { PostStatus, SessionStateView } from '@st/shared';
 
 type TurnView = SessionStateView['turns'][number];
 
-/** A turn's after-reply run as the state view reports it. */
-export type PostRunRef = { executionId?: string; turnNumber: number | null; status: PostStatus; error?: string };
+/**
+ * A turn's after-reply status as the state view reports it: for a chat that runs several workflows, the run that decides
+ * it (`workflowName`, and the log of that very run in `executionId`).
+ */
+export type PostRunRef = {
+  executionId?: string;
+  turnNumber: number | null;
+  status: PostStatus;
+  error?: string;
+  workflowName?: string;
+};
+
+/**
+ * The after-reply run of a turn that has `runs` and decides its status, by the rule the view's derived `postStatus` uses
+ * (any running reads as running, else the first error, else a stopped one, else completed), but pointing at that run
+ * itself: the derived `postExecutionId` is always the first post run's, which is not the one that failed.
+ */
+function postRunOfRuns(turn: TurnView, runs: NonNullable<TurnView['runs']>): PostRunRef | undefined {
+  const post = runs.filter((run) => run.part === 'post');
+  const decisive =
+    post.find((run) => run.status === 'running') ??
+    post.find((run) => run.status === 'error') ??
+    post.find((run) => run.status === 'stopped') ??
+    post[0];
+  if (!decisive) return undefined;
+  return {
+    status: decisive.status,
+    turnNumber: turn.turnNumber,
+    executionId: decisive.executionId,
+    ...(decisive.status === 'error' && decisive.error !== undefined && { error: decisive.error }),
+    ...(decisive.workflowName !== undefined && { workflowName: decisive.workflowName }),
+  };
+}
 
 export const postRunOf = (turn: TurnView): PostRunRef | undefined =>
-  turn.postStatus
-    ? {
-        status: turn.postStatus,
-        turnNumber: turn.turnNumber,
-        ...(turn.postExecutionId !== undefined && { executionId: turn.postExecutionId }),
-        ...(turn.postError !== undefined && { error: turn.postError }),
-      }
-    : undefined;
+  turn.runs
+    ? postRunOfRuns(turn, turn.runs)
+    : turn.postStatus
+      ? {
+          status: turn.postStatus,
+          turnNumber: turn.turnNumber,
+          ...(turn.postExecutionId !== undefined && { executionId: turn.postExecutionId }),
+          ...(turn.postError !== undefined && { error: turn.postError }),
+        }
+      : undefined;
 
 /** The newest after-reply run that is still running, if any: what the status row near the composer shows. */
 export function runningPostRun(view: SessionStateView | undefined): PostRunRef | undefined {

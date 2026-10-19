@@ -168,3 +168,52 @@ describe('the after-reply run of a turn', () => {
     expect(chips(view, messages).size).toBe(0);
   });
 });
+
+describe('a turn of several runs', () => {
+  const run = (executionId: string, workflowId: string, part: 'reply' | 'post', status: 'completed' | 'error') => ({
+    executionId,
+    workflowId,
+    part,
+    status,
+    ...(status === 'error' && { error: 'boom' }),
+  });
+  const twoReplies = [run('e1', 'a', 'reply', 'completed'), run('r2', 'b', 'reply', 'completed')];
+  const view = (runs: ReturnType<typeof run>[], writes = [] as ReturnType<typeof setWrite>[]) => {
+    const messages = [userMessage(), reply('e1')];
+    return {
+      messages,
+      view: buildView({
+        messages,
+        entries: [{ ...entry('e1', writes), runs }],
+        workflowNames: { a: 'Narrator' },
+      }),
+    };
+  };
+
+  it('has a chip that lists the runs in order, even when the turn stored nothing', () => {
+    const { messages, view: built } = view(twoReplies);
+    expect(chips(built, messages).get('m-e1')?.runs).toEqual([
+      { executionId: 'e1', part: 'reply', status: 'completed', workflowName: 'Narrator' },
+      { executionId: 'r2', part: 'reply', status: 'completed' },
+    ]);
+  });
+
+  it('keeps the stored lines next to the runs', () => {
+    const { messages, view: built } = view(twoReplies, [setWrite('tension', 6)]);
+    const chip = chips(built, messages).get('m-e1');
+    expect(chip?.lines).toEqual(['scene.tension → 6']);
+    expect(chip?.runs).toHaveLength(2);
+  });
+
+  it('has no chip for a turn of one reply run that stored nothing', () => {
+    const { messages, view: built } = view([run('e1', 'a', 'reply', 'completed')]);
+    expect(chips(built, messages).size).toBe(0);
+  });
+
+  it('lists a workflow with after-reply steps as two runs and keeps the failure', () => {
+    const { messages, view: built } = view([run('e1', 'a', 'reply', 'completed'), run('p1', 'a', 'post', 'error')]);
+    const chip = chips(built, messages).get('m-e1');
+    expect(chip?.runs?.map((item) => item.part)).toEqual(['reply', 'post']);
+    expect(chip?.post).toEqual({ status: 'error', message: 'boom', executionId: 'p1' });
+  });
+});

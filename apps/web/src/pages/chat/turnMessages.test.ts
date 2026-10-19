@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { ChatMessage } from '@st/shared';
-import { applyDelta, lastTurnReplyIds, replaceLastTurnReplies, settleRegenerate, settleTurn } from './turnMessages.js';
+import type { ChatMessage, ExecutionLog } from '@st/shared';
+import {
+  applyDelta,
+  lastTurnReplyIds,
+  messageLogId,
+  replaceLastTurnReplies,
+  resultLogs,
+  settleRegenerate,
+  settleTurn,
+} from './turnMessages.js';
 
 const user = (id: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({
   id,
@@ -18,14 +26,63 @@ const assistant = (id: string, extra: Partial<ChatMessage> = {}): ChatMessage =>
 });
 
 it('creates one streaming row per output and grows it with text and reasoning', () => {
-  let messages = applyDelta([user('u')], 'out', undefined, 'think ');
-  messages = applyDelta(messages, 'out', 'Hel');
-  messages = applyDelta(messages, 'other', 'B');
-  messages = applyDelta(messages, 'out', 'lo', 'more');
+  let messages = applyDelta([user('u')], { nodeId: 'out', reasoningDelta: 'think ' });
+  messages = applyDelta(messages, { nodeId: 'out', textDelta: 'Hel' });
+  messages = applyDelta(messages, { nodeId: 'other', textDelta: 'B' });
+  messages = applyDelta(messages, { nodeId: 'out', textDelta: 'lo', reasoningDelta: 'more' });
   expect(messages).toHaveLength(3);
   expect(messages[1]).toMatchObject({ nodeId: 'out', status: 'streaming', content: 'Hello', reasoning: 'think more' });
   expect(messages[2]).toMatchObject({ nodeId: 'other', content: 'B' });
   expect(messages[2]?.reasoning).toBeUndefined();
+});
+
+it('keys a row by its run and node together: two workflows may use the same node id', () => {
+  let messages = applyDelta([user('u')], { nodeId: 'out', runId: 'r1', textDelta: 'A' });
+  messages = applyDelta(messages, { nodeId: 'out', runId: 'r2', textDelta: 'B' });
+  messages = applyDelta(messages, { nodeId: 'out', runId: 'r1', textDelta: 'a' });
+  messages = applyDelta(messages, { nodeId: 'out', runId: 'r2', textDelta: 'b' });
+  expect(messages.slice(1).map((m) => [m.runId, m.content])).toEqual([
+    ['r1', 'Aa'],
+    ['r2', 'Bb'],
+  ]);
+});
+
+it('opens a message log by its own run, else by the turn (older messages have no run id)', () => {
+  expect(messageLogId({ runId: 'run', executionId: 'turn' })).toBe('run');
+  expect(messageLogId({ executionId: 'turn' })).toBe('turn');
+  expect(messageLogId({})).toBeUndefined();
+});
+
+it('collects the logs of every run of a result, and still reads a single-run one', () => {
+  const log = (id: string): ExecutionLog => ({
+    id,
+    workflowId: 'w',
+    sessionId: 's',
+    status: 'completed',
+    startedAt: '',
+    nodes: {},
+    warnings: [],
+  });
+  expect(resultLogs({ execution: log('a'), executions: [log('a'), log('b')] }).map((l) => l.id)).toEqual(['a', 'b']);
+  // A failure: `execution` is the failing run's, `executions` may not list it.
+  expect(resultLogs({ execution: log('b'), executions: [log('a')] }).map((l) => l.id)).toEqual(['a', 'b']);
+  expect(resultLogs({ execution: log('a') }).map((l) => l.id)).toEqual(['a']);
+});
+
+it('settles a turn of several runs from the saved messages, whatever their order of streaming', () => {
+  const live = [
+    assistant('l1', { status: 'streaming', nodeId: 'out', runId: 'r1' }),
+    assistant('l2', { status: 'streaming', nodeId: 'out', runId: 'r2' }),
+  ];
+  const saved = {
+    userMessage: user('saved'),
+    assistantMessages: [assistant('f1', { runId: 'r1' }), assistant('f2', { runId: 'r2' })],
+  };
+  expect(settleTurn([user('optimistic'), ...live], 'optimistic', saved).map((m) => m.id)).toEqual([
+    'saved',
+    'f1',
+    'f2',
+  ]);
 });
 
 it('settles a turn by replacing local rows with the saved ones and keeping older history', () => {

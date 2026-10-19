@@ -15,7 +15,7 @@ export function PostFailures({ failures }: { failures: readonly PostFailure[] })
         {failures.map((failure, index) => (
           <li key={failure.executionId ?? index}>
             <p className="error">
-              <strong>{postFailureSubject(failure)}</strong> · {postFailureNote(failure.error)}
+              <strong>{postFailureSubject(failure)}</strong> · {postFailureNote(failure.error, failure.workflowName)}
             </p>
             {failure.executionId && <ExecutionDetails id={failure.executionId} label={POST_DETAILS_LABEL} optional />}
           </li>

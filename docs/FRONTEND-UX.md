@@ -79,7 +79,7 @@ Rules:
 
 ## Confirmations
 
-- **Inside a draft, no confirmation.** Removing a preset entry, a state key, a canvas node or a setting row only changes the draft. Revert, or undo on the canvas, gets it back.
+- **Inside a draft, no confirmation.** Removing a preset entry, a state key, a canvas node or a setting row only changes the draft. Revert, or undo on the canvas, gets it back. A chat's On reply list is not a draft (every change saves at once) but removing a row asks nothing either: the workflow itself is untouched and Add workflow brings it back.
 - **Deleting something stored asks.** A chat, character, persona, preset, workflow, provider, collection, state definition or message. The dialog names the item and the consequences when known (workflows that use it, story state the delete undoes).
 - **Leaving unsaved changes** asks Save / Discard / Cancel (see Unsaved work).
 - **One building block:** `confirm({ title, body, actions })` returns a promise of the chosen action. It is built on `<dialog>` (modal). Focus starts on the safe action, Escape cancels, and it works on phones. `body` can hold structure (a list of state changes), not only text.
@@ -91,11 +91,12 @@ Rules:
 - **Library: dnd-kit** (`@dnd-kit/core` + `@dnd-kit/sortable`, the stable line). It handles mouse, touch and pen through pointer events, keyboard dragging and screen-reader announcements, and later covers dragging between lists and drop targets.
   - It is wrapped once in a `SortableList` component. Pages never import dnd-kit directly, so moving to its rewrite (`@dnd-kit/react`, 0.x today) touches one file.
   - The reorder itself is a pure function (`moveItem(list, from, to)`), as `reorderEntries` is today.
-- **Every reorderable list uses `SortableList`**, with a drag handle, its up/down buttons kept, and `Alt+↑/↓` on the focused row. Today there are five, each with its own code:
+- **Every reorderable list uses `SortableList`**, with a drag handle, its up/down buttons kept, and `Alt+↑/↓` on the focused row. Today there are six, each with its own code:
   - preset entries (the only one with drag, through HTML5 drag-and-drop, which doesn't work on touch);
   - collection entries;
   - provider overrides;
   - workflow chat settings;
+  - the chat panel's On reply list (see Chat panel: On reply);
   - the collection picker in Recall/Draw (node-ui).
   - **Decision:** the collection picker in node-ui can't import from `apps/web`, and its list is short and rarely reordered. It keeps its up/down buttons and gains `Alt+↑/↓` on its rows, but no drag and no dnd-kit. The other four use `SortableList`.
 - **Not dnd-kit:**
@@ -139,6 +140,12 @@ Rules:
   - **Drag to empty space.** Dropping a connection on empty canvas opens a node picker at that point, listing only node types with a port that accepts the connection (through `canConnect`). Picking one creates the node there and connects it.
   - **Undo/redo.** The editor keeps a history of canvas snapshots (nodes, edges, configs). A drag counts once (recorded on drag stop) and typing in a config field is grouped. The history resets when another workflow opens; saving doesn't clear it.
   - **Copy/paste nodes.** Copies the selected nodes and the edges between them; paste gives them new ids and offsets them. It works across tabs (the system clipboard carries JSON). A second Chat Input is not pasted (a toast says why).
+- **Chat panel: On reply.** The chat's workflows live in the chat panel's first section, not in the header. A row is the workflow's name (a link that opens it in the editor), an on/off checkbox, move up, move down and remove (never on the only row); the rows reorder by drag, buttons or `Alt+↑/↓`, and an Add workflow dropdown lists the workflows not listed yet.
+  - Every change saves at once. It is never disabled by a running reply (unlike the title and character/persona selectors): the list applies from the next message, and the panel says so.
+  - One save is in flight at a time; changes made meanwhile are sent together as the newest list, so what the panel shows is always the last thing the user did, and a failed save (toasted) falls back to what the server holds.
+  - Escape and focus follow the chat panel's rules: the select and checkboxes are fields (Escape leaves them first), and Escape then closes the panel.
+  - A new chat copies the open chat's list, order and switches included.
+- **Several runs in a turn.** The chip under the last reply of a turn that ran more than one workflow (or a workflow with After Reply steps) lists each run, in order, with its result and log. The "waiting" indicator names the running workflow when the chat runs several.
 - **Swipes and regenerate.** Agreed, but they change stored messages and must fit story state (a regenerated turn replaces the old turn's writes). They get their own short spec before any code.
 
 ## Not now (decided)

@@ -2,6 +2,8 @@ import {
   DRAW_STATE_KEY,
   analyzeLinks,
   effectivePostRun,
+  effectiveRuns,
+  postOfEntry,
   fingerprintMessages,
   foldStoryState,
   oldestFirst,
@@ -121,12 +123,15 @@ export function buildView({
   messages,
   entries,
   nodeLabels = { bump: 'State Write #1 (state-write)', note: 'State Write #2 (state-write)', draw: 'Draw #1 (draw)' },
+  workflowNames = {},
 }: {
   definitions?: readonly StateDefinition[];
   messages: readonly ChatMessage[];
   entries: readonly TurnEntry[];
   /** Node id -> name; a node missing here reads as deleted. */
   nodeLabels?: Record<string, string>;
+  /** Workflow id -> current name, for the turns' runs; a workflow missing here reads as deleted. */
+  workflowNames?: Record<string, string>;
 }): SessionStateView {
   const ordered = oldestFirst(definitions);
   const story = foldStoryState({ definitions: ordered, messages, state: { turns: entries } });
@@ -142,17 +147,30 @@ export function buildView({
     })),
     nodes: story.nodes.map((folded) => {
       const label = nodeLabels[folded.nodeId];
-      return { nodeId: folded.nodeId, ...(label !== undefined && { label }), ...keyViews(folded.keys), omitted: {} };
+      return {
+        nodeId: folded.nodeId,
+        ...(folded.workflowId !== undefined && { workflowId: folded.workflowId }),
+        ...(label !== undefined && { label }),
+        ...keyViews(folded.keys),
+        omitted: {},
+      };
     }),
     turns: story.turns.map(({ entry: stored, turn }) => {
       // As the server reports it: the run is live (no restart happened), so a stored `running` stays running.
-      const post = effectivePostRun(stored, true);
+      const runs = effectiveRuns(stored, () => true);
+      const post = runs ? postOfEntry(stored, () => true) : effectivePostRun(stored, true);
       return {
         executionId: stored.executionId,
         at: stored.at,
         completed: stored.completed,
         replies: stored.replies,
         turnNumber: turn,
+        ...(runs && {
+          runs: runs.map((run) => {
+            const workflowName = workflowNames[run.workflowId];
+            return { ...run, ...(workflowName !== undefined && { workflowName }) };
+          }),
+        }),
         ...(post && { postStatus: post.status }),
         ...(post?.executionId !== undefined && { postExecutionId: post.executionId }),
         ...(post?.error !== undefined && { postError: post.error }),

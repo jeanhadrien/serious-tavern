@@ -5,10 +5,23 @@ import { postRunOf } from './postRuns.js';
 /** A turn's after-reply run once it ended: the chip says how and links to its log (a running one has none yet). */
 type PostNote = { status: Exclude<PostStatus, 'running'>; message?: string; executionId?: string };
 
+/** One run of a turn that ran several, as the card lists it. `workflowName` is absent when the workflow was deleted. */
+export type RunNote = {
+  executionId: string;
+  workflowName?: string;
+  part: 'reply' | 'post';
+  status: 'running' | 'completed' | 'error' | 'stopped';
+  error?: string;
+};
+
+type TurnView = SessionStateView['turns'][number];
+
 type DescribedTurn = {
   turnNumber: number;
   lines: string[];
   post?: PostNote;
+  /** The turn's runs, in the order they ran: only for a turn that ran more than one (a chat with a list of workflows). */
+  runs?: RunNote[];
   /** Items the turn's runs lost at commit time (a linked message changed meanwhile). */
   warnings?: string[];
 };
@@ -26,6 +39,14 @@ export type StoryChip = DescribedTurn & {
  */
 export type DescribedTurns = ReadonlyMap<string, DescribedTurn>;
 
+const runNote = (run: NonNullable<TurnView['runs']>[number]): RunNote => ({
+  executionId: run.executionId,
+  part: run.part,
+  status: run.status,
+  ...(run.workflowName !== undefined && { workflowName: run.workflowName }),
+  ...(run.error !== undefined && { error: run.error }),
+});
+
 export function describeTurns(view: SessionStateView | undefined): DescribedTurns {
   const described = new Map<string, DescribedTurn>();
   if (!view) return described;
@@ -42,11 +63,15 @@ export function describeTurns(view: SessionStateView | undefined): DescribedTurn
           }
         : undefined;
     const warnings = turn.linkWarnings ?? [];
-    if (turn.writes.length || post || warnings.length)
+    // A turn of one run has nothing more to list: its reply carries the log. Several runs, each with its own log and
+    // possibly no reply at all, are only reached through the chip.
+    const runs = (turn.runs?.length ?? 0) > 1 ? turn.runs?.map(runNote) : undefined;
+    if (turn.writes.length || post || warnings.length || runs)
       described.set(turn.executionId, {
         turnNumber: turn.turnNumber,
         lines: turn.writes.map((write) => describeWrite(write, texts)),
         ...(post && { post }),
+        ...(runs && { runs }),
         ...(warnings.length && { warnings }),
       });
   }

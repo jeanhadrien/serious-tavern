@@ -52,7 +52,8 @@ export type DefinitionBlock = {
 };
 
 type NodeMemoryRow = KeyRow & { older: number };
-export type NodeMemoryBlock = { nodeId: string; label: string; keys: NodeMemoryRow[] };
+/** `workflowId` is the workflow whose node it is (absent for what was stored before a chat ran several workflows). */
+export type NodeMemoryBlock = { nodeId: string; workflowId?: string; label: string; keys: NodeMemoryRow[] };
 
 /** How many of a node's newest items its memory shows; the rest is "and N older". */
 export const NODE_ITEMS_SHOWN = 8;
@@ -137,6 +138,7 @@ export function nodeMemory(view: SessionStateView): NodeMemoryBlock[] {
   return view.nodes
     .map((node) => ({
       nodeId: node.nodeId,
+      ...(node.workflowId !== undefined && { workflowId: node.workflowId }),
       label: node.label ?? REMOVED_NODE_LABEL,
       keys: keyRows(node, replied).map((row) => {
         const omitted = node.omitted[row.key] ?? 0;

@@ -17,10 +17,13 @@ import './story.css';
  */
 export function StorySection({
   story,
+  workflowNames,
   onJump,
   onJumpMessage,
 }: {
   story: StoryPanelData;
+  /** Workflow id to name, given when the chat lists several workflows: node memory then says whose node it is. */
+  workflowNames?: ReadonlyMap<string, string>;
   onJump(executionId: string): void;
   onJumpMessage(messageId: string): void;
 }) {
@@ -86,7 +89,7 @@ export function StorySection({
       {unused.length > 0 && (
         <p className="hint story-unused">Not used in this chat yet: {unused.map((block) => block.name).join(', ')}</p>
       )}
-      <NodeMemory nodes={memory} onJump={jump} />
+      <NodeMemory nodes={memory} workflowNames={workflowNames} onJump={jump} />
     </div>
   );
 }

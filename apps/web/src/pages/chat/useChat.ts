@@ -6,6 +6,7 @@ import {
   type ExecutionLog,
   type ApiBody,
   type ChatMessage,
+  type ReplyEntry,
 } from '@st/shared';
 import { sessionsApi, streamMessage, streamRegenerate } from '../../api.js';
 import { ApiError, notifyError } from '../../api/transport.js';
@@ -13,9 +14,17 @@ import type { TurnHandlers, TurnResult } from '../../api/turnStream.js';
 import { alerts } from '../../alerts/index.js';
 import { charactersStore, personasStore, sessionsStore, useList, workflowsStore } from '../../stores/index.js';
 import { createDraftSaver, loadDraft, pruneDrafts, saveDraft } from './composerDraft.js';
-import { withStoredMetadata, withStoredSettings } from './openSession.js';
+import { withStoredMetadata, withStoredSettings, withStoredTriggers } from './openSession.js';
+import { copiedList } from './panel/replyList.js';
 import type { SaveOptions } from './panel/useSettingSaver.js';
-import { applyDelta, lastTurnReplyIds, replaceLastTurnReplies, settleRegenerate, settleTurn } from './turnMessages.js';
+import {
+  applyDelta,
+  lastTurnReplyIds,
+  replaceLastTurnReplies,
+  resultLogs,
+  settleRegenerate,
+  settleTurn,
+} from './turnMessages.js';
 import { useMessageActions } from './useMessageActions.js';
 
 export function useChat() {
@@ -59,6 +68,8 @@ export function useChat() {
     queuedRef.current = value;
     setQueued(value);
   };
+  // The workflow whose run started last (`run.start`): the "waiting" indicator names it until a reply row shows up.
+  const [runningWorkflow, setRunningWorkflow] = useState<string>();
   const opening = useRef(0);
   const streamControllerRef = useRef<AbortController | undefined>(undefined);
   const [logs, setLogs] = useState<Record<string, ExecutionLog>>({});
@@ -107,9 +118,11 @@ export function useChat() {
     const request = ++opening.current;
     const initialWorkflow = workflows.find((w) => w.name === 'Default Assistant') ?? workflows[0];
     if (!initialWorkflow) return;
+    // A new chat starts with the open chat's reply list (order and switches included), else the Default Assistant alone.
+    const copied = copiedList(session, workflows);
     try {
       const next = await sessionsApi.create({
-        workflowId: initialWorkflow.id,
+        ...(copied ? { triggers: { reply: copied } } : { workflowId: initialWorkflow.id }),
         personaId: session?.personaId ?? personas[0]?.id,
       });
       if (request === opening.current) enter(next);
@@ -147,6 +160,22 @@ export function useChat() {
     },
     [],
   );
+  // The reply list saves while a turn runs too (it applies from the next turn); only `triggers` and `workflowId` are
+  // taken from the answer (`withStoredTriggers`). The panel's saver sends one request at a time, so answers come in order.
+  // Resolves true when saved; on a failure (toasted) the panel falls back to what the server holds.
+  const updateReplyList = useCallback(async (sessionId: string, reply: ReplyEntry[]): Promise<boolean> => {
+    const apply = (next: Session) => setSession((current) => withStoredTriggers(current, next));
+    try {
+      apply(await sessionsApi.update(sessionId, { triggers: { reply } }));
+      return true;
+    } catch {
+      await sessionsApi
+        .get(sessionId, { silent: true })
+        .then(apply)
+        .catch(() => {});
+      return false;
+    }
+  }, []);
   const remove = async (id: string) => {
     if (busyRef.current || messageActions.isPending()) return;
     ++opening.current;
@@ -192,7 +221,8 @@ export function useChat() {
       patchMessages((messages) =>
         replaced ? settleRegenerate(messages, replaced, result) : settleTurn(messages, optimisticUser?.id, result),
       );
-      setLogs((prev) => ({ ...prev, [result.execution.id]: result.execution }));
+      // Every run of the turn has a log (a result from before reply lists has the one).
+      setLogs((prev) => ({ ...prev, ...Object.fromEntries(resultLogs(result).map((log) => [log.id, log])) }));
     };
     const resync = () =>
       sessionsApi
@@ -211,8 +241,8 @@ export function useChat() {
             // A regenerate shows only its own rows once the server runs it; until then (queued) the reply stays.
             if (replaced) patchMessages((messages) => replaceLastTurnReplies(messages, replaced));
           },
-          onDelta: (nodeId, textDelta, reasoningDelta) =>
-            patchMessages((messages) => applyDelta(messages, nodeId, textDelta, reasoningDelta)),
+          onRun: (run) => setRunningWorkflow(run.workflowName),
+          onDelta: (delta) => patchMessages((messages) => applyDelta(messages, delta)),
           onComplete: settle,
         },
         controller.signal,
@@ -237,6 +267,7 @@ export function useChat() {
       busyRef.current = false;
       setBusy(false);
       setWaiting(false);
+      setRunningWorkflow(undefined);
       refresh().catch(() => {});
     }
   };
@@ -289,12 +320,14 @@ export function useChat() {
     setContent,
     busy,
     queued,
+    runningWorkflow,
     logs,
     open,
     close,
     create,
     update,
     updateSettings,
+    updateReplyList,
     remove,
     send,
     regenerate,

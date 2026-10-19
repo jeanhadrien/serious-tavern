@@ -163,3 +163,86 @@ describe('postFailureSubject', () => {
     expect(postFailureSubject(turnRef)).toBe(text);
   });
 });
+
+describe('a turn with runs (a chat that lists several workflows)', () => {
+  type Part = 'reply' | 'post';
+  const run = (executionId: string, workflowId: string, part: Part, status: PostStatus, error?: string) => ({
+    executionId,
+    workflowId,
+    part,
+    status,
+    ...(error && { error }),
+  });
+  const withRuns = (id: string, runs: ReturnType<typeof run>[]) => ({ ...entry(id), runs });
+  const names = { a: 'Narrator', b: 'Memory' };
+  const viewWith = (...entries: ReturnType<typeof withRuns>[]) =>
+    buildView({
+      messages: [userMessage(), ...entries.map((item) => reply(item.executionId))],
+      entries,
+      workflowNames: names,
+    });
+  const replies = [run('e1', 'a', 'reply', 'completed'), run('r2', 'b', 'reply', 'completed')];
+
+  it('names the workflow whose after-reply steps run now: the first run still running', () => {
+    const view = viewWith(
+      withRuns('e1', [
+        ...replies,
+        run('p-a', 'a', 'post', 'completed'),
+        run('p-b', 'b', 'post', 'running'),
+        run('p-c', 'c', 'post', 'running'),
+      ]),
+    );
+    expect(runningPostRun(view)).toEqual({
+      status: 'running',
+      turnNumber: 1,
+      executionId: 'p-b',
+      workflowName: 'Memory',
+    });
+  });
+
+  it('points at the run that failed, not the first after-reply run the derived fields name', () => {
+    const view = viewWith(
+      withRuns('e1', [...replies, run('p-a', 'a', 'post', 'completed'), run('p-b', 'b', 'post', 'error', 'boom')]),
+    );
+    const [turn] = view.turns;
+    expect(turn?.postExecutionId).toBe('p-a');
+    expect(postRunOf(turn!)).toEqual({
+      status: 'error',
+      turnNumber: 1,
+      executionId: 'p-b',
+      error: 'boom',
+      workflowName: 'Memory',
+    });
+    expect(postFailures(view).map((failure) => failure.executionId)).toEqual(['p-b']);
+  });
+
+  it('has no after-reply run when the turn ran reply parts only', () => {
+    const view = viewWith(withRuns('e1', replies));
+    expect(postRunOf(view.turns[0]!)).toBeUndefined();
+    expect(runningPostRun(view)).toBeUndefined();
+  });
+
+  it.each<[PostStatus, PostStatus[]]>([
+    ['running', ['completed', 'running']],
+    ['error', ['completed', 'error', 'stopped']],
+    ['stopped', ['completed', 'stopped']],
+    ['completed', ['completed', 'completed']],
+  ])('reads %s exactly as the view derives it', (expected, statuses) => {
+    const view = viewWith(
+      withRuns('e1', [
+        ...replies,
+        ...statuses.map((status, i) => run(`p${i}`, 'a', 'post', status, status === 'error' ? 'x' : undefined)),
+      ]),
+    );
+    const [turn] = view.turns;
+    expect(turn?.postStatus).toBe(expected);
+    expect(postRunOf(turn!)?.status).toBe(expected);
+  });
+
+  it('toasts a failure once, keyed by the failing run, and says whose steps failed', () => {
+    const failed = viewWith(withRuns('e1', [...replies, run('p-b', 'b', 'post', 'error', 'boom')]));
+    const next = nextAlerts({ sessionId: 's', seen: new Set() }, 's', failed);
+    expect(next.failures.map(postFailureToast)).toEqual(['After-reply steps of Memory failed on turn 1: boom']);
+    expect(nextAlerts(next.memory, 's', failed).failures).toEqual([]);
+  });
+});

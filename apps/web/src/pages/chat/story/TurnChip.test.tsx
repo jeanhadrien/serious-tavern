@@ -115,3 +115,46 @@ describe('a turn that lost a linked item at commit time', () => {
     expect(html).toContain('An item for memory.summaries');
   });
 });
+
+describe('a turn of several runs', () => {
+  const runs = [
+    { executionId: 'e1', part: 'reply' as const, status: 'completed' as const, workflowName: 'Narrator' },
+    { executionId: 'r2', part: 'reply' as const, status: 'error' as const, error: 'HTTP 500' },
+    { executionId: 'p3', part: 'post' as const, status: 'completed' as const, workflowName: 'Memory' },
+  ];
+  const several = { turnNumber: 4, lines: [], editedAfter: false, runs };
+
+  it('lists each run with its workflow, part, status and error, and a log for every finished one', () => {
+    const html = renderToStaticMarkup(<TurnChipCard chip={several} />);
+    expect(html).toContain('Runs:');
+    expect(html).toContain('<strong>Narrator</strong> · reply · completed');
+    expect(html).toContain('<strong>Memory</strong> · after reply · completed');
+    // A deleted workflow keeps its run.
+    expect(html).toContain('<strong>Unknown workflow</strong> · reply · error');
+    expect(html).toContain('HTTP 500');
+    expect(html.match(/<details class="execution">/g)).toHaveLength(3);
+  });
+
+  it('does not offer a log for a run that has not finished', () => {
+    const html = renderToStaticMarkup(
+      <TurnChipCard chip={{ ...several, runs: [{ ...runs[2]!, status: 'running' as const }, runs[0]!] }} />,
+    );
+    expect(html.match(/<details class="execution">/g)).toHaveLength(1);
+  });
+
+  it('names the button for the runs and warns when one failed', () => {
+    const button = renderToStaticMarkup(<TurnChip chip={several} />).match(/<button[^>]*>/)?.[0] ?? '';
+    expect(button).toContain('aria-label="Turn runs"');
+    expect(button).toContain('chip-alert');
+    const calm = renderToStaticMarkup(<TurnChip chip={{ ...several, runs: [runs[0]!, runs[2]!] }} />);
+    expect(calm).not.toContain('chip-alert');
+  });
+
+  it('does not repeat the after-reply details above the list', () => {
+    const html = renderToStaticMarkup(
+      <TurnChipCard chip={{ ...several, post: { status: 'error', message: 'boom', executionId: 'p3' } }} />,
+    );
+    expect(html).not.toContain('After-reply run details');
+    expect(html).not.toContain('After-reply steps failed: boom');
+  });
+});

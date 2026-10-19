@@ -28,7 +28,7 @@ it('dispatches deltas and the completed turn, even when frames are split across 
   const started = vi.fn();
   await streamMessage('s', 'hi', {
     onStart: started,
-    onDelta: (_node, delta) => deltas.push(delta ?? ''),
+    onDelta: ({ textDelta }) => deltas.push(textDelta ?? ''),
     onComplete: completed,
   });
   expect(deltas).toEqual(['Hi']);
@@ -64,4 +64,45 @@ it('regenerates through its own route with no body and no content type, and read
   expect(init?.body).toBeUndefined();
   expect(init?.headers).toBeUndefined();
   expect(completed).toHaveBeenCalledOnce();
+});
+
+it('tells each run of a reply list apart: run.start, then node events tagged with their run', async () => {
+  const done = frame({
+    type: 'turn.complete',
+    assistantMessages: [],
+    execution,
+    executions: [execution, { ...execution, id: 'f' }],
+  });
+  respondWith([
+    frame({ type: 'turn.start', executionId: 'e' }),
+    frame({ type: 'run.start', runId: 'e', workflowId: 'w1', workflowName: 'First' }),
+    frame({ type: 'node.delta', nodeId: 'out', runId: 'e', textDelta: 'A' }),
+    frame({ type: 'run.start', runId: 'f', workflowId: 'w2', workflowName: 'Second' }),
+    frame({ type: 'node.delta', nodeId: 'out', runId: 'f', reasoningDelta: 'think' }),
+    done,
+  ]);
+  const seen: unknown[] = [];
+  const completed = vi.fn();
+  await streamMessage('s', 'hi', {
+    onRun: (run) => seen.push(run),
+    onDelta: (delta) => seen.push(delta),
+    onComplete: completed,
+  });
+  expect(seen).toEqual([
+    { runId: 'e', workflowId: 'w1', workflowName: 'First' },
+    { nodeId: 'out', runId: 'e', textDelta: 'A' },
+    { runId: 'f', workflowId: 'w2', workflowName: 'Second' },
+    { nodeId: 'out', runId: 'f', reasoningDelta: 'think' },
+  ]);
+  expect(completed.mock.calls[0]?.[0].executions).toHaveLength(2);
+});
+
+it('still reads the events of a run without ids (a single-run server)', async () => {
+  respondWith([
+    frame({ type: 'node.delta', nodeId: 'out', textDelta: 'Hi' }),
+    frame({ type: 'turn.complete', assistantMessages: [], execution }),
+  ]);
+  const deltas: unknown[] = [];
+  await streamMessage('s', 'hi', { onDelta: (delta) => deltas.push(delta) });
+  expect(deltas).toEqual([{ nodeId: 'out', textDelta: 'Hi' }]);
 });
