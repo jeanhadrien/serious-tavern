@@ -1,7 +1,7 @@
 # AGENTS.md — notes for AI agents working on this repo
 
 Read `PLAN.md` for the vision and `README.md` for usage and architecture before making changes.
-For web layout work, `docs/FRONTEND-LAYOUT.md` is the agreed design reference.
+For web layout work, `docs/FRONTEND-LAYOUT.md` is the agreed design reference; for interaction behaviour (Escape, shortcuts, unsaved work, confirmations, drag and drop, resizing), `docs/FRONTEND-UX.md`.
 
 ## What this is
 A chatbot web app. Each chat reply comes from a user-built workflow of nodes, edited visually in an n8n-style editor. The frontend is a **thin client**: all storage, secrets and workflow execution live in the backend.

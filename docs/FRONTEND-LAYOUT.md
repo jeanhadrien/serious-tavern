@@ -1,6 +1,6 @@
 # Frontend layout
 
-Design reference for the web app's chat-centred layout. It replaces the old "top nav bar plus one full-width page per tab" layout. The goal: the user can edit workflows, presets, characters, etc. while the chat stays visible.
+Design reference for the web app's chat-centred layout. Interaction behaviour (Escape, shortcuts, unsaved work, confirmations, drag and drop, resizing) is in `FRONTEND-UX.md`. It replaces the old "top nav bar plus one full-width page per tab" layout. The goal: the user can edit workflows, presets, characters, etc. while the chat stays visible.
 
 Status: implemented (October 2026), including the phone layout (see Phone mode).
 
