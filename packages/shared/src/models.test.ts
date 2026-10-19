@@ -91,6 +91,14 @@ it('preserves unknown fields on stored records for forward compatibility', () =>
   expect((execution.nodes.n! as Record<string, unknown>).futureNodeField).toBe(1);
 });
 
+it('reads a session with and without forkedFrom', () => {
+  const base = { id: 's', title: 'T', workflowId: 'w', messages: [], createdAt: '', updatedAt: '' };
+  expect(sessionSchema.parse(base).forkedFrom).toBeUndefined();
+  const forkedFrom = { sessionId: 'src', messageId: 'm1' };
+  expect(sessionSchema.parse({ ...base, forkedFrom }).forkedFrom).toEqual(forkedFrom);
+  expect(sessionSchema.safeParse({ ...base, forkedFrom: { sessionId: 'src' } }).success).toBe(false);
+});
+
 it('preserves unknown preset fields and defaults old placement/role', () => {
   const preset = presetSchema.parse({
     id: 'e305f530-421a-492b-9d25-fbb054f28c04',

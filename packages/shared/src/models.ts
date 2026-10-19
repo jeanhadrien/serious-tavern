@@ -87,6 +87,9 @@ export const sessionSchema = z
     // What the chat's settled turns stored (see state/). Absent in older files, and stored records are not
     // parsed on read: read the entries through `readTurnEntries`, never as `session.state.turns`.
     state: sessionStateSchema.optional(),
+    // Set on a chat forked from another (fork.ts): the source chat and the reply the fork was cut after. Provenance
+    // only, nothing reads it yet. Absent on every other chat.
+    forkedFrom: z.object({ sessionId: z.string(), messageId: z.string() }).optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
