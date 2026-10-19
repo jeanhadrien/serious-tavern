@@ -5,6 +5,8 @@ workflows** instead of one, each with an on/off toggle, sharing the chat's state
 After Reply goes away; and later, other events may start workflows. It builds on
 [STATE-DESIGN-PROPOSAL-3.md](STATE-DESIGN-PROPOSAL-3.md) as amended by
 [STATE-DESIGN-AMENDMENT-1.md](STATE-DESIGN-AMENDMENT-1.md), and changes its Part 5 (post-turn runs).
+It is checked against the code of PR #2 (frontend UX, stacked on #1), where After Reply runs, the Trigger
+node, chat settings, regenerate and swipes are already built.
 
 ## The brief, and the design branch
 
@@ -42,7 +44,7 @@ sub-workflow node.
 | T6 | **After Reply is removed.** Post-reply work is a workflow listed after the reply workflow; because it reads the history, it waits for the reply, which is exactly what After Reply did |
 | T7 | Workflows never raise events and never start other workflows. Signalling between workflows goes through state, within the list order |
 | T8 | A new chat copies the **open chat's** reply list (order and toggles), as it already copies the persona. With no chat open, it gets the Default Assistant alone |
-| T9 | Feature name: **Triggers** (each one shown as "On reply", later "On edit", …). Proposal 3's planned Trigger node is renamed **Gate** |
+| T9 | Feature name: **Triggers** (each one shown as "On reply", later "On edit", …). The Trigger node is relabelled **Gate**; its stored type id `trigger` stays, so saved workflows keep loading |
 
 ## Why not custom events
 
@@ -92,8 +94,11 @@ two sets of **resources**:
   or a node without `stateAccess` that is marked as touching state: the workflow reads and writes
   everything, so it waits for all earlier workflows and all later ones wait for it. Correct first, fast
   where provable.
-- Draw's and Gate's own bookkeeping (implicit per-node keys) is private to that node, so it never
-  conflicts across workflows. A workflow may appear only once in a list, which keeps those keys private.
+- Draw's and Gate's own bookkeeping is stored under `{ kind: 'node', nodeId, key }`. Node ids are only
+  unique within a workflow, so with several workflows that target must also name the workflow
+  (`workflowId`, additive; a stored target without it belongs to the session's legacy `workflowId`).
+  Then it is private to that node and never conflicts across workflows. A workflow may appear only once
+  in a list, which keeps those keys private.
 - Chat settings are read-only during a run (the user owns them), so they never order anything.
 
 ### Scheduling
@@ -104,7 +109,7 @@ For each enabled workflow *j*, its predecessors are the earlier workflows *i* wi
 - **Each run reads a view** = the turn-start state plus the committed writes of **earlier-listed** runs.
   Later-listed runs' writes are never visible, even if they committed first. Because a run only starts
   after every earlier run whose writes it reads has settled, its view is complete for what it reads.
-- **Each run commits when it settles** (its own `settle` write, like phase 5's `settlePostRun`), so
+- **Each run commits when it settles** (its own settle write, generalizing today's `settlePostRun`), so
   replies are saved as soon as their workflow ends and dependants can start.
 - **The stored result is folded in list order**, not completion order. So two workflows that both write
   the same key don't need to wait for each other: the lower one wins, as it would running top to bottom.
@@ -123,8 +128,14 @@ surprise.
 - Stop stops every running and pending workflow of the turn.
 - The next message waits for the whole list, as it waited for the post-turn run. The reply itself is
   never delayed by a workflow listed after it that doesn't feed it.
-- Each run has its own execution log; the turn records its runs (`executionIds` in list order). The
-  per-message chip and the delete confirmation list writes per workflow.
+- Each run has its own execution log; the turn records its runs in list order. The per-message chip and
+  the delete confirmation list writes per workflow.
+- Today's after-reply UI generalizes: the quiet status row above the composer (`PostRunStatus`) shows
+  the workflows still running once the replies have settled, and Escape still never stops them (only
+  the Stop button does), as it never stops an after-reply run now.
+- **Regenerate** re-runs the whole list as a new alternative, and a **swipe** switches every run of the
+  turn at once. That needs no new rule: an alternative is already an ordinary turn, and `turnPresence`
+  applies a turn's writes only while its replies are active.
 
 ## Validation changes
 
@@ -140,8 +151,9 @@ surprise.
 | --- | --- | --- |
 | Reply list | Session | `triggers: { reply: [{ workflowId, enabled }] }`, optional |
 | Legacy | Session | `workflowId` stays. A session without `triggers` reads as `reply: [{ workflowId, enabled: true }]`; the first save writes `triggers` and keeps `workflowId` (unknown fields survive, nothing is removed) |
-| Turn | Session story state | `TurnEntry` gains `runs: [{ executionId, workflowId, position, writes, completed }]`; the fold applies runs by `position` within a turn |
-| Chat settings | Session | Unchanged. The panel shows the settings of all enabled workflows; a key declared by several workflows is one setting (a type clash shows the existing "doesn't fit" warning) |
+| Turn | Session story state | Today a `TurnEntry` holds the reply run (`executionId`, `writes`) and at most one after-reply run (`postExecutionId`, `postStatus`, `postError`, its writes appended by `withPostRun` after the turn's own). That pair generalizes to `runs: [{ executionId, workflowId, position, status, error }]`, each write tagged with its run, and the fold applies runs by `position`. An entry without `runs` reads as the reply run followed by its post run, so stored chats fold exactly as before. The restart rule (`effectivePostRun`) applies per run |
+| Node keys | Session story state | `{ kind: 'node', nodeId, key }` gains an optional `workflowId` (see "Access sets") |
+| Chat settings | Session | Unchanged storage. The panel shows the settings of all enabled workflows; a key declared by several workflows is one setting (a type clash shows the existing "doesn't fit" warning). `PATCH` checks keys against that union instead of the one workflow (`400 CHAT_SETTING_INVALID` otherwise) |
 
 API: `PATCH /api/sessions/:id` gains `triggers` (whole list replace); `createSession` takes either
 `workflowId` (legacy) or `triggers`. The plan ("waits for…") comes back with the session view.
@@ -198,7 +210,13 @@ LLM-raised custom events are not planned: they are state plus a Condition (see "
    copies the list; runs strictly one after another (no parallelism yet), one turn with several runs.
 2. Access sets (`stateAccess`, template walk, unknown = everything), the scheduler and the list-order
    fold; the "waits for" hints.
-3. Remove After Reply; Chat Input's `replies`; "at least one sink" validation.
+3. Retire After Reply; Chat Input's `replies`; "at least one sink" validation. User workflows and the
+   "Rolling summaries (example)" pack already contain After Reply nodes, so it can't simply go:
+   - it leaves the node palette, but a workflow that has one keeps its post part, run right after that
+     workflow's own reply part, inside its row of the list;
+   - the editor offers "Split into two workflows" (the post part becomes a new workflow, listed below
+     the original in the chats that use it);
+   - the example pack ships the two-workflow version for new installs only (seeds never overwrite).
 4. Later triggers, in the order above.
 
 Phase 1 alone delivers the feature with correct results; phase 2 only makes it faster, so it can be
