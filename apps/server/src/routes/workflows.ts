@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { apiContract, type ApiResponse, type WorkflowInvalidDetails } from '@st/shared';
+import { apiContract, replyWorkflows, type ApiResponse, type WorkflowInvalidDetails } from '@st/shared';
 import { pruneInvalidEdges, validateWorkflow } from '@st/engine';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
@@ -39,7 +39,8 @@ export function registerWorkflows(app: FastifyInstance, context: AppContext) {
   });
   app.delete<ApiRoute<'deleteWorkflow'>>('/api/workflows/:id', async (request, reply) => {
     const { id } = apiContract.deleteWorkflow.params.parse(request.params);
-    if ((await sessions.list()).some((s) => s.workflowId === id))
+    // Used by a chat when its reply list names it (`replyWorkflows`: the legacy `workflowId` for a chat without a list).
+    if ((await sessions.list()).some((s) => replyWorkflows(s).some((entry) => entry.workflowId === id)))
       throw new HttpError(409, 'WORKFLOW_IN_USE', 'Workflow is used by a session');
     await workflows.delete(id);
     return reply.code(204).send();

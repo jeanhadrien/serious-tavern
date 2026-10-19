@@ -38,6 +38,7 @@ describe('a workflow without After Reply', () => {
     const raw = (await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json();
     for (const field of ['postExecutionId', 'postStatus', 'postError'])
       expect(raw.state.turns[0]).not.toHaveProperty(field);
+    expect(raw.state.turns[0].runs).toMatchObject([{ part: 'reply', status: 'completed' }]);
     expect(await postRunOf(app, session.id)).toEqual({});
     expect(await readdir(join(directory, 'executions'))).toHaveLength(1);
   });
@@ -53,11 +54,16 @@ describe('the post run of a turn', () => {
     // The reply is complete while the post run is held; the entry says so, and so does the state view.
     expect(result.assistantMessages.map((message) => message.content)).toEqual(['n=0 turn=1']);
     const [entry] = entriesOf(await readSession(app, session.id));
-    expect(entry).toMatchObject({ completed: true, replies: 1, postStatus: 'running' });
-    expect(await postRunOf(app, session.id)).toEqual({
-      postStatus: 'running',
-      postExecutionId: entry!.postExecutionId,
-    });
+    // The entry lists its two runs: the reply run, and the after-reply run announced as running (the three post fields are
+    // only derived, for the state view: a new entry never stores them).
+    expect(entry).toMatchObject({ completed: true, replies: 1 });
+    expect(entry).not.toHaveProperty('postStatus');
+    expect(entry!.runs).toMatchObject([
+      { executionId: result.execution.id, part: 'reply', status: 'completed' },
+      { part: 'post', status: 'running' },
+    ]);
+    const postId = entry!.runs![1]!.executionId;
+    expect(await postRunOf(app, session.id)).toEqual({ postStatus: 'running', postExecutionId: postId });
     // The reply log shows the after-reply nodes as not run.
     const nodes = result.execution.nodes;
     expect([nodes.after, nodes.postBump, nodes.postAdd, nodes.gate].map((item) => item?.status)).toEqual(
@@ -67,7 +73,7 @@ describe('the post run of a turn', () => {
 
     gate.release();
     const done = await waitForPostRun(app, session.id, 'completed');
-    expect(done.postExecutionId).toBe(entry!.postExecutionId);
+    expect(done.postExecutionId).toBe(postId);
     const post = await readExecution(app, done.postExecutionId!);
     expect(post).toMatchObject({
       part: 'post',

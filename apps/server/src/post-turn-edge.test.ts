@@ -58,14 +58,10 @@ describe('closing the app', () => {
     await app.close();
     const stored = JSON.parse(await readFile(join(directory, 'sessions', `${session.id}.json`), 'utf8'));
     // Like a restart that cut it short, not like a Stop: nothing says the steps should be run again otherwise.
-    expect(stored.state.turns[0]).toMatchObject({
-      completed: true,
-      postStatus: 'error',
-      postError: 'The run was interrupted by a server restart.',
-    });
-    const log = JSON.parse(
-      await readFile(join(directory, 'executions', `${stored.state.turns[0].postExecutionId}.json`), 'utf8'),
-    );
+    const post = stored.state.turns[0].runs.find((run: { part: string }) => run.part === 'post');
+    expect(stored.state.turns[0]).toMatchObject({ completed: true });
+    expect(post).toMatchObject({ status: 'error', error: 'The run was interrupted by a server restart.' });
+    const log = JSON.parse(await readFile(join(directory, 'executions', `${post.executionId}.json`), 'utf8'));
     expect(log.warnings).toContain('The after-reply run ended because the server shut down before it finished.');
   });
 });

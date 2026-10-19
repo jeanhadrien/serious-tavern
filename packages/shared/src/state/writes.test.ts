@@ -23,6 +23,15 @@ describe('stateWriteSchema', () => {
       'a node target',
       { op: 'add', target: { kind: 'node', nodeId: 'n', key: 'draws' }, nodeId: 'n', item: { id: 'i', text: '' } },
     ],
+    [
+      'a node target of a workflow',
+      {
+        op: 'add',
+        target: { kind: 'node', nodeId: 'n', key: 'draws', workflowId: 'w1' },
+        nodeId: 'n',
+        item: { id: 'i', text: '' },
+      },
+    ],
     ['unknown fields', { op: 'delete', target: { ...target, extra: 1 }, nodeId: 'n', note: 'x' }],
     [
       'an item linked to messages',
@@ -270,6 +279,46 @@ describe('withUpdatedTurnEntry', () => {
   });
 });
 
+describe('the runs of an entry', () => {
+  const good = turnEntry('a', [setWrite('n', 1)]);
+  const reply = { executionId: 'r1', workflowId: 'w1', part: 'reply', status: 'completed' };
+  const post = { executionId: 'r2', workflowId: 'w1', part: 'post', status: 'running', note: 'kept' };
+
+  it('reads an entry without runs as it always was: no runs key', () => {
+    expect(readTurnEntries({ turns: [good] })[0]).not.toHaveProperty('runs');
+  });
+
+  it('reads the runs in order, keeping unknown fields', () => {
+    expect(readTurnEntries({ turns: [{ ...good, runs: [reply, post] }] })[0]!.runs).toEqual([reply, post]);
+  });
+
+  it('skips a run it cannot read without dropping the others or the turn', () => {
+    const bad = [{ ...reply, status: 'weird' }, { ...reply, part: 'middle' }, 'x', null, { part: 'post' }];
+    expect(readTurnEntries({ turns: [{ ...good, runs: [...bad, post] }] })[0]!.runs).toEqual([post]);
+  });
+
+  it('reads an entry whose runs are all unreadable, or not a list, as a legacy one', () => {
+    for (const runs of [[{ junk: 1 }], [], 'x', 5, {}]) {
+      const [entry] = readTurnEntries({ turns: [{ ...good, runs, postExecutionId: 'p', postStatus: 'running' }] });
+      expect(entry).not.toHaveProperty('runs');
+      expect(entry).toMatchObject({ executionId: 'a', postStatus: 'running' });
+    }
+  });
+
+  it('drops a bad error text of a run, not the run', () => {
+    expect(readTurnEntries({ turns: [{ ...good, runs: [{ ...reply, status: 'error', error: 5 }] }] })[0]!.runs).toEqual(
+      [{ ...reply, status: 'error' }],
+    );
+  });
+
+  it('keeps legacy post fields and runs side by side', () => {
+    const [entry] = readTurnEntries({
+      turns: [{ ...good, runs: [reply], postExecutionId: 'p', postStatus: 'completed' }],
+    });
+    expect(entry).toMatchObject({ runs: [reply], postExecutionId: 'p', postStatus: 'completed' });
+  });
+});
+
 describe('session and message schemas', () => {
   const session = { id: 's', title: 'T', workflowId: 'w', messages: [], createdAt: '', updatedAt: '' };
 
@@ -278,6 +327,14 @@ describe('session and message schemas', () => {
     const withState = { ...session, state: { turns: [turnEntry('a', [setWrite('n', 1)])] } };
     expect(sessionSchema.parse(withState)).toEqual(withState);
     expect(sessionSchema.parse({ ...session, state: { turns: [], extra: 1 } }).state).toEqual({ turns: [], extra: 1 });
+  });
+
+  it('keeps the reply list and a message’s run id, and does not require them', () => {
+    const triggers = { reply: [{ workflowId: 'w', enabled: false }], other: 1 };
+    const message = { id: 'm', role: 'assistant', content: 'hi', createdAt: '', runId: 'r1' };
+    const withBoth = { ...session, triggers, messages: [message] };
+    expect(sessionSchema.parse(withBoth)).toEqual(withBoth);
+    expect(sessionSchema.parse(session)).not.toHaveProperty('triggers');
   });
 
   it('keeps editedAt on messages and does not require it', () => {

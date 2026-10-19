@@ -7,10 +7,11 @@ export class RunningTurn {
   readonly controller = new AbortController();
   stoppedBy?: TurnStop;
   /**
-   * The post-turn run (After Reply) this turn leaves behind. Set before the turn settles, so that a state read
-   * can tell the run is live (`TurnRegistry.hasPostRun`) while the entry already says `running`.
+   * The execution ids of the post-turn runs (After Reply, one per workflow that has one) this turn leaves behind. Filled
+   * before the turn settles, so that a state read can tell the runs are live (`TurnRegistry.hasPostRun`) while the entry
+   * already says `running`.
    */
-  postExecutionId?: string;
+  postRunIds = new Set<string>();
   /**
    * Follow-up work that runs in this turn's queue slot once `run` has delivered its result: the next message to
    * the session waits for it. It gets a RunningTurn of its own, which is what Stop stops. Set by the action.
@@ -73,7 +74,7 @@ export class TurnRegistry {
 
   /** Whether the post-turn run `executionId` of the session is still to run or running (its turn holds the slot). */
   hasPostRun(sessionId: string, executionId: string): boolean {
-    return this.running.get(sessionId)?.postExecutionId === executionId;
+    return this.running.get(sessionId)?.postRunIds.has(executionId) ?? false;
   }
 
   /**
@@ -98,7 +99,7 @@ export class TurnRegistry {
   // A follow-up never rejects the queue or the caller (who already has the result): it can only be logged.
   private async follow(sessionId: string, turn: RunningTurn, after: NonNullable<RunningTurn['after']>): Promise<void> {
     const run = this.start(sessionId);
-    run.postExecutionId = turn.postExecutionId;
+    run.postRunIds = turn.postRunIds;
     try {
       await after(run);
     } catch (error) {

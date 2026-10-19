@@ -54,7 +54,8 @@ describe('a failing settle write', () => {
     const failed = await postRunOf(app, session.id);
     expect(failed.postError).toBe('The result of the after-reply run could not be saved: disk full');
     const [entry] = entriesOf(await readSession(app, session.id));
-    expect(entry).toMatchObject({ completed: true, replies: 1, postStatus: 'error' });
+    expect(entry).toMatchObject({ completed: true, replies: 1 });
+    expect(entry!.runs!.find((run) => run.part === 'post')).toMatchObject({ status: 'error' });
     expect(entry!.writes.map((write) => write.nodeId)).toEqual(['bump']);
     expect(await turn(app, session.id)).toEqual(['n=1 turn=2']);
   });

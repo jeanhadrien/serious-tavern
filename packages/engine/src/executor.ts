@@ -126,6 +126,7 @@ export async function executeWorkflow(
   const stateRun = new StateRun(
     options.state,
     execution,
+    workflow.id,
     part === 'post' ? { ids: parts.reply, nameOf: (id) => nodeDisplayName(workflow.nodes, labelOf, id) } : undefined,
   );
   let wave = 0;

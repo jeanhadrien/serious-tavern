@@ -9,12 +9,17 @@ import { settlePostRun } from './settle-post-run.js';
 import { foldSession } from './story-state.js';
 import type { RunningTurn } from './turns.js';
 
-/** What the after-reply run of a settled turn needs: the reply run's own inputs, and what the turn produced. */
+/**
+ * What the after-reply run of one workflow of a settled turn needs: its reply run's own inputs, and what that run
+ * produced. A turn leaves one per enabled workflow that has an After Reply part.
+ */
 export type PostTurn = {
   prepared: PreparedWorkflow;
+  /** The workflow the run belongs to: the scope of the nodes' own state, and the run's record in the entry. */
+  workflowId: string;
   /** The definitions the turn's ports were resolved with, so the run's ports and its state cannot disagree. */
   definitions: StateDefinition[];
-  /** The reply run, which the entry is on. */
+  /** The turn, whose entry the run is listed in. */
   turnExecutionId: string;
   /** This run, announced in the entry before it started. */
   executionId: string;
@@ -26,23 +31,43 @@ export type PostTurn = {
   settings: Record<string, unknown>;
   character?: Character;
   persona?: Persona;
-  /** The turn's settled assistant messages: what After Reply outputs. */
+  /** The settled assistant messages of the workflow's own reply run: what After Reply outputs. */
   replies: ChatMessage[];
 };
 
 type Outcome = { result: PostRunResult; execution?: ExecutionLog };
 
 /**
- * Runs the after-reply part of a settled turn and records how it ended on the turn's entry. It runs in the turn's
- * queue slot (`RunningTurn.after`), so the next message waits for it and Stop stops it. Whatever happens here
- * stays here: a failure is the entry's `error`, never the turn's, and nothing is thrown.
+ * The after-reply runs of a settled turn, one after another in list order (each settles into the turn's entry before the
+ * next starts, so it reads what the ones before it wrote). They run in the turn's queue slot (`RunningTurn.after`), so
+ * the next message waits for them and Stop stops the running one: the rest are then not run, and their records in the
+ * entry (listed `running` when the turn settled) end as stopped, never left `running`.
  */
-export async function runPostTurn(
+export async function runPostTurns(
   context: AppContext,
   sessionId: string,
-  post: PostTurn,
+  posts: readonly PostTurn[],
   run: RunningTurn,
 ): Promise<void> {
+  for (const post of posts) {
+    if (!run.stoppedBy) await runPostTurn(context, sessionId, post, run);
+    else
+      await settle(
+        context,
+        sessionId,
+        post,
+        run.stoppedBy === 'shutdown'
+          ? { status: 'error', error: POST_INTERRUPTED_MESSAGE, writes: [] }
+          : { status: 'stopped', writes: [] },
+      );
+  }
+}
+
+/**
+ * Runs the after-reply part of a settled turn's workflow and records how it ended on its record in the turn's entry.
+ * Whatever happens here stays here: a failure is the record's `error`, never the turn's, and nothing is thrown.
+ */
+async function runPostTurn(context: AppContext, sessionId: string, post: PostTurn, run: RunningTurn): Promise<void> {
   const outcome = await execute(context, sessionId, post, run).catch(
     (error): Outcome => ({ result: { status: 'error', error: errorMessage(error), writes: [] } }),
   );
@@ -82,6 +107,7 @@ async function settle(
     const updated = await context.sessions.silent.update(sessionId, (current) => {
       warnings = settlePostRun(current, {
         turnExecutionId: post.turnExecutionId,
+        run: { executionId: post.executionId, workflowId: post.workflowId },
         definitions: post.definitions,
         ...settlement,
       });
@@ -125,7 +151,7 @@ async function execute(
   const turn =
     presence.find(({ entry }) => entry.executionId === post.turnExecutionId)?.turn ??
     presence.filter((item) => item.turn !== null).length;
-  const story = foldSession(post.definitions, session, turn, post.history);
+  const story = foldSession(post.definitions, session, turn, post.history, { workflowId: post.workflowId });
   const { replies } = post;
   let execution: ExecutionLog;
   let result: PostRunResult;

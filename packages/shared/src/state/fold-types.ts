@@ -43,8 +43,13 @@ export type FoldedDefinition = {
   warnings: StateWarning[];
 };
 
-/** Everything one node wrote under its own implicit keys (Draw's `draws`); only keys that were written. */
-export type FoldedNode = { nodeId: string; keys: Record<string, FoldedKey> };
+/**
+ * Everything one node wrote under its own implicit keys (Draw's `draws`); only keys that were written. `workflowId` is
+ * the workflow whose node it is, set only when the fold was not scoped to a workflow (`FoldInput.workflowId`): then
+ * nodes of different workflows are separate entries, and the writes made before chats ran several workflows (none has a
+ * workflow id) are the entries without one. A scoped fold merges those into the workflow's own and sets none.
+ */
+export type FoldedNode = { nodeId: string; workflowId?: string; keys: Record<string, FoldedKey> };
 
 export type StoryState = {
   /** The turn the state is read at: the turn being run (present turns + 1), unless the fold was given one. */

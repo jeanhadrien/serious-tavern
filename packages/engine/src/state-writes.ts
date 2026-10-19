@@ -17,6 +17,8 @@ export class StateWriteBuffer {
   constructor(
     private readonly snapshot: StateSnapshot | undefined,
     private readonly executionId: string,
+    // The run's workflow: a node's own keys are stored under it (see `resolveWrites`).
+    private readonly workflowId?: string,
   ) {}
 
   /**
@@ -64,7 +66,7 @@ export class StateWriteBuffer {
         wave === undefined ? [] : requests.map((request) => ({ nodeId, wave, request })),
       )
       .sort((a, b) => a.wave - b.wave || byText(a.nodeId, b.nodeId));
-    return resolveWrites(committed, this.snapshot);
+    return resolveWrites(committed, this.snapshot, this.workflowId);
   }
 
   private node(nodeId: string): NodeRequests {
@@ -92,9 +94,10 @@ export class StateRun {
   constructor(
     private readonly snapshot: StateSnapshot | undefined,
     private readonly execution: Pick<ExecutionLog, 'id' | 'warnings'>,
+    workflowId: string,
     private readonly repeated?: RepeatedNodes,
   ) {
-    this.buffer = new StateWriteBuffer(snapshot, execution.id);
+    this.buffer = new StateWriteBuffer(snapshot, execution.id, workflowId);
     this.values = frozenStateValues(snapshot);
   }
 

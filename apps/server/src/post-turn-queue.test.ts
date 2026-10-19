@@ -134,7 +134,8 @@ describe('a failing post run', () => {
     expect(failed.postError).toBe('Post Gate (gate): boom');
     const saved = await readSession(app, session.id);
     expect(saved.messages).toEqual(before.messages);
-    expect(entriesOf(saved)[0]).toMatchObject({ completed: true, replies: 1, postStatus: 'error' });
+    expect(entriesOf(saved)[0]).toMatchObject({ completed: true, replies: 1 });
+    expect(entriesOf(saved)[0]!.runs!.find((run) => run.part === 'post')).toMatchObject({ status: 'error' });
     expect(entriesOf(saved)[0]!.writes.map((write) => write.nodeId)).toEqual(['bump', 'postBump']);
     const post = await readExecution(app, failed.postExecutionId!);
     expect(post).toMatchObject({ status: 'error', part: 'post' });
@@ -176,8 +177,7 @@ describe('a reply that did not finish', () => {
       expect((await send(app, session.id, 'not json')).statusCode).toBe(500);
       const [entry] = entriesOf(await readSession(app, session.id));
       expect(entry).toMatchObject({ completed: false });
-      expect(entry!.postExecutionId).toBeUndefined();
-      expect(entry!.postStatus).toBeUndefined();
+      expect(entry!.runs!.map((run) => run.part)).toEqual(['reply']);
       expect(gate.runs).toBe(0);
       expect((await stateView(app, session.id)).turns[0]!.postStatus).toBeUndefined();
     } finally {
@@ -224,7 +224,7 @@ describe('a reply that did not finish', () => {
       expect(frames.at(-1)).toMatchObject({ type: 'turn.error', error: { code: 'TURN_STOPPED' } });
       const [entry] = entriesOf(await readSession(app, session.id));
       expect(entry).toMatchObject({ completed: false, replies: 1 });
-      expect(entry!.postStatus).toBeUndefined();
+      expect(entry!.runs!.map((run) => run.part)).toEqual(['reply']);
       expect(gate.runs).toBe(0);
     } finally {
       gate.dispose();

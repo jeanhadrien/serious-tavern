@@ -313,9 +313,9 @@ describe('mergeSettings', () => {
   const workflow = { id: 'w', name: 'W', nodes: [], edges: [], createdAt: '', updatedAt: '', settings: [] };
   it('returns a new object and leaves the stored one alone', () => {
     const stored = Object.freeze({ ghost: 1 });
-    expect(mergeSettings(stored, { ghost: null }, workflow)).toEqual({});
+    expect(mergeSettings(stored, { ghost: null }, [workflow])).toEqual({});
     expect(stored).toEqual({ ghost: 1 });
-    expect(mergeSettings(undefined, {}, workflow)).toEqual({});
+    expect(mergeSettings(undefined, {}, [workflow])).toEqual({});
   });
 });
 

@@ -306,3 +306,66 @@ it('describes regenerate (no body, the send result) and the swipe body', () => {
   expect(apiContract.setAlternative.body.safeParse({ executionId: '' }).success).toBe(false);
   expect(apiContract.setAlternative.body.safeParse({}).success).toBe(false);
 });
+
+it('describes the reply list of a chat: both ways to create one, a whole-replace patch, and the runs of a turn', () => {
+  const w1 = '11111111-1111-4111-8111-111111111111';
+  const w2 = '22222222-2222-4222-8222-222222222222';
+  const reply = [
+    { workflowId: w1, enabled: true },
+    { workflowId: w2, enabled: false },
+  ];
+  // Exactly one of workflowId and triggers when creating.
+  expect(apiContract.createSession.body.parse({ workflowId: w1 })).toEqual({ workflowId: w1 });
+  expect(apiContract.createSession.body.parse({ triggers: { reply }, title: 'T' })).toEqual({
+    triggers: { reply },
+    title: 'T',
+  });
+  for (const bad of [{}, { title: 'T' }, { workflowId: w1, triggers: { reply } }])
+    expect(apiContract.createSession.body.safeParse(bad).success).toBe(false);
+  // The list's own rules (not empty, no repeats) are the server's `TRIGGERS_INVALID`; its shape is the contract's.
+  expect(apiContract.updateSession.body.parse({ triggers: { reply } })).toEqual({ triggers: { reply } });
+  expect(apiContract.updateSession.body.parse({ triggers: { reply: [] } })).toEqual({ triggers: { reply: [] } });
+  for (const bad of [
+    { triggers: { reply: [{ workflowId: 'nope', enabled: true }] } },
+    { triggers: { reply: [{ workflowId: w1 }] } },
+    { triggers: {} },
+  ])
+    expect(apiContract.updateSession.body.safeParse(bad).success).toBe(false);
+
+  const log = { id: 'e', workflowId: 'wf', sessionId: 's', status: 'completed', startedAt: '', nodes: {} };
+  const result = { assistantMessages: [], execution: log, executions: [log, log] };
+  expect(apiContract.sendMessage.response.parse(result).executions).toHaveLength(2);
+  expect(apiContract.sendMessage.response.parse({ assistantMessages: [], execution: log }).executions).toBeUndefined();
+  const events = [
+    { type: 'run.start', runId: 'r1', workflowId: 'wf', workflowName: 'Story' },
+    { type: 'node.start', nodeId: 'llm', runId: 'r1' },
+    { type: 'node.delta', nodeId: 'llm', runId: 'r1', textDelta: 'x' },
+    { type: 'node.complete', nodeId: 'llm', runId: 'r1' },
+    { type: 'turn.complete', ...result },
+  ];
+  for (const event of events) expect(apiContract.streamTurn.response.parse(event)).toMatchObject(event);
+  expect(apiContract.streamTurn.response.safeParse({ type: 'run.start', runId: 'r1' }).success).toBe(false);
+
+  // The state view: a turn's runs, and the node state of a workflow, both additive.
+  const turn = { executionId: 'x', at: '', completed: true, replies: 1, turnNumber: 1, writes: [] };
+  const run = { executionId: 'x', workflowId: w1, part: 'reply', status: 'completed' };
+  const view = (turns: unknown[], nodes: unknown[] = []) =>
+    apiContract.getSessionState.response.parse({ turn: 2, definitions: [], nodes, turns });
+  expect(view([turn]).turns[0]).not.toHaveProperty('runs');
+  expect(
+    view([
+      {
+        ...turn,
+        runs: [
+          { ...run, workflowName: 'Story' },
+          { ...run, part: 'post', status: 'error', error: 'x' },
+        ],
+      },
+    ]).turns[0]!.runs,
+  ).toHaveLength(2);
+  expect(() => view([{ ...turn, runs: [{ ...run, status: 'weird' }] }])).toThrow();
+  const node = { nodeId: 'draw', values: {}, meta: {}, history: {}, omitted: {} };
+  expect(view([], [{ ...node, workflowId: w1 }, node]).nodes.map((item) => item.workflowId)).toEqual([w1, undefined]);
+  // Messages say which run wrote them, and a session keeps its reply list.
+  expect(messageSchema.parse({ id: 'm', role: 'assistant', content: '', createdAt: '', runId: 'r1' }).runId).toBe('r1');
+});

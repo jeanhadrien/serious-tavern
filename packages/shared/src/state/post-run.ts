@@ -35,6 +35,14 @@ export type PostRunResult = {
   linkWarnings?: string[];
 };
 
+/** `raw.linkWarnings` with `warnings` appended, cut like the entry keeps them (see `LINK_WARNING_LIMITS`). */
+export function appendLinkWarnings(raw: Record<string, unknown>, warnings: readonly string[]): unknown[] {
+  return [
+    ...(Array.isArray(raw.linkWarnings) ? raw.linkWarnings : []),
+    ...warnings.map((text) => text.slice(0, LINK_WARNING_LIMITS.length)),
+  ].slice(-LINK_WARNING_LIMITS.count);
+}
+
 /**
  * `state` with the post run's result recorded on the entry whose `executionId` is given: `postStatus` (and
  * `postError` for an error) set and `writes` appended AFTER the turn's own, so a later write to a key wins and
@@ -50,12 +58,7 @@ export function withPostRun(state: unknown, executionId: string, result: PostRun
       postStatus: result.status,
       ...(result.status === 'error' && result.error ? { postError: result.error.slice(0, POST_ERROR_LIMIT) } : {}),
       writes: [...stored, ...result.writes],
-      ...(result.linkWarnings?.length && {
-        linkWarnings: [
-          ...(Array.isArray(raw.linkWarnings) ? raw.linkWarnings : []),
-          ...result.linkWarnings.map((text) => text.slice(0, LINK_WARNING_LIMITS.length)),
-        ].slice(-LINK_WARNING_LIMITS.count),
-      }),
+      ...(result.linkWarnings?.length && { linkWarnings: appendLinkWarnings(raw, result.linkWarnings) }),
     };
   });
 }

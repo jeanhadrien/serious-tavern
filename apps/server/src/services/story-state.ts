@@ -32,14 +32,24 @@ export async function listDefinitions(repository: Pick<StateDefinitionRepository
  * the default and shows up in `issues`. `atTurn` reads the state as of that turn instead of the next one (an
  * after-reply run reads at the turn it follows). `history` is the history messages the run's nodes see: with it, items
  * that link to messages carry their computed `link` in the snapshot (the SAME history the nodes judge links by).
+ * `scope` is for the run of one workflow: its `workflowId` scopes the nodes' own state (`FoldInput.workflowId`; a caller
+ * that runs a workflow always gives it) and `including` is the turn being run (`FoldInput.including`), for the later
+ * runs of a turn whose first run has settled.
  */
 export function foldSession(
   definitions: StateDefinition[],
   session: Pick<Session, 'messages' | 'state'>,
   atTurn?: number,
   history?: readonly ChatMessage[],
+  scope: { workflowId?: string; including?: string } = {},
 ): SessionStory {
-  const story = foldStoryState({ definitions, messages: session.messages, state: session.state, turn: atTurn });
+  const story = foldStoryState({
+    definitions,
+    messages: session.messages,
+    state: session.state,
+    turn: atTurn,
+    ...scope,
+  });
   return {
     definitions,
     story,

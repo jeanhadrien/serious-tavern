@@ -25,11 +25,13 @@ const label = (found: Pick<Found, 'definition' | 'key'>) => `${found.definition.
  * Turns the committed requests (already sorted by wave, node id and call order) into the writes to store.
  * Scalars are stored as the value AFTER the write: an `increment` is computed from the turn-start value plus
  * the earlier writes of the same run to that key, clamped at every step, and stored as a `set`. A request for a
- * definition or key the snapshot doesn't have is dropped with a warning. Never throws.
+ * definition or key the snapshot doesn't have is dropped with a warning. A node's own key is stored under the
+ * run's `workflowId` (node ids are only unique within a workflow). Never throws.
  */
 export function resolveWrites(
   committed: readonly Committed[],
   snapshot: StateSnapshot | undefined,
+  workflowId?: string,
 ): { writes: StateWrite[]; warnings: string[] } {
   const writes: StateWrite[] = [];
   const warnings: string[] = [];
@@ -45,7 +47,12 @@ export function resolveWrites(
     const { target } = request;
     if (target.kind === 'node') {
       // A node's own key has no definition to check against.
-      const node = { kind: 'node' as const, nodeId, key: target.key };
+      const node = {
+        kind: 'node' as const,
+        nodeId,
+        key: target.key,
+        ...(workflowId === undefined ? {} : { workflowId }),
+      };
       if (request.op === 'set') writes.push({ op: 'set', target: node, nodeId, value: request.value });
       else if (request.op === 'add') writes.push({ op: 'add', target: node, nodeId, item: request.item });
       else if (request.op === 'remove') writes.push({ op: 'remove', target: node, nodeId, itemId: request.itemId });

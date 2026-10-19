@@ -184,12 +184,12 @@ describe('TurnRegistry.hasPostRun', () => {
     };
     const done = registry.run('s', async (turn) => {
       probe('before it is set');
-      turn.postExecutionId = 'p1';
+      turn.postRunIds.add('p1');
       probe('set, still in the turn');
       entered.resolve();
       await hold.promise;
       turn.after = async (run) => {
-        expect(run.postExecutionId).toBe('p1');
+        expect(run.postRunIds.has('p1')).toBe(true);
         probe('in the follow-up');
         await gate.promise;
       };

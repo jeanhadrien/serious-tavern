@@ -101,6 +101,7 @@ export async function playTurn(
     definitions: oldestFirst(chat.definitions),
     messages: chat.messages,
     state: chat.state,
+    workflowId: workflow.id,
   });
   const result = await executeWorkflow(workflow, {
     message,
@@ -147,6 +148,7 @@ export async function playPost(
     messages: chat.messages,
     state: chat.state,
     turn: turn.turn,
+    workflowId: workflow.id,
   });
   const replies = chat.messages.filter(
     (reply) => reply.role === 'assistant' && reply.executionId === turn.execution.id,

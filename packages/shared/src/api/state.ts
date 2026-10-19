@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { linkStatuses } from '../links/status.js';
 import { stateDefinitionSchema, stateDefinitionWriteSchema } from '../state/definition.js';
 import { historyPointSchema, keyMetaSchema, stateWarningSchema } from '../state/fold-types.js';
-import { postStatusSchema, stateWriteSchema } from '../state/writes.js';
+import { postStatusSchema, stateWriteSchema, turnRunSchema } from '../state/writes.js';
 import { endpoint, idParamsSchema, noContentSchema } from './common.js';
 
 /**
@@ -69,7 +69,10 @@ export const NODE_ITEMS_LIMIT = 50;
 // What a node stored under its own implicit keys (Draw's `draws`): only keys that were written.
 export const nodeStateSchema = z.object({
   nodeId: z.string(),
-  // The node's name in the chat's workflow (`Draw #1 (draw)`); absent when the node no longer exists.
+  // The workflow the node belongs to: a node's own state is its workflow's (node ids repeat across workflows). Absent for
+  // what was written before chats ran several workflows; those writes are read by the nodes of every workflow.
+  workflowId: z.string().optional(),
+  // The node's name in its workflow (`Draw #1 (draw)`); absent when the node no longer exists.
   label: z.string().optional(),
   ...keyViews,
   // For each collection key with more than `NODE_ITEMS_LIMIT` items: how many of the oldest items `values`
@@ -86,9 +89,14 @@ export const stateWriteViewSchema = z.object({
   truncated: z.boolean().optional(),
   // The current name of the definition a write targets; absent for node keys and deleted definitions.
   definitionName: z.string().optional(),
-  // The writing node's name in the chat's workflow; absent when the node no longer exists.
+  // The writing node's name in its workflow (a node-key write names it by its own workflow id; other writes by the
+  // first workflow of the chat that has a node with that id); absent when the node no longer exists.
   nodeLabel: z.string().optional(),
 });
+// One run of a turn, as the chat shows it: the stored record with the restart rule applied (a run stored as `running`
+// that the server no longer holds reads as `error`) and the workflow's current name while it exists.
+export const turnRunViewSchema = turnRunSchema.extend({ workflowName: z.string().optional() });
+export type TurnRunView = z.infer<typeof turnRunViewSchema>;
 export const turnStateSchema = z.object({
   executionId: z.string(),
   at: z.string(),
@@ -97,7 +105,12 @@ export const turnStateSchema = z.object({
   // 1-based among the turns that still count; null when its replies were deleted (it no longer counts).
   turnNumber: z.number().nullable(),
   writes: z.array(stateWriteViewSchema),
-  // The turn's post-turn run (After Reply), absent when the workflow had none. A run stored as `running` that the
+  // The turn's runs in the order they ran (the reply part of each enabled workflow, then the after-reply parts); absent
+  // for an entry stored before chats ran several workflows.
+  runs: z.array(turnRunViewSchema).optional(),
+  // The turn's after-reply status, absent when it left none. For an entry with `runs` it is derived from its post runs:
+  // any running reads as running; else the first error with its text; else stopped if any; else completed;
+  // `postExecutionId` is the first post run's. Otherwise it is as stored. A run stored as `running` that the
   // server no longer holds (it restarted) is reported as `error`. `postExecutionId` names the run's execution log;
   // `postError` is cut to a few hundred characters (the log has the full text).
   postStatus: postStatusSchema.optional(),

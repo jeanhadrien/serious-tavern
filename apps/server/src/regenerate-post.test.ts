@@ -34,7 +34,7 @@ it('waits for the post run of the turn, then runs its own post run for the new a
   const saved = await readSession(app, session.id);
   const [first, second] = entriesOf(saved);
   expect(second!.executionId).toBe(result.execution.id);
-  expect(second!.postExecutionId).toBe(post.postExecutionId);
+  expect(second!.runs!.find((run) => run.part === 'post')?.executionId).toBe(post.postExecutionId);
   expect((await readExecution(app, post.postExecutionId!)).turnExecutionId).toBe(result.execution.id);
   // The replaced turn keeps its own record, but it is not present: only the shown alternative's reply-part and
   // after-reply writes count (n: +1 and +1), and the collection holds one item.
