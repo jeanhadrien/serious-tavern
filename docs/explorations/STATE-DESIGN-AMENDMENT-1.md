@@ -5,6 +5,9 @@ replaces its Part 3 storage model. It records a design discussion with the user 
 build; the reasoning is kept because the first design (a separate summary store) was a reasonable answer
 to a slightly wrong question.
 
+Proposal 3 has since been updated to describe the result (its Part 3); this document keeps the
+reasoning and the decisions as they were taken.
+
 ## The decision
 
 | # | Decision |

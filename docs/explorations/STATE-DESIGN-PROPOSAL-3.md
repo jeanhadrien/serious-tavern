@@ -1,29 +1,26 @@
 # State design, proposal 3: settings, story state, summaries and authored collections
 
-The third version of the state design (October 2026). It follows
-[STATE-DESIGN-PROPOSAL-2.md](STATE-DESIGN-PROPOSAL-2.md) and the two reviews
-([REVIEW-1](STATE-DESIGN-REVIEW-1.md) on implementation, [REVIEW-2](STATE-DESIGN-REVIEW-2.md) on product
-fit against [CREATIVITY.md](CREATIVITY.md)), and records the decisions the user made after them. It
-supersedes proposals 1 and 2. It is the reference for the coding briefs; anything it leaves open is
-listed at the end.
-
-> **Amended** by [STATE-DESIGN-AMENDMENT-1.md](STATE-DESIGN-AMENDMENT-1.md) (after phase 6): collection
-> items can link to chat messages, and summaries are story state (linked items of a collection key)
-> instead of a separate store. Where Part 3, D3 or the summaries rows below disagree with it, the
-> amendment wins.
+The state design (October 2026), **built in phases 1–7** (see [state-impl/HANDOFF.md](state-impl/HANDOFF.md);
+user guide: [docs/STATE-AND-LORE.md](../STATE-AND-LORE.md)). It replaced two earlier proposals and the two
+reviews of them (one on implementation, one on product fit against [CREATIVITY.md](CREATIVITY.md)); those
+documents were removed from the repository after the build and remain in the git history. This document
+is kept up to date with what was built. [STATE-DESIGN-AMENDMENT-1.md](STATE-DESIGN-AMENDMENT-1.md) records
+the one design change made during the build (message links; summaries as story state) and its reasoning;
+Part 3 below already describes the result.
 
 ## Decisions taken
 
 | # | Decision | Source |
 | --- | --- | --- |
-| D1 | Values the user sets (dials, notes) are **chat settings**: declared by the workflow, set per chat, passed to the run, never undone by editing the chat | User, after REVIEW-2 §3.4 |
-| D2 | Values a turn writes are **story state**: declared in state definitions, stored per chat, and they live as long as the turn's replies | PROPOSAL-2, REVIEW-1 §6, REVIEW-2 §3.3 |
-| D3 | Summaries are **tied to the messages they cover**, not to the turn that wrote them. The prompt gets the most recent messages raw and older history as summarized chunks. *Amended (A2, A3): summaries are validated by the messages they cover and live with the turn that wrote them* | User |
-| D4 | Lorebooks and decks are one thing: **authored collections**, written and edited by the user, read-only for workflows. Two ways to read them: **Recall** (by relevance) and **Draw** (by chance) | User, REVIEW-2 §6 |
-| D5 | Story state is **per chat** first. Shared writable state (a character's memory across chats, campaigns) comes later, through an outbox | REVIEW-1 §6.2, REVIEW-2 §7.1 |
-| D6 | Expensive work after the reply (summaries, extraction) runs as a **separate post-turn run** on the chat's queue, never inside the reply's run | REVIEW-1 §3.6 |
+| D1 | Values the user sets (dials, notes) are **chat settings**: declared by the workflow, set per chat, passed to the run, never undone by editing the chat | User, after the product review |
+| D2 | Values a turn writes are **story state**: declared in state definitions, stored per chat, and they live as long as the turn's replies | Proposal 2, both reviews |
+| D3 | The prompt gets the most recent messages raw and older history as **summaries of chunks**. A summary is **story state**: an item of a collection key that **links to the messages it covers**. It is used only while those messages are unchanged, and it lives with the turn that wrote it (amendment 1) | User |
+| D4 | Lorebooks and decks are one thing: **authored collections**, written and edited by the user, read-only for workflows. Two ways to read them: **Recall** (by relevance) and **Draw** (by chance) | User, the product review |
+| D5 | Story state is **per chat** first. Shared writable state (a character's memory across chats, campaigns) comes later, through an outbox | Both reviews |
+| D6 | Expensive work after the reply (summaries, extraction) runs as a **separate post-turn run** on the chat's queue, never inside the reply's run | The implementation review |
 | D7 | No variations view or harness in this plan | User |
 | D8 | Nothing is automatic: every behaviour is a node or a template the user wires | AGENTS.md, PLAN.md |
+| D9 | Any collection item may **link to chat messages** (ids plus a fingerprint; status computed on read). Nodes stay generic: nothing in the engine is about summaries | User (amendment 1) |
 
 ## The five kinds of data
 
@@ -34,7 +31,7 @@ happens when the user edits the chat.
 | --- | --- | --- | --- | --- | --- |
 | **Chat settings** | The user, in the chat | Workflows | Until the user changes it | One chat | Volatility dial, author's note, max intensity |
 | **Story state** | Workflow turns | Workflows | As long as the writing turn's replies | One chat | Tension, turns since last injection, injected items |
-| **Summaries** | Workflow (post-turn) | Workflows | *Amended: story state (linked collection items); used while the messages they cover are unchanged* | One chat | Summary of messages 1–20 |
+| **Summaries** (a kind of story state) | Workflow (post-turn) | Workflows | As long as the writing turn's replies; used only while the messages they cover are unchanged | One chat | Summary of messages 1–20 |
 | **Authored collections** | The user, in an editor | Workflows | Until the user edits them | Global records | Lorebook of the Northern Wastes, a deck of forest textures |
 | **Run trace** | The engine | The user | With the execution log | One turn | What was read, written, rolled and drawn |
 
@@ -146,7 +143,7 @@ keys:
 | Node | Config | Ports |
 | --- | --- | --- |
 | **State Write** | definition, key, operation | `value` input (typed from the key; not needed for `delete`); pass-through output |
-| **State Read** | definition, key, what to read (`value` or `meta`) | Typed output(s) |
+| **State Read** | definition, key, what to read (`value`, `meta`, or for lists `linked`: intact linked items in chat order) | Typed output(s) |
 
 Operations per type:
 
@@ -154,7 +151,7 @@ Operations per type:
 | --- | --- |
 | `number` | `set`, `increment` (by the input, default 1), clamped to `min`/`max` |
 | `boolean`, `enum`, `text`, `object` | `set` |
-| `collection` | `add` (item from the input: text, or an object with `text` and fields), `remove` (by item id) |
+| `collection` | `add` (item from the input: text, or an object with `text` and fields; an optional `messages` input links it to chat messages, Part 3), `remove` (by item id) |
 | all | `delete` (back to the default) |
 
 Meta, for every key:
@@ -222,13 +219,7 @@ Within one turn:
 
 Story state is read-only in the panel at first. Manual corrections come later (Part 7).
 
-## Part 3: History summaries
-
-> The storage model below (summary sets in `session.summaries`, summaries surviving the deletion of the
-> turn that wrote them) was built in phase 6 and then replaced by
-> [amendment 1](STATE-DESIGN-AMENDMENT-1.md): summaries are linked items of a story state collection key.
-> Chunks, validity and the raw window stay as described here; the nodes change (Save Summary is dropped,
-> Memory loses its summary option, State Write links items, a new Unlinked Messages node).
+## Part 3: History summaries (message links)
 
 ### What the user gets
 
@@ -240,48 +231,62 @@ exactly as they were when it was written.
 [summary of messages 1–20] [summary of messages 21–40] [messages 41–58, raw]
 ```
 
-### Chunks and validity
+### Message links
 
-- History is cut into **chunks** of a fixed number of messages (configurable, e.g. 20), counted from the
-  start of the chat, over the messages that count as history (partial replies don't).
-- A chunk is only summarized once it is **older than the raw window** (the last N messages, e.g. 16),
-  so the messages the model sees verbatim are never also summarized.
-- A summary records **the ids of the messages it covers and a fingerprint of their content**.
-- A summary is **valid** while every covered message still exists unchanged. Otherwise it is **invalid**:
-  - the prompt falls back to the raw messages of that chunk (more tokens, never wrong content);
-  - the chunk is queued for summarizing again, over its surviving messages. Chunk boundaries are kept
-    by message id, so deleting one message doesn't shift every later chunk.
-- Deleting or editing the reply that happened to trigger a summary changes nothing: summaries are not
-  turn state.
-- Invalid summaries are kept (marked invalid) until replaced, so the panel can show what was there.
+- Any **collection item** of story state may carry a link: `messages: { ids, fingerprint }`, the ids of
+  the messages it is about and a hash of their content. Summaries are one use; facts extracted from a
+  reply or a mood per message are others.
+- A link's **status is computed on read**: `intact` (all there, unchanged), `changed` (one was edited),
+  `partial` (some deleted), `gone` (all deleted). Nothing about it is stored.
+- **Ids only**, never positions or turn counts: a turn can have several replies or none, and deleting a
+  message shifts every position after it.
+- Linked items follow the **story state lifetime rule unchanged** (Part 2): they live as long as the
+  replies of the turn that wrote them. Deleting or regenerating that reply removes a summary; the next
+  turn writes it again.
+- **Checked at commit time:** when a turn's writes are stored, a linked item whose messages were edited or
+  deleted while the run went on is dropped with a warning on the turn's chip.
+- The chat shows a marker on messages that state links to, a note before editing or deleting one, and
+  each linked item's range, status and a jump to its first message in the Story state panel.
 
-### Nodes
+### Chunks
+
+- History is cut into **chunks** of a fixed number of messages (e.g. 20), over the messages that count as
+  history (partial replies don't).
+- A chunk is only summarized once it is **older than the raw window** (the last N messages, e.g. 16), so
+  the messages the model sees verbatim are never also summarized.
+- A summary that is not `intact` is ignored and its chunk is planned again over its surviving messages; a
+  broken item that intact items already cover counts as **replaced** and needs no `remove`.
+
+### Nodes (all generic)
 
 | Node | What it does |
 | --- | --- |
-| **Next Chunk** | Finds the oldest chunk outside the raw window that has no valid summary. Outputs its messages (as messages and as text) and a chunk reference. Outputs nothing when every chunk is summarized, so the branch is skipped |
-| **Save Summary** | A sink: stores a text summary for a chunk reference (the fingerprint was taken by Next Chunk; if the chunk changed meanwhile, the save is dropped with a warning) |
-| **Memory** (existing) | New option: a summary set name. Output becomes summaries of valid chunks + raw messages for the rest + the raw window, in order. `lastN` keeps its meaning for the raw window |
+| **Next Chunk** | Over a collection key: re-plans the first broken, not replaced item, else finds the first `chunkSize` messages outside the raw window that no intact item links to. Outputs them (messages, text) and a `link`; outputs nothing otherwise, so the branch is skipped |
+| **State Write** | `add` on a collection key takes a `messages` input (a link, a message or a list of messages): that is how a summary is stored |
+| **Unlinked Messages** | Drops from a list of messages those that intact items of a key link to: "the history no summary stands for" |
+| **Memory** | Plain recent history (last N, or all messages); it knows nothing about summaries |
+| `linked` helper / State Read `linked` | The intact linked items of a key, in chat order, for a preset or a wire |
 
-A chat can hold several **summary sets** (for example a short and a detailed one), named in the node
-config.
-
-The user wires it like this, in the post-turn part of the workflow (Part 5):
+The user wires it like this (the "Rolling summaries" example pack):
 
 ```
-After Reply → Next Chunk → LLM (summarize, the user's own preset) → Save Summary
+Reply part:   Memory (all) → Unlinked Messages (memory.summaries) → LLM
+              + preset entry: {{#each (linked state.memory.summaries)}}{{text}}{{/each}}
+After reply:  After Reply → Next Chunk (memory.summaries) → LLM (summarize)
+              → State Write (memory.summaries, add; messages ← Next Chunk's link)
 ```
 
 One chunk per turn at most, so the cost per turn is bounded and a long imported chat catches up over a
-few turns. Until it does, the prompt uses raw messages for the missing chunks.
+few turns. Until it does, the prompt carries raw messages for the missing chunks. A `cap` on the key would
+drop the oldest summaries, so summary keys have none.
 
 ### Later
 
-- **Summaries of summaries:** a level-2 set whose chunks are level-1 summaries, same mechanism.
-- **Token-based raw window** (PLAN.md backlog: history trimmed to a token budget).
-- A **detail-keeping** variant: the walkthrough recommends asking the summarizer for names, objects and
-  open threads alongside the gist, because summaries tend to drop exactly the specific details that keep
-  prose fresh (REVIEW-2 §5).
+- **Summaries of summaries:** a second key whose items link to the union of the messages of the level-1
+  summaries they condense.
+- **Token-based raw window and chunk size** (PLAN.md backlog: history trimmed to a token budget).
+- A **detail-keeping** variant: ask the summarizer for names, objects and open threads alongside the gist,
+  because summaries tend to drop exactly the specific details that keep prose fresh.
 
 ## Part 4: Authored collections (lorebooks and decks)
 
@@ -376,7 +381,7 @@ preset pattern, for example:
 ### Sinks
 
 Today only nodes that some Chat Output depends on run. That becomes **nodes that some sink depends on**,
-with a `sink` flag on node definitions. Chat Output, State Write and Save Summary are sinks. Existing
+with a `sink` flag on node definitions. Chat Output and State Write are sinks. Existing
 workflows behave exactly as before; the seeded workflows keep validating. A workflow still needs at least
 one Chat Output.
 
@@ -414,10 +419,11 @@ A new **After Reply** node marks work that must not delay or endanger the reply.
 | Recall | Collections | Source | 4 |
 | Draw | Collections | Source (keeps its own recent-draws state) | 4 |
 | After Reply | Chat | Source (post-turn) | 5 |
-| Next Chunk | History | Source | 3 |
-| Save Summary | History | Sink | 3 |
-| Memory | Chat | Existing, gains summary sets | 3 |
+| Next Chunk | History | Source (over a collection key) | 3 |
+| Unlinked Messages | History | Transform | 3 |
+| Memory | Chat | Existing, gains "all messages" | 3 |
 | Trigger | Creativity | Source (keeps its own timing state) | 6 |
+| Pick Fields | Logic | Transform (keeps named fields of an object) | 7 |
 
 **Parse JSON** turns an LLM's text answer into an object, list, number or boolean (tolerating code
 fences and surrounding prose around one JSON value), optionally checked against a target key's type. A
@@ -431,7 +437,7 @@ flips a coin with a probability input. Outputs the result and the roll.
 
 The creativity pipeline's first stage (CREATIVITY.md §1. Trigger) needs more than Random + Condition:
 the editor has no arithmetic, so a probability that rises over time, a score from several signals and a
-choice of intensity can't be wired by hand (REVIEW-2 §4.2). The Trigger node does exactly that, and
+choice of intensity can't be wired by hand. The Trigger node does exactly that, and
 nothing else.
 
 - **Inputs:** any number of signal inputs (numbers 0–1, for example a stagnation score from an LLM
@@ -441,7 +447,10 @@ nothing else.
   - **signal weights**: how much each signal adds to the score;
   - **cooldowns per level** (at most one level-4 every N turns);
   - **level choice**: weights per level, capped by max level.
-- **Outputs:** `fire` (boolean), `level` (1–5), and a **reason** ("score 0.42 = hazard 0.18 + stagnation
+- **Score:** `clamp01((baseChance + growthPerTurn × turnsSinceLastFiring + Σ weight × signal) × (0.5 +
+  volatility))`, one roll against it, then a weighted level pick among the levels within the max, off
+  cooldown and weighted above 0. A signal whose source was skipped counts as 0.
+- **Outputs:** `fire` (boolean), `level` (1–5), `true`/`false` branches, `score`, `roll`, and a **reason** ("score 0.42 = hazard 0.18 + stagnation
   0.24 × 1.0; roll 0.31 < 0.42; level 2 chosen, level 4 on cooldown").
 - Like Draw, it keeps its own timing state (turn of last firing, per level) as implicit story state,
   visible in the panel and undone with the reply.
@@ -451,7 +460,8 @@ nothing else.
 
 ## Part 7: Later
 
-In rough order of value:
+Not built. The current list, with sizes and the fixes found during the build, is
+[state-impl/FOLLOW-UPS.md](state-impl/FOLLOW-UPS.md). In rough order of value:
 
 1. **Manual corrections to story state** from the panel. A correction is stored as its own entry at the
    point in the chat where it was made, not attached to any reply, so deleting a reply never undoes it;
@@ -459,7 +469,7 @@ In rough order of value:
 2. **Collections attached to a chat or a character** ("this chat's world", "this character's lorebook"),
    read through Recall/Draw set to "attached collections". Import of SillyTavern World Info JSON and of a
    card's embedded `character_book`.
-3. **Summaries of summaries** and a token-based raw window.
+3. **Summaries of summaries** and a token-based raw window and chunk size (Part 3, Later).
 4. **Shared writable state:** state definitions gain `partitionBy` (`character`, `character + persona`,
    or a named instance such as a campaign that chats join). A chat's writes to shared state stay
    pending in that chat (visible to it at once) and are published to the shared copy when sealed: when
@@ -473,11 +483,9 @@ In rough order of value:
 6. **Search over collections:** keyword (BM25) first, semantic (embeddings, similarity band) only when
    there's evidence it beats a good prompt.
 7. **Regenerate and swipes**, with "keep the rolls".
-8. **From amendment 1:** summaries of summaries over linked items, discarding a linked item from the
-   panel (with manual corrections), per-message extraction recipes.
-9. **Form editors** for state definitions and collections; a seeded "Fresh texture" example (a scene
-   definition, a small self-written texture deck, a workflow with Trigger → Draw → preset, and a
-   level-worded preset).
+8. **Discarding a linked item** from the panel (with manual corrections), and **per-message extraction
+   recipes** (facts, moods, open threads) now that items can link to messages.
+9. **Form editors** where YAML is still the main path (advanced collection fields, object keys' schema).
 
 ## Walkthroughs
 
@@ -485,7 +493,7 @@ In rough order of value:
 
 1. Chat settings: `volatility` (0.3) and `maxLevel` (2).
 2. An LLM node rates "calmer, same or tenser than the last turn?" (a relative question: absolute 0–10
-   ratings cluster, REVIEW-2 §5) → Parse JSON → State Write `scene.mood` (`set`).
+   ratings cluster) → Parse JSON → State Write `scene.mood` (`set`).
 3. **Trigger** with volatility from Chat Settings, a signal from a small "is the scene stagnating?"
    classifier, a cooldown of 3 turns for level 2.
 4. On `fire`: **Draw** from "Northern Wastes" with `maxLevel` from the Trigger's `level`, tag filter
@@ -495,16 +503,22 @@ In rough order of value:
 Nodes: Chat Settings, LLM (rating), Parse JSON, State Write, LLM (classifier), Trigger, Draw, plus the
 usual LLM and Chat Output. Delete the reply and the draw, the cooldown and the mood all go back.
 
+The seeded "Fresh texture (example)" is a smaller version without the rating and the classifier: Chat
+Settings → Trigger → Draw → (Pick Fields → State Write `scene.injected`) and a preset that words Draw's
+`text` by its `level`.
+
 ### Rolling summaries
 
-(Amendment 1 rewires this: see its "Summaries, wired" section. The steps below describe phase 6.)
-
-1. Memory with summary set `main`, raw window 16.
-2. Post-turn: After Reply → Next Chunk (set `main`, chunk size 20, raw window 16) → LLM (the user's
-   summary preset, asking for gist plus names and open threads) → Save Summary.
+1. A state definition `memory` with a list key `summaries` (no cap).
+2. Reply part: Memory (all messages) → Unlinked Messages (`memory.summaries`) → the LLM's history input,
+   and a preset entry `{{#each (linked state.memory.summaries)}}{{text}}{{/each}}`.
+3. After reply: After Reply → Next Chunk (`memory.summaries`, chunk size 20, raw window 16) → LLM (the
+   user's summary preset, asking for gist plus names and open threads) → State Write (`memory.summaries`,
+   `add`, `messages` from Next Chunk's `link`).
 
 The reply never waits for a summary, a failed summary never costs a reply, and editing an old message
-makes its chunk fall back to raw text until it is summarized again.
+makes its chunk fall back to raw text until it is summarized again. This is the seeded "Rolling summaries
+(example)".
 
 ### Author's note
 
@@ -526,18 +540,20 @@ All additive and backward compatible (AGENTS.md "Data compatibility"):
 | Chat settings declarations | Workflow record | `settings: SettingDef[]`, default `[]` |
 | Chat settings values | Session record | `settings: Record<string, unknown>`, default `{}` |
 | State definitions | `data/state/definitions/<slug>.yaml` | YAML records, `YamlRepository` |
-| Story state | Session record | `state: { turns: TurnEntry[] }`, default empty. `TurnEntry = { executionId, at, completed, writes, seed }`; scalar writes store the value **after** the write, collections store `add`/`remove` with item ids |
-| Summaries | ~~Session record~~ Story state (amendment 1) | ~~`summaries: { [set]: Summary[] }`~~ Items `{ id, text, messages: { ids, fingerprint } }` of a collection key; link status is computed, not stored |
+| Story state | Session record | `state: { turns: TurnEntry[] }`, default empty. `TurnEntry = { executionId, at, completed, replies, writes, postExecutionId?, postStatus?, postError?, linkWarnings? }` (the seed is in the execution log); scalar writes store the value **after** the write, collections store `add`/`remove` with item ids |
+| Summaries and other linked items | Story state | Collection items with `messages: { ids, fingerprint }`; link status is computed, never stored |
+| Example seeds ledger | `data/.seeded.json` | `<pack>/<kind>:<id>` lines: examples already created once, so a deleted one is not recreated |
 | Authored collections | `data/collections/<slug>.yaml` | YAML records, `YamlRepository`, live reload |
 | Execution traces | Execution log | Per node: `stateReads`, `stateWrites`, `roll`, `draw`, `reason`; per run: `seed`, `settings` |
 
 - The current story state is a **pure function** in `shared`: definitions + turn entries + the set of
-  surviving turns → values and meta. Summary validity is another pure function: summaries + current
-  messages → valid or not.
-- Story state and the replies are committed in the **same session write** (`settleTurn`): no second
-  file, no recovery step.
+  surviving turns → values and meta. Link status is another pure function: a link + the current
+  messages → intact, changed, partial or gone.
+- Story state and the replies are committed in the **same session write** (`settleTurn`; the after-reply
+  part's writes in `settlePostRun`): no second file, no recovery step. Linked writes are checked against
+  the messages in that same write.
 - Session files are rewritten while a reply streams; caps on collections keep the state part small. If
-  sessions grow too large, story state and summaries can move to a sidecar file with the session write
+  sessions grow too large, story state can move to a sidecar file with the session write
   still as the commit point.
 - Change events: `stateDefinitions.changed` and `collections.changed` (file-backed, like presets and
   providers); session changes keep using `sessions.changed`.
@@ -546,13 +562,15 @@ All additive and backward compatible (AGENTS.md "Data compatibility"):
 
 - State definitions: list, get, create, update, delete (`409` on renaming a definition with data, or
   deleting one that chats use, with the list of chats).
-- Collections: list, get, create, update, delete.
+- Collections: list, get, create, update, delete (`409 COLLECTION_IN_USE` while a Recall or Draw node uses
+  one).
 - Workflow `settings` travel in the workflow record (no new endpoint).
 - Chat settings values: `PATCH /api/sessions/:id` gains `settings` (a partial map; `null` resets a key to
   its default). It is a metadata patch: it doesn't advance `updatedAt`.
-- Story state, summaries and settings are part of `GET /api/sessions/:id`; the panel needs no new read
-  endpoint. A computed view (`state` values + meta, summary validity) is returned alongside, so the web
-  app doesn't reimplement the fold.
+- Story state and settings are stored in the session (`GET /api/sessions/:id` returns them raw). The chat
+  reads a computed view from `GET /api/sessions/:id/state` (values and meta per key, history for
+  sparklines, per-turn writes and after-reply status, link status and positions of linked items), so the
+  web app never reimplements the fold or the link rules.
 
 ## Templates
 
@@ -563,39 +581,32 @@ New namespaces, all driven by catalogs (never hand-written lists):
 | `settings.<key>` | Settings declared by workflows | `{{settings.authorsNote}}` |
 | `state.<definition>.<key>` | State definitions | `{{state.scene.tension}}` |
 | `trigger.turn` | Engine | `{{trigger.turn}}` |
+| helper `linked` | Message links (Part 3) | `{{#each (linked state.memory.summaries)}}{{text}}{{/each}}` |
 
 Unknown paths keep the existing behaviour: they render empty, with a warning in preset validation.
 
-## Phases (commit-sized)
+## Phases (all built)
 
-1. **Engine foundations:** Parse JSON node; per-turn seed in the execution log; Random node; sinks
-   (`sink` flag, "what runs" from sinks, AGENTS.md updated).
-2. **Chat settings:** workflow declarations and editor tab; session values and `PATCH`; Chat Settings
-   node; `{{settings.*}}` with catalog hints; chat settings panel.
-3. **Authored collections:** schema, repository, watcher, API, raw YAML editor; Recall node; Draw node
-   (without avoid-recent).
-4. **Story state:** definitions (schema, repository, API, YAML editor, seeded `scene`); session storage
-   and the fold; State Read/Write with meta; `{{state.*}}`; commit in `settleTurn`; execution log
-   entries; Draw's avoid-recent; read-only state panel; per-message chip; delete confirmation.
-5. **Post-turn runs:** After Reply node, second run on the chat queue, its own log, failure reporting.
-6. **History summaries:** summary sets in the session, validity, Next Chunk, Save Summary, Memory
-   summary option, panel section.
-   6b. **Amendment 1:** message links on collection items; summaries moved into story state.
-7. **Trigger node.**
-8. Part 7, in its order.
+1. **Engine foundations:** Parse JSON, per-run seed, Random, sinks.
+2. **Chat settings:** declarations and editor tab, session values and `PATCH`, Chat Settings node,
+   `{{settings.*}}`, chat panel.
+3. **Authored collections:** schema, repository, watcher, API, editor; Recall and Draw.
+4. **Story state** (4a backend, 4b web): definitions and their editor, the fold, State Read/Write,
+   `{{state.*}}`, Draw's avoid-recent, panel, chips, delete confirmation.
+5. **Post-turn runs:** After Reply, the post part in the chat's queue slot, its log, failure reporting.
+6. **History summaries**, first as a separate store, then (6b) as message links on story state (Part 3).
+7. **Trigger**, Pick Fields, the example packs and the user guide.
 
-Each phase ends with docs: README (technical), AGENTS.md (contracts: sinks, turn rule, settings
-ownership, summary validity), `docs/TEMPLATING.md` (new namespaces).
+Each phase updated README (technical), AGENTS.md (contracts) and `docs/TEMPLATING.md`; details per phase
+are in [state-impl/HANDOFF.md](state-impl/HANDOFF.md).
 
 ## Open questions
 
-1. **Naming in the UI:** "Chat settings", "Story state", "Collections"? Or "Knobs", "Memory", "Lore &
-   decks"? The documents use the first set.
-2. **Draw's and Trigger's own state:** implicit per-node keys (this proposal) or always explicit State
-   Read/Write wiring? Implicit is far less wiring; explicit is more transparent.
-3. **Chunk size:** by message count (this proposal) or by tokens? Count is simple and stable; tokens fit
-   the context budget better.
-4. **Edited replies:** is the "edited after it was stored" mark enough, or should a workflow be able to
+Settled by the build: the UI says "Chat settings", "Story state" and "Collections"; Draw and Trigger keep
+their own state as implicit per-node keys (visible in the panel and undone with the reply); chunks are
+counted in messages (tokens are a follow-up). Still open:
+
+1. **Edited replies:** is the "edited after it was stored" mark enough, or should a workflow be able to
    react to it (for example, re-rate tension on the next turn)?
-5. **Collections attached to characters:** should importing a card with an embedded lorebook create a
+2. **Collections attached to characters:** should importing a card with an embedded lorebook create a
    collection automatically, or only on request?
