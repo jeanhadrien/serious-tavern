@@ -29,6 +29,8 @@ it.each([
   ['Alt+Ctrl+Z', press('z', { ctrlKey: true, altKey: true }), undefined],
   ['Ctrl+Cmd+Z', press('z', { ctrlKey: true, metaKey: true }), undefined],
   ['a plain Z', press('z'), undefined],
+  ['Ctrl+C is the native copy event, not a key shortcut', press('c', { ctrlKey: true }), undefined],
+  ['Ctrl+V is the native paste event, not a key shortcut', press('v', { ctrlKey: true }), undefined],
   ['Escape', press('Escape'), undefined],
 ])('%s', (_name, event, expected) => {
   expect(matchShortcut(event)).toBe(expected);
@@ -39,9 +41,9 @@ it('declares each shortcut once', () => {
   expect(new Set(keys).size).toBe(keys.length);
 });
 
-it('declares the undo and redo keys in the canvas scope', () => {
+it('declares the undo, redo, copy and paste keys in the canvas scope', () => {
   const canvas = SHORTCUTS.filter((shortcut) => shortcut.scope === 'canvas').map((shortcut) => shortcut.keys);
-  expect(canvas).toEqual(['Mod+Z', 'Mod+Shift+Z', 'Mod+Y']);
+  expect(canvas).toEqual(['Mod+Z', 'Mod+Shift+Z', 'Mod+Y', 'Mod+C', 'Mod+V']);
 });
 
 it.each([

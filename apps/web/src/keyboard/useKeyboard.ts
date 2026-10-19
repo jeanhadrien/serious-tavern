@@ -4,8 +4,8 @@ import { ITEM_SOURCES } from '../layout/itemSources.js';
 import { RESOURCE_IDS, type ResourceId } from '../layout/state.js';
 import { escapeStep, isFieldElement } from './escape.js';
 import { areaOf, closeNewestLayer, layerCount, runArea } from './escapeRegistry.js';
-import { runShortcut } from './shortcutAreas.js';
-import { areaShortcutAllowed, matchShortcut, type AreaShortcut } from './shortcuts.js';
+import { runClipboard, runShortcut } from './shortcutAreas.js';
+import { areaShortcutAllowed, matchShortcut, type AreaShortcut, type ClipboardShortcut } from './shortcuts.js';
 
 const viewSection = (key: ViewKey | undefined) =>
   key ? document.querySelector<HTMLElement>(`section.view[data-view="${key}"]`) : null;
@@ -69,8 +69,20 @@ function onAreaShortcut(shortcut: AreaShortcut, event: KeyboardEvent, lastPointe
   if (view && runShortcut(view, shortcut)) event.preventDefault();
 }
 
+/** The native copy and paste events, with the same rules as the keys: never in a field or a dialog. */
+function onClipboard(shortcut: ClipboardShortcut, event: ClipboardEvent, lastPointer: ViewKey | undefined) {
+  const target = event.target instanceof Element ? event.target : null;
+  const allowed = areaShortcutAllowed({
+    handled: event.defaultPrevented,
+    inDialog: !!target?.closest('dialog[open]'),
+    inField: isFieldElement(target),
+  });
+  const view = allowed ? focusedView(lastPointer) : undefined;
+  if (view && runClipboard(view, shortcut, event)) event.preventDefault();
+}
+
 /**
- * The app's one keyboard listener (call it once, in the shell): Escape and the shortcuts of `SHORTCUTS`. It is on the
+ * The app's one keyboard listener (call it once, in the shell): Escape, the shortcuts of `SHORTCUTS` and the copy and paste events. It is on the
  * document in the bubble phase, so React's handlers on the root run first and a field that acted has already
  * called `preventDefault()`.
  */
@@ -90,11 +102,17 @@ export function useKeyboard() {
       if (shortcut === 'save') onSave(event, lastPointer);
       else if (shortcut) onAreaShortcut(shortcut, event, lastPointer);
     };
+    const onCopy = (event: ClipboardEvent) => onClipboard('copy', event, lastPointer);
+    const onPaste = (event: ClipboardEvent) => onClipboard('paste', event, lastPointer);
     document.addEventListener('pointerdown', onPointer, true);
     document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('copy', onCopy);
+    document.addEventListener('paste', onPaste);
     return () => {
       document.removeEventListener('pointerdown', onPointer, true);
       document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('copy', onCopy);
+      document.removeEventListener('paste', onPaste);
     };
   }, []);
 }

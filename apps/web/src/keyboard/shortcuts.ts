@@ -5,6 +5,8 @@ export const SHORTCUTS = [
   { keys: 'Mod+Z', scope: 'canvas', description: 'Undo on the workflow canvas (not inside a field)' },
   { keys: 'Mod+Shift+Z', scope: 'canvas', description: 'Redo on the workflow canvas (not inside a field)' },
   { keys: 'Mod+Y', scope: 'canvas', description: 'Redo on the workflow canvas (not inside a field)' },
+  { keys: 'Mod+C', scope: 'canvas', description: 'Copy the selected nodes (not inside a field)' },
+  { keys: 'Mod+V', scope: 'canvas', description: 'Paste copied nodes (not inside a field)' },
 ] as const;
 
 interface ShortcutEvent {
@@ -18,6 +20,11 @@ interface ShortcutEvent {
 /** Shortcuts that act on the view with the keyboard (`useShortcutArea`), but never inside a field. */
 export type AreaShortcut = 'undo' | 'redo';
 export type Shortcut = 'save' | AreaShortcut;
+/**
+ * Shortcuts that are the browser's native `copy` and `paste` events, not keys (`matchShortcut` never returns them): the
+ * event carries the clipboard, needs no permission and also works from the menu. Same rules as the area shortcuts.
+ */
+export type ClipboardShortcut = 'copy' | 'paste';
 
 /** The shortcut an event is, if any. `Mod` is Ctrl, or Cmd on macOS. */
 export function matchShortcut(event: ShortcutEvent): Shortcut | undefined {

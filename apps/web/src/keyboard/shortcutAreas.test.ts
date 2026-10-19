@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { registerShortcutArea, runShortcut } from './shortcutAreas.js';
+import { registerShortcutArea, runClipboard, runShortcut } from './shortcutAreas.js';
 
 describe('shortcut areas', () => {
   const answer = (calls: string[], name: string, result: boolean) => () => {
@@ -46,6 +46,33 @@ describe('shortcut areas', () => {
   it('is false when the view claims nothing for that shortcut', () => {
     const off = registerShortcutArea('editor:workflows', { undo: () => true });
     expect(runShortcut('editor:workflows', 'redo')).toBe(false);
+    off();
+  });
+});
+
+describe('clipboard handlers', () => {
+  const event = { clipboardData: null } as unknown as ClipboardEvent;
+  it('get the event, newest first, and stop at the first true', () => {
+    const old = vi.fn(() => true);
+    const newest = vi.fn((_event: ClipboardEvent) => false);
+    const off = [
+      registerShortcutArea('editor:workflows', { copy: old }),
+      registerShortcutArea('editor:workflows', { copy: newest }),
+    ];
+    expect(runClipboard('editor:workflows', 'copy', event)).toBe(true);
+    expect(newest).toHaveBeenCalledWith(event);
+    expect(old).toHaveBeenCalledWith(event);
+    for (const remove of off) remove();
+    expect(runClipboard('editor:workflows', 'copy', event)).toBe(false);
+  });
+
+  it('keep copy, paste and views apart', () => {
+    const paste = vi.fn(() => true);
+    const off = registerShortcutArea('editor:workflows', { paste });
+    expect(runClipboard('editor:workflows', 'copy', event)).toBe(false);
+    expect(runClipboard('chat', 'paste', event)).toBe(false);
+    expect(paste).not.toHaveBeenCalled();
+    expect(runShortcut('editor:workflows', 'undo')).toBe(false);
     off();
   });
 });

@@ -34,7 +34,7 @@ Plans for building `docs/FRONTEND-UX.md` (the agreed spec). There is one file pe
 | 7a. Composer draft, copy message | [07a-composer-draft-and-copy.md](07a-composer-draft-and-copy.md) | done |
 | 7b. Canvas: drag to empty space | [07b-canvas.md](07b-canvas.md) | done |
 | 7c. Canvas: undo/redo | [07b-canvas.md](07b-canvas.md) | done |
-| 7d. Canvas: copy/paste | [07b-canvas.md](07b-canvas.md) | to do |
+| 7d. Canvas: copy/paste | [07b-canvas.md](07b-canvas.md) | done |
 | 7e. Regenerate and swipes (shared, server, web) | [07e-swipes.md](07e-swipes.md) | to do |
 
 Decisions the orchestrator took while the user was away are marked **Decision** in the plans.

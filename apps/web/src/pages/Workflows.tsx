@@ -64,8 +64,14 @@ function WorkflowEditor() {
     else return false;
     return true;
   });
-  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or +Y step through the canvas history (never inside a field).
-  useShortcutArea('editor:workflows', { undo: canvas.undo, redo: canvas.redo });
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or +Y step through the canvas history; the copy and paste events copy and paste
+  // nodes (never inside a field).
+  useShortcutArea('editor:workflows', {
+    undo: canvas.undo,
+    redo: canvas.redo,
+    copy: canvas.copy,
+    paste: canvas.paste,
+  });
   return (
     <div className="workflow-layout">
       {workflow ? (

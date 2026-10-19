@@ -161,7 +161,7 @@ One commit (or a few) per step; each passes `npm run check`.
 4. **Shared draft hook and editor header**, one editor at a time. Done.
 5. **`SortableList`** (dnd-kit) across the reorderable lists: four on dnd-kit, the node-ui picker with buttons and `Alt+↑/↓`. Done.
 6. **Splitter** inside editors. Done.
-7. **Features**: composer draft and copy message (7a, done), then the canvas (drag to empty space and undo/redo, done; copy/paste, to do), then the swipes spec.
+7. **Features**: composer draft and copy message (7a, done), then the canvas (drag to empty space, undo/redo and copy/paste, done), then the swipes spec.
 
 ## Testing
 

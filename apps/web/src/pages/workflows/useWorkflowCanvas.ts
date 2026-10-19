@@ -10,18 +10,11 @@ import {
   type Edge,
   type ReactFlow,
 } from '@xyflow/react';
-import {
-  nodeDisplayName,
-  type Workflow,
-  type NodeTypeDescriptor,
-  type NodeInstance,
-  type Preset,
-  type Character,
-  type StateDefinition,
-} from '@st/shared';
+import type { Workflow, NodeTypeDescriptor, NodeInstance, Preset, Character, StateDefinition } from '@st/shared';
 import { alerts } from '../../alerts/index.js';
 import { checkConnection } from '../../connection.js';
-import { workflowToCanvas, type CanvasNode } from './model.js';
+import { withDisplayNames, workflowToCanvas, type CanvasNode } from './model.js';
+import { useCanvasClipboard } from './useCanvasClipboard.js';
 import { useCanvasHistory } from './useCanvasHistory.js';
 import { useConnectPicker } from './useConnectPicker.js';
 import { useDynamicPorts } from './useDynamicPorts.js';
@@ -145,22 +138,23 @@ export function useWorkflowCanvas(
   const addNode = (descriptor: NodeTypeDescriptor, position: { x: number; y: number }): string => {
     const id = crypto.randomUUID();
     record();
-    setNodes((prev) => {
-      const next: CanvasNode[] = [
-        ...prev,
-        {
-          id,
-          type: 'workflow',
-          position,
-          data: { descriptor, config: { ...descriptor.defaultConfig }, name: descriptor.label },
-        },
-      ];
-      const labelOf = (type: string) => types.find((item) => item.type === type)?.label ?? type;
-      const list = next.map((node) => ({ id: node.id, type: node.data.descriptor.type }));
-      return next.map((node) => ({ ...node, data: { ...node.data, name: nodeDisplayName(list, labelOf, node.id) } }));
-    });
+    setNodes((prev) =>
+      withDisplayNames(
+        [
+          ...prev,
+          {
+            id,
+            type: 'workflow',
+            position,
+            data: { descriptor, config: { ...descriptor.defaultConfig }, name: descriptor.label },
+          },
+        ],
+        types,
+      ),
+    );
     return id;
   };
+  const clipboard = useCanvasClipboard({ nodes, edges, types, setNodes, setEdges, setSelected, record });
   const picker = useConnectPicker({ nodes, types, canvasRef, addNode, linkEdge });
   // Another workflow was loaded (or the canvas cleared): the drop point no longer means anything.
   useEffect(picker.close, [canvasVersion]);
@@ -241,6 +235,8 @@ export function useWorkflowCanvas(
     deselect,
     deleteSelection,
     deleteNode,
+    copy: clipboard.copy,
+    paste: clipboard.paste,
     undo: history.undo,
     redo: history.redo,
     canUndo: history.canUndo,
