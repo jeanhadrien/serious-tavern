@@ -300,6 +300,32 @@ describe('Trigger in a workflow', () => {
     expect(seen).toEqual(new Set([true, false]));
   });
 
+  it('still runs, counting a signal as 0, when the only thing connected is a signal from a branch not taken', async () => {
+    const workflow = graph(
+      [
+        node('input', 'chat-input'),
+        node('cond', 'condition', { operator: 'equals', right: 'storm' }),
+        node('trigger', 'trigger', {
+          ...base,
+          baseChance: 1,
+          volatility: 0.5,
+          signals: [{ name: 'stuck', weight: 5 }],
+        }),
+        node('output', 'chat-output'),
+      ],
+      [
+        edge('input', 'message', 'cond', 'value'),
+        edge('cond', 'true', 'trigger', 'stuck'),
+        edge('trigger', 'reason', 'output', 'value'),
+      ],
+    );
+    const idle = await play(workflow);
+    expect(idle.execution.nodes.cond?.status).toBe('completed');
+    expect(idle.execution.nodes.trigger?.status).toBe('completed');
+    // The signal was given 0, so its weight added nothing.
+    expect(idle.replies[0]?.content).toContain('5×0 stuck');
+  });
+
   it('with a score of 1 it always fires, whatever the seed', async () => {
     const workflow = graph(
       [node('input', 'chat-input'), node('trigger', 'trigger', { ...base }), node('output', 'chat-output')],

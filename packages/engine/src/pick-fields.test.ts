@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { validateWorkflow } from './executor.js';
+import { edge, graph, node } from './test-collections.js';
+import { SCENE_ID, newChat, playTurn, sceneDefinition } from './test-state.js';
 import type { ExecutionContext } from './types.js';
 import { stateless } from './test-state.js';
 import { pickFields, pickedNames } from './nodes/pick-fields/index.js';
@@ -9,7 +12,7 @@ const run = (fields: string, value: unknown) => {
     nodeId: 'pick',
     ...stateless('pick'),
     inputs: { value },
-    config: pickFields.configSchema.parse({ fields }),
+    config: { fields },
     trigger: { message: '', sessionId: 's' },
     settings: {},
     history: [],
@@ -60,5 +63,58 @@ describe('Pick Fields node', () => {
     ['text', null, 'Pick Fields needs an object as input'],
   ])('fails for fields %j and input %j', async (fields, value, message) => {
     await expect(run(fields, value).result).rejects.toThrow(message);
+  });
+});
+
+describe('Pick Fields in a workflow', () => {
+  const picked = (fields: string) =>
+    graph(
+      [
+        node('input', 'chat-input'),
+        node('parse', 'parse-json', { expect: 'object' }),
+        node('pick', 'pick-fields', { fields }),
+        node('remember', 'state-write', { definitionId: SCENE_ID, key: 'injected', op: 'add' }),
+        node('output', 'chat-output'),
+      ],
+      [
+        edge('input', 'message', 'parse', 'text'),
+        edge('parse', 'value', 'pick', 'value'),
+        edge('pick', 'value', 'remember', 'value'),
+        edge('input', 'message', 'output', 'value'),
+      ],
+    );
+  const entry = JSON.stringify({ text: 'a bell', level: 2, tags: ['sound'], keywords: [], collectionId: 'c' });
+
+  it('narrows an object to what the key declares, so State Write has nothing to leave out', async () => {
+    const chat = newChat([sceneDefinition]);
+    const workflow = picked('text, level');
+    expect(await validateWorkflow(workflow, chat.resources)).toEqual([]);
+    const result = await playTurn(chat, workflow, 'e1', entry);
+    expect(result.execution.nodes.remember?.logs?.join('\n')).not.toContain('Left out');
+    expect(result.writes).toMatchObject([{ op: 'add', item: { text: 'a bell', level: 2 } }]);
+    // The same object without Pick Fields would have logged what it dropped.
+    const direct = graph(
+      [
+        node('input', 'chat-input'),
+        node('parse', 'parse-json', { expect: 'object' }),
+        node('remember', 'state-write', { definitionId: SCENE_ID, key: 'injected', op: 'add' }),
+        node('output', 'chat-output'),
+      ],
+      [
+        edge('input', 'message', 'parse', 'text'),
+        edge('parse', 'value', 'remember', 'value'),
+        edge('input', 'message', 'output', 'value'),
+      ],
+    );
+    const loud = await playTurn(newChat([sceneDefinition]), direct, 'e2', entry);
+    expect(loud.execution.nodes.remember?.logs?.join('\n')).toContain('Left out fields');
+  });
+
+  it.each(['', ' , '])('is reported by validation, not by the first turn, when fields is %j', async (fields) => {
+    const chat = newChat([sceneDefinition]);
+    const issues = await validateWorkflow(picked(fields), chat.resources);
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.message).toContain('List at least one field name');
+    expect(issues[0]?.nodeIds).toEqual(['pick']);
   });
 });

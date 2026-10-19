@@ -89,7 +89,7 @@ export function TriggerPanel({ descriptor, config, onChange }: NodeConfigPanelPr
         parse={parseUnit}
         onCommit={(next) => set('baseChance', next)}
         invalid="A number from 0 to 1"
-        hint="Chance on a turn right after a firing, before signals."
+        hint="The starting chance each turn, before growth and signals."
       />
       <DraftInput
         label="Growth per turn"

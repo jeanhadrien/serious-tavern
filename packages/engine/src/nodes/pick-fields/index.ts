@@ -25,6 +25,8 @@ export const pickFields: NodeDefinition = {
     fields: z
       .string()
       .default('')
+      // The default is blank: a node nobody has set up yet is reported by Validate, not by the first turn.
+      .refine((fields) => pickedNames(fields).length > 0, 'List at least one field name')
       .describe('Field names to keep, separated by commas. A name the object lacks is left out.'),
   }),
   defaultConfig: { fields: '' },

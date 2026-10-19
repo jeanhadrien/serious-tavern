@@ -41,9 +41,7 @@ const unit = (label: string) =>
 
 export const configSchema = z
   .object({
-    baseChance: unit('Base chance')
-      .default(0.1)
-      .describe('Chance of firing on a turn right after a firing, before signals'),
+    baseChance: unit('Base chance').default(0.1).describe('The starting chance each turn, before growth and signals'),
     growthPerTurn: z
       .number()
       .min(0, 'Growth per turn can not be negative')
@@ -109,6 +107,8 @@ export function signalPorts(config: Record<string, unknown>): PortDef[] {
       name,
       label: name,
       dataType: 'number',
+      // A signal whose source was skipped (a branch not taken) is no signal: it counts as 0 and never skips the node.
+      neverSkips: true,
       description: `A signal from 0 to 1 (weight ${typeof row.weight === 'number' ? row.weight : '?'}): adds weight × signal to the score. Not connected counts as 0`,
     });
   }
