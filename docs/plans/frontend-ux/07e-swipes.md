@@ -27,6 +27,13 @@ This reuses the one rule story state already has (`turnPresence`): an inactive r
 - `alternativesOfLastTurn(messages)`: the root id, the ordered alternatives (`executionId`, created order) and which one is active. It's empty when the last turn has no assistant reply, or when a user message follows it.
 - `withActiveAlternative(messages, executionId)`: returns new messages with `inactive` set on every reply of the group except the chosen execution's (cleared there). It's only valid for the last turn's group.
 
+**Implementation note (part 1, shared).** `packages/shared/src/alternatives.ts` exports `activeMessages`, `alternativesOfLastTurn`, `withActiveAlternative`, `withoutLastTurnReplies` and the types `AlternativeMessage`, `Alternative`, `LastTurnAlternatives`.
+- **The last turn** is the execution of the last active, settled (not `streaming`) assistant reply that has an `executionId`, as long as no active user message comes after it. It is decided by `executionId`, not by user messages, so a turn that followed an empty send works like any other. Its group is every settled assistant row, active or not, whose `executionId` is the root or whose `alternativeOf` is the root, where root = that reply's `alternativeOf ?? executionId`. The user message that shares the root's `executionId` is not a member.
+- `alternativesOfLastTurn` returns `null` (not an empty object) when there is no such turn; otherwise `{ rootId, alternatives: [{ executionId, messageIds }], activeExecutionId, activeIndex, lastReplyId }`. Alternatives are in created order (the order their first row appears in the messages; swiping never reorders). A never-regenerated turn has one alternative.
+- `withActiveAlternative` returns `undefined` when `executionId` is not an alternative of the last turn (the swipe route answers 400 from that). The chosen execution loses the `inactive` key (never `false`); other group rows get `inactive: true`; untouched messages keep their identity.
+- `withoutLastTurnReplies` gives the active messages minus all of the last turn's replies: the regenerate's history and the messages to fold the state over (`trigger.turn` stays the original number).
+- `inactive` is read only as `=== true`; `turnPresence` skips inactive messages through `activeMessages`.
+
 ## Server
 
 **Regenerate**: `POST /api/sessions/:id/regenerate/stream` (SSE, the same `turnEventSchema` as `messages/stream`) and `POST /api/sessions/:id/regenerate` (plain), contract first in `packages/shared/src/api/`.

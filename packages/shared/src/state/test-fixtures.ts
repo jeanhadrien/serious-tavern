@@ -65,10 +65,15 @@ export const turnEntry = (
   ...over,
 });
 
-export const reply = (executionId: string, status?: PresenceMessage['status']): PresenceMessage => ({
+export const reply = (
+  executionId: string,
+  status?: PresenceMessage['status'],
+  inactive?: boolean,
+): PresenceMessage => ({
   role: 'assistant',
   executionId,
   ...(status && { status }),
+  ...(inactive && { inactive }),
 });
 export const userMessage = (executionId: string): PresenceMessage => ({ role: 'user', executionId });
 

@@ -1,8 +1,9 @@
+import { activeMessages } from '../alternatives.js';
 import type { ChatMessage } from '../models.js';
 import { readTurnEntries, type TurnEntry } from './writes.js';
 
 /** The part of a message that decides whether a turn is still in the chat. */
-export type PresenceMessage = Pick<ChatMessage, 'role' | 'executionId' | 'status'>;
+export type PresenceMessage = Pick<ChatMessage, 'role' | 'executionId' | 'status' | 'inactive'>;
 
 export type TurnPresence = {
   entry: TurnEntry;
@@ -13,12 +14,14 @@ export type TurnPresence = {
 /**
  * Which stored turns are still in the chat. A turn is present when any of its replies still exists (a reply
  * stopped halfway counts, a reply still streaming does not), or, for a turn that produced no reply, when it
- * completed. User messages never count: deleting a reply undoes its turn though the user message stays.
+ * completed. User messages never count: deleting a reply undoes its turn though the user message stays. An inactive
+ * reply (an alternative that isn't shown, see alternatives.ts) is not there at all, so a turn whose replies are all
+ * inactive is not present and its writes do not apply.
  * Present turns are numbered 1..n in stored order; the turn being run is n + 1.
  */
 export function turnPresence(messages: readonly PresenceMessage[], entries: readonly TurnEntry[]): TurnPresence[] {
   const replied = new Set<string>();
-  for (const message of messages)
+  for (const message of activeMessages(messages))
     if (message.role === 'assistant' && message.status !== 'streaming' && message.executionId)
       replied.add(message.executionId);
   let number = 0;

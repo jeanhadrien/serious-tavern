@@ -22,6 +22,9 @@ describe('turnPresence', () => {
     ['two replies made and one deleted', [reply('t1', 'final')], { replies: 2 }, 1],
     ['a failed run that kept a partial reply', [reply('t1', 'partial')], { completed: false }, 1],
     ['a failed run whose partial reply was deleted', [], { completed: false }, null],
+    ['only an inactive reply (an alternative not shown)', [reply('t1', 'final', true)], {}, null],
+    ['an inactive and an active reply of the turn', [reply('t1', 'final', true), reply('t1', 'final')], {}, 1],
+    ['an inactive reply, no reply made, completed', [reply('t1', 'final', true)], { replies: 0, completed: true }, 1],
   ])('%s', (_, messages, over, expected) => {
     expect(turnPresence(messages, [turnEntry('t1', [], over)]).map(({ turn }) => turn)).toEqual([expected]);
   });

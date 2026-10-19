@@ -55,6 +55,12 @@ export const messageSchema = z
     nodeId: z.string().optional(),
     // Set when the content was edited after it was stored (display only: stored state is never recomputed).
     editedAt: z.string().optional(),
+    // Regenerate and swipes (alternatives.ts): on the replies of a regenerated alternative, the `executionId` of the
+    // first alternative of that turn (the root, whose own replies don't carry it). Absent in older messages.
+    alternativeOf: z.string().optional(),
+    // Written only as `true`, on the replies of an alternative that isn't shown. Absent means active, so every
+    // stored message is active. Read it as `inactive === true` (see `activeMessages`).
+    inactive: z.boolean().optional(),
   })
   .passthrough();
 export const sessionSchema = z
