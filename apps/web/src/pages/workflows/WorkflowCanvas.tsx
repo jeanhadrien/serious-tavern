@@ -3,6 +3,7 @@ import { ReactFlow, Background, Controls, Panel, useNodesInitialized, useReactFl
 import { Trash2 } from 'lucide-react';
 import { IconButton } from '../../components/IconButton.js';
 import { checkConnection } from '../../connection.js';
+import { ConnectPicker } from './ConnectPicker.js';
 import { WorkflowNode } from './WorkflowNode.js';
 import type { useWorkflowCanvas } from './useWorkflowCanvas.js';
 
@@ -64,6 +65,9 @@ export function WorkflowCanvas({ canvas }: { canvas: ReturnType<typeof useWorkfl
           </Panel>
         )}
       </ReactFlow>
+      {canvas.picker && (
+        <ConnectPicker picker={canvas.picker} onPick={canvas.pickCandidate} onClose={canvas.closePicker} />
+      )}
     </div>
   );
 }

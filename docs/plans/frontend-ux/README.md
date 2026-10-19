@@ -32,7 +32,7 @@ Plans for building `docs/FRONTEND-UX.md` (the agreed spec). There is one file pe
 | 5. SortableList (dnd-kit) | [05-sortable-list.md](05-sortable-list.md) | done (provider list is the reasoning fields: overrides are YAML text) |
 | 6. Splitter | [06-splitter.md](06-splitter.md) | done |
 | 7a. Composer draft, copy message | [07a-composer-draft-and-copy.md](07a-composer-draft-and-copy.md) | done |
-| 7b. Canvas: drag to empty space | [07b-canvas.md](07b-canvas.md) | to do |
+| 7b. Canvas: drag to empty space | [07b-canvas.md](07b-canvas.md) | done |
 | 7c. Canvas: undo/redo | [07b-canvas.md](07b-canvas.md) | to do |
 | 7d. Canvas: copy/paste | [07b-canvas.md](07b-canvas.md) | to do |
 | 7e. Regenerate and swipes (shared, server, web) | [07e-swipes.md](07e-swipes.md) | to do |

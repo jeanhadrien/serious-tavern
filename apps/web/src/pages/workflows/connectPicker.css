@@ -1,0 +1,39 @@
+/* The node picker opened by dropping a connection on empty canvas (ConnectPicker.tsx). Sits inside .canvas. */
+.connect-picker {
+  position: absolute;
+  z-index: 20;
+  width: 240px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  background: #242832;
+  border: 1px solid #444a58;
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.connect-picker input {
+  min-width: 0;
+}
+.connect-picker-list {
+  max-height: 14rem;
+  overflow-y: auto;
+}
+.connect-option {
+  display: grid;
+  gap: 1px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.connect-option[aria-selected="true"] {
+  background: #363d4c;
+}
+.connect-option small,
+.connect-picker-empty {
+  color: #9aa1b3;
+}
+.connect-picker-empty {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+}

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   addEdge,
   applyNodeChanges,
@@ -22,6 +22,7 @@ import {
 import { alerts } from '../../alerts/index.js';
 import { checkConnection } from '../../connection.js';
 import { workflowToCanvas, type CanvasNode } from './model.js';
+import { useConnectPicker } from './useConnectPicker.js';
 import { useDynamicPorts } from './useDynamicPorts.js';
 
 export function useWorkflowCanvas(
@@ -93,6 +94,15 @@ export function useWorkflowCanvas(
   const onEdgesChange: OnEdgesChange = useCallback((changes) => {
     setEdges((prev) => applyEdgeChanges(changes, prev));
   }, []);
+  // The edge rules of a manual connection: one edge per target handle, a new one replaces the old.
+  const linkEdge = useCallback((connection: Connection) => {
+    setEdges((prev) =>
+      addEdge(
+        { ...connection, id: crypto.randomUUID() },
+        prev.filter((e) => e.target !== connection.target || e.targetHandle !== connection.targetHandle),
+      ),
+    );
+  }, []);
   const connect = useCallback(
     (connection: Connection) => {
       if (!connection.sourceHandle || !connection.targetHandle) return;
@@ -101,16 +111,34 @@ export function useWorkflowCanvas(
         alerts.info(result.reason);
         return;
       }
-      setEdges((prev) =>
-        addEdge(
-          { ...connection, id: crypto.randomUUID() },
-          prev.filter((e) => e.target !== connection.target || e.targetHandle !== connection.targetHandle),
-        ),
-      );
+      linkEdge(connection);
     },
-    [nodes],
+    [nodes, linkEdge],
   );
-  const onConnectEnd: React.ComponentProps<typeof ReactFlow>['onConnectEnd'] = (_, state) => {
+  // Returns the new node's id, for callers that connect it right away.
+  const addNode = (descriptor: NodeTypeDescriptor, position: { x: number; y: number }): string => {
+    const id = crypto.randomUUID();
+    setNodes((prev) => {
+      const next: CanvasNode[] = [
+        ...prev,
+        {
+          id,
+          type: 'workflow',
+          position,
+          data: { descriptor, config: { ...descriptor.defaultConfig }, name: descriptor.label },
+        },
+      ];
+      const labelOf = (type: string) => types.find((item) => item.type === type)?.label ?? type;
+      const list = next.map((node) => ({ id: node.id, type: node.data.descriptor.type }));
+      return next.map((node) => ({ ...node, data: { ...node.data, name: nodeDisplayName(list, labelOf, node.id) } }));
+    });
+    return id;
+  };
+  const picker = useConnectPicker({ nodes, types, canvasRef, addNode, linkEdge });
+  // Another workflow was loaded (or the canvas cleared): the drop point no longer means anything.
+  useEffect(picker.close, [canvasVersion]);
+  const onConnectEnd: React.ComponentProps<typeof ReactFlow>['onConnectEnd'] = (event, state) => {
+    if (picker.open(event, state)) return;
     if (state.isValid !== false || !state.fromHandle || !state.toHandle) return;
     const source = state.fromHandle.type === 'source' ? state.fromHandle : state.toHandle;
     const target = state.fromHandle.type === 'target' ? state.fromHandle : state.toHandle;
@@ -124,22 +152,6 @@ export function useWorkflowCanvas(
       nodes,
     );
     if (!result.ok) alerts.info(result.reason);
-  };
-  const addNode = (descriptor: NodeTypeDescriptor, position: { x: number; y: number }) => {
-    setNodes((prev) => {
-      const next: CanvasNode[] = [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          type: 'workflow',
-          position,
-          data: { descriptor, config: { ...descriptor.defaultConfig }, name: descriptor.label },
-        },
-      ];
-      const labelOf = (type: string) => types.find((item) => item.type === type)?.label ?? type;
-      const list = next.map((node) => ({ id: node.id, type: node.data.descriptor.type }));
-      return next.map((node) => ({ ...node, data: { ...node.data, name: nodeDisplayName(list, labelOf, node.id) } }));
-    });
   };
   const addAtCenter = (descriptor: NodeTypeDescriptor) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -190,6 +202,9 @@ export function useWorkflowCanvas(
     onEdgesChange,
     connect,
     onConnectEnd,
+    picker: picker.picker,
+    pickCandidate: picker.pick,
+    closePicker: picker.close,
     addAtCenter,
     onDrop,
     updateConfig,
