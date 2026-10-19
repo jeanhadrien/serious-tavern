@@ -30,6 +30,7 @@ export const memory: NodeDefinition = {
       ),
   }),
   defaultConfig: { lastN: 10, format: 'text', all: false },
+  access: () => ({ reads: [{ kind: 'messages' }], writes: [] }),
   async execute({ history, config }) {
     const recent = config.all === true ? history : config.lastN === 0 ? [] : history.slice(-Number(config.lastN));
     return { history: config.format === 'messages' ? recent : recent.map((m) => `${m.role}: ${m.content}`).join('\n') };

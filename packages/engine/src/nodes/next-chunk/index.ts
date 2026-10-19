@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { planNextChunk, type PortDef } from '@st/shared';
+import { keyAccess, planNextChunk, type PortDef } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { coerceValue } from '../../text.js';
 import { itemsOf, locateCollection } from '../state-key.js';
@@ -59,6 +59,11 @@ export const nextChunk: NodeDefinition = {
       ),
   }),
   defaultConfig: { definitionId: '', key: '', chunkSize: 20, rawWindow: 16 },
+  // Plans over the key's items and the chat.
+  access: (config, { definition }) => {
+    const definitionId = String(config.definitionId ?? '');
+    return { reads: keyAccess(definitionId, String(config.key ?? ''), definition(definitionId)), writes: [] };
+  },
   // The ports never change; resolving them checks the target, so an unset or mistaken key shows as "not set up".
   async resolvePorts(config, resources) {
     await locateCollection(config, (id) => resources.stateDefinitions?.get(id));

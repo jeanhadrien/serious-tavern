@@ -1,3 +1,4 @@
+import { noAccess } from '@st/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { Workflow, Edge, ChatMessage, Preset } from '@st/shared';
@@ -58,6 +59,7 @@ describe('executor', () => {
     });
     registry.set('slow-test', {
       type: 'slow-test',
+      access: () => noAccess(),
       label: 'Slow',
       description: '',
       category: '',
@@ -204,6 +206,7 @@ describe('executor', () => {
   it('marks a timed-out node failed and emits events', async () => {
     registry.set('slow-test', {
       type: 'slow-test',
+      access: () => noAccess(),
       label: 'Slow',
       description: '',
       category: '',
@@ -261,6 +264,7 @@ describe('executor', () => {
   it('rejects incompatible edges with node, port and type names after port resolution', async () => {
     registry.set('typed-test', {
       type: 'typed-test',
+      access: () => noAccess(),
       label: 'Typed',
       description: '',
       category: '',
@@ -294,6 +298,7 @@ describe('executor', () => {
     );
     registry.set('typed-test', {
       type: 'typed-test',
+      access: () => noAccess(),
       label: 'Typed',
       description: '',
       category: '',
@@ -317,6 +322,7 @@ describe('executor', () => {
     });
     registry.set('fail-test', {
       type: 'fail-test',
+      access: () => noAccess(),
       label: 'Fail',
       description: '',
       category: '',
@@ -338,6 +344,7 @@ describe('executor', () => {
   it('fails when a connected required output is omitted but permits optional branch omission', async () => {
     registry.set('missing-test', {
       type: 'missing-test',
+      access: () => noAccess(),
       label: 'Missing',
       description: '',
       category: '',
@@ -360,6 +367,7 @@ describe('executor', () => {
 
     registry.set('optional-test', {
       type: 'optional-test',
+      access: () => noAccess(),
       label: 'Optional',
       description: '',
       category: '',
@@ -390,6 +398,7 @@ describe('executor', () => {
     let siblingSettled = false;
     registry.set('fast-fail-test', {
       type: 'fast-fail-test',
+      access: () => noAccess(),
       label: 'Fast failure',
       description: '',
       category: '',
@@ -403,6 +412,7 @@ describe('executor', () => {
     });
     registry.set('abort-test', {
       type: 'abort-test',
+      access: () => noAccess(),
       label: 'Abort-aware',
       description: '',
       category: '',
@@ -449,6 +459,7 @@ describe('executor', () => {
   it('waits for an abort-ignoring sibling and prevents its late callbacks from changing the log', async () => {
     registry.set('fast-fail-test', {
       type: 'fast-fail-test',
+      access: () => noAccess(),
       label: 'Fast failure',
       description: '',
       category: '',
@@ -462,6 +473,7 @@ describe('executor', () => {
     });
     registry.set('ignore-abort-test', {
       type: 'ignore-abort-test',
+      access: () => noAccess(),
       label: 'Ignores abort',
       description: '',
       category: '',
@@ -508,6 +520,7 @@ describe('executor', () => {
     registry.set('fast-fail-test', {
       ...registry.get('chat-input')!,
       type: 'fast-fail-test',
+      access: () => noAccess(),
       async execute() {
         throw new Error('first failure');
       },
@@ -515,6 +528,7 @@ describe('executor', () => {
     registry.set('ignore-abort-test', {
       ...registry.get('chat-input')!,
       type: 'ignore-abort-test',
+      access: () => noAccess(),
       async execute({ recordWire, emit }) {
         await new Promise<void>((resolve) => {
           finish = resolve;
@@ -563,6 +577,7 @@ describe('executor', () => {
     registry.set('typed-test', {
       ...registry.get('chat-input')!,
       type: 'typed-test',
+      access: () => noAccess(),
       outputs: [{ name: 'out', label: 'Out', dataType: 'object' }],
       async execute() {
         return { out: circular };
@@ -597,6 +612,7 @@ describe('executor', () => {
         registry.set('fast-fail-test', {
           ...definition,
           type: 'fast-fail-test',
+          access: () => noAccess(),
           async execute() {
             throw new Error('real failure');
           },
@@ -604,6 +620,7 @@ describe('executor', () => {
         registry.set('abort-test', {
           ...definition,
           type: 'abort-test',
+          access: () => noAccess(),
           async execute({ signal }) {
             await new Promise<void>((resolve) => {
               if (signal.aborted) resolve();
@@ -663,6 +680,7 @@ describe('execution id', () => {
     expect(result.execution.id).toBe('turn-execution');
     registry.set('fail-id-test', {
       type: 'fail-id-test',
+      access: () => noAccess(),
       label: 'Failure',
       description: '',
       category: '',

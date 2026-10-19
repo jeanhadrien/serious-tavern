@@ -3,6 +3,7 @@ import { activeMessages, apiContract } from '@st/shared';
 import type { AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
 import { setAlternative } from '../services/alternatives.js';
+import { replyPlan } from '../services/reply-plan.js';
 import { sessionStateView } from '../services/session-state.js';
 import { createSession, updateSession } from '../services/sessions.js';
 import type { ApiRoute } from './types.js';
@@ -21,6 +22,9 @@ export function registerSessions(app: FastifyInstance, context: AppContext) {
   );
   app.get<ApiRoute<'getSession'>>('/api/sessions/:id', async (request) =>
     requireEntity(sessions, apiContract.getSession.params.parse(request.params).id, 'Session'),
+  );
+  app.get<ApiRoute<'getReplyPlan'>>('/api/sessions/:id/reply-plan', async (request) =>
+    replyPlan(context, apiContract.getReplyPlan.params.parse(request.params).id),
   );
   app.get<ApiRoute<'getSessionState'>>('/api/sessions/:id/state', async (request) =>
     sessionStateView(context, apiContract.getSessionState.params.parse(request.params).id),

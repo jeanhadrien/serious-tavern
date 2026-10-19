@@ -1,4 +1,4 @@
-import { replyWorkflows, type ReplyEntry, type Session, type Workflow } from '@st/shared';
+import { replyWorkflows, type ReplyEntry, type ReplyPlan, type Session, type Workflow } from '@st/shared';
 import { moveItem } from '../../../components/sortable/moveItem.js';
 
 // The chat panel's "On reply" list as pure functions: what each control changes, and what a row shows. The list itself
@@ -59,4 +59,36 @@ export function copiedList(
     .filter((entry) => known.has(entry.workflowId))
     .map(({ workflowId, enabled }) => ({ workflowId, enabled }));
   return list.length ? list : undefined;
+}
+
+/** What a row says about when it runs: the text under its name, the server's reason as its title, and whether it is a problem. */
+export type PlanHint = { text: string; title?: string; problem?: boolean };
+
+/**
+ * The hints of the "On reply" rows, from the server's plan (`GET /api/sessions/:id/reply-plan`; the web never works out
+ * what waits for what). A disabled row has none, and neither has the first enabled row, which has nothing above it. A
+ * workflow that waits says "Waits for X, Y" (the reason is the title); one that doesn't says it "Runs alongside the ones
+ * above"; one that cannot run (gone or invalid) says why. Without a plan there are no hints.
+ */
+export function planHints(
+  list: readonly ReplyEntry[],
+  workflows: readonly Workflow[],
+  plan: ReplyPlan | undefined,
+): Map<string, PlanHint> {
+  const hints = new Map<string, PlanHint>();
+  if (!plan) return hints;
+  const names = new Map(workflows.map((workflow) => [workflow.id, workflow.name]));
+  const planned = new Map(plan.entries.map((entry) => [entry.workflowId, entry]));
+  let above = 0;
+  for (const { workflowId, enabled } of list) {
+    const entry = enabled ? planned.get(workflowId) : undefined;
+    if (!entry) continue;
+    if (!entry.waitsFor.length && entry.reason) hints.set(workflowId, { text: entry.reason, problem: true });
+    else if (entry.waitsFor.length) {
+      const waits = entry.waitsFor.map((id) => rowLabel({ workflowId: id, name: names.get(id) })).join(', ');
+      hints.set(workflowId, { text: `Waits for ${waits}`, ...(entry.reason ? { title: entry.reason } : {}) });
+    } else if (above > 0) hints.set(workflowId, { text: 'Runs alongside the ones above' });
+    above++;
+  }
+  return hints;
 }

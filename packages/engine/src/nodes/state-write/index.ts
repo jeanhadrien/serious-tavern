@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { stateNodeOps } from '@st/shared';
+import { stateNodeOps, type Resource } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { locateConfigured } from '../state-key.js';
 import { messageLink } from './link.js';
@@ -30,6 +30,16 @@ export const stateWrite: NodeDefinition = {
       ),
   }),
   defaultConfig: { definitionId: '', key: '', op: 'set' },
+  // Writes its key. `increment` and `remove` also read it: the new value is computed from the key's value, and what a
+  // `remove` finds there decides whether anything is removed. The other operations only show the old value in the log.
+  access: (config) => {
+    const key: Resource = {
+      kind: 'key',
+      definitionId: String(config.definitionId ?? ''),
+      key: String(config.key ?? ''),
+    };
+    return { reads: config.op === 'increment' || config.op === 'remove' ? [key] : [], writes: [key] };
+  },
   async resolvePorts(config, resources) {
     const found = await locateConfigured(config, (id) => resources.stateDefinitions?.get(id));
     return writePorts(found.def, checkOp(found.def, String(config.op ?? 'set')), fixedValue(config) !== undefined);

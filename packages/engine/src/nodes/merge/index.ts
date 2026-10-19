@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { noAccess } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 export const merge: NodeDefinition = {
   type: 'merge',
@@ -9,6 +10,7 @@ export const merge: NodeDefinition = {
   outputs: [{ name: 'value', label: 'Value', dataType: 'any' }],
   configSchema: z.object({ mode: z.enum(['object', 'array', 'first-non-empty']).default('object') }),
   defaultConfig: { mode: 'object' },
+  access: () => noAccess(),
   async execute({ inputs, config }) {
     const entries = Object.entries(inputs);
     const value =

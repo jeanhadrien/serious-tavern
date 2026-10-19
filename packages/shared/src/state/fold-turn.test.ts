@@ -93,3 +93,54 @@ describe('a run of the after section: its writes in the fold', () => {
     expect(valueAt(foldTurns(readTurnEntries(state), { gone: ['b'] }), 'tension')).toBe(4);
   });
 });
+
+describe('foldStoryState visibleRuns', () => {
+  // The turn being run holds the writes of three runs; a run reads only the ones it waited for.
+  const tagged = (runId: string, ...writes: ReturnType<typeof setWrite>[]) =>
+    writes.map((write) => ({ ...write, runId }));
+  const state = {
+    turns: [
+      turnEntry('a', [setWrite('tension', 5)]),
+      turnEntry(
+        't',
+        [...tagged('r1', setWrite('tension', 7)), ...tagged('r2', setWrite('mood', 'tense'), setWrite('tension', 9))],
+        {
+          replies: 0,
+        },
+      ),
+    ],
+  };
+  const read = (visibleRuns?: string[]) =>
+    foldStoryState({
+      definitions: [scene],
+      messages: [reply('a', 'final')],
+      state,
+      including: 't',
+      ...(visibleRuns && { visibleRuns: new Set(visibleRuns) }),
+    });
+
+  it('counts only the writes of the visible runs of the turn being run, later ones winning', () => {
+    expect(valueAt(read(['r1']), 'tension')).toBe(7);
+    expect(valueAt(read(['r1']), 'mood')).toBe('calm');
+    expect(valueAt(read(['r1', 'r2']), 'tension')).toBe(9);
+    expect(valueAt(read(['r2']), 'mood')).toBe('tense');
+  });
+
+  it("shows none of the turn's writes to a run that waited for nothing, and every one when no runs are named", () => {
+    expect(valueAt(read([]), 'tension')).toBe(5);
+    expect(valueAt(read(), 'tension')).toBe(9);
+  });
+
+  it('never hides a write without a run tag, or the writes of other turns', () => {
+    const legacy = { turns: [turnEntry('t', [setWrite('tension', 8)], { replies: 0 })] };
+    const story = foldStoryState({
+      definitions: [scene],
+      messages: [],
+      state: legacy,
+      including: 't',
+      visibleRuns: new Set(),
+    });
+    expect(valueAt(story, 'tension')).toBe(8);
+    expect(valueAt(read([]), 'tension')).toBe(5);
+  });
+});

@@ -50,7 +50,14 @@ export type StateTarget = z.infer<typeof stateTargetSchema>;
 
 // `nodeId` is the node that wrote it. Scalars always store the value AFTER the write (an increment is
 // computed into a `set`); collections store item-level `add` and `remove`; `delete` resets a key.
-const writer = { target: stateTargetSchema, nodeId: z.string() };
+// `runId` tags the write with the run (execution id) that made it, so that a settle can place it among the writes of the
+// runs listed above and below it (`withRunSettled`) and a run's view can leave out the runs it must not see. Absent on
+// writes made before runs were tagged; `.catch` so a bad value reads as absent.
+const writer = {
+  target: stateTargetSchema,
+  nodeId: z.string(),
+  runId: z.string().min(1).optional().catch(undefined),
+};
 export const stateWriteSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('set'), ...writer, value: z.unknown() }).passthrough(),
   z.object({ op: z.literal('add'), ...writer, item: collectionItemSchema }).passthrough(),
@@ -75,6 +82,9 @@ export const turnRunSchema = z
     status: runStatusSchema,
     // Cut to `POST_ERROR_LIMIT`; the full text is in the run's execution log.
     error: z.string().optional().catch(undefined),
+    // The run's index among the turn's enabled workflows, in list order. Runs finish in any order, so the entry keeps its
+    // `runs` and each run's writes in this order (`withRunSettled`). Absent on runs recorded before runs were concurrent.
+    position: z.number().int().nonnegative().optional().catch(undefined),
   })
   .passthrough();
 export type TurnRun = z.infer<typeof turnRunSchema>;
@@ -136,6 +146,17 @@ export function readTurnEntries(state: unknown): TurnEntry[] {
     const { runs: _raw, ...rest } = shell.data;
     return [{ ...rest, writes, ...(runs?.length ? { runs } : {}) }];
   });
+}
+
+/** Whether `state` has a stored item for the turn `executionId` (readable or not: only its id is looked at). */
+export function hasTurnEntry(state: unknown, executionId: string): boolean {
+  return rawTurns(state).some(
+    (raw) =>
+      typeof raw === 'object' &&
+      raw !== null &&
+      !Array.isArray(raw) &&
+      (raw as { executionId?: unknown }).executionId === executionId,
+  );
 }
 
 /**

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { noAccess } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { renderTemplate } from '../../template.js';
 import { stringify } from '../../text.js';
@@ -21,6 +22,7 @@ export const condition: NodeDefinition = {
     right: z.string().default(''),
   }),
   defaultConfig: { left: '{{input.value}}', operator: 'equals', right: '' },
+  access: () => noAccess(),
   async execute(ctx) {
     const left = renderTemplate(String(ctx.config.left), ctx);
     const right = renderTemplate(String(ctx.config.right), ctx);

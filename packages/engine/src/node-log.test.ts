@@ -1,3 +1,4 @@
+import { noAccess } from '@st/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { ChatMessage, Workflow } from '@st/shared';
@@ -8,6 +9,7 @@ import type { ExecutionContext } from './types.js';
 const register = (execute: (ctx: ExecutionContext) => Promise<Record<string, unknown>>) =>
   registry.set('log-test', {
     type: 'log-test',
+    access: () => noAccess(),
     label: 'Log test',
     description: '',
     category: '',

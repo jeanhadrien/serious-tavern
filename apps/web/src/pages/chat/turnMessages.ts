@@ -6,10 +6,13 @@ export type DeltaTarget = { nodeId: string; runId?: string; textDelta?: string; 
 /**
  * Appends streamed text to the row of a Chat Output, creating its row on the first delta. A row is one Chat Output of
  * one run: workflows of a reply list may use the same node ids, so rows are keyed by `runId` and node id together.
+ * Runs that stream at the same time start in any order, so a new row goes before the streaming rows of runs listed
+ * below its own (`positions`: the runs' list positions, from `run.start`), which is where the settled turn puts them.
  */
 export function applyDelta(
   messages: ChatMessage[],
   { nodeId, runId, textDelta = '', reasoningDelta = '' }: DeltaTarget,
+  positions: ReadonlyMap<string, number> = new Map(),
   fresh: () => ChatMessage = () => ({
     id: crypto.randomUUID(),
     role: 'assistant',
@@ -27,7 +30,18 @@ export function applyDelta(
     content: message.content + textDelta,
     ...(reasoningDelta ? { reasoning: (message.reasoning ?? '') + reasoningDelta } : {}),
   });
-  return messages.some(live) ? messages.map((m) => (live(m) ? grow(m) : m)) : [...messages, grow(fresh())];
+  if (messages.some(live)) return messages.map((m) => (live(m) ? grow(m) : m));
+  const own = runId === undefined ? undefined : positions.get(runId);
+  const later = messages.findIndex(
+    (message) =>
+      own !== undefined &&
+      message.status === 'streaming' &&
+      message.runId !== undefined &&
+      (positions.get(message.runId) ?? -1) > own,
+  );
+  return later < 0
+    ? [...messages, grow(fresh())]
+    : [...messages.slice(0, later), grow(fresh()), ...messages.slice(later)];
 }
 
 /** The id of the execution log a message opens: its own run's (`runId`), else the turn's (older messages). */

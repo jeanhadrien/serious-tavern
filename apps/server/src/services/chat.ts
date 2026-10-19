@@ -101,10 +101,10 @@ async function executeTurn(
   const [execution] = executions;
   if (!failed && !stopped) return { userMessage, assistantMessages, ...(execution && { execution }), executions };
   const details = (execution: ExecutionLog) => ({ execution, executions, userMessage, assistantMessages });
-  // A stop ends the turn as stopped, with the log of the run it ended (or of the last one run, when it fell between two
-  // runs); otherwise the first failure does, after the runs below it ran.
+  // A stop ends the turn as stopped, with the log of the last run (in list order) it ended (or of the last one run, when
+  // every run it left had finished); otherwise the first failure does, after the other runs ran.
   if (stopped) {
-    const last = results.at(-1)!;
+    const last = [...results].reverse().find((result) => result.stopped) ?? results.at(-1)!;
     if (!last.execution) throw last.failure;
     throw new HttpError(409, 'TURN_STOPPED', 'The turn was stopped before it finished', {
       ...details(last.execution),

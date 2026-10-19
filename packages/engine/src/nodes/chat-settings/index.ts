@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { noAccess } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 
 export const chatSettings: NodeDefinition = {
@@ -26,6 +27,7 @@ export const chatSettings: NodeDefinition = {
     key: z.string().default('').describe('Setting to output as Value; leave empty to use Settings only'),
   }),
   defaultConfig: { key: '' },
+  access: () => noAccess(),
   async execute(ctx) {
     const settings = { ...ctx.settings };
     const key = String(ctx.config.key ?? '').trim();

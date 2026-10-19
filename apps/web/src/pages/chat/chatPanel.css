@@ -93,6 +93,23 @@
 .reply-row-off .reply-name {
   color: #8a90a2;
 }
+/* Under the name: whether the workflow waits for one above it (the server's plan). */
+.reply-name {
+  display: flex;
+  flex-direction: column;
+}
+.reply-name > a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.reply-hint {
+  white-space: normal;
+  font-size: 12px;
+  color: #8a90a2;
+}
+.reply-hint-problem {
+  color: #e0a45a;
+}
 .reply-row .icon-button {
   flex-shrink: 0;
   padding: 4px;

@@ -542,7 +542,7 @@ describe('finalizing a turn', () => {
       userMessage,
       replies: [{ nodeId: 'output', content: 'Hello', name: 'Ann' }],
       streamed: [streamed],
-      run: { executionId: 'execution', workflowId: 'workflow', status: 'completed' },
+      run: { executionId: 'execution', workflowId: 'workflow', position: 0, status: 'completed' },
     });
     expect(settled.assistantMessages).toEqual([
       {
@@ -569,7 +569,7 @@ describe('finalizing a turn', () => {
       userMessage: structuredClone(user),
       replies: [],
       streamed: [streamed],
-      run: { executionId: 'execution', workflowId: 'workflow', status: 'completed' },
+      run: { executionId: 'execution', workflowId: 'workflow', position: 0, status: 'completed' },
     });
     expect(settled.assistantMessages).toEqual([]);
     expect(current.messages.map((message) => message.id)).toEqual(['user-1']);
@@ -582,7 +582,7 @@ describe('finalizing a turn', () => {
       userMessage: structuredClone(user),
       replies: [],
       streamed: [streamed],
-      run: { executionId: 'execution', workflowId: 'workflow', status: 'stopped' },
+      run: { executionId: 'execution', workflowId: 'workflow', position: 0, status: 'stopped' },
     });
     expect(settled.assistantMessages).toEqual([
       {
@@ -609,7 +609,7 @@ describe('finalizing a turn', () => {
       userMessage: structuredClone(user),
       replies: [{ nodeId: 'output', content: 'Hello' }],
       streamed: [streamed, other],
-      run: { executionId: 'execution', workflowId: 'workflow', status: 'stopped' },
+      run: { executionId: 'execution', workflowId: 'workflow', position: 0, status: 'stopped' },
     });
     expect(settled.assistantMessages.map(({ id, content, status }) => [id, content, status])).toEqual([
       ['row-1', 'Hello', 'final'],
@@ -624,7 +624,7 @@ describe('finalizing a turn', () => {
       userMessage: structuredClone(user),
       replies: [{ nodeId: 'plain', content: 'Plain reply' }],
       streamed: [],
-      run: { executionId: 'execution', workflowId: 'workflow', status: 'completed' },
+      run: { executionId: 'execution', workflowId: 'workflow', position: 0, status: 'completed' },
     });
     expect(settled.assistantMessages).toHaveLength(1);
     expect(settled.assistantMessages[0]).toMatchObject({ role: 'assistant', content: 'Plain reply' });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { noAccess } from '@st/shared';
 import { registry } from './registry.js';
 import type { NodeDefinition } from './types.js';
 
@@ -14,6 +15,7 @@ export const testType = (type: string, extra: Partial<NodeDefinition> = {}): Nod
   outputs: [{ name: 'value', label: 'Value', dataType: 'any' }],
   configSchema: z.object({}),
   defaultConfig: {},
+  access: () => noAccess(),
   execute: async (ctx) => ({ value: ctx.inputs.value }),
   ...extra,
 });

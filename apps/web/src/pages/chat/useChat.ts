@@ -68,8 +68,12 @@ export function useChat() {
     queuedRef.current = value;
     setQueued(value);
   };
-  // The workflow whose run started last (`run.start`): the "waiting" indicator names it until a reply row shows up.
+  // The workflows whose runs have started (`run.start`): the "waiting" indicator names them until a reply row shows up.
   const [runningWorkflow, setRunningWorkflow] = useState<string>();
+  // The reply section's runs of the turn in flight: where each streams among the others (`run.start`'s `position`) and
+  // their names (the ones that wait for another start later).
+  const runPositions = useRef(new Map<string, number>());
+  const runNames = useRef<string[]>([]);
   const opening = useRef(0);
   const streamControllerRef = useRef<AbortController | undefined>(undefined);
   const [logs, setLogs] = useState<Record<string, ExecutionLog>>({});
@@ -237,12 +241,18 @@ export function useChat() {
       await stream(
         {
           onStart: () => {
+            runPositions.current.clear();
+            runNames.current = [];
             setWaiting(false);
             // A regenerate shows only its own rows once the server runs it; until then (queued) the reply stays.
             if (replaced) patchMessages((messages) => replaceLastTurnReplies(messages, replaced));
           },
-          onRun: (run) => setRunningWorkflow(run.workflowName),
-          onDelta: (delta) => patchMessages((messages) => applyDelta(messages, delta)),
+          onRun: (run) => {
+            runPositions.current.set(run.runId, run.position);
+            runNames.current = [...runNames.current, run.workflowName];
+            setRunningWorkflow(runNames.current.join(', '));
+          },
+          onDelta: (delta) => patchMessages((messages) => applyDelta(messages, delta, runPositions.current)),
           onComplete: settle,
         },
         controller.signal,

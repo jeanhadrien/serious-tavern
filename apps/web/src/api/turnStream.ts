@@ -5,13 +5,17 @@ export type TurnResult = ApiResponse<'sendMessage'>;
 
 /** Streamed text of one Chat Output of one run. `runId` is absent in events of a server from before reply lists. */
 type TurnDelta = { nodeId: string; runId?: string; textDelta?: string; reasoningDelta?: string };
-/** A run of the reply list is starting: its node events follow, tagged with its `runId`. */
-type RunStart = { runId: string; workflowId: string; workflowName: string };
+/**
+ * A run of the reply list is starting: its node events follow, tagged with its `runId`. `position` is its index among the
+ * chat's enabled workflows, which is the order its replies go in: runs that cannot affect each other start (and stream) at
+ * the same time, so these arrive in start order, not list order.
+ */
+type RunStart = { runId: string; workflowId: string; workflowName: string; position: number };
 
 export type TurnHandlers = {
   /** The turn began on the server. Until then the message may be waiting in its queue and can still be cancelled. */
   onStart?: () => void;
-  /** One run per enabled workflow of the chat's reply list begins, one after another, before its node events. */
+  /** A run of the chat's reply list begins, before its node events; runs that don't wait for each other begin together. */
   onRun?: (run: RunStart) => void;
   onDelta?: (delta: TurnDelta) => void;
   onComplete?: (result: TurnResult) => void;
@@ -110,7 +114,12 @@ function handleFrame(frame: string, handlers: TurnHandlers): boolean {
       handlers.onStart?.();
       return false;
     case 'run.start':
-      handlers.onRun?.({ runId: event.runId, workflowId: event.workflowId, workflowName: event.workflowName });
+      handlers.onRun?.({
+        runId: event.runId,
+        workflowId: event.workflowId,
+        workflowName: event.workflowName,
+        position: event.position,
+      });
       return false;
     case 'node.delta':
       handlers.onDelta?.({

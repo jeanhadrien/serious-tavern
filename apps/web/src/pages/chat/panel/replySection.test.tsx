@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
-import type { ReplyEntry, Workflow } from '@st/shared';
+import type { ReplyEntry, ReplyPlan, Workflow } from '@st/shared';
 import { layoutHref } from '../../../layout/url.js';
 import { ReplySection } from './ReplySection.js';
 import { SettingsSection } from './SettingsSection.js';
@@ -17,12 +17,46 @@ const workflow = (id: string, name: string, settings?: unknown[]): Workflow => (
 });
 const entry = (workflowId: string, enabled = true): ReplyEntry => ({ workflowId, enabled });
 const all = [workflow('a', 'Narrator'), workflow('b', 'Memory'), workflow('c', 'Aside')];
-const render = (stored: ReplyEntry[], workflows = all) =>
+const render = (stored: ReplyEntry[], workflows = all, plan?: ReplyPlan) =>
   renderToStaticMarkup(
     <MemoryRouter>
-      <ReplySection sessionId="s1" workflows={workflows} stored={stored} onSave={async () => true} />
+      <ReplySection sessionId="s1" workflows={workflows} stored={stored} plan={plan} onSave={async () => true} />
     </MemoryRouter>,
   );
+
+describe('On reply plan hints', () => {
+  const plan: ReplyPlan = {
+    entries: [
+      { workflowId: 'a', waitsFor: [] },
+      { workflowId: 'b', waitsFor: ['a'], reason: 'reads the chat history Narrator writes' },
+      { workflowId: 'c', waitsFor: [] },
+    ],
+  };
+
+  it('says under each row whether it waits, with the reason as the title', () => {
+    const html = render([entry('a'), entry('b'), entry('c')], all, plan);
+    expect(html).toContain(
+      '<span class="reply-hint" title="reads the chat history Narrator writes">Waits for Narrator</span>',
+    );
+    expect(html).toContain('>Runs alongside the ones above</span>');
+    // The first row has nothing above it.
+    expect(html.match(/class="reply-hint/g)).toHaveLength(2);
+  });
+
+  it('shows no hint before the plan has loaded', () => {
+    expect(render([entry('a'), entry('b')])).not.toContain('reply-hint');
+  });
+
+  it('marks a workflow that cannot run as a problem', () => {
+    const html = render([entry('a'), entry('b')], all, {
+      entries: [
+        { workflowId: 'a', waitsFor: [] },
+        { workflowId: 'b', waitsFor: [], reason: 'This workflow is invalid, so it cannot run yet.' },
+      ],
+    });
+    expect(html).toContain('class="reply-hint reply-hint-problem"');
+  });
+});
 
 describe('On reply', () => {
   it('lists the workflows in order, each a link to its editor with a switch', () => {

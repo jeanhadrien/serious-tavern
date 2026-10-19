@@ -33,13 +33,14 @@ export async function listDefinitions(repository: Pick<StateDefinitionRepository
  * that link to messages carry their computed `link` in the snapshot (the SAME history the nodes judge links by).
  * `scope` is for the run of one workflow: its `workflowId` scopes the nodes' own state (`FoldInput.workflowId`; a caller
  * that runs a workflow always gives it) and `including` is the turn being run (`FoldInput.including`), for the later
- * runs of a turn whose first run has settled.
+ * runs of a turn whose first run has settled, and `visibleRuns` the runs of that turn whose writes the run may read
+ * (`FoldInput.visibleRuns`).
  */
 export function foldSession(
   definitions: StateDefinition[],
   session: Pick<Session, 'messages' | 'state'>,
   history?: readonly ChatMessage[],
-  scope: { workflowId?: string; including?: string } = {},
+  scope: { workflowId?: string; including?: string; visibleRuns?: ReadonlySet<string> } = {},
 ): SessionStory {
   const story = foldStoryState({
     definitions,

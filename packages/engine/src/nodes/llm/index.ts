@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { characterSchema, presetInputLabel, reasoningEfforts, type PromptMessage } from '@st/shared';
+import {
+  characterSchema,
+  entryTemplates,
+  noAccess,
+  presetInputLabel,
+  reasoningEfforts,
+  type PromptMessage,
+} from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { renderPreset } from '../../preset.js';
 import { adapters, missingSecretMessage, type ChatResponse } from '../../providers/index.js';
@@ -76,6 +83,14 @@ export const llm: NodeDefinition = {
     reasoningExclude: false,
     mergeSystemMessages: false,
     streaming: true,
+  },
+  // What it reads is in the templates of its preset (`resourceTemplates`).
+  access: () => noAccess(),
+  async resourceTemplates(config, resources) {
+    const preset = await resources.presets.get(String(config.presetId ?? ''));
+    return (preset?.entries ?? []).flatMap((entry) =>
+      entry.kind === 'message' && entry.enabled ? entryTemplates(entry).map(({ template }) => template) : [],
+    );
   },
   async resolvePorts(config, resources) {
     const preset = await resources.presets.get(String(config.presetId ?? ''));

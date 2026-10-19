@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import type { ChatMessage, Session, StateDefinition, StateWrite } from '@st/shared';
 import {
   activeMessages,
+  hasTurnEntry,
   LINK_WARNING_LIMITS,
   POST_ERROR_LIMIT,
+  taggedWrites,
   withRunSettled,
   withTurnEntry,
   type TurnRun,
@@ -11,6 +13,7 @@ import {
 import type { ChatReply } from '@st/engine';
 import { now } from '../context.js';
 import { commitLinks } from './links.js';
+import { replyIndex } from './reply-order.js';
 import type { StreamedRow } from './turn-stream.js';
 
 /**
@@ -28,10 +31,13 @@ export type Settlement = {
   /** The turn: the execution id of its first run. Every message of the turn carries it. */
   executionId: string;
   /**
-   * The reply-section run being settled. The turn's first run (its id is the turn's) creates the entry; later ones
-   * update it. Absent when the reply section is empty: the entry is created with no reply run (and no reply).
+   * The reply-section run being settled, with its `position` in the chat's enabled list. Whichever run settles first
+   * creates the turn's entry; the others update it, each placing its records, writes and replies by position (runs finish
+   * in any order). Absent when the reply section is empty: the entry is created with no reply run (and no reply).
    */
-  run?: { executionId: string; workflowId: string } & RunEnd;
+  run?: { executionId: string; workflowId: string; position: number } & RunEnd;
+  /** The execution ids of every run of the turn, in list order: where the run's replies go among the messages. */
+  runOrder?: readonly string[];
   userMessage?: ChatMessage;
   replies: ChatReply[];
   streamed: StreamedRow[];
@@ -41,7 +47,7 @@ export type Settlement = {
   definitions?: readonly StateDefinition[];
   // The runs of the after section this turn leaves behind, known when its last reply-section run settles: the entry lists
   // them as `running` from the moment it is saved, so the turn never shows a gap in which none is listed.
-  postRuns?: readonly { executionId: string; workflowId: string }[];
+  postRuns?: readonly { executionId: string; workflowId: string; position: number }[];
   // Set when the turn is a regenerate of the last turn (`rootId`: the `executionId` of its first alternative). Its
   // replies join that turn's alternatives and, if there are any, replace the shown ones in this same write.
   regenerate?: { rootId: string };
@@ -57,6 +63,7 @@ export function settleTurn(
   {
     executionId,
     run,
+    runOrder = [],
     userMessage,
     replies,
     streamed,
@@ -115,7 +122,9 @@ export function settleTurn(
   // A regenerate that produced a reply row shows it: the previous alternatives of the turn go inactive in the same
   // write. One that produced none leaves the messages as they are.
   if (regenerate && assistantMessages.length) deactivateAlternatives(current.messages, regenerate.rootId, executionId);
-  current.messages.push(...assistantMessages);
+  // Placed in list order: before any reply a run listed below this one already saved (or is still streaming).
+  const at = run ? replyIndex(current.messages, executionId, runOrder, run.position) : current.messages.length;
+  current.messages.splice(at, 0, ...assistantMessages);
   // A write that links messages is judged against the chat as it is now, the turn's own messages included.
   const committed = commitLinks(historyMessages(current.messages), writes, definitions);
   // Every settled turn leaves an entry, with or without writes, so turn counting is stable. Whether it still
@@ -126,6 +135,7 @@ export function settleTurn(
     executionId: run.executionId,
     workflowId: run.workflowId,
     part: 'reply',
+    position: run.position,
     status: run.status,
     ...(run.status === 'error' && run.error ? { error: run.error.slice(0, POST_ERROR_LIMIT) } : {}),
   };
@@ -134,16 +144,17 @@ export function settleTurn(
       executionId: post.executionId,
       workflowId: post.workflowId,
       part: 'post',
+      position: post.position,
       status: 'running',
     }),
   );
-  if (!record || record.executionId === executionId)
+  if (!hasTurnEntry(current.state, executionId))
     current.state = withTurnEntry(current.state, {
       executionId,
       at: now(),
       completed: !interrupted && !(regenerate && !assistantMessages.length),
       replies: assistantMessages.length,
-      writes: committed.writes,
+      writes: run ? taggedWrites(committed.writes, run.executionId) : committed.writes,
       ...(committed.warnings.length && {
         linkWarnings: committed.warnings
           .map((text) => text.slice(0, LINK_WARNING_LIMITS.length))
@@ -151,7 +162,7 @@ export function settleTurn(
       }),
       runs: [...(record ? [record] : []), ...announce],
     });
-  else
+  else if (record)
     current.state = withRunSettled(current.state, executionId, {
       run: record,
       writes: committed.writes,

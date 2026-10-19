@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { registry } from '@st/engine';
-import { apiContract, type Session } from '@st/shared';
+import { noAccess, apiContract, type Session } from '@st/shared';
 import { define, edge, makeSession, makeWorkflow, node, tempApps, type App } from './story.js';
 
 // Helpers of the regenerate and swipe tests.
@@ -17,6 +17,7 @@ function altNode() {
   let begin: (() => void) | undefined;
   registry.set(ALT_TYPE, {
     type: ALT_TYPE,
+    access: () => noAccess(),
     label: 'Alt',
     description: '',
     category: 'Tests',

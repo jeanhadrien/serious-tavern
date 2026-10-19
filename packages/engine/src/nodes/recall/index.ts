@@ -93,6 +93,7 @@ export const recall: NodeDefinition = {
     maxChars: 0,
     separator: '\n\n',
   },
+  access: () => ({ reads: [{ kind: 'messages' }], writes: [] }),
   async execute(ctx) {
     const config = ctx.config as RecallConfig;
     const collections = await loadCollections(ctx, config.collectionIds);

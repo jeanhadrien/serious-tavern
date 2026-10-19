@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cardTemplates, noAccess } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 
 export const character: NodeDefinition = {
@@ -22,6 +23,13 @@ export const character: NodeDefinition = {
     if (config.source === 'card' && !(await resources.characters?.get(String(config.characterId))))
       throw new Error(`Character ${config.characterId || '(none)'} not found`);
     return { inputs: character.inputs, outputs: character.outputs };
+  },
+  access: () => noAccess(),
+  // A card's fields are templates too, expanded wherever the card is rendered.
+  async resourceTemplates(config, resources) {
+    return config.source === 'card'
+      ? cardTemplates(await resources.characters?.get(String(config.characterId ?? '')), 'character')
+      : [];
   },
   async execute(ctx) {
     const card =

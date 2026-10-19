@@ -50,9 +50,16 @@ describe('turns with story state', () => {
       ]);
       const entries = entriesOf(await readSession(app, session.id));
       expect(entries).toHaveLength(7);
+      // Each write is tagged with the run that made it (a chat of one workflow: the run is the turn).
       expect(entries.map((entry) => entry.writes)).toEqual(
-        [1, 2, 3, 4, 5, 5, 5].map((value) => [
-          { op: 'set', target: { kind: 'definition', definitionId: definition.id, key: 'n' }, nodeId: 'bump', value },
+        [1, 2, 3, 4, 5, 5, 5].map((value, index) => [
+          {
+            op: 'set',
+            target: { kind: 'definition', definitionId: definition.id, key: 'n' },
+            nodeId: 'bump',
+            runId: entries[index]!.executionId,
+            value,
+          },
         ]),
       );
       for (const entry of entries) expect(entry).toMatchObject({ completed: true, replies: 1 });

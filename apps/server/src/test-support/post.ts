@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { vi } from 'vitest';
 import { z } from 'zod';
 import { registry } from '@st/engine';
-import { apiContract, type RunStatus } from '@st/shared';
+import { noAccess, apiContract, type RunStatus } from '@st/shared';
 import { ChangeHub } from '../services/change-events.js';
 import { TurnRegistry } from '../services/turns.js';
 import { define, edge, makeWorkflow, node, tempApps, type App } from './story.js';
@@ -33,6 +33,7 @@ export function gateNode() {
   });
   registry.set(GATE_TYPE, {
     type: GATE_TYPE,
+    access: () => noAccess(),
     label: 'Post Gate',
     description: '',
     category: 'Tests',
@@ -76,6 +77,7 @@ export function gateNode() {
 function registerRepliesText() {
   registry.set(REPLIES_TEXT_TYPE, {
     type: REPLIES_TEXT_TYPE,
+    access: () => noAccess(),
     label: 'Replies Text',
     description: '',
     category: 'Tests',

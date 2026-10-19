@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import type { ChatMessage, Edge, Workflow } from '@st/shared';
+import { noAccess, type ChatMessage, type Edge, type Workflow } from '@st/shared';
 import { executeWorkflow, validateWorkflow } from './executor.js';
 import { descriptors, registry } from './registry.js';
 import type { EngineEvent, NodeDefinition } from './types.js';
@@ -37,6 +37,7 @@ const testType = (type: string, extra: Partial<NodeDefinition>): NodeDefinition 
   label: type,
   description: '',
   category: '',
+  access: () => noAccess(),
   inputs: [{ name: 'value', label: 'Value', dataType: 'any' }],
   outputs: [{ name: 'value', label: 'Value', dataType: 'any' }],
   configSchema: z.object({}),

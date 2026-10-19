@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { registry } from '@st/engine';
-import { apiContract, type Session } from '@st/shared';
+import { apiContract, noAccess, type Session } from '@st/shared';
 import { define, edge, makeWorkflow, node, send, tempApps, type App } from './story.js';
 import { stateView, waitForPostRun } from './post.js';
 import { makeListSession } from './triggers.js';
@@ -25,7 +25,14 @@ export function holdStarted(): Promise<void> {
 
 /** Registers the test node types; call `dispose` in `afterEach`. */
 function linkNodes() {
-  const base = { label: '', description: '', category: 'Tests', configSchema: z.object({}), defaultConfig: {} };
+  const base = {
+    label: '',
+    description: '',
+    category: 'Tests',
+    configSchema: z.object({}),
+    defaultConfig: {},
+    access: () => noAccess(),
+  };
   registry.set(SUMMARIZER, {
     ...base,
     type: SUMMARIZER,

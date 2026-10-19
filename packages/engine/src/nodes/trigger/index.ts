@@ -1,4 +1,4 @@
-import type { PortDef } from '@st/shared';
+import { noAccess, type PortDef } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { numberInput } from '../number-input.js';
 import { configSchema, defaultConfig, signalPorts, type TriggerConfig } from './config.js';
@@ -66,6 +66,8 @@ export const trigger: NodeDefinition = {
   async resolvePorts(config) {
     return { inputs: [...inputs, ...signalPorts(config)], outputs };
   },
+  // Its `fires` memory is private to the node and its workflow (see `StateWriteTarget`): it conflicts with no other workflow.
+  access: () => noAccess(),
   async execute(ctx) {
     const config = ctx.config as TriggerConfig;
     // The three fixed inputs are requiredIfConnected: present here means connected, so a skipped source skips the node.

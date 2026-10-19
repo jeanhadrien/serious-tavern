@@ -6,17 +6,18 @@ import { errorMessage } from '../errors.js';
 import { failureMessage, stopWarning } from './failure.js';
 import { settleAfterRun } from './settle-after-run.js';
 import { historyMessages } from './settle-turn.js';
-import { foldRun, type PlannedRun, type StartedTurn } from './turn-start.js';
+import { foldRun, waitedFor, type PlannedRun, type StartedTurn } from './turn-start.js';
 import type { RunningTurn } from './turns.js';
 
 type Outcome = { result: PostRunResult; execution?: ExecutionLog };
 
 /**
- * The runs of a turn's after section: the enabled workflows below the last one that replies, one after another in list
- * order, each settling into the turn's entry before the next starts, so it reads what the ones above it wrote. They run
- * in the turn's queue slot (`RunningTurn.after`), after the turn's result was sent: the next message waits for them and
- * Stop stops the running one, and the rest are then not run: their records in the entry (listed `running` when the reply
- * section settled) end as stopped, never left `running`.
+ * The runs of a turn's after section: the enabled workflows below the last one that replies. Like the reply section, a
+ * run starts once the earlier runs whose writes it reads have ended (the reply section's all have), so those that cannot
+ * affect each other run at the same time; each settles into the turn's entry, which stores everything in list order, so it
+ * reads what the runs it waited for wrote. They run in the turn's queue slot (`RunningTurn.after`), after the turn's result
+ * was sent: the next message waits for them and Stop stops every running one, and the ones that have not started are then
+ * not run: their records in the entry (listed `running` when the reply section settled) end as stopped, never left `running`.
  */
 export async function runAfterSection(
   context: AppContext,
@@ -24,19 +25,26 @@ export async function runAfterSection(
   started: StartedTurn,
   run: RunningTurn,
 ): Promise<void> {
-  for (const planned of started.after) {
-    if (!run.stoppedBy) await runAfterRun(context, sessionId, started, planned, run);
-    else
-      await settle(
-        context,
-        sessionId,
-        started,
-        planned,
-        run.stoppedBy === 'shutdown'
-          ? { status: 'error', error: POST_INTERRUPTED_MESSAGE, writes: [] }
-          : { status: 'stopped', writes: [] },
-      );
-  }
+  await Promise.all(
+    started.after.map(async (planned) => {
+      try {
+        await started.board.until(planned.waitsFor);
+        if (!run.stoppedBy) await runAfterRun(context, sessionId, started, planned, run);
+        else
+          await settle(
+            context,
+            sessionId,
+            started,
+            planned,
+            run.stoppedBy === 'shutdown'
+              ? { status: 'error', error: POST_INTERRUPTED_MESSAGE, writes: [] }
+              : { status: 'stopped', writes: [] },
+          );
+      } finally {
+        started.board.end(planned.position);
+      }
+    }),
+  );
 }
 
 /**
@@ -89,7 +97,7 @@ async function settle(
     const updated = await context.sessions.silent.update(sessionId, (current) => {
       warnings = settleAfterRun(current, {
         turnExecutionId: started.turnId,
-        run: { executionId: planned.runId, workflowId: planned.workflow.id },
+        run: { executionId: planned.runId, workflowId: planned.workflow.id, position: planned.position },
         definitions: started.definitions,
         ...settlement,
       });
@@ -167,6 +175,7 @@ async function execute(
   }
   execution.part = 'post';
   execution.turnExecutionId = started.turnId;
+  execution.waitedFor = waitedFor(started, planned);
   execution.warnings.push(...planned.settingIssues, ...story.issues);
   return { result, execution };
 }

@@ -1,4 +1,5 @@
 import type {
+  Access,
   Character,
   ChatMessage,
   Collection,
@@ -33,8 +34,13 @@ export type NodeResources = {
   providers?: { get(id: string): Promise<Provider | undefined> };
   // Authored collections by id (Recall, Draw). Read-only for workflows: no node writes them.
   collections?: { get(id: string): Promise<Collection | undefined> };
-  // State definitions by id (State Read and State Write resolve their ports from them).
-  stateDefinitions?: { get(id: string): Promise<StateDefinition | undefined> };
+  // State definitions by id (State Read and State Write resolve their ports from them). `list` (all of them) is how
+  // templates' `{{state.<name>.<key>}}` references are mapped to definitions when the run's access is computed; without it
+  // every state reference counts as a read of all story state.
+  stateDefinitions?: {
+    get(id: string): Promise<StateDefinition | undefined>;
+    list?(): Promise<StateDefinition[]>;
+  };
 };
 // Where a write goes: a definition's key, or the writing node's own implicit key (Draw's `draws`).
 export type StateWriteTarget =
@@ -96,6 +102,13 @@ export type ExecutionContext = {
   recordWire(exchange: WireExchange): void;
   emit(event: EngineEvent): void;
 };
+// What `NodeDefinition.access` is told about the node it describes.
+export type NodeAccessInfo = {
+  // The node's output ports that some connection uses.
+  connected: ReadonlySet<string>;
+  // A state definition by id (from the listing the run loaded); undefined when there is none with that id.
+  definition(id: string): StateDefinition | undefined;
+};
 export type NodeDefinition = {
   type: string;
   label: string;
@@ -108,6 +121,14 @@ export type NodeDefinition = {
     resources: NodeResources,
   ) => Promise<{ inputs: PortDef[]; outputs: PortDef[] }>;
   templateFields?: string[];
+  // The templates the node renders that come from a resource instead of its config (the LLM's preset). Used with
+  // `templateFields` to work out what the node reads of the chat's shared data.
+  resourceTemplates?: (config: Record<string, unknown>, resources: NodeResources) => Promise<string[]>;
+  // What the node reads and writes of the chat's shared data (story state, the chat's messages) when it runs, beyond what its
+  // templates read. REQUIRED, so that a new node cannot forget it: the workflows of a chat's reply list run at the same
+  // time unless one writes what another reads (see `Access`). A node that touches none returns `noAccess()`. Never read
+  // `ctx.state` or `ctx.history` in `execute` without declaring it here.
+  access(config: Record<string, unknown>, info: NodeAccessInfo): Access;
   configSchema: z.ZodType<Record<string, unknown>>;
   defaultConfig: Record<string, unknown>;
   timeoutMs?: number;

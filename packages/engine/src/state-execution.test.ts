@@ -1,3 +1,4 @@
+import { noAccess } from '@st/shared';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { ChatMessage, Edge, StateDefinition, Workflow } from '@st/shared';
@@ -69,6 +70,7 @@ const writer = (): NodeDefinition => ({
   label: 'writer-test',
   description: '',
   category: '',
+  access: () => noAccess(),
   sink: true,
   inputs: [{ name: 'value', label: 'Value', dataType: 'any' }],
   outputs: [{ name: 'seen', label: 'Seen', dataType: 'text', optional: true }],
@@ -136,6 +138,7 @@ const register = () => {
   registry.set('strict-test', {
     ...writer(),
     type: 'strict-test',
+    access: () => noAccess(),
     outputs: [{ name: 'seen', label: 'Seen', dataType: 'text' }],
   });
 };

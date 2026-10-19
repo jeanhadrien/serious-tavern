@@ -8,6 +8,7 @@ import { listedWorkflows } from './panel/replyList.js';
 import { ReplySection } from './panel/ReplySection.js';
 import { SettingsSection, type SaveSettings } from './panel/SettingsSection.js';
 import type { SaveReplyList } from './panel/useReplyList.js';
+import { useReplyPlan } from './panel/useReplyPlan.js';
 import { closesPanelAfter, scrollToItem, scrollToMessage, scrollToTurn } from './story/scrollToTurn.js';
 import { StorySection } from './story/StorySection.js';
 import type { StoryPanelData } from './story/useStoryState.js';
@@ -52,6 +53,7 @@ export const ChatPanel = memo(function ChatPanel({
 }) {
   const panel = useRef<HTMLElement>(null);
   const width = useStoredSize('chat-panel', WIDTH);
+  const plan = useReplyPlan(sessionId, replyList);
   // Settings follow the saved list, not a change still being saved: the server checks values against the saved one.
   const listed = useMemo(() => listedWorkflows(replyList, workflows), [replyList, workflows]);
   // Node memory names its workflow only when there are several to tell apart.
@@ -101,7 +103,13 @@ export const ChatPanel = memo(function ChatPanel({
         </div>
         <section aria-labelledby={`chat-reply-${sessionId}`}>
           <h3 id={`chat-reply-${sessionId}`}>On reply</h3>
-          <ReplySection sessionId={sessionId} workflows={workflows} stored={replyList} onSave={onSaveReply} />
+          <ReplySection
+            sessionId={sessionId}
+            workflows={workflows}
+            stored={replyList}
+            plan={plan}
+            onSave={onSaveReply}
+          />
         </section>
         <section aria-labelledby={`chat-settings-${sessionId}`}>
           <h3 id={`chat-settings-${sessionId}`}>Settings</h3>

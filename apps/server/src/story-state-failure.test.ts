@@ -68,7 +68,13 @@ describe('story state of failed and stopped turns', () => {
       expect(entriesOf(saved)).toHaveLength(1);
       expect(entry).toMatchObject({ completed: false, replies: 1 });
       expect(entry!.writes).toEqual([
-        { op: 'set', target: { kind: 'definition', definitionId: definition.id, key: 'n' }, nodeId: 'bump', value: 1 },
+        {
+          op: 'set',
+          target: { kind: 'definition', definitionId: definition.id, key: 'n' },
+          nodeId: 'bump',
+          runId: entry!.executionId,
+          value: 1,
+        },
       ]);
       // The partial reply keeps the turn present: it is counted and its write applies.
       const fixed = counting(definition.id, false);

@@ -337,7 +337,7 @@ it('describes the reply list of a chat: both ways to create one, a whole-replace
   expect(apiContract.sendMessage.response.parse(result).executions).toHaveLength(2);
   expect(apiContract.sendMessage.response.parse({ assistantMessages: [], execution: log }).executions).toBeUndefined();
   const events = [
-    { type: 'run.start', runId: 'r1', workflowId: 'wf', workflowName: 'Story' },
+    { type: 'run.start', runId: 'r1', workflowId: 'wf', workflowName: 'Story', position: 0 },
     { type: 'node.start', nodeId: 'llm', runId: 'r1' },
     { type: 'node.delta', nodeId: 'llm', runId: 'r1', textDelta: 'x' },
     { type: 'node.complete', nodeId: 'llm', runId: 'r1' },
@@ -345,6 +345,15 @@ it('describes the reply list of a chat: both ways to create one, a whole-replace
   ];
   for (const event of events) expect(apiContract.streamTurn.response.parse(event)).toMatchObject(event);
   expect(apiContract.streamTurn.response.safeParse({ type: 'run.start', runId: 'r1' }).success).toBe(false);
+  // A run's position (its index among the enabled workflows) is part of the event.
+  expect(
+    apiContract.streamTurn.response.safeParse({
+      type: 'run.start',
+      runId: 'r1',
+      workflowId: 'wf',
+      workflowName: 'Story',
+    }).success,
+  ).toBe(false);
 
   // The state view: a turn's runs, and the node state of a workflow, both additive.
   const turn = { executionId: 'x', at: '', completed: true, replies: 1, turnNumber: 1, writes: [] };

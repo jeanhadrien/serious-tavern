@@ -26,6 +26,8 @@ export const chatOutput: NodeDefinition = {
       ),
   }),
   defaultConfig: { template: '', name: '', order: 0 },
+  // Appends the reply to the chat; the template reads are added from `templateFields`.
+  access: () => ({ reads: [], writes: [{ kind: 'messages' }] }),
   async execute(ctx) {
     if (Object.hasOwn(ctx.inputs, 'character')) characterSchema.parse(ctx.inputs.character);
     return {

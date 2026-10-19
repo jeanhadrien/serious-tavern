@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { PortDef } from '@st/shared';
+import { noAccess, type PortDef } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { describeValue } from '../../text.js';
 
@@ -137,6 +137,7 @@ export const random: NodeDefinition = {
     if (!modes.includes(mode as Mode)) throw new Error(`Unknown mode "${String(mode)}"`);
     return ports[mode as Mode];
   },
+  access: () => noAccess(),
   async execute(ctx) {
     const config = ctx.config as { mode: Mode; min?: number; max?: number; weightField: string; probability: number };
     // Exactly one draw per run in every mode, so `roll` tells the whole story.

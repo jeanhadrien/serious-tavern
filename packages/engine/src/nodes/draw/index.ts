@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DRAW_STATE_KEY } from '@st/shared';
+import { noAccess, DRAW_STATE_KEY } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { candidates, entryOutput, loadCollections, type Candidate } from '../../collections.js';
 import { describeValue } from '../../text.js';
@@ -111,6 +111,8 @@ export const draw: NodeDefinition = {
     useWeights: true,
     avoidRecent: 0,
   },
+  // Its `draws` memory is private to the node and its workflow (see `StateWriteTarget`): it conflicts with no other workflow.
+  access: () => noAccess(),
   async execute(ctx) {
     const config = ctx.config as DrawConfig;
     // Both inputs are requiredIfConnected: present here means connected, so a skipped source skips the node.

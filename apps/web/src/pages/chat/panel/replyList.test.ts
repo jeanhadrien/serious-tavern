@@ -7,6 +7,7 @@ import {
   copiedList,
   listedWorkflows,
   moveEntry,
+  planHints,
   removeEntry,
   replyRows,
   rowLabel,
@@ -101,5 +102,57 @@ describe('the list a new chat starts with', () => {
   it('copies only the workflow and its switch, not what else is stored on an entry', () => {
     const triggers = { reply: [{ ...entry('a'), later: 1 }] };
     expect(copiedList({ workflowId: 'a', triggers }, all)).toEqual([entry('a')]);
+  });
+});
+
+describe('plan hints', () => {
+  const plan = (...entries: { workflowId: string; waitsFor: string[]; reason?: string }[]) => ({ entries });
+
+  it('says a workflow runs alongside the ones above, or waits for named workflows with the reason as title', () => {
+    const hints = planHints(
+      [entry('a'), entry('b'), entry('c')],
+      all,
+      plan(
+        { workflowId: 'a', waitsFor: [] },
+        { workflowId: 'b', waitsFor: [] },
+        { workflowId: 'c', waitsFor: ['a', 'b'], reason: 'reads scene.tension, which Narrator writes' },
+      ),
+    );
+    // The first row has nothing above it.
+    expect(hints.get('a')).toBeUndefined();
+    expect(hints.get('b')).toEqual({ text: 'Runs alongside the ones above' });
+    expect(hints.get('c')).toEqual({
+      text: 'Waits for Narrator, Memory',
+      title: 'reads scene.tension, which Narrator writes',
+    });
+  });
+
+  it('counts the first enabled row as the one with nothing above it, and gives a disabled row no hint', () => {
+    const hints = planHints(
+      [entry('a', false), entry('b'), entry('c')],
+      all,
+      plan({ workflowId: 'b', waitsFor: [] }, { workflowId: 'c', waitsFor: [] }),
+    );
+    expect([...hints.keys()]).toEqual(['c']);
+  });
+
+  it('names a workflow it cannot find, and shows why a workflow cannot run', () => {
+    const hints = planHints(
+      [entry('a'), entry('b'), entry('x')],
+      all,
+      plan(
+        { workflowId: 'a', waitsFor: [], reason: 'This workflow is invalid, so it cannot run yet.' },
+        { workflowId: 'b', waitsFor: ['gone'] },
+        { workflowId: 'x', waitsFor: [], reason: 'This workflow no longer exists.' },
+      ),
+    );
+    expect(hints.get('a')).toEqual({ text: 'This workflow is invalid, so it cannot run yet.', problem: true });
+    expect(hints.get('b')).toEqual({ text: 'Waits for Unknown workflow (gone)' });
+    expect(hints.get('x')).toEqual({ text: 'This workflow no longer exists.', problem: true });
+  });
+
+  it('has no hints without a plan, or for a workflow the plan does not list', () => {
+    expect(planHints([entry('a'), entry('b')], all, undefined).size).toBe(0);
+    expect(planHints([entry('a'), entry('b')], all, plan({ workflowId: 'a', waitsFor: [] })).size).toBe(0);
   });
 });

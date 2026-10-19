@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { hashSeed, type ChatMessage, type Edge, type Workflow } from '@st/shared';
+import { noAccess, hashSeed, type ChatMessage, type Edge, type Workflow } from '@st/shared';
 import { ExecutionFailure, executeWorkflow } from './executor.js';
 import { createRandom } from './seeded-random.js';
 import { registry } from './registry.js';
@@ -95,6 +95,7 @@ describe('run seed', () => {
   const register = () =>
     registry.set('random-test', {
       type: 'random-test',
+      access: () => noAccess(),
       label: 'Random test',
       description: '',
       category: '',
@@ -141,6 +142,7 @@ describe('run seed', () => {
   it('records the seed of a failed run', async () => {
     registry.set('random-fail-test', {
       type: 'random-fail-test',
+      access: () => noAccess(),
       label: 'Random fail test',
       description: '',
       category: '',

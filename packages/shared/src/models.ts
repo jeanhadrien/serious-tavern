@@ -142,6 +142,11 @@ export const executionLogSchema = z
     part: z.enum(['reply', 'post']).optional(),
     /** On a post run's log: the execution id of the turn it belongs to. */
     turnExecutionId: z.string().optional(),
+    /**
+     * The runs of the same turn this one waited for before it started, by execution id: the workflows listed above it whose
+     * writes it reads (see `predecessors`). Empty when it ran at once; absent in older logs.
+     */
+    waitedFor: z.array(z.string()).optional(),
     nodes: z.record(z.string(), nodeExecutionSchema),
     warnings: z.array(z.string()).default([]),
   })

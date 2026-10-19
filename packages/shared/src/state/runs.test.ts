@@ -139,6 +139,104 @@ describe('withRunSettled', () => {
   });
 });
 
+describe('withRunSettled placing runs that finish out of order', () => {
+  // The entry of a turn of three runs listed a, b, c: whichever settles first creates it, the others settle into it.
+  const create = (settled: TurnRun, writes: ReturnType<typeof setWrite>[]) =>
+    withTurnEntry(
+      { turns: [] },
+      turnEntry(
+        't',
+        writes.map((write) => ({ ...write, runId: settled.executionId })),
+        {
+          replies: 1,
+          runs: [settled],
+        },
+      ),
+    );
+  const at = (executionId: string, position: number, status: TurnRun['status'] = 'completed') =>
+    run(executionId, 'reply', status, { position });
+  const settle = (state: unknown, settled: TurnRun, writes: ReturnType<typeof setWrite>[]) =>
+    withRunSettled(state, 't', { run: settled, writes, replies: 1 });
+  const values = (state: unknown) =>
+    entryOf(state).writes.map((write) => [write.runId, (write as { value?: unknown }).value]);
+
+  it('places records and writes in list order whatever the order they settle in', () => {
+    // c settles first, then a, then b: the entry reads a, b, c.
+    let state = create(at('c', 2), [setWrite('n', 3)]);
+    state = settle(state, at('a', 0), [setWrite('n', 1)]);
+    state = settle(state, at('b', 1), [setWrite('n', 2), setWrite('mood', 'tense')]);
+    expect(entryOf(state).runs!.map((item) => item.executionId)).toEqual(['a', 'b', 'c']);
+    expect(values(state)).toEqual([
+      ['a', 1],
+      ['b', 2],
+      ['b', 'tense'],
+      ['c', 3],
+    ]);
+    expect(entryOf(state).replies).toBe(3);
+  });
+
+  it("tags the writes it stores with their run, and keeps the order of a run's own writes", () => {
+    const state = settle(create(at('a', 0), []), at('b', 1), [setWrite('n', 1), setWrite('n', 2)]);
+    expect(values(state)).toEqual([
+      ['b', 1],
+      ['b', 2],
+    ]);
+  });
+
+  it('counts a write whose run is not recorded (older data), and a run without a position, as listed above everything', () => {
+    const legacy = withTurnEntry(
+      { turns: [] },
+      turnEntry('t', [setWrite('n', 0)], { replies: 1, runs: [run('t', 'reply', 'completed')] }),
+    );
+    // No positions anywhere: the order runs settled in, as before runs were concurrent.
+    const state = settle(legacy, run('x', 'reply', 'completed'), [setWrite('n', 1)]);
+    expect(entryOf(state).runs!.map((item) => item.executionId)).toEqual(['t', 'x']);
+    expect(values(state)).toEqual([
+      [undefined, 0],
+      ['x', 1],
+    ]);
+    // A run without a position counts as listed above everything, so a positioned run goes after it.
+    const placed = settle(state, at('p', 0), [setWrite('n', 2)]);
+    expect(values(placed)).toEqual([
+      [undefined, 0],
+      ['x', 1],
+      ['p', 2],
+    ]);
+  });
+
+  it('settles an announced run of the after section in place, after the reply runs and by position among its own', () => {
+    const state = withTurnEntry(
+      { turns: [] },
+      turnEntry('t', [], {
+        replies: 1,
+        runs: [at('a', 0), run('p', 'post', 'running', { position: 1 }), run('q', 'post', 'running', { position: 2 })],
+      }),
+    );
+    const afterQ = withRunSettled(state, 't', {
+      run: run('q', 'post', 'completed', { position: 2 }),
+      writes: [setWrite('n', 2)],
+    });
+    const afterP = withRunSettled(afterQ, 't', {
+      run: run('p', 'post', 'completed', { position: 1 }),
+      writes: [setWrite('n', 1)],
+    });
+    expect(entryOf(afterP).runs!.map((item) => [item.executionId, item.status])).toEqual([
+      ['a', 'completed'],
+      ['p', 'completed'],
+      ['q', 'completed'],
+    ]);
+    expect(values(afterP)).toEqual([
+      ['p', 1],
+      ['q', 2],
+    ]);
+  });
+
+  it('recomputes completed over the runs recorded so far', () => {
+    const state = settle(create(at('b', 1), []), at('a', 0, 'error'), []);
+    expect(entryOf(state).completed).toBe(false);
+  });
+});
+
 describe('effectiveRuns', () => {
   const entry = { runs: [run('t', 'reply', 'completed'), run('p', 'post', 'running'), run('q', 'post', 'running')] };
 

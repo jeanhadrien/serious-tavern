@@ -3,6 +3,7 @@ import type { ApiResponse, Character, ChatMessage, Session } from '@st/shared';
 import type { EngineEvent, PreparedWorkflow } from '@st/engine';
 import type { Repository } from '../storage/repository.js';
 import { now } from '../context.js';
+import { replyIndex } from './reply-order.js';
 import { passthroughSources, replyRanks } from './stream-bindings.js';
 
 export type TurnFrame = ApiResponse<'streamTurn'>;
@@ -60,6 +61,10 @@ export class TurnStream {
       executionId: string;
       // The run these rows and frames belong to: the rows' `runId`, and the `runId` of every node frame.
       runId: string;
+      // The run's index among the turn's runs and the runs' execution ids in list order: a row of a run listed above
+      // another's is stored before the other's rows, whichever run streams first (see `replyIndex`).
+      position: number;
+      runOrder: readonly string[];
       // A regenerate's rows are alternatives of the turn this root started (see alternatives.ts).
       alternativeOf?: string;
       prepared: PreparedWorkflow;
@@ -205,8 +210,12 @@ export class TurnStream {
         ...(stream.reasoning ? { reasoning: stream.reasoning } : {}),
       };
       const index = later ? current.messages.findIndex((message) => message.id === later.id) : -1;
-      if (index === -1) current.messages.push(row);
-      else current.messages.splice(index, 0, row);
+      const { executionId, position, runOrder } = this.options;
+      current.messages.splice(
+        index === -1 ? replyIndex(current.messages, executionId, runOrder, position) : index,
+        0,
+        row,
+      );
       return current;
     });
     stream.minted = true;

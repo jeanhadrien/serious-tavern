@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { noAccess } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { stringify } from '../../text.js';
 import { checkType, expectedLabel, extractJson, type JsonExpect, jsonExpectTypes } from './extract.js';
@@ -47,6 +48,7 @@ export const parseJson: NodeDefinition = {
       ],
     };
   },
+  access: () => noAccess(),
   async execute(ctx) {
     const expect = ctx.config.expect as JsonExpect;
     const input = ctx.inputs.text;

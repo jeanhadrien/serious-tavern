@@ -65,8 +65,16 @@ export type TurnFailureDetails = z.infer<typeof turnFailureDetailsSchema>;
 export const turnEventSchema = z.discriminatedUnion('type', [
   // The turn's id: the execution id of its first run.
   z.object({ type: z.literal('turn.start'), executionId: z.string() }),
-  // Before each run's node events (one run per enabled workflow, one after another). Its node events carry the `runId`.
-  z.object({ type: z.literal('run.start'), runId: z.string(), workflowId: z.string(), workflowName: z.string() }),
+  // Before each run's node events, when the run starts: one run per enabled workflow of the reply section. Runs that cannot
+  // affect each other start (and stream) at the same time, so these arrive in start order, not list order; `position` is the
+  // run's index in the chat's enabled list, which is the order its replies appear in. Its node events carry the `runId`.
+  z.object({
+    type: z.literal('run.start'),
+    runId: z.string(),
+    workflowId: z.string(),
+    workflowName: z.string(),
+    position: z.number().int().nonnegative(),
+  }),
   z.object({ type: z.literal('node.start'), nodeId: z.string(), runId: z.string().optional() }),
   z.object({
     type: z.literal('node.delta'),
@@ -79,10 +87,22 @@ export const turnEventSchema = z.discriminatedUnion('type', [
   sendMessageResultSchema.extend({ type: z.literal('turn.complete') }),
   errorEnvelopeSchema.extend({ type: z.literal('turn.error') }),
 ]);
+// What each enabled workflow of a chat's reply list waits for (`GET /api/sessions/:id/reply-plan`): the same access sets a
+// turn schedules by, so the list can say beforehand which workflows run together. `waitsFor` are the workflows listed above
+// that it waits for directly (their ids, in list order); `reason` says why in plain words ("reads scene.tension, which
+// Pacing writes"). An entry with a `reason` and nothing to wait for is a workflow that cannot run: it is invalid or gone.
+export const replyPlanEntrySchema = z.object({
+  workflowId: z.string(),
+  waitsFor: z.array(z.string()),
+  reason: z.string().optional(),
+});
+export const replyPlanSchema = z.object({ entries: z.array(replyPlanEntrySchema) });
+export type ReplyPlan = z.infer<typeof replyPlanSchema>;
 export const sessionEndpoints = {
   listSessions: endpoint(z.array(sessionSummarySchema)),
   createSession: endpoint(sessionSchema, createSessionSchema),
   getSession: endpoint(sessionSchema, undefined, idParamsSchema),
+  getReplyPlan: endpoint(replyPlanSchema, undefined, idParamsSchema),
   updateSession: endpoint(sessionSchema, updateSessionSchema, idParamsSchema),
   deleteSession: endpoint(noContentSchema, undefined, idParamsSchema),
   sendMessage: endpoint(sendMessageResultSchema, sendMessageSchema, idParamsSchema),

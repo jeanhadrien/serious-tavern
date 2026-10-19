@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { noAccess } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { renderTemplate } from '../../template.js';
 export const httpRequest: NodeDefinition = {
@@ -31,6 +32,7 @@ export const httpRequest: NodeDefinition = {
     responseType: 'json',
     timeoutMs: 15000,
   },
+  access: () => noAccess(),
   async execute(ctx) {
     const headers = Object.fromEntries(
       (ctx.config.headers as { key: string; value: string }[])

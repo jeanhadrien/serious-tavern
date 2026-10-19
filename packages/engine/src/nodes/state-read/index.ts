@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  keyAccess,
   linkedInChatOrder,
   stateKeyPortType,
   stateReads,
@@ -83,6 +84,13 @@ export const stateRead: NodeDefinition = {
       ),
   }),
   defaultConfig: { definitionId: '', key: '', read: 'value' },
+  // Its key; a read of a collection's items (`value`, `linked`) also reads the chat, which their links are judged against.
+  access: (config, { definition }) => {
+    const definitionId = String(config.definitionId ?? '');
+    const key = String(config.key ?? '');
+    const facts = keyAccess(definitionId, key, definition(definitionId));
+    return { reads: config.read === 'meta' ? facts.filter(({ kind }) => kind === 'key') : facts, writes: [] };
+  },
   async resolvePorts(config, resources) {
     const found = await locateConfigured(config, (id) => resources.stateDefinitions?.get(id));
     return { inputs: [], outputs: outputsFor(found, readOf(config, found)) };

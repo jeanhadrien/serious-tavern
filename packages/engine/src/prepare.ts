@@ -1,6 +1,7 @@
 import { findBuiltInProvider, nodeDisplayName, workflowSettingIssues } from '@st/shared';
 import { canConnect } from '@st/shared/ports';
-import type { Edge, PortDef, ValidationIssue, Workflow } from '@st/shared';
+import type { Access, Edge, PortDef, ValidationIssue, Workflow } from '@st/shared';
+import { workflowAccess } from './access.js';
 import { upstreamOf } from './replies.js';
 import { registry } from './registry.js';
 import type { NodeDefinition, NodeResources } from './types.js';
@@ -14,6 +15,9 @@ export type PreparedWorkflow = {
   upstream: Map<string, string[]>;
   // Nodes some sink depends on, sinks included: the only nodes that run.
   reachable: Set<string>;
+  // What a run reads and writes of the chat's shared data (see `workflowAccess`): the story state and the chat's messages.
+  // Decides which workflows of a reply list may run at the same time.
+  access: Access;
 };
 
 export const labelOf = (type: string) => registry.get(type)?.label ?? type;
@@ -48,7 +52,12 @@ export async function prepareWorkflow(
       get: cachedGet(async (id) => findBuiltInProvider(id) ?? (await sourceResources.providers?.get(id))),
     },
     collections: { get: cachedGet(async (id) => sourceResources.collections?.get(id)) },
-    stateDefinitions: { get: cachedGet(async (id) => sourceResources.stateDefinitions?.get(id)) },
+    stateDefinitions: {
+      get: cachedGet(async (id) => sourceResources.stateDefinitions?.get(id)),
+      ...(sourceResources.stateDefinitions?.list
+        ? { list: async () => structuredClone(await sourceResources.stateDefinitions!.list!()) }
+        : {}),
+    },
   };
   const errors: ValidationIssue[] = [];
   const nameOf = (id: string) => nodeDisplayName(workflow.nodes, labelOf, id);
@@ -215,7 +224,11 @@ export async function prepareWorkflow(
     reachable.add(node.id);
     for (const id of upstreamOf(upstream, node.id)) reachable.add(id);
   }
-  return { errors: [], prepared: { workflow, resources, definitions, ports, incoming, upstream, reachable } };
+  const access = await workflowAccess({ workflow, reachable, definitions, resources });
+  return {
+    errors: [],
+    prepared: { workflow, resources, definitions, ports, incoming, upstream, reachable, access },
+  };
 }
 
 export async function validateWorkflow(workflow: Workflow, resources?: NodeResources): Promise<ValidationIssue[]> {

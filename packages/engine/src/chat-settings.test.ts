@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { presetSchema, type ChatMessage, type Edge, type Workflow } from '@st/shared';
+import { noAccess, presetSchema, type ChatMessage, type Edge, type Workflow } from '@st/shared';
 import { executeWorkflow } from './executor.js';
 import { prepareWorkflow, validateWorkflow } from './prepare.js';
 import { renderPreset } from './preset.js';
@@ -93,6 +93,7 @@ describe('settings in templates', () => {
     it('gives nodes a frozen object, so a node cannot change what the log records', async () => {
       registry.set('settings-writer-test', {
         type: 'settings-writer-test',
+        access: () => noAccess(),
         label: 'Writer',
         description: '',
         category: '',

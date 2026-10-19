@@ -1,3 +1,4 @@
+import { noAccess } from '@st/shared';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { Character, ChatMessage, Preset, Workflow } from '@st/shared';
@@ -221,6 +222,7 @@ describe('multiple chat outputs', () => {
   it('keeps completed replies on a downstream failure', async () => {
     registry.set('reply-fail-test', {
       type: 'reply-fail-test',
+      access: () => noAccess(),
       label: 'Fail',
       description: '',
       category: 'Test',

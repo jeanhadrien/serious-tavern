@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { analyzeLinks } from '@st/shared';
+import { analyzeLinks, keyAccess } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { coerceValue } from '../../text.js';
 import { itemsOf, locateCollection } from '../state-key.js';
@@ -39,6 +39,10 @@ export const unlinkedMessages: NodeDefinition = {
     key: z.string().min(1, 'Select a key'),
   }),
   defaultConfig: { definitionId: '', key: '' },
+  access: (config, { definition }) => {
+    const definitionId = String(config.definitionId ?? '');
+    return { reads: keyAccess(definitionId, String(config.key ?? ''), definition(definitionId)), writes: [] };
+  },
   async execute(ctx) {
     // Unlike Next Chunk the ports are static: a missing or mistaken key is an error when the node runs.
     const found = await locateCollection(ctx.config, (id) => ctx.state.definition(id));

@@ -4,7 +4,7 @@ import type { AppContext } from '../context.js';
 import { errorMessage, notFound } from '../errors.js';
 import { failureMessage, stopWarning } from './failure.js';
 import { settleTurn, type RunEnd } from './settle-turn.js';
-import { announcedRuns, type PlannedRun, type StartedTurn } from './turn-start.js';
+import { announcedRuns, waitedFor, type PlannedRun, type StartedTurn } from './turn-start.js';
 import { TurnStream, type TurnFrame } from './turn-stream.js';
 import type { RunningTurn } from './turns.js';
 
@@ -28,18 +28,19 @@ export type RunResult = {
 export type ReplyRunInput = {
   started: StartedTurn;
   planned: PlannedRun;
-  /** The history the run starts from: the turn's, plus the replies the runs above it saved. */
+  /** The history the run starts from: the turn's, plus the replies of the runs it waited for. */
   history: ChatMessage[];
-  /** What it starts from: the turn-start state plus what the runs above it committed. */
+  /** What it starts from: the turn-start state plus what the runs it waited for committed. */
   start: { state: StateSnapshot; issues: string[] };
-  /** The replies the runs above it saved (Chat Input's `replies`), in chat order. */
+  /** The replies of the runs it waited for (Chat Input's `replies`), in chat order. */
   replies: ChatMessage[];
-  /** Only for the first run of the turn, which stores the message. */
+  /** The turn's user message: stored as saved by whichever run settles first, so every run is given it. */
   userMessage?: ChatMessage;
-  /** The runs above it. */
-  earlier: readonly RunResult[];
-  /** The turn's last reply-section run announces the after section in the write that settles it. */
-  isLast: boolean;
+  /**
+   * Told how the run ended, once that is known and before its result is written, so that the section can tell which run
+   * settles last: it answers whether this run's write announces the after section.
+   */
+  ended: (end: { stopped: boolean; produced: number }) => boolean;
   emit?: (frame: TurnFrame) => void;
 };
 
@@ -54,16 +55,16 @@ function runEnd(failure: unknown, turn: RunningTurn): RunEnd {
 }
 
 /**
- * Runs one workflow of the reply section and settles it into the session in its own update (the turn's first run
- * creates the entry, later ones add to it). When this is the section's last run and nothing was stopped, the runs of the
- * after section are announced in that same write (`running` in the entry), and `announced` says so: they then run once
- * the turn's result is sent. Never throws for the workflow's own failure.
+ * Runs one workflow of the reply section and settles it into the session in its own update (the run that settles first
+ * creates the turn's entry, the others add to it, placed by list position). When this settles the section's last run and
+ * nothing was stopped, the runs of the after section are announced in that same write (`running` in the entry), and
+ * `announced` says so: they then run once the turn's result is sent. Never throws for the workflow's own failure.
  */
 export async function runReplyRun(
   context: AppContext,
   sessionId: string,
   turn: RunningTurn,
-  { started, planned, history, start, replies: above, userMessage, earlier, isLast, emit }: ReplyRunInput,
+  { started, planned, history, start, replies: above, userMessage, ended, emit }: ReplyRunInput,
 ): Promise<{ result: RunResult; announced: boolean }> {
   const { sessions, executions, secrets } = context;
   const { prepared, runId, workflow } = planned;
@@ -74,6 +75,8 @@ export async function runReplyRun(
         sessionId,
         executionId: turnId,
         runId,
+        position: planned.position,
+        runOrder: started.runs.map((run) => run.runId),
         alternativeOf: started.rootId,
         prepared,
         emit,
@@ -109,15 +112,14 @@ export async function runReplyRun(
   execution?.warnings.push(...planned.settingIssues, ...start.issues);
   const stoppedNow = !outcome && !!turn.stoppedBy;
   if (stoppedNow && execution) execution.warnings.push(stopWarning('turn', turn.stoppedBy!));
-  if (execution) await executions.save(execution);
+  if (execution) {
+    execution.waitedFor = waitedFor(started, planned);
+    await executions.save(execution);
+  }
   // The after section follows a turn whose reply section ended without a stop, whether or not a workflow of it failed. A
   // regenerate that left no reply at all changes nothing in the chat: its turn is not present, so there is nothing to follow.
-  const all = [...earlier, { stopped: stoppedNow, produced: replies.length }];
-  const announced =
-    isLast &&
-    started.after.length > 0 &&
-    !all.some((item) => item.stopped) &&
-    !(started.rootId && all.every((item) => !item.produced));
+  // Decided here, with no await before the write, so that exactly one run (the last to end) announces it.
+  const announced = ended({ stopped: stoppedNow, produced: replies.length });
   if (announced) for (const { runId: id } of started.after) turn.postRunIds.add(id);
   const end = runEnd(outcome ? undefined : (failure ?? new Error('The run failed')), turn);
   const settled: { value?: { userMessage?: ChatMessage; assistantMessages: ChatMessage[]; linkWarnings: string[] } } =
@@ -126,7 +128,8 @@ export async function runReplyRun(
   const session = await sessions.silent.update(sessionId, (current) => {
     settled.value = settleTurn(current, {
       executionId: turnId,
-      run: { executionId: runId, workflowId: workflow.id, ...end },
+      run: { executionId: runId, workflowId: workflow.id, position: planned.position, ...end },
+      runOrder: started.runs.map((run) => run.runId),
       userMessage,
       replies,
       streamed,

@@ -75,9 +75,9 @@ it('tells each run of a reply list apart: run.start, then node events tagged wit
   });
   respondWith([
     frame({ type: 'turn.start', executionId: 'e' }),
-    frame({ type: 'run.start', runId: 'e', workflowId: 'w1', workflowName: 'First' }),
+    frame({ type: 'run.start', runId: 'e', workflowId: 'w1', workflowName: 'First', position: 0 }),
     frame({ type: 'node.delta', nodeId: 'out', runId: 'e', textDelta: 'A' }),
-    frame({ type: 'run.start', runId: 'f', workflowId: 'w2', workflowName: 'Second' }),
+    frame({ type: 'run.start', runId: 'f', workflowId: 'w2', workflowName: 'Second', position: 1 }),
     frame({ type: 'node.delta', nodeId: 'out', runId: 'f', reasoningDelta: 'think' }),
     done,
   ]);
@@ -89,9 +89,9 @@ it('tells each run of a reply list apart: run.start, then node events tagged wit
     onComplete: completed,
   });
   expect(seen).toEqual([
-    { runId: 'e', workflowId: 'w1', workflowName: 'First' },
+    { runId: 'e', workflowId: 'w1', workflowName: 'First', position: 0 },
     { nodeId: 'out', runId: 'e', textDelta: 'A' },
-    { runId: 'f', workflowId: 'w2', workflowName: 'Second' },
+    { runId: 'f', workflowId: 'w2', workflowName: 'Second', position: 1 },
     { nodeId: 'out', runId: 'f', reasoningDelta: 'think' },
   ]);
   expect(completed.mock.calls[0]?.[0].executions).toHaveLength(2);

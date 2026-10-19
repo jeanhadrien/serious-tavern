@@ -5,7 +5,7 @@ import { historyMessages } from './settle-turn.js';
 export type AfterSettlement = {
   turnExecutionId: string;
   /** The run of the after section being settled: it is listed in the turn's entry as `running` already. */
-  run: { executionId: string; workflowId: string };
+  run: { executionId: string; workflowId: string; position: number };
   /** Names the keys of the writes in the warnings of the link check. */
   definitions?: readonly StateDefinition[];
 } & PostRunResult;
@@ -28,6 +28,7 @@ export function settleAfterRun(
       executionId: run.executionId,
       workflowId: run.workflowId,
       part: 'post',
+      position: run.position,
       status: result.status,
       ...(result.status === 'error' && result.error ? { error: result.error.slice(0, POST_ERROR_LIMIT) } : {}),
     },

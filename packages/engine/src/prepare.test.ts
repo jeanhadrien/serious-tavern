@@ -1,3 +1,4 @@
+import { noAccess } from '@st/shared';
 import { afterEach, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { Preset, Workflow } from '@st/shared';
@@ -53,6 +54,7 @@ it('shares cloned resource snapshots between preparation and execution, includin
   const get = vi.fn(async () => preset);
   registry.set('prepare-test', {
     type: 'prepare-test',
+    access: () => noAccess(),
     label: 'Test',
     description: '',
     category: '',

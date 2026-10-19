@@ -61,8 +61,8 @@ describe('a turn of two workflows', () => {
       expect(others).toEqual([]);
       expect(entry).toMatchObject({ executionId: first!.id, completed: true, replies: 2 });
       expect(entry!.runs).toEqual([
-        { executionId: first!.id, workflowId: one.id, part: 'reply', status: 'completed' },
-        { executionId: second!.id, workflowId: two.id, part: 'reply', status: 'completed' },
+        { executionId: first!.id, workflowId: one.id, part: 'reply', position: 0, status: 'completed' },
+        { executionId: second!.id, workflowId: two.id, part: 'reply', position: 1, status: 'completed' },
       ]);
       expect((await readExecution(app, second!.id)).workflowId).toBe(two.id);
       // The next turn is turn 2 for both.
@@ -85,7 +85,8 @@ describe('a turn of two workflows', () => {
     const { app } = await open();
     try {
       const one = await sayingWorkflow(app, 'One', 'one');
-      const two = await sayingWorkflow(app, 'Two', 'two');
+      // Reads the chat history, so it waits for the first run: the runs then stream one after the other.
+      const two = await sayingWorkflow(app, 'Two', 'two {{history.length}}');
       const session = await makeListSession(app, [{ workflowId: one.id }, { workflowId: two.id }]);
       const response = await app.inject({
         method: 'POST',
@@ -99,6 +100,8 @@ describe('a turn of two workflows', () => {
         [one.id, 'One'],
         [two.id, 'Two'],
       ]);
+      // A run's position is its index in the chat's enabled list.
+      expect(starts.map(({ frame }) => (frame as { position: number }).position)).toEqual([0, 1]);
       const [a, b] = starts.map(({ frame }) => (frame as { runId: string }).runId);
       expect(frames[0]).toMatchObject({ executionId: a });
       const nodeRuns = frames.flatMap((frame, index) =>
@@ -232,7 +235,8 @@ describe('a run that fails or is stopped', () => {
         [edge('input', 'message', 'gate', 'value'), edge('gate', 'value', 'output', 'value')],
         'Held',
       );
-      const later = await sayingWorkflow(app, 'Later', 'never');
+      // Reads the chat history, so it waits for the held run (which writes the chat) and never starts.
+      const later = await sayingWorkflow(app, 'Later', 'never {{history.length}}');
       const session = await makeListSession(app, [{ workflowId: held.id }, { workflowId: later.id }]);
       const running = send(app, session.id);
       await gate.started;
@@ -267,7 +271,7 @@ describe('a run that fails or is stopped', () => {
         [edge('input', 'message', 'gate', 'value'), edge('gate', 'value', 'output', 'value')],
         'Held',
       );
-      const never = await sayingWorkflow(app, 'Never', 'never');
+      const never = await sayingWorkflow(app, 'Never', 'never {{history.length}}');
       const session = await makeListSession(app, [
         { workflowId: quick.id },
         { workflowId: held.id },

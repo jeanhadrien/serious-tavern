@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { createApp } from './app.js';
 import { placeholderPng, writePngCard } from './card.js';
 import {
+  noAccess,
   apiContract,
   errorEnvelopeSchema,
   type ApiEndpoint,
@@ -208,6 +209,8 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     const sessions = await request('listSessions', { method: 'GET', url: '/api/sessions' });
     expect(sessions[0]?.messageCount).toBe(2);
     await request('getSession', { method: 'GET', url: `/api/sessions/${session.id}` });
+    const plan = await request('getReplyPlan', { method: 'GET', url: `/api/sessions/${session.id}/reply-plan` });
+    expect(plan.entries).toEqual([{ workflowId: session.workflowId, waitsFor: [] }]);
     const story = await request('getSessionState', { method: 'GET', url: `/api/sessions/${session.id}/state` });
     expect(story.turn).toBe(2);
     expect(story.turns.map((entry) => entry.turnNumber)).toEqual([1]);
@@ -583,6 +586,7 @@ it('serializes same-session message exchanges and merges concurrent session patc
   });
   registry.set('slow-echo-test', {
     type: 'slow-echo-test',
+    access: () => noAccess(),
     label: 'Slow echo',
     description: '',
     category: 'Tests',

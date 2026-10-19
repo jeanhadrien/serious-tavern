@@ -47,6 +47,37 @@ it('keys a row by its run and node together: two workflows may use the same node
   ]);
 });
 
+it('places a row of a run listed above before the streaming rows of the runs below it, whichever streams first', () => {
+  const positions = new Map([
+    ['r1', 0],
+    ['r2', 1],
+    ['r3', 2],
+  ]);
+  let messages = applyDelta([user('u')], { nodeId: 'out', runId: 'r3', textDelta: 'C' }, positions);
+  messages = applyDelta(messages, { nodeId: 'out', runId: 'r1', textDelta: 'A' }, positions);
+  messages = applyDelta(messages, { nodeId: 'out', runId: 'r2', textDelta: 'B' }, positions);
+  messages = applyDelta(messages, { nodeId: 'out', runId: 'r3', textDelta: 'c' }, positions);
+  // Rows grow in place and settled messages never move.
+  expect(messages.slice(1).map((m) => [m.runId, m.content])).toEqual([
+    ['r1', 'A'],
+    ['r2', 'B'],
+    ['r3', 'Cc'],
+  ]);
+  const settled = [user('u'), assistant('s', { runId: 'r0' })];
+  expect(applyDelta(settled, { nodeId: 'out', runId: 'r1', textDelta: 'A' }, positions).map((m) => m.id)).toEqual([
+    'u',
+    's',
+    expect.any(String),
+  ]);
+});
+
+it('appends the row of a run whose position is not known', () => {
+  const positions = new Map([['r2', 1]]);
+  let messages = applyDelta([user('u')], { nodeId: 'out', runId: 'r2', textDelta: 'B' }, positions);
+  messages = applyDelta(messages, { nodeId: 'out', runId: 'other', textDelta: 'X' }, positions);
+  expect(messages.slice(1).map((m) => m.runId)).toEqual(['r2', 'other']);
+});
+
 it('opens a message log by its own run, else by the turn (older messages have no run id)', () => {
   expect(messageLogId({ runId: 'run', executionId: 'turn' })).toBe('run');
   expect(messageLogId({ executionId: 'turn' })).toBe('turn');

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { NodeDefinition } from '../../types.js';
-import { isPlainObject } from '@st/shared';
+import { noAccess, isPlainObject } from '@st/shared';
 
 /** The field names of the `fields` config: comma separated, trimmed, blanks and repeats dropped. */
 export const pickedNames = (fields: string): string[] => [
@@ -30,6 +30,7 @@ export const pickFields: NodeDefinition = {
       .describe('Field names to keep, separated by commas. A name the object lacks is left out.'),
   }),
   defaultConfig: { fields: '' },
+  access: () => noAccess(),
   async execute({ inputs, config, log }) {
     const names = pickedNames(String(config.fields ?? ''));
     if (!names.length) throw new Error('Pick Fields needs at least one field name');

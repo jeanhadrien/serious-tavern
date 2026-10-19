@@ -68,3 +68,28 @@ describe('analyzeTemplate', () => {
     expect(analyzeTemplate('{{#each}}x{{/each}}').problems).toEqual(['Block helper #each requires an argument']);
   });
 });
+
+describe('dynamic access to the render context', () => {
+  it('flags @root and this where the item is the render context itself', () => {
+    for (const template of [
+      '{{@root.state}}',
+      '{{lookup @root "state"}}',
+      '{{lookup this "state"}}',
+      '{{this}}',
+      '{{.}}',
+    ])
+      expect(analyzeTemplate(template).dynamic).toBe(true);
+    // In a conditional the context is unchanged, so `this` is still the render context.
+    expect(analyzeTemplate('{{#if input.x}}{{this.state}}{{/if}}').dynamic).toBe(true);
+  });
+
+  it("does not flag an item's own `this`, data variables, or ordinary paths", () => {
+    for (const template of [
+      '{{#each history}}{{this.content}}{{@index}}{{/each}}',
+      '{{#each history}}{{#if this.content}}x{{/if}}{{/each}}',
+      '{{state.scene.tension}}',
+      'plain',
+    ])
+      expect(analyzeTemplate(template).dynamic).toBeUndefined();
+  });
+});

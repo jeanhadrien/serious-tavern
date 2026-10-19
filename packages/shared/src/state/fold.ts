@@ -8,12 +8,20 @@ import { readTurnEntries } from './writes.js';
 type Slots = Map<string, SlotWrite[]>;
 
 // The writes of present turns grouped by definition id and by node id, then by key, in stored order.
-function collectWrites(turns: readonly TurnPresence[], workflowId: string | undefined) {
+function collectWrites(
+  turns: readonly TurnPresence[],
+  workflowId: string | undefined,
+  // The writes of the turn being run count only for these runs (a run reads what the runs it waited for committed).
+  visible: { turn: string; runs: ReadonlySet<string> } | undefined,
+) {
   const byDefinition = new Map<string, Slots>();
   const byNode = new Map<string, { nodeId: string; workflowId?: string; slots: Slots }>();
   for (const { entry, turn } of turns) {
     if (turn === null) continue;
     for (const write of entry.writes) {
+      // A write of the turn being run by a run this one must not see (listed below it, or not one it waited for).
+      if (visible && entry.executionId === visible.turn && write.runId !== undefined && !visible.runs.has(write.runId))
+        continue;
       const { target } = write;
       let slots: Slots;
       if (target.kind === 'definition') {
@@ -81,6 +89,12 @@ export type FoldInput = {
    * `turn` says otherwise the state is read as of that turn, so `trigger.turn` is the same for every run of the turn.
    */
   including?: string;
+  /**
+   * The runs of the turn being run (`including`) whose writes count, by execution id: a run of a turn that runs its
+   * workflows at the same time reads only what the runs it waited for committed, whatever else has settled meanwhile.
+   * Without it every write of the turn counts. Writes without a run tag (older ones) always count.
+   */
+  visibleRuns?: ReadonlySet<string>;
 };
 
 /**
@@ -95,11 +109,22 @@ export type FoldInput = {
  *   a key the definition no longer has, or for another key type, are ignored (and reported); writes for a
  *   definition that no longer exists are ignored silently. Restoring the definition brings them back.
  */
-export function foldStoryState({ definitions, messages, state, workflowId, including }: FoldInput): StoryState {
+export function foldStoryState({
+  definitions,
+  messages,
+  state,
+  workflowId,
+  including,
+  visibleRuns,
+}: FoldInput): StoryState {
   const turns = turnPresence(messages, readTurnEntries(state), including);
   const own = including === undefined ? undefined : turns.find(({ entry }) => entry.executionId === including)?.turn;
   const turn = own ?? turns.filter((presence) => presence.turn !== null).length + 1;
-  const { byDefinition, byNode } = collectWrites(turns, workflowId);
+  const { byDefinition, byNode } = collectWrites(
+    turns,
+    workflowId,
+    including !== undefined && visibleRuns ? { turn: including, runs: visibleRuns } : undefined,
+  );
   return {
     turn,
     turns,

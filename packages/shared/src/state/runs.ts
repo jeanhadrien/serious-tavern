@@ -41,10 +41,10 @@ function appendLinkWarnings(raw: Record<string, unknown>, warnings: readonly str
 export type RunSettlement = {
   /**
    * The run's record. A run the entry already lists (a run of the after section announced as `running`) is replaced in place; a
-   * run it does not list (a reply run after the first) is appended, so `runs` stays in the order the runs happened.
+   * run it does not list is placed by its `position` (appended when it has none), so `runs` stays in list order.
    */
   run: TurnRun;
-  /** The run's resolved writes, also of a failed or stopped run (the nodes that completed): appended after everything earlier. */
+  /** The run's resolved writes, also of a failed or stopped run (the nodes that completed): placed by the run's position. */
   writes: readonly StateWrite[];
   /** Assistant messages the run saved (partial rows included); added to the entry's count. */
   replies?: number;
@@ -65,14 +65,31 @@ export type RunSettlement = {
 const isRun = (raw: unknown): raw is Record<string, unknown> =>
   typeof raw === 'object' && raw !== null && !Array.isArray(raw);
 
+/** The writes tagged with the run that made them (see `stateWriteSchema`). */
+export const taggedWrites = (writes: readonly StateWrite[], runId: string): StateWrite[] =>
+  writes.map((write) => ({ ...write, runId }));
+
+const positionOf = (raw: unknown): number | undefined =>
+  isRun(raw) && typeof raw.position === 'number' ? raw.position : undefined;
+
+/** `items` with `item` inserted before the first one that `follows`, else at the end. */
+function inserted<T>(items: readonly T[], item: T, follows: (existing: T) => boolean): T[] {
+  const at = items.findIndex(follows);
+  return at < 0 ? [...items, item] : [...items.slice(0, at), item, ...items.slice(at)];
+}
+
 /**
- * `state` with a run of the turn `turnExecutionId` settled into its entry, (the one place runs are
- * recorded after the entry exists; the turn's first settle creates the entry itself):
- * `writes` appended AFTER everything earlier, so a later write to a key wins and deleting the turn's replies undoes all
- * of them; `replies` added; `linkWarnings` appended; the run's record appended or replaced; and, when the run is a reply
- * run, `completed` recomputed: true only while every reply run of the entry ran to the end (and, for a regenerate, the
- * turn replied). Keeps unknown things as `withUpdatedTurnEntry` does; no matching entry returns the state unchanged. A
- * run's `error` is kept only for the status `error` and cut to `POST_ERROR_LIMIT`. Never changes its input.
+ * `state` with a run of the turn `turnExecutionId` settled into its entry (the one place runs are recorded after the
+ * entry exists; the turn's first settle creates the entry itself): the run's `writes`, tagged with the run, placed by
+ * its list position; `replies` added; `linkWarnings` appended; the run's record placed or replaced; and, when the run is
+ * a reply run, `completed` recomputed: true only while every reply run of the entry ran to the end (and, for a
+ * regenerate, the turn replied). Keeps unknown things as `withUpdatedTurnEntry` does; no matching entry returns the state
+ * unchanged. A run's `error` is kept only for the status `error` and cut to `POST_ERROR_LIMIT`. Never changes its input.
+ *
+ * Runs of a turn may finish in any order, but the entry always reads as if they had settled top to bottom: a run's
+ * record goes after the records of the runs listed above it and before those listed below it, and so do its writes among
+ * the others' (a write whose run is not recorded, or a run without a position, counts as listed above everything). A run
+ * without a `position` is appended, which is the order of runs that settle one after another.
  */
 export function withRunSettled(state: unknown, turnExecutionId: string, settlement: RunSettlement): SessionState {
   const { run, writes, replies = 0, linkWarnings, announce = [], needsReply } = settlement;
@@ -84,27 +101,50 @@ export function withRunSettled(state: unknown, turnExecutionId: string, settleme
     };
     const earlier = Array.isArray(raw.runs) ? raw.runs : [];
     const listed = earlier.some((item) => isRun(item) && item.executionId === run.executionId);
-    const runs = [
-      ...(listed
-        ? earlier.map((item) => (isRun(item) && item.executionId === run.executionId ? record : item))
-        : [...earlier, record]),
-      ...announce,
-    ];
+    const placed = listed
+      ? earlier.map((item) => (isRun(item) && item.executionId === run.executionId ? record : item))
+      : run.position === undefined
+        ? [...earlier, record]
+        : inserted(earlier, record, (item) => (positionOf(item) ?? -1) > run.position!);
+    const runs = [...placed, ...announce];
     const total = (typeof raw.replies === 'number' ? raw.replies : 0) + replies;
     const replyRuns = runs.flatMap((item) => {
       const parsed = turnRunSchema.safeParse(item);
       return parsed.success && parsed.data.part === 'reply' ? [parsed.data] : [];
     });
     const completed = replyRuns.every((item) => item.status === 'completed') && !(needsReply && total === 0);
+    const position =
+      run.position ?? positionOf(placed.find((item) => isRun(item) && item.executionId === run.executionId));
+    const positions = new Map(
+      runs.flatMap((item) =>
+        isRun(item) && typeof item.executionId === 'string' ? [[item.executionId, positionOf(item)]] : [],
+      ),
+    );
+    const storedWrites = Array.isArray(raw.writes) ? raw.writes : [];
+    const tagged = taggedWrites(writes, run.executionId);
+    const settled =
+      position === undefined
+        ? [...storedWrites, ...tagged]
+        : [
+            ...storedWrites.filter((write) => !listsAfter(write, positions, position)),
+            ...tagged,
+            ...storedWrites.filter((write) => listsAfter(write, positions, position)),
+          ];
     return {
       ...raw,
       runs,
       replies: total,
-      writes: [...(Array.isArray(raw.writes) ? raw.writes : []), ...writes],
+      writes: settled,
       ...(run.part === 'reply' ? { completed } : {}),
       ...(linkWarnings?.length && { linkWarnings: appendLinkWarnings(raw, linkWarnings) }),
     };
   });
+}
+
+// Whether a stored write was made by a run listed below the one at `position`.
+function listsAfter(write: unknown, positions: ReadonlyMap<string, number | undefined>, position: number): boolean {
+  const runId = isRun(write) && typeof write.runId === 'string' ? write.runId : undefined;
+  return (runId === undefined ? -1 : (positions.get(runId) ?? -1)) > position;
 }
 
 /**

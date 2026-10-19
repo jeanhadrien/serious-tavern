@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { noAccess } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 export const chatInput: NodeDefinition = {
   type: 'chat-input',
@@ -27,6 +28,9 @@ export const chatInput: NodeDefinition = {
   ],
   configSchema: z.object({}),
   defaultConfig: {},
+  // `history` and `replies` are the chat as the runs above this one left it.
+  access: (_config, { connected }) =>
+    connected.has('history') || connected.has('replies') ? { reads: [{ kind: 'messages' }], writes: [] } : noAccess(),
   async execute({ trigger, history, replies }) {
     return {
       message: trigger.message,

@@ -19,6 +19,9 @@ export const sessionsApi = {
   /** Shows another alternative of the last turn; the answer is the whole stored session. */
   setAlternative: (id: string, body: ApiBody<'setAlternative'>, options?: RequestOptions) =>
     api<ApiResponse<'setAlternative'>>(`/sessions/${id}/alternative`, { ...json('PATCH', body), ...options }),
+  /** What each enabled workflow of the chat's reply list waits for: which run together (read-only). */
+  replyPlan: (id: string, options?: RequestOptions) =>
+    api<ApiResponse<'getReplyPlan'>>(`/sessions/${id}/reply-plan`, options),
   /** The chat's computed story state (read-only; the fold the next turn starts from). */
   state: (id: string, options?: RequestOptions) =>
     api<ApiResponse<'getSessionState'>>(`/sessions/${id}/state`, options),

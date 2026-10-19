@@ -34,6 +34,11 @@ export type TemplateAnalysis = {
   references: TemplateReference[];
   /** Plain-language problems: syntax errors and constructs that fail or render nothing at runtime. */
   problems: string[];
+  /**
+   * Set when the template reaches into the whole render context in a way the references cannot name (`{{@root.state}}`,
+   * `{{lookup this "state"}}` at the top level): it may read anything. Absent otherwise.
+   */
+  dynamic?: true;
 };
 
 type Scope = { changesContext: boolean; blockParams: readonly string[] };
@@ -127,13 +132,21 @@ function walkExpression(node: AST.Expression, scopes: Scope[], analysis: Templat
 }
 
 function walkPath(path: AST.PathExpression, scopes: Scope[], analysis: TemplateAnalysis): void {
-  // `@index`-style data variables and `this`/`./` refer to the current item rather than a named value.
-  if (path.data || path.original === 'this' || path.original.startsWith('this.') || path.original.startsWith('./'))
+  const depth = scopes.filter((scope) => scope.changesContext).length;
+  // `@index`-style data variables and `this`/`./` refer to the current item rather than a named value. Only `@root`, and
+  // `this` where the item is the root context itself, reach the whole render context.
+  const relative =
+    path.original === 'this' ||
+    path.original.startsWith('this.') ||
+    path.original.startsWith('./') ||
+    path.original === '.';
+  if (path.data || relative) {
+    if (path.original.startsWith('@root') || (!path.data && path.depth === depth)) analysis.dynamic = true;
     return;
+  }
   if (path.parts.length === 0 || path.parts.some((part) => typeof part !== 'string')) return;
   const head = path.parts[0] as string;
   if (path.depth === 0 && scopes.some((scope) => scope.blockParams.includes(head))) return;
-  const depth = scopes.filter((scope) => scope.changesContext).length;
   analysis.references.push({
     expression: `{{${path.original}}}`,
     name: path.parts.join('.'),

@@ -16,4 +16,5 @@ export * from './imports.js';
 export * from './character.js';
 export * from './macros.js';
 export * from './template-analysis.js';
+export * from './access/index.js';
 export * from './api/index.js';
