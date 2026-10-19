@@ -194,6 +194,31 @@ pre {
 .kv-row button {
   padding: 3px;
 }
+.level-table,
+.signal-table {
+  display: grid;
+  align-items: center;
+  gap: 6px 8px;
+}
+.level-table {
+  grid-template-columns: auto 1fr 1fr;
+}
+.signal-table {
+  grid-template-columns: 1fr 5rem auto;
+}
+.level-table input,
+.signal-table input {
+  width: 100%;
+  min-width: 0;
+  padding: 5px;
+}
+.level-table small,
+.signal-table small {
+  text-transform: none;
+}
+.signal-table .wide-row {
+  grid-column: 1 / -1;
+}
 .config-field {
   display: grid;
   gap: 6px;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { parseDecimal } from '@st/shared';
 import type { NodeConfigPanelProps } from './types.js';
 import { DraftInput } from './DraftInput.js';
@@ -82,11 +82,6 @@ export function TriggerPanel({ descriptor, config, onChange }: NodeConfigPanelPr
   const maxLevel = numberSetting(config, defaults, 'maxLevel', 2);
   return (
     <div className="config-fields">
-      <p className="hint">
-        Decides whether to inject something this turn and how strongly. Score = (base chance + growth × turns since the
-        last firing + Σ signal weight × signal) × (0.5 + volatility). It fires when a random roll is below the score and
-        a level is available. Draw or Recall choose what; the preset words it.
-      </p>
       <DraftInput
         label="Base chance"
         value={numberSetting(config, defaults, 'baseChance')}
@@ -131,13 +126,16 @@ export function TriggerPanel({ descriptor, config, onChange }: NodeConfigPanelPr
           Cooldown: turns between two firings at that level (0 = none). Weight: relative chance when it fires (0 =
           never).
         </small>
-        <div className="kv-list">
+        <div className="level-table">
+          <span />
+          <small>Cooldown</small>
+          <small>Weight</small>
           {TRIGGER_LEVELS.map((item) => (
-            <div className="kv-row" key={item}>
+            <Fragment key={item}>
               <span>Level {item}</span>
               {level('cooldowns', item, parseTurns, `Cooldown of level ${item}`)}
               {level('levelWeights', item, (text) => parseAtLeast(text, 0), `Weight of level ${item}`)}
-            </div>
+            </Fragment>
           ))}
         </div>
       </div>
@@ -147,37 +145,42 @@ export function TriggerPanel({ descriptor, config, onChange }: NodeConfigPanelPr
           Each named signal is an input from 0 to 1 (a classifier score, say) that adds weight × signal to the score. A
           negative weight lowers it; not connected counts as 0.
         </small>
-        <div className="kv-list">
+        <div className="signal-table">
+          {rows.length > 0 && (
+            <>
+              <small>Name</small>
+              <small>Weight</small>
+              <span />
+            </>
+          )}
           {rows.map((row, index) => {
             const problem = signalNameHint(row.name, rows, index);
             return (
-              <div key={index}>
-                <div className="kv-row">
-                  <NameCell
-                    label={`Signal ${index + 1} name`}
-                    value={row.name}
-                    onCommit={(name) => onChange(withSignals(config, changeSignal(rows, index, { name })))}
-                  />
-                  <NumberCell
-                    label={`Signal ${index + 1} weight`}
-                    value={row.weight}
-                    parse={parseDecimal}
-                    onCommit={(weight) => onChange(withSignals(config, changeSignal(rows, index, { weight })))}
-                  />
-                  <button
-                    type="button"
-                    aria-label={`Remove signal ${index + 1}`}
-                    title="Remove signal"
-                    onClick={() => onChange(withSignals(config, removeSignal(rows, index)))}
-                  >
-                    ×
-                  </button>
-                </div>
-                {problem && <small className="hint">{problem}</small>}
-              </div>
+              <Fragment key={index}>
+                <NameCell
+                  label={`Signal ${index + 1} name`}
+                  value={row.name}
+                  onCommit={(name) => onChange(withSignals(config, changeSignal(rows, index, { name })))}
+                />
+                <NumberCell
+                  label={`Signal ${index + 1} weight`}
+                  value={row.weight}
+                  parse={parseDecimal}
+                  onCommit={(weight) => onChange(withSignals(config, changeSignal(rows, index, { weight })))}
+                />
+                <button
+                  type="button"
+                  aria-label={`Remove signal ${index + 1}`}
+                  title="Remove signal"
+                  onClick={() => onChange(withSignals(config, removeSignal(rows, index)))}
+                >
+                  ×
+                </button>
+                {problem && <small className="hint wide-row">{problem}</small>}
+              </Fragment>
             );
           })}
-          <button type="button" onClick={() => onChange(withSignals(config, addSignal(rows)))}>
+          <button type="button" className="wide-row" onClick={() => onChange(withSignals(config, addSignal(rows)))}>
             + Add signal
           </button>
         </div>
