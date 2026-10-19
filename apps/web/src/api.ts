@@ -1,6 +1,6 @@
 export { ApiError, api, json } from './api/transport.js';
 export { sessionsApi, executionsApi } from './api/sessions.js';
-export { streamMessage } from './api/turnStream.js';
+export { streamMessage, streamRegenerate } from './api/turnStream.js';
 export { workflowsApi } from './api/workflows.js';
 export { presetsApi } from './api/presets.js';
 export { charactersApi, personasApi } from './api/entities.js';

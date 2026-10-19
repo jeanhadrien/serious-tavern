@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { ApiError } from './transport.js';
-import { streamMessage } from './turnStream.js';
+import { streamMessage, streamRegenerate } from './turnStream.js';
 
 const execution = { id: 'e', workflowId: 'w', sessionId: 's', status: 'completed', startedAt: '', nodes: {} };
 const user = { id: 'u', role: 'user', content: 'hi', createdAt: '' };
@@ -49,4 +49,19 @@ it('turns a non-2xx response into an ApiError and a cut connection into a networ
   const error = await streamMessage('s', 'hi', {}).catch((cause: unknown) => cause);
   expect(error).toBeInstanceOf(ApiError);
   expect(error).toMatchObject({ code: 'NETWORK_ERROR' });
+});
+
+it('regenerates through its own route with no body and no content type, and reads the same events', async () => {
+  respondWith([
+    frame({ type: 'turn.start', executionId: 'e' }),
+    frame({ type: 'turn.complete', assistantMessages: [], execution }),
+  ]);
+  const completed = vi.fn();
+  await streamRegenerate('s', { onComplete: completed });
+  const [url, init] = vi.mocked(fetch).mock.calls[0] ?? [];
+  expect(url).toBe('/api/sessions/s/regenerate/stream');
+  expect(init).toMatchObject({ method: 'POST' });
+  expect(init?.body).toBeUndefined();
+  expect(init?.headers).toBeUndefined();
+  expect(completed).toHaveBeenCalledOnce();
 });

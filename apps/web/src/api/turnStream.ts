@@ -16,20 +16,38 @@ export type TurnHandlers = {
  * server's), a failed request, or a connection that ended early. Aborting the signal rejects with
  * an AbortError. Nothing is toasted here: the caller decides what to show.
  */
-export async function streamMessage(
+export function streamMessage(
   id: string,
   content: string,
   handlers: TurnHandlers,
   options: { signal?: AbortSignal } = {},
 ): Promise<void> {
+  return readTurn(
+    `/api/sessions/${id}/messages/stream`,
+    { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) },
+    handlers,
+    options,
+  );
+}
+
+/** Runs the chat's last turn again (no body, no user message) and reads the same events as `streamMessage`. */
+export function streamRegenerate(
+  id: string,
+  handlers: TurnHandlers,
+  options: { signal?: AbortSignal } = {},
+): Promise<void> {
+  return readTurn(`/api/sessions/${id}/regenerate/stream`, {}, handlers, options);
+}
+
+async function readTurn(
+  url: string,
+  init: { headers?: Record<string, string>; body?: string },
+  handlers: TurnHandlers,
+  options: { signal?: AbortSignal },
+): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`/api/sessions/${id}/messages/stream`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-      signal: options.signal,
-    });
+    response = await fetch(url, { method: 'POST', ...init, signal: options.signal });
   } catch (cause) {
     throw isAbort(cause) ? cause : networkError(cause);
   }

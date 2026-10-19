@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import type { Character, ChatMessage, ExecutionLog, Persona } from '@st/shared';
 import { Bot, User } from 'lucide-react';
 import { charactersApi, personasApi } from '../../api.js';
+import { AlternativeControls, type AlternativeControlsProps } from './AlternativeControls.js';
 import { ExecutionDetails } from './ExecutionDetails.js';
 import { MessageContent } from './MessageContent.js';
 import { MessageActions } from './MessageActions.js';
@@ -22,6 +23,8 @@ interface ChatMessageViewProps {
   links?: readonly MessageLinkNote[];
   /** What deleting the message would undo of the story state (see `MessageActions`). */
   undoOnDelete?: () => readonly string[] | undefined;
+  /** Regenerate and swipe controls: given only to the last reply of the last turn. */
+  alternatives?: AlternativeControlsProps;
   disabled?: boolean;
   onEdit?: (id: string, content: string) => Promise<boolean>;
   onDelete?: (id: string) => Promise<boolean>;
@@ -45,6 +48,7 @@ export function ChatMessageView({
   storyChip,
   links,
   undoOnDelete,
+  alternatives,
   disabled = false,
   onEdit,
   onDelete,
@@ -134,6 +138,7 @@ export function ChatMessageView({
           {message.status === 'partial' && <small className="message-stopped">Stopped before it finished</small>}
         </>
       )}
+      {alternatives && !editing && <AlternativeControls {...alternatives} />}
       {storyChip && !editing && <TurnChip chip={storyChip} />}
       {message.executionId && <ExecutionDetails id={message.executionId} cached={execution} />}
     </article>

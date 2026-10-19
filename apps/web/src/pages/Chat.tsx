@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { activeMessages, alternativesOfLastTurn } from '@st/shared';
 import { useEscapeArea } from '../keyboard/escapeRegistry.js';
 import type { ChatState } from './chat/useChat.js';
 import { ChatHeader } from './chat/ChatHeader.js';
@@ -43,13 +44,19 @@ export function Chat({ chat }: { chat: ChatState }) {
   usePostRunAlerts(session?.id, story.view);
   // What deleting a reply would undo; the shared fold runs only when the trash button is clicked.
   const definitions = useList(stateDefinitionsStore);
-  const messages = session?.messages;
+  // The chat as it is shown: the replies of alternatives that aren't shown are left out of the thread, the chips
+  // and the delete check alike. One pass per change of the messages (a streamed token included), never per child.
+  const stored = session?.messages;
+  const messages = useMemo(() => (stored ? activeMessages(stored) : undefined), [stored]);
   const view = story.view;
   const undoOnDelete = useMemo(
     () =>
       messages && view ? (messageId: string) => undoneByDelete({ messageId, messages, view, definitions }) : undefined,
     [messages, view, definitions],
   );
+  // The controls of the last turn's last reply. None while a run is in flight: the thread is changing under it (a
+  // run on an empty send follows the previous turn's replies, which would look like its own).
+  const lastTurn = useMemo(() => (stored && !chat.busy ? alternativesOfLastTurn(stored) : null), [stored, chat.busy]);
   return (
     <section className="chat-main">
       {session ? (
@@ -73,7 +80,7 @@ export function Chat({ chat }: { chat: ChatState }) {
               <MessageList
                 key={`messages-${session.id}`}
                 sessionId={session.id}
-                messages={session.messages}
+                messages={messages ?? []}
                 characters={chat.characters}
                 persona={chat.personas.find((item) => item.id === session.personaId)}
                 logs={chat.logs}
@@ -83,6 +90,9 @@ export function Chat({ chat }: { chat: ChatState }) {
                 disabled={locked}
                 onEdit={chat.editMessage}
                 onDelete={chat.deleteMessage}
+                lastTurn={lastTurn}
+                onRegenerate={chat.regenerate}
+                onSwipe={chat.swipe}
                 onShowLinked={showLinked}
               />
               <PostRunStatus key={`post-${session.id}`} sessionId={session.id} run={postRun} onStopped={story.reload} />

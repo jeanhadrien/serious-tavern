@@ -127,6 +127,8 @@ it('renders a busy multiline composer, an empty edit guard and an accessible pen
       disabled
       onEdit={async () => true}
       onDelete={async () => true}
+      onRegenerate={() => {}}
+      onSwipe={async () => true}
     />,
   );
   expect(list).toContain('role="status"');
@@ -156,6 +158,8 @@ it('shows reasoning, a stopped note, and no pending indicator once a reply row i
       disabled
       onEdit={async () => true}
       onDelete={async () => true}
+      onRegenerate={() => {}}
+      onSwipe={async () => true}
     />,
   );
   expect(list).not.toContain('typing-dots');
@@ -254,6 +258,8 @@ it('shows the story chip on a message only when it is given one, and puts it on 
       disabled={false}
       onEdit={async () => true}
       onDelete={async () => true}
+      onRegenerate={() => {}}
+      onSwipe={async () => true}
     />,
   );
   expect(list.match(/What this turn stored/g)).toHaveLength(2); // aria-label and title of the one button

@@ -22,6 +22,8 @@ it('says a message is waiting for the after-reply steps while the previous turnâ
         disabled
         onEdit={async () => true}
         onDelete={async () => true}
+        onRegenerate={() => {}}
+        onSwipe={async () => true}
       />,
     );
   const entries = (status: 'running' | 'completed') => [{ ...entry('e1'), postStatus: status, postExecutionId: 'p1' }];

@@ -7,15 +7,15 @@ import {
   type ApiBody,
   type ChatMessage,
 } from '@st/shared';
-import { sessionsApi, streamMessage } from '../../api.js';
+import { sessionsApi, streamMessage, streamRegenerate } from '../../api.js';
 import { ApiError, notifyError } from '../../api/transport.js';
-import type { TurnResult } from '../../api/turnStream.js';
+import type { TurnHandlers, TurnResult } from '../../api/turnStream.js';
 import { alerts } from '../../alerts/index.js';
 import { charactersStore, personasStore, sessionsStore, useList, workflowsStore } from '../../stores/index.js';
 import { createDraftSaver, loadDraft, pruneDrafts, saveDraft } from './composerDraft.js';
 import { withStoredMetadata, withStoredSettings } from './openSession.js';
 import type { SaveOptions } from './panel/useSettingSaver.js';
-import { applyDelta, settleTurn } from './turnMessages.js';
+import { applyDelta, lastTurnReplyIds, replaceLastTurnReplies, settleRegenerate, settleTurn } from './turnMessages.js';
 import { useMessageActions } from './useMessageActions.js';
 
 export function useChat() {
@@ -177,26 +177,21 @@ export function useChat() {
     }
     sessionsApi.stopTurn(session.id, { silent: true }).catch(() => streamControllerRef.current?.abort());
   };
-  const send = async () => {
-    if (!session || busyRef.current || messageActions.isPending()) return;
-    busyRef.current = true;
-    const sessionId = session.id;
-    const text = content.trim();
-    // Sending clears the stored draft at once; only a message cancelled while queued is put back.
-    draftSaver.cancel();
-    saveDraft(sessionId, '');
-    show('');
-    setBusy(true);
-    setWaiting(true);
-
-    // An empty send adds no user message; the turn runs on the history as it is.
-    const optimisticUser: ChatMessage | undefined = text
-      ? { id: crypto.randomUUID(), role: 'user', content: text, createdAt: new Date().toISOString() }
-      : undefined;
+  // The streaming path of a send and of a regenerate: rows are local (`streaming`) until the turn settles, errors
+  // are decided here (never toasted by the stream), and a failure without saved details falls back to the server's
+  // copy of the chat.
+  const runStream = async (
+    sessionId: string,
+    stream: (handlers: TurnHandlers, signal: AbortSignal) => Promise<void>,
+    kind: { optimisticUser?: ChatMessage; replaced?: readonly string[]; cancelled?: () => void },
+  ) => {
+    const { optimisticUser, replaced } = kind;
     const patchMessages = (change: (messages: ChatMessage[]) => ChatMessage[]) =>
       setSession((prev) => (prev?.id === sessionId ? { ...prev, messages: change(prev.messages) } : prev));
     const settle = (result: TurnResult | TurnFailureDetails) => {
-      patchMessages((messages) => settleTurn(messages, optimisticUser?.id, result));
+      patchMessages((messages) =>
+        replaced ? settleRegenerate(messages, replaced, result) : settleTurn(messages, optimisticUser?.id, result),
+      );
       setLogs((prev) => ({ ...prev, [result.execution.id]: result.execution }));
     };
     const resync = () =>
@@ -209,16 +204,18 @@ export function useChat() {
     const controller = new AbortController();
     streamControllerRef.current = controller;
     try {
-      await streamMessage(
-        sessionId,
-        text,
+      await stream(
         {
-          onStart: () => setWaiting(false),
+          onStart: () => {
+            setWaiting(false);
+            // A regenerate shows only its own rows once the server runs it; until then (queued) the reply stays.
+            if (replaced) patchMessages((messages) => replaceLastTurnReplies(messages, replaced));
+          },
           onDelta: (nodeId, textDelta, reasoningDelta) =>
             patchMessages((messages) => applyDelta(messages, nodeId, textDelta, reasoningDelta)),
           onComplete: settle,
         },
-        { signal: controller.signal },
+        controller.signal,
       );
     } catch (error) {
       const failure = error instanceof ApiError ? turnFailureDetailsSchema.safeParse(error.details) : undefined;
@@ -230,11 +227,7 @@ export function useChat() {
       } else {
         if (error instanceof ApiError) notifyError(error);
         else if (!(error instanceof Error && error.name === 'AbortError')) alerts.error(String(error));
-        // A message cancelled while it waited goes back to the composer, to be edited or sent again.
-        if (cancelledRef.current && !contentRef.current) {
-          show(text);
-          saveDraft(sessionId, text);
-        }
+        if (cancelledRef.current) kind.cancelled?.();
         // Whatever the server kept (the user message, partial rows) is the truth; drop local rows.
         await resync();
       }
@@ -246,6 +239,45 @@ export function useChat() {
       setWaiting(false);
       refresh().catch(() => {});
     }
+  };
+  const send = async () => {
+    if (!session || busyRef.current || messageActions.isPending()) return;
+    busyRef.current = true;
+    const sessionId = session.id;
+    const text = content.trim();
+    // Sending clears the stored draft at once; only a message cancelled while queued is put back.
+    draftSaver.cancel();
+    saveDraft(sessionId, '');
+    show('');
+    setBusy(true);
+    setWaiting(true);
+    // An empty send adds no user message; the turn runs on the history as it is.
+    const optimisticUser: ChatMessage | undefined = text
+      ? { id: crypto.randomUUID(), role: 'user', content: text, createdAt: new Date().toISOString() }
+      : undefined;
+    await runStream(sessionId, (handlers, signal) => streamMessage(sessionId, text, handlers, { signal }), {
+      optimisticUser,
+      // A message cancelled while it waited goes back to the composer, to be edited or sent again.
+      cancelled: () => {
+        if (contentRef.current) return;
+        show(text);
+        saveDraft(sessionId, text);
+      },
+    });
+  };
+  // Runs the last turn again on the same history. The composer and its draft are not involved. The current replies
+  // stay until the server starts the run; then they are hidden (the new rows stream in their place), and they come
+  // back if the run leaves no reply at all (`settleRegenerate`).
+  const regenerate = async () => {
+    if (!session || busyRef.current || messageActions.isPending()) return;
+    const replaced = lastTurnReplyIds(session.messages);
+    if (!replaced.length) return;
+    busyRef.current = true;
+    setBusy(true);
+    setWaiting(true);
+    await runStream(session.id, (handlers, signal) => streamRegenerate(session.id, handlers, { signal }), {
+      replaced,
+    });
   };
   return {
     workflows,
@@ -265,6 +297,8 @@ export function useChat() {
     updateSettings,
     remove,
     send,
+    regenerate,
+    swipe: messageActions.swipe,
     stop,
     mutating: messageActions.mutating,
     editMessage: messageActions.editMessage,
