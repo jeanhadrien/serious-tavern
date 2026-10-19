@@ -36,7 +36,10 @@ const stateOf = async (id: string) =>
     (await app!.inject({ method: 'GET', url: `/api/sessions/${id}/state` })).json(),
   );
 const injected = (view: SessionStateView) =>
-  (view.definitions.find((definition) => definition.name === 'scene')?.values.injected ?? []) as { level: number; entryId?: string }[];
+  (view.definitions.find((definition) => definition.name === 'scene')?.values.injected ?? []) as {
+    level: number;
+    entryId?: string;
+  }[];
 const fires = (view: SessionStateView) => view.nodes.find((node) => node.nodeId === 'trigger')?.meta.fires?.count ?? 0;
 
 it('answers every turn, injects a leveled detail now and then, and takes it back with the reply', async () => {
