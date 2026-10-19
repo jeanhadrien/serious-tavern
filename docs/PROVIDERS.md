@@ -24,7 +24,7 @@ A provider record lets you describe how *your* backend spells these things. The 
 
 1. **Save your API key.** Open **Settings**, choose a secret name (for example `deepseek`), paste the key and save. Keys are encrypted on the server and can never be read back. Local servers usually need no key.
 2. **Create a provider.** Click the **Providers** icon (left column), then click **+ New**, or open **OpenRouter** and click **Duplicate**. Fill in the name, base URL and secret name, then **Save**.
-3. **Use it.** In a workflow, open an **LLM** node, pick your provider in the provider dropdown and set the model id the backend expects (for example `deepseek-chat`).
+3. **Use it.** In a workflow, open an **LLM** node, pick your provider in the provider dropdown and set the model id the backend expects (for example `deepseek-chat`). The example workflows (see [STATE-AND-LORE.md](STATE-AND-LORE.md#try-the-examples)) use OpenRouter and `openai/gpt-4o-mini` until you change their LLM nodes this way.
 
 Two providers are built in, always there and can't be edited:
 

@@ -2,7 +2,7 @@
 
 A single-user chat app where each conversation runs a visual, reusable workflow. TypeScript/ESM throughout; no account system in this MVP.
 
-See [Plan & Vision](PLAN.md) for the product vision and planned next steps.
+See [Plan & Vision](PLAN.md) for the product vision and planned next steps. User guides: [Story state, lore and summaries](docs/STATE-AND-LORE.md) (chat settings, collections, story state, after-reply work, summaries, the Trigger and the two example workflows), [collections](docs/COLLECTIONS.md), [LLM providers](docs/PROVIDERS.md), [templating](docs/TEMPLATING.md).
 
 ## Run
 
@@ -421,7 +421,7 @@ Status: records, storage, API, resolution, the record-driven adapter, the wire l
 
 ## Authored collections
 
-An **authored collection** is a list of entries the user writes (a lorebook, a deck of story textures). Workflows only read collections; no node writes them. User guide: [docs/COLLECTIONS.md](docs/COLLECTIONS.md).
+An **authored collection** is a list of entries the user writes (a lorebook, a deck of story textures). Workflows only read collections; no node writes them. User guide: [docs/COLLECTIONS.md](docs/COLLECTIONS.md); how it fits with story state, the Trigger and the examples: [docs/STATE-AND-LORE.md](docs/STATE-AND-LORE.md).
 
 - **Schema** (`packages/shared/src/collection.ts`, `passthrough` at both levels so imported formats round-trip): a collection has `name`, optional `description` and `entries`; an entry has `text` (required, may be multi-line), optional `title`, `keywords`, `tags`, `level` (integer 1–5), `weight` (number ≥ 0, default 1) and `enabled` (default true). Collections are read through the YAML codec, which parses every file on read, so `.default()` is safe for them (unlike JSON records).
 - **Entry ids are derived, not stored:** `collectionEntryId(index)` gives `entry-<n>` (1-based position). Reordering or inserting entries changes them, so nothing may rely on an entry id surviving a save. An `id` key written in a file is an unknown field: kept, never read.
@@ -439,7 +439,7 @@ An **authored collection** is a list of entries the user writes (a lorebook, a d
 
 ## Story state
 
-**Story state** is what a chat remembers between turns: numbers, flags, moods, notes and lists that workflow nodes write and later turns read (pacing, what was just drawn). It belongs to one chat and lives exactly as long as the replies of the turns that wrote it: delete a reply and what its turn stored is undone. A **state definition** names and types the keys; nodes (State Read, State Write, Draw's `avoidRecent`) and templates (`{{state.*}}`) use them. The model is in `packages/shared/src/state/`; the engine side is `StateWriteBuffer`, `ctx.state` and `ctx.writeState`; the server folds, stores and serves it.
+**Story state** is what a chat remembers between turns: numbers, flags, moods, notes and lists that workflow nodes write and later turns read (pacing, what was just drawn). It belongs to one chat and lives exactly as long as the replies of the turns that wrote it: delete a reply and what its turn stored is undone. A **state definition** names and types the keys; nodes (State Read, State Write, Draw's `avoidRecent`) and templates (`{{state.*}}`) use them. The model is in `packages/shared/src/state/`; the engine side is `StateWriteBuffer`, `ctx.state` and `ctx.writeState`; the server folds, stores and serves it. User guide: [docs/STATE-AND-LORE.md](docs/STATE-AND-LORE.md).
 
 ### State definitions
 

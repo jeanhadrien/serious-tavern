@@ -178,3 +178,6 @@ One draw, worded by its own level. (Two Draw nodes with different level ranges w
 - Template macros inside entries (`{{char}}`) are not expanded: entries reach the prompt as written.
 - Draw's memory of recent draws is per chat and per Draw node; it is not shared between chats or nodes.
 - SillyTavern World Info and a card's embedded lorebook can't be imported yet.
+
+For how collections fit with story state, the Trigger and the ready-made examples (Fresh texture draws from a deck of
+forest textures), see [STATE-AND-LORE.md](STATE-AND-LORE.md).
