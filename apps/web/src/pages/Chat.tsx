@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { activeMessages, alternativesOfLastTurn, replyWorkflows } from '@st/shared';
+import { activeMessages, alternativesOfLastTurn, forkPoints, replyWorkflows } from '@st/shared';
 import { useEscapeArea } from '../keyboard/escapeRegistry.js';
 import type { ChatState } from './chat/useChat.js';
 import { ChatHeader } from './chat/ChatHeader.js';
@@ -48,6 +48,9 @@ export function Chat({ chat }: { chat: ChatState }) {
   // and the delete check alike. One pass per change of the messages (a streamed token included), never per child.
   const stored = session?.messages;
   const messages = useMemo(() => (stored ? activeMessages(stored) : undefined), [stored]);
+  // The replies a fork may start from: the last shown reply of each turn. A pure pass over the messages, like
+  // `activeMessages` above (streaming rows are not fork points, and the buttons are locked while a run is in flight).
+  const forkable = useMemo(() => new Set(messages ? forkPoints(messages) : []), [messages]);
   const view = story.view;
   // The chat's reply list, read only through `replyWorkflows`. It keeps its identity across streamed tokens (the session
   // object changes every token, its list does not), so the memoized panel is not rendered again for them.
@@ -102,6 +105,8 @@ export function Chat({ chat }: { chat: ChatState }) {
                 lastTurn={lastTurn}
                 onRegenerate={chat.regenerate}
                 onSwipe={chat.swipe}
+                forkable={forkable}
+                onFork={chat.fork}
                 onShowLinked={showLinked}
               />
               <PostRunStatus key={`post-${session.id}`} sessionId={session.id} run={postRun} onStopped={story.reload} />

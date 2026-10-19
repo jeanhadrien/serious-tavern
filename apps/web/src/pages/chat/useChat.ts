@@ -132,6 +132,19 @@ export function useChat() {
       /* API errors are toasted. */
     }
   };
+  // Starts a new chat as a copy of the open one, cut after the reply `messageId` (a fork point), and opens it.
+  const fork = async (messageId: string) => {
+    if (!session || busyRef.current || messageActions.isPending()) return;
+    const request = ++opening.current;
+    try {
+      const next = await sessionsApi.fork(session.id, { messageId });
+      if (request === opening.current) enter(next);
+      alerts.info('Chat forked');
+      await refresh();
+    } catch {
+      /* API errors are toasted. */
+    }
+  };
   const update = async (changes: ApiBody<'updateSession'>) => {
     if (!session || busyRef.current || messageActions.isPending()) return;
     try {
@@ -325,6 +338,7 @@ export function useChat() {
     open,
     close,
     create,
+    fork,
     update,
     updateSettings,
     updateReplyList,

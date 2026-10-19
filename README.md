@@ -272,6 +272,7 @@ The chat's **last turn** can be run again, and every generated alternative is ke
 - **Ids are kept:** message ids, `executionId`, `runId` and `alternativeOf` stay as in the source, because message links store message ids and replies open their log by `runId ?? executionId`. The fork shares the source's execution logs.
 - **Alternatives:** with the app setting `forkKeepsAlternatives` on (the default), the alternatives of the forked turn come along, so the fork can swipe and regenerate it. Off, the fork holds no hidden alternative at all.
 - **A running chat cannot be forked:** `409 TURN_RUNNING` while a turn, a regenerate or a run after the reply holds the chat.
+- **In the web** (`useChat.fork`, `MessageActions.tsx`): a **Fork chat from here** button (branch icon) in the action row of every reply in `forkPoints(activeMessages(session.messages))`, computed in `Chat.tsx` once per change of the messages and handed to `MessageList` as `forkable`; user messages, streaming rows and earlier replies of a multi-reply turn have none. It is disabled while the chat is busy or saving a message change, and while a run after the reply works (the same condition as the swipe buttons). The click calls `sessionsApi.fork`, opens the new chat (an empty composer) and toasts "Chat forked". The app setting is the **Chats** section of the Settings page (`pages/settings/ChatsSection.tsx`): the checkbox "Forks keep the alternatives of the reply they start from" loads on mount and saves on change through `appSettingsApi`.
 
 ## Chat settings
 
