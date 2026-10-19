@@ -1,7 +1,8 @@
-import { useState, type DragEvent } from 'react';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { presetInputLabel, type Preset, type PresetEntry } from '@st/shared';
 import { IconButton } from '../../components/IconButton.js';
+import { moveItem } from '../../components/sortable/moveItem.js';
+import { SortableList } from '../../components/sortable/SortableList.js';
 
 export const newId = () => crypto.randomUUID();
 
@@ -24,34 +25,6 @@ export function entryIcon(entry: PresetEntry, preset: Preset): string {
   return preset.inputs.find((input) => input.key === entry.inputKey)?.dataType === 'messages' ? '📜' : '🔤';
 }
 
-// Moves the entry with fromId to the entry with toId (before it, or after
-// it when dropping below its midpoint); a null toId appends to the end.
-// Returns the original array when nothing would change.
-export function reorderEntries(
-  entries: PresetEntry[],
-  fromId: string,
-  toId: string | null,
-  after: boolean,
-): PresetEntry[] {
-  const moving = entries.find((entry) => entry.id === fromId);
-  if (!moving) return entries;
-  const rest = entries.filter((entry) => entry.id !== fromId);
-  if (toId === null) return [...rest, moving];
-  const to = rest.findIndex((entry) => entry.id === toId);
-  if (to === -1) return entries;
-  const at = after ? to + 1 : to;
-  return [...rest.slice(0, at), moving, ...rest.slice(at)];
-}
-
-// Moves an entry one place up (-1) or down (1): the touch-friendly twin of drag and drop.
-// Returns the original array at either end of the list or for an unknown id.
-export function moveEntry(entries: PresetEntry[], id: string, offset: -1 | 1): PresetEntry[] {
-  const index = entries.findIndex((entry) => entry.id === id);
-  const neighbour = index === -1 ? undefined : entries[index + offset];
-  if (!neighbour) return entries;
-  return reorderEntries(entries, id, neighbour.id, offset === 1);
-}
-
 // Read-only lists still allow selecting entries, so they can be browsed; every change control is disabled.
 export function EntryList(props: {
   preset: Preset;
@@ -60,13 +33,7 @@ export function EntryList(props: {
   onChange(preset: Preset): void;
   onSelect(id: string): void;
 }) {
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ id: string; after: boolean } | null>(null);
   const updateEntries = (entries: PresetEntry[]) => props.onChange({ ...props.preset, entries });
-  const clearDrag = () => {
-    setDraggedId(null);
-    setDropTarget(null);
-  };
   const addMessage = () => {
     const entry = newMessage();
     updateEntries([...props.preset.entries, entry]);
@@ -92,7 +59,8 @@ export function EntryList(props: {
     props.onSelect(copy.id);
   };
   const selectedIndex = props.preset.entries.findIndex((entry) => entry.id === props.selectedId);
-  const move = (offset: -1 | 1) => updateEntries(moveEntry(props.preset.entries, props.selectedId, offset));
+  const reorder = (from: number, to: number) => updateEntries(moveItem(props.preset.entries, from, to));
+  const move = (offset: -1 | 1) => reorder(selectedIndex, selectedIndex + offset);
   const getDepthLabel = (entry: PresetEntry) => {
     if (entry.kind !== 'message' || entry.placement.mode !== 'depth') return undefined;
     const entryId = entry.placement.entryId;
@@ -100,47 +68,6 @@ export function EntryList(props: {
       (item): item is Extract<PresetEntry, { kind: 'slot' }> => item.id === entryId && item.kind === 'slot',
     );
     return target?.inputKey ?? 'slot';
-  };
-  const startDrag = (event: DragEvent<HTMLDivElement>, id: string) => {
-    event.dataTransfer.setData('text/plain', id);
-    event.dataTransfer.effectAllowed = 'move';
-    setDraggedId(id);
-  };
-  const belowMidpoint = (event: DragEvent<HTMLDivElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    return event.clientY > rect.top + rect.height / 2;
-  };
-  const hoverRow = (event: DragEvent<HTMLDivElement>, entry: PresetEntry) => {
-    if (!draggedId || draggedId === entry.id) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    const after = belowMidpoint(event);
-    setDropTarget((prev) => (prev && prev.id === entry.id && prev.after === after ? prev : { id: entry.id, after }));
-  };
-  const dropOnRow = (event: DragEvent<HTMLDivElement>, entry: PresetEntry) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const id = draggedId;
-    clearDrag();
-    if (!id || id === entry.id) return;
-    updateEntries(reorderEntries(props.preset.entries, id, entry.id, belowMidpoint(event)));
-  };
-  const dropAtEnd = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const id = draggedId;
-    clearDrag();
-    const entries = props.preset.entries;
-    if (!id || (entries.length > 0 && entries[entries.length - 1]!.id === id)) return;
-    updateEntries(reorderEntries(entries, id, null, false));
-  };
-  const rowClass = (entry: PresetEntry) => {
-    const classes = ['preset-entry-row'];
-    if (entry.id === props.selectedId) classes.push('selected');
-    if (!entry.enabled) classes.push('disabled');
-    if (entry.id === draggedId) classes.push('dragging');
-    if (dropTarget && dropTarget.id === entry.id && entry.id !== draggedId)
-      classes.push(dropTarget.after ? 'drop-below' : 'drop-above');
-    return classes.join(' ');
   };
   return (
     <section className="preset-entry-list">
@@ -167,19 +94,21 @@ export function EntryList(props: {
           </button>
         </div>
       </div>
-      <div className="entry-list-scroll" onDragOver={(event) => event.preventDefault()} onDrop={dropAtEnd}>
-        {props.preset.entries.map((entry) => (
-          <div
-            className={rowClass(entry)}
-            key={entry.id}
-            title={props.readOnly ? undefined : 'Drag to reorder'}
-            draggable={!props.readOnly}
-            onDragStart={(event) => startDrag(event, entry.id)}
-            onDragEnd={clearDrag}
-            onDragOver={(event) => hoverRow(event, entry)}
-            onDragLeave={() => setDropTarget((prev) => (prev && prev.id === entry.id ? null : prev))}
-            onDrop={(event) => dropOnRow(event, entry)}
-          >
+      <SortableList
+        className="entry-list-scroll"
+        items={props.preset.entries}
+        getId={(entry) => entry.id}
+        label={(entry) => entry.displayName}
+        disabled={props.readOnly}
+        onMove={reorder}
+        rowClassName={(entry) =>
+          ['preset-entry-row', entry.id === props.selectedId && 'selected', !entry.enabled && 'disabled']
+            .filter(Boolean)
+            .join(' ')
+        }
+        renderItem={(entry, row) => (
+          <>
+            {row.handle}
             <button className="preset-entry-select" onClick={() => props.onSelect(entry.id)}>
               <span>
                 {entryIcon(entry, props.preset)} {entry.displayName}
@@ -224,9 +153,9 @@ export function EntryList(props: {
             >
               ×
             </button>
-          </div>
-        ))}
-      </div>
+          </>
+        )}
+      />
     </section>
   );
 }

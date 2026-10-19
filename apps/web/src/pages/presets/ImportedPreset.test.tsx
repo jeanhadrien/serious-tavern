@@ -75,7 +75,8 @@ it('disables entry changes but keeps entries selectable in a read-only list', ()
   expect(html).toMatch(/\+ Message<\/button>/);
   expect(html.match(/aria-label="Delete entry"[^>]*disabled=""/g)).toHaveLength(2);
   expect(html.match(/aria-label="Duplicate entry"[^>]*disabled=""/g)).toHaveLength(2);
-  expect(html).toContain('draggable="false"');
+  expect(html).not.toContain('Drag to reorder');
+  expect(html).not.toContain('sortable-handle');
   expect(html).not.toMatch(/class="preset-entry-select"[^>]*disabled/);
 });
 

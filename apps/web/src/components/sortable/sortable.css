@@ -1,0 +1,30 @@
+/* A list with no box of its own: its rows lay out as children of the list's parent. */
+.sortable-contents {
+  display: contents;
+}
+.sortable-row {
+  position: relative;
+}
+.sortable-row.sortable-dragging {
+  z-index: 3;
+  opacity: 0.85;
+  outline: 2px solid #95a4ff;
+  outline-offset: -1px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.4);
+}
+/* Only the handle takes the touch, so the rest of the row still scrolls the page. */
+.sortable-row .icon-button.sortable-handle {
+  padding: 4px;
+  cursor: grab;
+  touch-action: none;
+  color: #a7adbd;
+  background: transparent;
+  border-color: transparent;
+}
+.sortable-row .icon-button.sortable-handle:hover {
+  color: #e8ebf6;
+}
+.sortable-row.sortable-dragging .icon-button.sortable-handle {
+  cursor: grabbing;
+}

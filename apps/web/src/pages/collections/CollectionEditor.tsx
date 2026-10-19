@@ -11,12 +11,14 @@ interface CollectionEditorProps {
   errors: readonly string[];
   /** The expanded entry. */
   selected?: number;
+  /** One stable id per entry, for dragging. */
+  entryIds: readonly string[];
   onChange(draft: CollectionDraft): void;
   onSelect(index: number | undefined): void;
   onEntryChange(index: number, patch: Partial<EntryDraft>): void;
   onAddEntry(): void;
   onRemoveEntry(index: number): void;
-  onMoveEntry(index: number, offset: number): void;
+  onMoveEntry(from: number, to: number): void;
   onSave(): void;
   /** Back to what is on disk (re-read, see `useCollectionEditor`). */
   onRevert(): void;
@@ -62,6 +64,7 @@ export function CollectionEditor(props: CollectionEditorProps) {
         <CollectionEntryList
           entries={draft.entries}
           selected={props.selected}
+          ids={props.entryIds}
           onSelect={props.onSelect}
           onChange={props.onEntryChange}
           onAdd={props.onAddEntry}

@@ -15,6 +15,15 @@ it.each([
   [1, 2, 1, 2],
   [0, 2, 1, 0],
   [undefined, 2, 3, undefined],
+  // Longer moves: the moved entry, the ones it passes, and the ones outside.
+  [0, 0, 3, 3],
+  [3, 0, 3, 2],
+  [1, 0, 3, 0],
+  [4, 0, 3, 4],
+  [3, 3, 0, 0],
+  [0, 3, 0, 1],
+  [2, 3, 0, 3],
+  [4, 3, 0, 4],
 ])('after a move %#: selected %j, %j → %j gives %j', (selected, from, to, expected) => {
   expect(selectionAfterMove(selected, from, to)).toBe(expected);
 });

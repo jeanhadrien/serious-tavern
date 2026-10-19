@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import {
   addId,
+  altArrowOffset,
   escapeSeparator,
   formatList,
   moveId,
@@ -60,4 +61,18 @@ it('adds, removes and moves ids', () => {
   expect(moveId(['a', 'b', 'c'], 2, -1)).toEqual(['a', 'c', 'b']);
   expect(moveId(['a', 'b'], 0, -1)).toEqual(['a', 'b']);
   expect(moveId(['a', 'b'], 1, 1)).toEqual(['a', 'b']);
+});
+
+it.each([
+  ['ArrowUp', {}, -1],
+  ['ArrowDown', {}, 1],
+  ['ArrowDown', { altKey: false }, undefined],
+  ['ArrowUp', { shiftKey: true }, undefined],
+  ['ArrowUp', { ctrlKey: true }, undefined],
+  ['ArrowDown', { metaKey: true }, undefined],
+  ['ArrowLeft', {}, undefined],
+  ['Enter', {}, undefined],
+])('Alt+arrow: key %s with %j gives %j', (key, mods, expected) => {
+  const event = { key, altKey: true, ctrlKey: false, metaKey: false, shiftKey: false, ...mods };
+  expect(altArrowOffset(event)).toBe(expected);
 });

@@ -97,6 +97,7 @@ Rules:
   - provider overrides;
   - workflow chat settings;
   - the collection picker in Recall/Draw (node-ui).
+  - **Decision:** the collection picker in node-ui can't import from `apps/web`, and its list is short and rarely reordered. It keeps its up/down buttons and gains `Alt+↑/↓` on its rows, but no drag and no dnd-kit. The other four use `SortableList`.
 - **Not dnd-kit:**
   - The workflow canvas: React Flow owns node and edge drags.
   - Files dropped from the computer: the browser's file drop (`EntityDropZone`). A single drop handler that routes a file to the right importer by type (card PNG, preset JSON, lorebook) is a later step.
@@ -151,7 +152,7 @@ One commit (or a few) per step; each passes `npm run check`.
 2. **Unsaved-work guard**: Save / Discard / Cancel on switching items (editor store) and the `beforeunload` warning. Done.
 3. **Escape and shortcuts**: the pure decision, the document listener, layers, area handlers, `Ctrl+S`; the one-off listeners move onto it; Escape stops a reply in the chat. Done.
 4. **Shared draft hook and editor header**, one editor at a time. Done.
-5. **`SortableList`** (dnd-kit) across the five reorderable lists.
+5. **`SortableList`** (dnd-kit) across the reorderable lists: four on dnd-kit, the node-ui picker with buttons and `Alt+↑/↓`. Done.
 6. **Splitter** inside editors.
 7. **Features**: composer draft, copy message, then the canvas (drag to empty space, undo/redo, copy/paste), then the swipes spec.
 

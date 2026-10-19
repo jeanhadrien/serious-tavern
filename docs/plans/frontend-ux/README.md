@@ -29,7 +29,7 @@ Plans for building `docs/FRONTEND-UX.md` (the agreed spec). There is one file pe
 | 2. Unsaved-work guard | [02-unsaved-guard.md](02-unsaved-guard.md) | done |
 | 3. Escape and shortcuts | [03-escape-and-shortcuts.md](03-escape-and-shortcuts.md) | done |
 | 4. Shared draft hook and editor header | [04-draft-and-header.md](04-draft-and-header.md) | done |
-| 5. SortableList (dnd-kit) | [05-sortable-list.md](05-sortable-list.md) | to do |
+| 5. SortableList (dnd-kit) | [05-sortable-list.md](05-sortable-list.md) | done (provider list is the reasoning fields: overrides are YAML text) |
 | 6. Splitter | [06-splitter.md](06-splitter.md) | to do |
 | 7a. Composer draft, copy message | [07a-composer-draft-and-copy.md](07a-composer-draft-and-copy.md) | to do |
 | 7b. Canvas: drag to empty space | [07b-canvas.md](07b-canvas.md) | to do |

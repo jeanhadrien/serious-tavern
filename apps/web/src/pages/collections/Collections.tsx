@@ -26,6 +26,7 @@ export function Collections() {
       saving={editor.saving}
       errors={editor.errors}
       selected={editor.selected}
+      entryIds={editor.entryIds}
       onChange={editor.change}
       onSelect={editor.select}
       onEntryChange={editor.updateEntry}

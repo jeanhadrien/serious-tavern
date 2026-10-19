@@ -549,21 +549,6 @@ pre {
 .preset-entry-row button:not(.preset-entry-select) {
   padding: 5px 8px;
 }
-.preset-entry-row {
-  cursor: grab;
-}
-.preset-entry-row:active {
-  cursor: grabbing;
-}
-.preset-entry-row.dragging {
-  opacity: 0.4;
-}
-.preset-entry-row.drop-above {
-  box-shadow: 0 -2px 0 0 #95a4ff;
-}
-.preset-entry-row.drop-below {
-  box-shadow: 0 2px 0 0 #95a4ff;
-}
 .depth-badge {
   white-space: nowrap;
   padding: 3px 5px;

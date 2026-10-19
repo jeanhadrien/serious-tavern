@@ -20,6 +20,7 @@ const render = (props: { dirty?: boolean; saving?: boolean; errors?: string[]; s
       saving={props.saving}
       errors={props.errors ?? []}
       selected={props.selected}
+      entryIds={['e1', 'e2']}
       onChange={noop}
       onSelect={noop}
       onEntryChange={noop}
@@ -72,5 +73,9 @@ it('labels its icon buttons and shows problems found on save', () => {
   for (const label of ['Back to collections', 'Move entry up', 'Move entry down', 'Delete entry'])
     expect(html).toContain(`aria-label="${label}" title="${label}"`);
   expect(html).toContain('role="alert"');
+  // Each row has a drag handle named after the entry, and the ends of the list cannot move further.
+  expect(html).toContain('aria-label="Drag to reorder The Salt Inn"');
+  expect(html).toContain('aria-label="Drag to reorder resin after rain"');
+  expect(html).toMatch(/aria-label="Move entry up"[^>]*disabled=""/);
   expect(html).toContain('Entry 2: weight must be a number of 0 or more');
 });

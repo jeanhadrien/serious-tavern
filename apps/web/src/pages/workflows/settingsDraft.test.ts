@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { WorkflowSetting } from '@st/shared';
 import {
   draftList,
-  moveSetting,
   newSetting,
   optionalNumber,
   optionsText,
@@ -52,15 +51,6 @@ describe('settings draft helpers', () => {
       type: 'number',
       default: 0,
     });
-  });
-
-  it.each([
-    [0, -1, ['a', 'b', 'c']],
-    [0, 1, ['b', 'a', 'c']],
-    [2, 1, ['a', 'b', 'c']],
-    [2, -1, ['a', 'c', 'b']],
-  ] as const)('moves item %i by %i', (index, delta, expected) => {
-    expect(moveSetting(['a', 'b', 'c'], index, delta)).toEqual(expected);
   });
 
   it('removes one item', () => {

@@ -8,6 +8,7 @@ import {
   type WorkflowSettingType,
 } from '@st/shared';
 import { IconButton } from '../../components/IconButton.js';
+import type { SortableRow } from '../../components/sortable/SortableList.js';
 import { DraftNumberInput } from './DraftNumberInput.js';
 import { optionsText, parseOptions, withType } from './settingsDraft.js';
 
@@ -18,19 +19,16 @@ type Problems = { show(field: Field): ReactNode; describedBy(field: Field): stri
 /** One chat setting declaration in the workflow editor, with its problems next to the fields they concern. */
 export function SettingRow({
   setting,
-  first,
-  last,
+  row,
   issues,
   onChange,
-  onMove,
   onRemove,
 }: {
   setting: WorkflowSetting;
-  first: boolean;
-  last: boolean;
+  /** The drag handle and the move buttons' actions, from the list that holds the row. */
+  row: Pick<SortableRow, 'handle' | 'moveUp' | 'moveDown'>;
   issues: readonly SettingDeclarationIssue[];
   onChange(setting: WorkflowSetting): void;
-  onMove(delta: -1 | 1): void;
   onRemove(): void;
 }) {
   const name = settingLabel(setting) || 'setting';
@@ -67,8 +65,9 @@ export function SettingRow({
           />
         </label>
         <span className="setting-row-actions">
-          <IconButton icon={ArrowUp} label={`Move ${name} up`} disabled={first} onClick={() => onMove(-1)} />
-          <IconButton icon={ArrowDown} label={`Move ${name} down`} disabled={last} onClick={() => onMove(1)} />
+          {row.handle}
+          <IconButton icon={ArrowUp} label={`Move ${name} up`} disabled={!row.moveUp} onClick={row.moveUp} />
+          <IconButton icon={ArrowDown} label={`Move ${name} down`} disabled={!row.moveDown} onClick={row.moveDown} />
           <IconButton icon={Trash2} label={`Remove ${name}`} className="delete-button" onClick={onRemove} />
         </span>
       </div>
