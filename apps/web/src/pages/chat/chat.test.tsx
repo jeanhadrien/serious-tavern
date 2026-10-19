@@ -275,3 +275,22 @@ it('keeps the inline delete step until the trash button is clicked, even when de
   expect(html).toContain('aria-label="Delete message"');
   expect(html).not.toContain('Delete message?');
 });
+
+it('offers Copy on stored messages with content, with or without edit and delete', () => {
+  const base = { id: 'm', role: 'assistant' as const, createdAt: '' };
+  const copyOnly = renderToStaticMarkup(<ChatMessageView message={{ ...base, content: 'Hi' }} />);
+  expect(copyOnly).toContain('aria-label="Copy message"');
+  expect(copyOnly).not.toContain('aria-label="Edit message"');
+  const all = renderToStaticMarkup(
+    <ChatMessageView message={{ ...base, content: 'Hi' }} onEdit={async () => true} onDelete={async () => true} />,
+  );
+  for (const label of ['Copy message', 'Edit message', 'Delete message'])
+    expect(all).toContain(`aria-label="${label}"`);
+});
+
+it('shows no Copy on a streaming row or a message without content', () => {
+  const base = { id: 'm', role: 'assistant' as const, createdAt: '' };
+  const streaming = { ...base, content: 'Hel', status: 'streaming' as const };
+  expect(renderToStaticMarkup(<ChatMessageView message={streaming} />)).not.toContain('Copy message');
+  expect(renderToStaticMarkup(<ChatMessageView message={{ ...base, content: '' }} />)).not.toContain('Copy message');
+});

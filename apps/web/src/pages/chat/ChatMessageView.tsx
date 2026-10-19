@@ -63,6 +63,8 @@ export function ChatMessageView({
   }, [editing, disabled]);
   const user = message.role === 'user';
   const streaming = message.status === 'streaming';
+  // Copy takes the stored text (Markdown), never the reasoning; a streaming row is not stored yet.
+  const copyable = !streaming && message.content.length > 0;
   const name = user ? persona?.name || 'You' : message.name || 'Assistant';
   const avatar = user
     ? typeof persona?.avatar === 'string'
@@ -94,11 +96,12 @@ export function ChatMessageView({
           <small>{user ? 'User' : 'Assistant'}</small>
           {!editing && marker.button}
         </div>
-        {onEdit && onDelete && (
+        {(copyable || (onEdit && onDelete)) && (
           <MessageActions
             disabled={disabled || editing}
-            onEdit={() => setEditing(true)}
-            onDelete={() => onDelete(message.id)}
+            copyText={copyable ? message.content : undefined}
+            onEdit={onEdit && onDelete ? () => setEditing(true) : undefined}
+            onDelete={onEdit && onDelete ? () => onDelete(message.id) : undefined}
             undoOnDelete={undoOnDelete}
             onConfirming={setDeleting}
             deleteNote={changeNote(links, 'delete')}

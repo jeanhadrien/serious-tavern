@@ -12,6 +12,7 @@ import { ApiError, notifyError } from '../../api/transport.js';
 import type { TurnResult } from '../../api/turnStream.js';
 import { alerts } from '../../alerts/index.js';
 import { charactersStore, personasStore, sessionsStore, useList, workflowsStore } from '../../stores/index.js';
+import { createDraftSaver, loadDraft, pruneDrafts, saveDraft } from './composerDraft.js';
 import { withStoredMetadata, withStoredSettings } from './openSession.js';
 import type { SaveOptions } from './panel/useSettingSaver.js';
 import { applyDelta, settleTurn } from './turnMessages.js';
@@ -23,7 +24,31 @@ export function useChat() {
   const personas = useList(personasStore);
   const sessions = useList(sessionsStore);
   const [session, setSession] = useState<Session>();
-  const [content, setContent] = useState('');
+  const [content, setContentState] = useState('');
+  // The composer text per chat: saved to localStorage debounced and on leaving a chat, never per streamed token
+  // (typing is the only writer; a turn's tokens never touch it).
+  const contentRef = useRef('');
+  const sessionIdRef = useRef<string | undefined>(undefined);
+  const [draftSaver] = useState(createDraftSaver);
+  const show = (text: string) => {
+    contentRef.current = text;
+    setContentState(text);
+  };
+  const setContent = useCallback(
+    (text: string) => {
+      contentRef.current = text;
+      setContentState(text);
+      if (sessionIdRef.current) draftSaver.schedule(sessionIdRef.current, text);
+    },
+    [draftSaver],
+  );
+  // Opens a chat (or none): the previous draft is written first, the new chat's draft is shown.
+  const enter = (next: Session | undefined) => {
+    draftSaver.flush();
+    sessionIdRef.current = next?.id;
+    setSession(next);
+    show(next ? loadDraft(next.id) : '');
+  };
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   // A sent message the server has not started yet: it may wait behind another turn or an after-reply run.
@@ -44,15 +69,29 @@ export function useChat() {
       streamControllerRef.current?.abort();
     };
   }, []);
+  useEffect(() => {
+    const flush = () => draftSaver.flush();
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      flush();
+    };
+  }, [draftSaver]);
+  // Drafts of deleted chats do not stay behind.
+  useEffect(() => {
+    sessionsStore
+      .refresh()
+      .then((list) =>
+        pruneDrafts([...list.map((item) => item.id), ...(sessionIdRef.current ? [sessionIdRef.current] : [])]),
+      )
+      .catch(() => {});
+  }, []);
   const open = async (id: string) => {
     if (busyRef.current || messageActions.isPending()) return;
     const request = ++opening.current;
     try {
       const next = await sessionsApi.get(id);
-      if (opening.current === request) {
-        setSession(next);
-        setContent('');
-      }
+      if (opening.current === request) enter(next);
     } catch {
       /* API errors are toasted. */
     }
@@ -61,8 +100,7 @@ export function useChat() {
   const close = () => {
     if (busyRef.current || messageActions.isPending()) return;
     ++opening.current;
-    setSession(undefined);
-    setContent('');
+    enter(undefined);
   };
   const create = async () => {
     if (busyRef.current || messageActions.isPending()) return;
@@ -74,10 +112,7 @@ export function useChat() {
         workflowId: initialWorkflow.id,
         personaId: session?.personaId ?? personas[0]?.id,
       });
-      if (request === opening.current) {
-        setSession(next);
-        setContent('');
-      }
+      if (request === opening.current) enter(next);
       alerts.info('Chat created');
       await refresh();
     } catch {
@@ -117,6 +152,11 @@ export function useChat() {
     ++opening.current;
     try {
       await sessionsApi.delete(id);
+      if (sessionIdRef.current === id) {
+        draftSaver.cancel();
+        enter(undefined);
+      }
+      saveDraft(id, '');
       setSession((current) => (current?.id === id ? undefined : current));
       alerts.info('Chat deleted');
       await refresh();
@@ -142,7 +182,10 @@ export function useChat() {
     busyRef.current = true;
     const sessionId = session.id;
     const text = content.trim();
-    setContent('');
+    // Sending clears the stored draft at once; only a message cancelled while queued is put back.
+    draftSaver.cancel();
+    saveDraft(sessionId, '');
+    show('');
     setBusy(true);
     setWaiting(true);
 
@@ -188,7 +231,10 @@ export function useChat() {
         if (error instanceof ApiError) notifyError(error);
         else if (!(error instanceof Error && error.name === 'AbortError')) alerts.error(String(error));
         // A message cancelled while it waited goes back to the composer, to be edited or sent again.
-        if (cancelledRef.current) setContent((current) => current || text);
+        if (cancelledRef.current && !contentRef.current) {
+          show(text);
+          saveDraft(sessionId, text);
+        }
         // Whatever the server kept (the user message, partial rows) is the truth; drop local rows.
         await resync();
       }
