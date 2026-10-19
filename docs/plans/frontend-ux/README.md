@@ -26,9 +26,13 @@ Plans for building `docs/FRONTEND-UX.md` (the agreed spec). There is one file pe
 | 1. Confirm dialog | [01-confirm-dialog.md](01-confirm-dialog.md) | to do |
 | 2. Unsaved-work guard | [02-unsaved-guard.md](02-unsaved-guard.md) | to do |
 | 3. Escape and shortcuts | [03-escape-and-shortcuts.md](03-escape-and-shortcuts.md) | to do |
-| 4. Shared draft hook and editor header | not written | — |
-| 5. SortableList (dnd-kit) | not written | — |
-| 6. Splitter | not written | — |
-| 7. Features (composer draft, copy message, canvas, swipes spec) | not written | — |
+| 4. Shared draft hook and editor header | [04-draft-and-header.md](04-draft-and-header.md) | to do |
+| 5. SortableList (dnd-kit) | [05-sortable-list.md](05-sortable-list.md) | to do |
+| 6. Splitter | [06-splitter.md](06-splitter.md) | to do |
+| 7a. Composer draft, copy message | [07a-composer-draft-and-copy.md](07a-composer-draft-and-copy.md) | to do |
+| 7b. Canvas: drag to empty space | [07b-canvas.md](07b-canvas.md) | to do |
+| 7c. Canvas: undo/redo | [07b-canvas.md](07b-canvas.md) | to do |
+| 7d. Canvas: copy/paste | [07b-canvas.md](07b-canvas.md) | to do |
+| 7e. Regenerate and swipes (shared, server, web) | [07e-swipes.md](07e-swipes.md) | to do |
 
-Plans 4–7 are written, committed and pushed before their steps start.
+Decisions the orchestrator took while the user was away are marked **Decision** in the plans.
