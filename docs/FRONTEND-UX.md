@@ -104,10 +104,17 @@ Rules:
 
 ## Resizing
 
-- The side columns already resize (`layout/ResizeHandle.tsx`, widths in `localStorage`).
-- That handle becomes a generic **splitter**: horizontal or vertical, pointer and keyboard (arrows), double-click resets to the default size. Sizes are remembered per browser under a stable key (`useStoredSize(key, default, min, max)`, with the same guarded `localStorage` access as `layout/widths.ts`).
-- It is used inside editors: the preset editor's panes (entry list, entry editor, preview), the workflow node config panel, the chat panel.
-- Later, optional: dragging a side column below its minimum collapses it.
+- The side columns resize (`layout/ResizeHandle.tsx`, widths in `localStorage`); a double-click on a handle resets that column.
+- One generic **splitter** (`components/splitter/`): horizontal or vertical, pointer and keyboard (arrows), double-click resets to the default size. Sizes are remembered per browser under a stable key (`useStoredSize(key, { initial, min, max })`, with the same guarded `localStorage` access as `layout/widths.ts`).
+- It is used inside editors, only where the panes sit side by side. A stored size is applied through a CSS custom property that only the side-by-side rules read, and the splitter is hidden in the stacked and overlay layouts (container queries decide).
+
+  | Split | Default / min / max | Where |
+  |---|---|---|
+  | Chat panel width | 320 / 260 / 640 | next to the thread; none when the panel overlays it (chat container up to 760px) |
+  | Workflow node config and chat settings panel (one shared width) | 300 (settings: 340) / 240 / 720 | beside or floating over the canvas; none when it covers the canvas (editor container up to 560px) |
+  | Preset entry list vs entry editor | 320 / 220 / 640 | the two-column layout (editor container 641 to 1000px); none in the wide three-column layout and none when stacked |
+
+- Later, optional: dragging a side column below its minimum collapses it; the preset preview pane; vertical splits (the component supports `orientation`, nothing uses it yet).
 
 ## Editors
 
@@ -153,7 +160,7 @@ One commit (or a few) per step; each passes `npm run check`.
 3. **Escape and shortcuts**: the pure decision, the document listener, layers, area handlers, `Ctrl+S`; the one-off listeners move onto it; Escape stops a reply in the chat. Done.
 4. **Shared draft hook and editor header**, one editor at a time. Done.
 5. **`SortableList`** (dnd-kit) across the reorderable lists: four on dnd-kit, the node-ui picker with buttons and `Alt+↑/↓`. Done.
-6. **Splitter** inside editors.
+6. **Splitter** inside editors. Done.
 7. **Features**: composer draft, copy message, then the canvas (drag to empty space, undo/redo, copy/paste), then the swipes spec.
 
 ## Testing

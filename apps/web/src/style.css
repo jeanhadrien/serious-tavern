@@ -161,7 +161,9 @@ pre {
   text-align: left;
 }
 .config-panel {
-  width: 300px;
+  /* Set on .editor-body from the remembered size; the container queries (workflows.css) decide where it applies. */
+  width: var(--config-panel-width, 300px);
+  max-width: 70%;
   border-right: 0;
   border-left: 1px solid #363b46;
 }

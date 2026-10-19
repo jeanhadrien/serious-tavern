@@ -72,7 +72,7 @@ export function Shell() {
 
   useDefaultEscapeAreas(layout, actions.closeEditor);
   const gridRef = useRef<HTMLDivElement>(null);
-  const { widths, resize } = useColumnWidths(gridRef, compact ? 2 : 3);
+  const { widths, resize, reset } = useColumnWidths(gridRef, compact ? 2 : 3);
   const chat = useChat();
   useLayoutUrl(layout, dispatch, chat);
 
@@ -165,6 +165,7 @@ export function Shell() {
               value={widths.left}
               direction={1}
               onResize={(width) => resize('left', width)}
+              onReset={() => reset('left')}
             />
           )}
           {!compact && (
@@ -174,6 +175,7 @@ export function Shell() {
               value={widths.right}
               direction={-1}
               onResize={(width) => resize('right', width)}
+              onReset={() => reset('right')}
             />
           )}
           {/* Views never change position in this list: moving one between columns only changes its grid

@@ -1,3 +1,5 @@
+import { safeStorage } from '../safeStorage.js';
+
 // Column width rules for the shell. Widths are pixels for the side columns; M takes the rest.
 
 export interface ColumnWidths {
@@ -12,7 +14,6 @@ export const MIN_SIDE = 180;
 export const MIN_MIDDLE = 360;
 /** Width of one drag handle between columns. */
 export const HANDLE_WIDTH = 6;
-export const KEY_STEP = 16;
 
 const STORAGE_KEY = 'st.layout.widths';
 
@@ -43,6 +44,11 @@ export function resizeSide(
   return { ...widths, [side]: Math.round(Math.min(Math.max(value, MIN_SIDE), max)) };
 }
 
+/** Puts one side column back to its default width (still clamped to what the other columns leave). */
+export function resetSide(widths: ColumnWidths, side: Side, total: number, columns: 2 | 3): ColumnWidths {
+  return resizeSide(widths, side, DEFAULT_WIDTHS[side], total, columns);
+}
+
 export function loadWidths(storage: Pick<Storage, 'getItem'> | undefined = safeStorage()): ColumnWidths {
   try {
     const parsed: unknown = JSON.parse(storage?.getItem(STORAGE_KEY) ?? 'null');
@@ -61,14 +67,5 @@ export function saveWidths(widths: ColumnWidths, storage: Pick<Storage, 'setItem
     storage?.setItem(STORAGE_KEY, JSON.stringify(widths));
   } catch {
     /* Storage can be full or blocked; the widths just aren't remembered. */
-  }
-}
-
-// Reading `localStorage` itself can throw (blocked site data).
-function safeStorage(): Storage | undefined {
-  try {
-    return typeof localStorage === 'undefined' ? undefined : localStorage;
-  } catch {
-    return undefined;
   }
 }

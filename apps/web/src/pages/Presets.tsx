@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { presetSchema, settingsCatalog, stateHints, type Preset } from '@st/shared';
 import { presetsApi } from '../api.js';
 import {
@@ -11,6 +11,8 @@ import {
   workflowsStore,
 } from '../stores/index.js';
 import { alerts } from '../alerts/index.js';
+import { Splitter } from '../components/splitter/Splitter.js';
+import { useStoredSize } from '../components/splitter/useStoredSize.js';
 import { useEscapeArea } from '../keyboard/escapeRegistry.js';
 import { useDraft } from './useDraft.js';
 import { PresetEditor } from './presets/PresetEditor.js';
@@ -21,9 +23,13 @@ import { duplicatePreset } from './presets/presetActions.js';
 import { usePresetLiveSync } from './presets/usePresetLiveSync.js';
 import './presets/presets.css';
 
+// The entry list's width in the two-column layout (the wide and the stacked layouts have no splitter).
+const LIST_WIDTH = { initial: 320, min: 220, max: 640 };
+
 export function Presets() {
   const { draft, saved, savedKey, dirty, set, load, clear, revert } = useDraft(presetEditorStore);
   const [selectedEntryId, setSelectedEntryId] = useState('');
+  const listWidth = useStoredSize('preset-list', LIST_WIDTH);
   const readOnly = draft !== undefined && isImportedPreset(draft);
   const refresh = () => presetsStore.refresh();
   // A preset isn't tied to one workflow, so its hints offer every key any workflow declares.
@@ -96,7 +102,7 @@ export function Presets() {
   const selectedEntry = draft?.entries.find((entry) => entry.id === selectedEntryId);
 
   return (
-    <div className="presets-layout">
+    <div className="presets-layout" style={{ '--preset-list-width': `${listWidth.size}px` } as CSSProperties}>
       {draft ? (
         <>
           <PresetEditor
@@ -109,6 +115,15 @@ export function Presets() {
             onDuplicate={() => void duplicatePreset(draft)}
             selectedEntryId={selectedEntryId}
             onSelectEntry={setSelectedEntryId}
+          />
+          <Splitter
+            className="preset-list-splitter"
+            label="Resize entry list"
+            value={listWidth.size}
+            min={LIST_WIDTH.min}
+            max={LIST_WIDTH.max}
+            onChange={listWidth.setSize}
+            onReset={listWidth.reset}
           />
           <div className="preset-detail-column">
             <PresetEntryEditor

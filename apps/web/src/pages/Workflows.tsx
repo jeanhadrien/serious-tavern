@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { workflowSettingIssues, workflowSettings, type Workflow } from '@st/shared';
 import { useEscapeArea } from '../keyboard/escapeRegistry.js';
+import { Splitter } from '../components/splitter/Splitter.js';
+import { useStoredSize } from '../components/splitter/useStoredSize.js';
 import { useWorkflowEditor } from './workflows/useWorkflowEditor.js';
 import { WorkflowToolbar } from './workflows/WorkflowToolbar.js';
 import { NodePalette } from './workflows/NodePalette.js';
@@ -12,6 +14,10 @@ import { canvasToWorkflow } from './workflows/model.js';
 import { toggleSettingsPanel } from './workflows/settingsDraft.js';
 import { duplicateWorkflow } from './workflows/workflowActions.js';
 import './workflows/workflows.css';
+
+// The node config panel and the settings panel share one slot and one remembered width; until the user sets it,
+// each keeps its own default (300 and 340).
+const PANEL_WIDTH = { min: 240, max: 720 };
 
 export function Workflows() {
   return (
@@ -43,6 +49,8 @@ function WorkflowEditor() {
   const hinted = useMemo(() => workflowSettings({ settings }), [settings]);
   // A selected node's config wins over the settings panel.
   const settingsShown = settingsOpen && !canvas.current;
+  const panelShown = canvas.current !== undefined || settingsOpen;
+  const panelWidth = useStoredSize('workflow-panel', { ...PANEL_WIDTH, initial: canvas.current ? 300 : 340 });
   const toggleSettings = () => {
     const next = toggleSettingsPanel(settingsShown);
     if (next.deselect) canvas.setSelected(undefined);
@@ -71,9 +79,21 @@ function WorkflowEditor() {
             onSave={() => void save()}
             onRevert={revert}
           />
-          <div className="editor-body">
+          <div className="editor-body" style={{ '--config-panel-width': `${panelWidth.size}px` } as CSSProperties}>
             <NodePalette types={types} onAdd={canvas.addAtCenter} />
             <WorkflowCanvas canvas={canvas} />
+            {panelShown && (
+              <Splitter
+                className="splitter-inline config-panel-splitter"
+                label="Resize panel"
+                value={panelWidth.size}
+                min={PANEL_WIDTH.min}
+                max={PANEL_WIDTH.max}
+                direction={-1}
+                onChange={panelWidth.setSize}
+                onReset={panelWidth.reset}
+              />
+            )}
             {canvas.current ? (
               <WorkflowConfigPanel
                 current={canvas.current}

@@ -35,11 +35,16 @@
   padding: 0;
   border: 0;
 }
-/* In a narrow middle column the preview drops below the entry list and the entry editor. */
+/* The splitter between the entry list and the entry editor exists only in the two-column layout below. */
+.presets-layout .preset-list-splitter {
+  display: none;
+}
+/* In a narrow middle column the preview drops below the entry list and the entry editor. The list's width is the
+   remembered size (--preset-list-width, set by Presets); the stacked layout below ignores it. */
 @container editor (max-width: 1000px) {
   .view .presets-layout {
     display: grid;
-    grid-template-columns: minmax(260px, 2fr) minmax(0, 3fr);
+    grid-template-columns: minmax(220px, min(var(--preset-list-width, 320px), 70%)) minmax(0, 1fr);
     grid-auto-rows: min-content;
     align-content: start;
     overflow: auto;
@@ -47,13 +52,30 @@
   .view .presets-layout > .empty-state {
     grid-column: 1 / -1;
   }
+  /* Placed by hand so the splitter can share the first cell without taking an auto-placement slot. */
   .presets-layout .preset-editor-column {
+    grid-area: 1 / 1;
     width: auto;
     min-width: 0;
   }
   .presets-layout .preset-detail-column {
+    grid-area: 1 / 2;
     min-width: 0;
     border-right: 0;
+  }
+  .presets-layout .splitter.preset-list-splitter:hover,
+  .presets-layout .splitter.preset-list-splitter:focus-visible,
+  .presets-layout .splitter.preset-list-splitter:active {
+    background: #6f7ddf;
+  }
+  .presets-layout .splitter.preset-list-splitter {
+    display: block;
+    grid-area: 1 / 1;
+    justify-self: end;
+    width: 6px;
+    margin: 0 -3px 0 0;
+    z-index: 6;
+    background: transparent;
   }
   .presets-layout .preset-preview-column {
     grid-column: 1 / -1;
@@ -66,10 +88,15 @@
   .view .presets-layout {
     grid-template-columns: minmax(0, 1fr);
   }
+  .presets-layout .splitter.preset-list-splitter {
+    display: none;
+  }
   .presets-layout .preset-editor-column {
+    grid-area: auto;
     border-right: 0;
   }
   .presets-layout .preset-detail-column {
+    grid-area: auto;
     border-top: 1px solid #343844;
   }
 }

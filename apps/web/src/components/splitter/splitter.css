@@ -1,0 +1,33 @@
+/* A divider between two panes (the shell's columns and the splits inside editors). */
+.splitter {
+  background: #343844;
+  touch-action: none;
+}
+.splitter[data-orientation="vertical"] {
+  cursor: col-resize;
+}
+.splitter[data-orientation="horizontal"] {
+  cursor: row-resize;
+}
+.splitter:hover,
+.splitter:focus-visible,
+.splitter:active {
+  background: #6f7ddf;
+  outline: none;
+}
+/* Inside an editor the splitter straddles the border between two panes instead of taking room of its own. */
+.splitter.splitter-inline {
+  position: relative;
+  z-index: 6;
+  flex-shrink: 0;
+  background: transparent;
+}
+.splitter.splitter-inline[data-orientation="vertical"] {
+  width: 6px;
+  margin: 0 -3px;
+}
+.splitter.splitter-inline:hover,
+.splitter.splitter-inline:focus-visible,
+.splitter.splitter-inline:active {
+  background: #6f7ddf;
+}
