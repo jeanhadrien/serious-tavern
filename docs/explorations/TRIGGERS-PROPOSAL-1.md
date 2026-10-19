@@ -82,7 +82,7 @@ two sets of **resources**:
 
 | Resource | Read by | Written by |
 | --- | --- | --- |
-| `state.<definition>.<key>` | State Read; `{{state.<def>.<key>}}` in any template (preset or config) it renders | State Write |
+| `state.<definition>.<key>` | State Read; `{{state.<def>.<key>}}` in any template (preset or config) it renders; State Write `increment` | State Write |
 | `state.<definition>` (whole) | `{{state.<def>}}`, `{{#each state.<def>}}`, any dynamic lookup into it | none (a write names a key) |
 | `messages` | Memory, `{{history}}`, Next Chunk, Unlinked Messages, Chat Input's history outputs | Chat Output (append) |
 
@@ -111,9 +111,15 @@ For each enabled workflow *j*, its predecessors are the earlier workflows *i* wi
   after every earlier run whose writes it reads has settled, its view is complete for what it reads.
 - **Each run commits when it settles** (its own settle write, generalizing today's `settlePostRun`), so
   replies are saved as soon as their workflow ends and dependants can start.
-- **The stored result is folded in list order**, not completion order. So two workflows that both write
-  the same key don't need to wait for each other: the lower one wins, as it would running top to bottom.
-  The same goes for appended replies.
+- **The stored result is folded in list order**, not completion order. Two workflows writing the same
+  key is not a conflict to resolve: the writes are applied top to bottom, exactly as if the workflows
+  ran one after another. For two `set`s that means the lower one's value is the one that stays; for
+  collection `add`/`remove`, both apply in list order. So writers of the same key don't need to wait for
+  each other, and the same goes for appended replies.
+- **`increment` reads the key.** It is stored as the value it produces (a `set` of the post-value,
+  clamped), so it is computed from the run's view. Two workflows incrementing the same key must
+  therefore run in order, or one increment would be lost: `increment` counts as a read of the key, and
+  the lower workflow waits for the upper one.
 - Read-only overlap (both read `scene.tension`) never orders anything: the user's own example.
 
 The editor shows the plan: each row in the chat's On reply list says "runs with the ones above" or "waits
@@ -224,9 +230,10 @@ measured before it is built.
 
 ## Open questions
 
-1. Should a workflow be allowed twice in one list (with different settings)? This proposal says no:
-   it keeps node-private state private and the list readable.
-2. Is "the lower one wins" for two writes of the same key the right default, or should the editor warn
-   when two enabled workflows write the same key?
+1. ~~Should a workflow be allowed twice in one list?~~ Decided: no, for now. It keeps node-private
+   state private and the list readable.
+2. ~~Should the editor warn when two enabled workflows write the same key?~~ Decided: no. Writing the
+   same key is ordinary: the list order says what happens, like running the workflows one after
+   another. The "waits for" hints are the only feedback.
 3. Name check: "Triggers" in the UI and the `{{trigger.*}}` template namespace now mean the same thing
    (the event that started the run). The Gate rename frees the word.
