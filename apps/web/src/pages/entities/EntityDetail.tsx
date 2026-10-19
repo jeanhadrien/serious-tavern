@@ -18,7 +18,7 @@ export function EntityDetail({
   dirty: boolean;
   onBack: () => void;
   onDelete: () => Promise<void>;
-  onSave: () => Promise<void>;
+  onSave: () => Promise<unknown>;
   actions?: ReactNode;
   children: ReactNode;
 }) {

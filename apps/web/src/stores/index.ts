@@ -23,7 +23,7 @@ import type {
 import { createEditorStore } from './editorStore.js';
 import { createListStore, type ListStore } from './listStore.js';
 
-export { useEditorCommands, useEditorState } from './editorStore.js';
+export { useEditorCommands, useEditorSaver, useEditorState } from './editorStore.js';
 
 // Stores refresh in the background: a failed fetch must not toast on every event.
 const silent = { silent: true };

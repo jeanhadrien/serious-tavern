@@ -13,17 +13,20 @@ export function WorkflowList() {
   const { currentId, dirty } = useEditorState(workflowEditorStore);
   const { openEditor } = useLayoutActions();
 
-  const open = (workflow: Workflow) => {
+  const show = (workflow: Workflow) => {
     workflowEditorStore.open(structuredClone(workflow));
     openEditor('workflows');
   };
+  const open = async (workflow: Workflow) => {
+    if (await workflowEditorStore.confirmSwitch(workflow.id)) show(workflow);
+  };
   const create = async () => {
     const name = window.prompt('Workflow name');
-    if (!name?.trim()) return;
+    if (!name?.trim() || !(await workflowEditorStore.confirmSwitch())) return;
     try {
       const created = await workflowsApi.create({ name });
       await workflowsStore.refresh();
-      open(created);
+      show(created);
     } catch {
       /* API errors are toasted. */
     }
@@ -53,7 +56,7 @@ export function WorkflowList() {
             type="button"
             className="session-link"
             aria-current={currentId === workflow.id ? 'true' : undefined}
-            onClick={() => open(workflow)}
+            onClick={() => void open(workflow)}
           >
             {workflow.name}
             {dirty && currentId === workflow.id && (

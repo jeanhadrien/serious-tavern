@@ -12,10 +12,14 @@ export function StateDefinitionListView() {
   const { currentId, dirty } = useEditorState(stateDefinitionEditorStore);
   const { openEditor } = useLayoutActions();
 
-  const open = (definition: StateDefinition) => showStateDefinition(definition, () => openEditor('stateDefinitions'));
+  const show = (definition: StateDefinition) => showStateDefinition(definition, () => openEditor('stateDefinitions'));
+  const open = async (definition: StateDefinition) => {
+    if (await stateDefinitionEditorStore.confirmSwitch(definition.id)) show(definition);
+  };
   const create = async () => {
+    if (!(await stateDefinitionEditorStore.confirmSwitch())) return;
     const created = await createStateDefinition();
-    if (created) open(created);
+    if (created) show(created);
   };
 
   return (
@@ -34,7 +38,7 @@ export function StateDefinitionListView() {
           type="button"
           key={definition.id}
           className={`state-row ${currentId === definition.id ? 'selected' : ''}`}
-          onClick={() => open(definition)}
+          onClick={() => void open(definition)}
         >
           <span className="state-row-name">
             {definition.name}

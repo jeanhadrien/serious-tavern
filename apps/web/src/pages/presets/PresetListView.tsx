@@ -14,10 +14,13 @@ export function PresetListView() {
       presets={presets}
       selectedId={currentId}
       dirtyId={dirty ? currentId : undefined}
-      onSelect={(preset) => {
-        presetEditorStore.open(structuredClone(preset));
-        showEditor();
-      }}
+      onSelect={(preset) =>
+        void presetEditorStore.confirmSwitch(preset.id).then((ok) => {
+          if (!ok) return;
+          presetEditorStore.open(structuredClone(preset));
+          showEditor();
+        })
+      }
       onCreate={() => void createPreset().then((ok) => ok && showEditor())}
       onDuplicate={(preset) => void duplicatePreset(preset).then((ok) => ok && showEditor())}
       onDelete={(preset) => void deletePreset(preset)}

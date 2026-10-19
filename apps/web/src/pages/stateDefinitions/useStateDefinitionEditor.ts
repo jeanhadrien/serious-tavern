@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StateDefinition } from '@st/shared';
 import { alerts } from '../../alerts/index.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
-import { stateDefinitionEditorStore, stateDefinitionsStore, useEditorCommands, useList } from '../../stores/index.js';
+import {
+  stateDefinitionEditorStore,
+  stateDefinitionsStore,
+  useEditorCommands,
+  useEditorSaver,
+  useList,
+} from '../../stores/index.js';
 import { useFileSync } from '../useFileSync.js';
 import { compile, definitionNameProblem } from './definitionCompile.js';
 import { afterEdit, afterKeepName, afterSave, freshNameState } from './nameState.js';
@@ -91,26 +97,31 @@ export function useStateDefinitionEditor() {
     setDraft(next);
     setNames(afterEdit);
   };
-  const save = async () => {
-    if (!definition || !draft || savingRef.current || problems.count) return;
+  /** Resolves true when saved; false on problems, a refused or failed save (shown inline or toasted), or a save in flight. */
+  const save = async (): Promise<boolean> => {
+    if (!definition || !draft || savingRef.current || problems.count) return false;
     const { body } = compile(draft, otherNames);
-    if (!body) return;
+    if (!body) return false;
     savingRef.current = true;
     setSaving(true);
     try {
       const outcome = await saveStateDefinition(definition.id, body);
       if (outcome.kind === 'saved') open(outcome.definition);
       else setNames((current) => afterSave(current, outcome, body.name));
+      return outcome.kind === 'saved';
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
   };
+  useEditorSaver(stateDefinitionEditorStore, { label: () => draft?.name || definition?.name || '', save });
   /** Copies the saved definition (not an unsaved draft) under a name the user picks. */
   const duplicate = async () => {
-    if (!definition) return;
+    if (!definition || !(await stateDefinitionEditorStore.confirmSwitch())) return;
+    // A Save in that question may have changed the saved definition (or its name): copy what is stored now.
+    const stored = stateDefinitionsStore.getSnapshot().find((item) => item.id === definition.id) ?? definition;
     const taken = definitions.map((item) => item.name);
-    const asked = window.prompt('Name of the copy', uniqueName(`${definition.name}_copy`, taken));
+    const asked = window.prompt('Name of the copy', uniqueName(`${stored.name}_copy`, taken));
     if (asked === null) return;
     const name = asked.trim();
     const problem = definitionNameProblem(name, taken);
@@ -118,7 +129,7 @@ export function useStateDefinitionEditor() {
       alerts.warning(problem);
       return;
     }
-    const copy = await createStateDefinitionFrom(copyOf(definition, name));
+    const copy = await createStateDefinitionFrom(copyOf(stored, name));
     if (copy) open(copy);
   };
   /** After a refused rename: the whole draft (keys included) becomes a new definition with the attempted name. */

@@ -115,12 +115,14 @@ export function useLayoutUrl(layout: LayoutState, dispatch: Dispatch<LayoutActio
       const open = source.editor.getSnapshot();
       if (open.currentId === id && !edge) return;
       // Back/Forward never discards an unsaved draft (the URL then follows what is shown); a clicked link,
-      // like a click in a list, replaces it.
+      // like a click in a list, asks Save / Discard / Cancel first. Cancel leaves the editor alone and the URL is
+      // then written back to what is shown.
       if (fromHistory && open.dirty && open.currentId !== id) return;
       const items = await source.list.refresh().catch(() => undefined);
       if (!items || !isCurrent()) return;
       const item = items.find((candidate) => candidate.id === id);
       if (!item) return dispatch({ type: 'closeEditor', id: resource }); // deleted since the link was made
+      if (!(await source.editor.confirmSwitch(id)) || !isCurrent()) return;
       source.editor.open(structuredClone(item), edge);
       await whenOpen(source.editor, id);
     };

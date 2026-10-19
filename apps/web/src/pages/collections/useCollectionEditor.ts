@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Collection, CollectionSummary } from '@st/shared';
 import { ApiError, collectionsApi } from '../../api.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
-import { collectionEditorStore, collectionsStore, useEditorCommands } from '../../stores/index.js';
+import { collectionEditorStore, collectionsStore, useEditorCommands, useEditorSaver } from '../../stores/index.js';
 import { useFileSync } from '../useFileSync.js';
 import { deleteCollection, saveCollection } from './collectionActions.js';
 import {
@@ -149,20 +149,26 @@ export function useCollectionEditor() {
     };
   }, []);
 
-  const save = async () => {
-    if (!collection || !draft || savingRef.current) return;
+  /** Resolves true when saved; false on validation errors, an API error, a declined recreate or a save in flight. */
+  const save = async (): Promise<boolean> => {
+    if (!collection || !draft || savingRef.current) return false;
     const result = draftToBody(draft);
-    if (!result.ok) return setErrors(result.errors);
+    if (!result.ok) {
+      setErrors(result.errors);
+      return false;
+    }
     savingRef.current = true;
     setSaving(true);
     try {
       const saved = await saveCollection(collection.id, result.body);
       if (saved) load(saved, true);
+      return !!saved;
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
   };
+  useEditorSaver(collectionEditorStore, { label: () => draft?.name ?? collection?.name ?? '', save });
   // Re-read first: the disk may have moved on while the draft was dirty (the live sync only warned), and
   // restoring the older baseline would let a later save overwrite that edit.
   const discard = async () => {

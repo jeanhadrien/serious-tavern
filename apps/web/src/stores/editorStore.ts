@@ -1,4 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { dialogs } from '../components/dialog/dialogStore.js';
 
 /** A request from a list to its editor. `seq` makes every request distinct so each is handled once. */
 type EditorCommand<T> = { seq: number; open: T; focus?: string } | { seq: number; close: string };
@@ -11,6 +12,14 @@ export interface EditorState<T> {
   /** The latest request from the list; the editor applies it when it sees a new `seq`. */
   command?: EditorCommand<T>;
 }
+
+/** What the unsaved-work dialog offers. `label` names the open item; `save` resolves true once saved. */
+export interface EditorSaver {
+  label(): string;
+  save(): Promise<boolean>;
+}
+
+type Ask = typeof dialogs.ask;
 
 export interface EditorStore<T> {
   getSnapshot(): EditorState<T>;
@@ -25,6 +34,14 @@ export interface EditorStore<T> {
   discard(id: string): void;
   /** Editor side: publish which item is open and whether it is dirty. */
   report(currentId: string | undefined, dirty: boolean): void;
+  /** Editor side: register what the unsaved-work dialog offers; `undefined` unregisters. */
+  setSaver(saver: EditorSaver | undefined): void;
+  /**
+   * List side: resolves true when the editor may open `nextId` now. True at once when `nextId` is the open item or
+   * the draft is clean; otherwise asks Save / Discard / Cancel. No argument means "something else replaces the open
+   * item" (create, import). Callers ask before `open`, and before any server write or layout change.
+   */
+  confirmSwitch(nextId?: string): Promise<boolean>;
 }
 
 /**
@@ -32,8 +49,9 @@ export interface EditorStore<T> {
  * component, which is always mounted; the store only carries what the list needs to show (selection, dirty marker)
  * and the list's requests to the editor.
  */
-export function createEditorStore<T extends { id: string }>(): EditorStore<T> {
+export function createEditorStore<T extends { id: string }>(ask: Ask = dialogs.ask.bind(dialogs)): EditorStore<T> {
   let state: EditorState<T> = { dirty: false };
+  let saver: EditorSaver | undefined;
   const listeners = new Set<() => void>();
   const set = (next: EditorState<T>) => {
     state = next;
@@ -60,6 +78,25 @@ export function createEditorStore<T extends { id: string }>(): EditorStore<T> {
     discard: (id) => send({ close: id }),
     report: (currentId, dirty) => {
       if (state.currentId !== currentId || state.dirty !== dirty) set({ ...state, currentId, dirty });
+    },
+    setSaver: (next) => {
+      saver = next;
+    },
+    confirmSwitch: async (nextId) => {
+      if (!state.dirty || (nextId !== undefined && nextId === state.currentId)) return true;
+      const current = saver;
+      const answer = await ask({
+        title: `Save changes to "${current?.label() ?? 'the open item'}"?`,
+        body: 'You have unsaved changes. Opening something else replaces them.',
+        actions: [
+          ...(current ? [{ id: 'save', label: 'Save', kind: 'primary' as const }] : []),
+          { id: 'discard', label: 'Discard changes', kind: 'danger' as const },
+        ],
+        // Cancel leaves everything as it is: where the list replaced the editor, the list stays on screen.
+        cancelLabel: 'Cancel',
+      });
+      if (answer === 'save') return (await current?.save()) === true;
+      return answer === 'discard';
     },
   };
 }
@@ -93,4 +130,14 @@ export function useEditorCommands<T>(
       latest.current.close(command.close);
     }
   }, [command, ready]);
+}
+
+/** Editor side: registers the latest saver for the unsaved-work dialog; a new function each render doesn't re-register. */
+export function useEditorSaver<T>(store: EditorStore<T>, saver: EditorSaver) {
+  const latest = useRef(saver);
+  latest.current = saver;
+  useEffect(() => {
+    store.setSaver({ label: () => latest.current.label(), save: () => latest.current.save() });
+    return () => store.setSaver(undefined);
+  }, [store]);
 }

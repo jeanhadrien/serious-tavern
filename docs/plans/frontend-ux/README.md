@@ -8,6 +8,8 @@ Plans for building `docs/FRONTEND-UX.md` (the agreed spec). There is one file pe
 2. A **fresh Sonnet agent** codes the step from the plan alone. One agent per step, never reused.
 3. The orchestrator verifies the work: reads the diff against the plan, runs `npm run check`, and runs a live check when the step changes behaviour on screen. Then it commits and pushes, or sends the work back to a new agent with the gaps listed.
 4. The status table below is updated in the same commit.
+5. While an agent's work is in the tree (a stash apply may have staged files), the orchestrator commits plan files with an explicit pathspec only (`git commit -- docs/plans/...`), never `git commit` on the whole index.
+6. Live checks run on a temp data dir with a fake OpenAI-compatible backend; never against `apps/server/data`.
 
 ## Rules every agent follows
 
@@ -24,7 +26,7 @@ Plans for building `docs/FRONTEND-UX.md` (the agreed spec). There is one file pe
 | Step | Plan | Code |
 |---|---|---|
 | 1. Confirm dialog | [01-confirm-dialog.md](01-confirm-dialog.md) | done |
-| 2. Unsaved-work guard | [02-unsaved-guard.md](02-unsaved-guard.md) | to do |
+| 2. Unsaved-work guard | [02-unsaved-guard.md](02-unsaved-guard.md) | done |
 | 3. Escape and shortcuts | [03-escape-and-shortcuts.md](03-escape-and-shortcuts.md) | to do |
 | 4. Shared draft hook and editor header | [04-draft-and-header.md](04-draft-and-header.md) | to do |
 | 5. SortableList (dnd-kit) | [05-sortable-list.md](05-sortable-list.md) | to do |

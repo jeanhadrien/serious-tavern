@@ -6,6 +6,7 @@ import {
   presetsStore,
   stateDefinitionsStore,
   useEditorCommands,
+  useEditorSaver,
   useList,
   workflowsStore,
 } from '../stores/index.js';
@@ -61,25 +62,29 @@ export function Presets() {
   const change = (next: Preset) => {
     if (!readOnly) setDraft(next);
   };
-  const save = async () => {
-    if (!draft || readOnly) return;
+  /** Resolves true when saved; false on a validation failure, an API error (toasted) or a read-only preset. */
+  const save = async (): Promise<boolean> => {
+    if (!draft || readOnly) return false;
     const parsed = presetSchema.safeParse(draft);
     if (!parsed.success) {
       alerts.error('Fix the preset validation errors before saving', {
         title: 'Invalid preset',
         details: parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('\n'),
       });
-      return;
+      return false;
     }
     try {
       const result = await presetsApi.update(draft.id, draft);
       choose(result);
       await refresh();
       alerts.success('Preset saved');
+      return true;
     } catch {
       /* API errors are toasted. */
+      return false;
     }
   };
+  useEditorSaver(presetEditorStore, { label: () => draft?.name ?? '', save });
   const selectedEntry = draft?.entries.find((entry) => entry.id === selectedEntryId);
 
   return (

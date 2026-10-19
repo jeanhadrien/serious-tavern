@@ -66,11 +66,13 @@ let openRequest = 0;
 /**
  * Opens a collection in its editor (`show` makes the editor visible). The list and the node panel links only
  * know summaries, so the whole collection is fetched first and the editor switches once, with the full record:
- * it never shows the previous collection while loading, and the URL changes once. The open one keeps its draft.
+ * it never shows the previous collection while loading, and the URL changes once. The open one keeps its draft;
+ * a dirty draft of another one asks Save / Discard / Cancel before anything is fetched.
  */
 export async function openCollection(id: string, show: () => void): Promise<void> {
   const request = ++openRequest;
   if (collectionEditorStore.getSnapshot().currentId === id) return show();
+  if (!(await collectionEditorStore.confirmSwitch(id)) || request !== openRequest) return;
   const collection = await collectionsApi.get(id).catch(() => undefined); // toasted
   if (collection && request === openRequest) showCollection(collection, show);
 }

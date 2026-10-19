@@ -26,6 +26,7 @@ import { useColumnWidths } from './useColumnWidths.js';
 import { useCompactMode, useMobileMode } from './useCompactMode.js';
 import { useDirtySync } from './useDirtySync.js';
 import { searchOf, useLayoutUrl } from './useLayoutUrl.js';
+import { useUnsavedWarning } from './useUnsavedWarning.js';
 import { VIEW_INFO } from './views.js';
 import { HANDLE_WIDTH } from './widths.js';
 import './shell.css';
@@ -101,6 +102,7 @@ export function Shell() {
   const selectMobile = (view: MobileView) =>
     view === 'chat' || view === 'editor' ? dispatch({ type: 'showMiddle', chat: view === 'chat' }) : select(view);
   const anyDirty = Object.values(layout.dirty).some(Boolean);
+  useUnsavedWarning(anyDirty);
   const titleId = shown === 'editor' ? layout.wide : shown;
   const mobileTitle = titleId && VIEW_INFO[titleId].label;
   const gridStyle: CSSProperties = mobile

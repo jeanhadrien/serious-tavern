@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Character, Persona } from '@st/shared';
 import { alerts } from '../../alerts/index.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
-import { useEditorCommands } from '../../stores/index.js';
+import { useEditorCommands, useEditorSaver } from '../../stores/index.js';
 import { importEntityFiles } from './entityActions.js';
 import type { EntityKind } from './entityKinds.js';
 import { confirmDelete } from '../../components/dialog/dialogStore.js';
@@ -34,16 +34,20 @@ export function useEntityEditor<T extends Character | Persona>(kind: EntityKind<
     },
   });
 
-  const save = async () => {
-    if (!draft || !kind.validate(draft)) return;
+  /** Resolves true when saved; false on a validation failure or an API error (toasted). */
+  const save = async (): Promise<boolean> => {
+    if (!draft || !kind.validate(draft)) return false;
     try {
       choose(await kind.save(draft));
       await kind.listStore.refresh();
       alerts.success(`${kind.label} saved`);
+      return true;
     } catch {
       /* API errors are toasted. */
+      return false;
     }
   };
+  useEditorSaver(kind.editorStore, { label: () => draft?.name ?? '', save });
   const remove = async () => {
     if (!draft || !(await confirmDelete(`Delete ${kind.label.toLowerCase()} "${draft.name}"?`))) return;
     try {

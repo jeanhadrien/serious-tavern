@@ -10,6 +10,7 @@ import {
   providersStore,
   stateDefinitionsStore,
   useEditorCommands,
+  useEditorSaver,
   useList,
   workflowEditorStore,
   workflowsStore,
@@ -108,6 +109,7 @@ export function useWorkflowEditor() {
       return false;
     }
   };
+  useEditorSaver(workflowEditorStore, { label: () => workflow?.name ?? '', save: () => save() });
   const validate = async () => {
     if (!workflow) return;
     try {

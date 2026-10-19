@@ -19,7 +19,7 @@ confirmSwitch(nextId?: string): Promise<boolean>;
 ```
 
 - `createEditorStore<T>(ask = dialogs.ask.bind(dialogs))`: the dialog function is injectable, for the tests.
-- The dialog: title `Save changes to "<label>"?`, body `You have unsaved changes. Opening something else replaces them.`. Actions: `{ id: 'save', label: 'Save', kind: 'primary' }` (only when a saver is registered) and `{ id: 'discard', label: 'Discard changes', kind: 'danger' }`; `cancelLabel: 'Keep editing'`. With no saver, the label is `the open item`.
+- The dialog: title `Save changes to "<label>"?`, body `You have unsaved changes. Opening something else replaces them.`. Actions: `{ id: 'save', label: 'Save', kind: 'primary' }` (only when a saver is registered) and `{ id: 'discard', label: 'Discard changes', kind: 'danger' }`; `cancelLabel: 'Cancel'` (Decision, orchestrator: was "Keep editing", but Cancel leaves a narrow editor's list on screen, so the label promised too much). With no saver, the label is `the open item`.
 - `save`: `await saver.save()`; true resolves true, false resolves false (a failed save already toasts). `discard` resolves true: the `open` that follows replaces the draft, as today. `cancel` resolves false.
 - `confirmSwitch()` with no argument means "something else replaces the open item" (create, import).
 - Add a hook `useEditorSaver(store, saver)` that registers the latest saver (through a ref, so a new function each render doesn't re-register) and unregisters on unmount.
@@ -86,6 +86,6 @@ If the same item is clicked again (`nextId === currentId`), nothing is asked, as
 
 - `npm run check` passes.
 - Live check (orchestrator):
-  - edit a character, then click another: Keep editing keeps the draft; Discard opens the other one; Save saves, then opens it;
+  - edit a character, then click another: Cancel keeps the draft; Discard opens the other one; Save saves, then opens it;
   - the same with a preset (a wide editor);
   - reloading with a dirty draft shows the browser's warning.

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ProviderView } from '@st/shared';
 import { secretsApi } from '../../api.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
-import { providerEditorStore, providersStore, useEditorCommands } from '../../stores/index.js';
+import { providerEditorStore, providersStore, useEditorCommands, useEditorSaver } from '../../stores/index.js';
 import { useFileSync } from '../useFileSync.js';
 import { deleteProvider, duplicateProvider, saveProvider } from './providerActions.js';
 import { classifyProviderChange, draftChanged, draftToBody, toDraft, type ProviderDraft } from './providerDraft.js';
@@ -73,15 +73,21 @@ export function useProviderEditor() {
     setDraft(next);
     setErrors([]);
   };
-  const save = async () => {
-    if (!provider || !draft || readOnly) return;
+  /** Resolves true when saved; false on validation errors, an API error (toasted) or a read-only provider. */
+  const save = async (): Promise<boolean> => {
+    if (!provider || !draft || readOnly) return false;
     const result = draftToBody(draft, provider.kind);
-    if (!result.ok) return setErrors(result.errors);
+    if (!result.ok) {
+      setErrors(result.errors);
+      return false;
+    }
     const saved = await saveProvider(provider.id, result.body);
     if (saved) open(saved);
+    return !!saved;
   };
+  useEditorSaver(providerEditorStore, { label: () => draft?.name ?? provider?.name ?? '', save });
   const duplicate = async () => {
-    if (!provider) return;
+    if (!provider || !(await providerEditorStore.confirmSwitch())) return;
     const copy = await duplicateProvider(provider);
     if (copy) open(copy);
   };

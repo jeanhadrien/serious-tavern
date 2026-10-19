@@ -6,7 +6,8 @@ import { unsavableSettings } from './settingsDraft.js';
 
 /**
  * Creates "<name> copy" from a workflow's graph and chat settings and opens it in the editor. Shared by the list (saved version)
- * and the editor toolbar (current canvas). Resolves with whether it succeeded; API errors are toasted.
+ * and the editor toolbar (current canvas). Resolves with whether it succeeded; API errors are toasted. A dirty open
+ * draft asks Save / Discard / Cancel first (Cancel resolves false and writes nothing).
  */
 export async function duplicateWorkflow(
   source: Pick<Workflow, 'name' | 'nodes' | 'edges' | 'settings'>,
@@ -19,6 +20,7 @@ export async function duplicateWorkflow(
     });
     return false;
   }
+  if (!(await workflowEditorStore.confirmSwitch())) return false;
   try {
     const copy = await workflowsApi.create({
       name: `${source.name} copy`,

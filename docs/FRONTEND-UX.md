@@ -72,7 +72,7 @@ Rules:
   - Discard drops the draft and opens the new item.
   - Cancel keeps everything as it is.
 
-  This lives in the editor store (`stores/editorStore.ts`), so every list gets it. The editor registers its save so the dialog can offer it. Today `open` silently replaces a dirty draft (for example `useEntityEditor`).
+  This lives in the editor store (`stores/editorStore.ts`), so every list gets it. The editor registers its save (`useEditorSaver`) so the dialog can offer it, and every caller asks `confirmSwitch(id)` before `open`.
 - **Closing or reloading the tab** while any editor is dirty triggers the browser's own "leave site?" warning (`beforeunload`).
 - **Escape, Back, back arrows and closing a wide editor never discard.** The editor stays mounted, and the dirty dot shows where the draft is.
 - Live disk sync (`useFileSync`, the preset live sync) keeps its current rules.
@@ -138,7 +138,7 @@ Rules:
 One commit (or a few) per step; each passes `npm run check`.
 
 1. **Confirm dialog** (`components/dialog/`), replacing every `window.confirm`. Done; deleting a chat now asks too.
-2. **Unsaved-work guard**: Save / Discard / Cancel on switching items (editor store) and the `beforeunload` warning.
+2. **Unsaved-work guard**: Save / Discard / Cancel on switching items (editor store) and the `beforeunload` warning. Done.
 3. **Escape and shortcuts**: the pure decision, the document listener, layers, area handlers, `Ctrl+S`; the one-off listeners move onto it; Escape stops a reply in the chat.
 4. **Shared draft hook and editor header**, one editor at a time.
 5. **`SortableList`** (dnd-kit) across the five reorderable lists.
