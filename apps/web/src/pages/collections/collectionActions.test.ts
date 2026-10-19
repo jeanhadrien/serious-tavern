@@ -36,7 +36,7 @@ it('recreates a collection the server no longer finds only when the user agrees'
   const missing = new ApiError(404, 'NOT_FOUND', 'Collection not found');
   collectionsApi.update.mockRejectedValue(missing);
   collectionsApi.create.mockResolvedValue({ ...lore, id: 'c2' });
-  const confirm = vi.fn(() => true);
+  const confirm = vi.fn(async () => true);
   expect(await saveCollection('c1', body, confirm)).toMatchObject({ id: 'c2' });
   expect(confirm).toHaveBeenCalledWith('Lore');
   expect(collectionsApi.create).toHaveBeenCalledWith(body);
@@ -47,7 +47,7 @@ it('recreates a collection the server no longer finds only when the user agrees'
 it('keeps the draft unsaved when the user declines the recreate (the file may only be unreadable)', async () => {
   // The server answers 404 for a file that no longer parses as well as for a deleted one.
   collectionsApi.update.mockRejectedValue(new ApiError(404, 'NOT_FOUND', 'Collection not found'));
-  expect(await saveCollection('c1', body, () => false)).toBeUndefined();
+  expect(await saveCollection('c1', body, async () => false)).toBeUndefined();
   expect(collectionsApi.create).not.toHaveBeenCalled();
   expect(refresh).not.toHaveBeenCalled();
   expect(alerts.success).not.toHaveBeenCalled();

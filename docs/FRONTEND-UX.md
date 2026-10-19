@@ -2,7 +2,7 @@
 
 Design reference for how the web app behaves under the user's hands: keyboard, Escape, drag and drop, resizing, confirmations, unsaved work. `FRONTEND-LAYOUT.md` says **where** things are; this file says **how they behave**.
 
-Status: agreed (October 2026), not built yet. The build order is at the end.
+Status: agreed (October 2026), being built. The build order at the end marks what is done.
 
 Functionality comes before style. Nothing here asks for visual polish.
 
@@ -137,7 +137,7 @@ Rules:
 
 One commit (or a few) per step; each passes `npm run check`.
 
-1. **Confirm dialog** (`components/`), replacing every `window.confirm`.
+1. **Confirm dialog** (`components/dialog/`), replacing every `window.confirm`. Done; deleting a chat now asks too.
 2. **Unsaved-work guard**: Save / Discard / Cancel on switching items (editor store) and the `beforeunload` warning.
 3. **Escape and shortcuts**: the pure decision, the document listener, layers, area handlers, `Ctrl+S`; the one-off listeners move onto it; Escape stops a reply in the chat.
 4. **Shared draft hook and editor header**, one editor at a time.

@@ -1,6 +1,7 @@
 import type { SessionSummary } from '@st/shared';
 import { Plus, Trash2 } from 'lucide-react';
 import { IconButton } from '../../components/IconButton.js';
+import { confirmDelete } from '../../components/dialog/dialogStore.js';
 
 interface ChatSidebarProps {
   sessions: SessionSummary[];
@@ -41,7 +42,14 @@ export function ChatSidebar({ sessions, activeId, canCreate, disabled, onOpen, o
             icon={Trash2}
             label={`Delete chat: ${session.title}`}
             disabled={disabled}
-            onClick={() => void onDelete(session.id)}
+            onClick={() =>
+              void confirmDelete(
+                `Delete chat "${session.title}"?`,
+                "Its messages and story state are deleted with it. This can't be undone.",
+              ).then((yes) => {
+                if (yes) void onDelete(session.id);
+              })
+            }
           />
         </div>
       ))}

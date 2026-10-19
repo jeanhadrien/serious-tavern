@@ -53,11 +53,12 @@ export function MessageActions({
             icon={Trash2}
             label="Delete message"
             disabled={disabled}
-            onClick={() => {
-              const click = deleteClick(undoOnDelete?.(), (text) => window.confirm(text), deleteNote);
-              if (click === 'inline') setConfirming(true);
-              else if (click === 'delete') void onDelete();
-            }}
+            onClick={() =>
+              void deleteClick(undoOnDelete?.(), deleteNote).then((click) => {
+                if (click === 'inline') setConfirming(true);
+                else if (click === 'delete') void onDelete();
+              })
+            }
           />
         </>
       )}

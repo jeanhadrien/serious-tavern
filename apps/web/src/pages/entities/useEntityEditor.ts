@@ -5,6 +5,7 @@ import { useLayoutActions } from '../../layout/LayoutActions.js';
 import { useEditorCommands } from '../../stores/index.js';
 import { importEntityFiles } from './entityActions.js';
 import type { EntityKind } from './entityKinds.js';
+import { confirmDelete } from '../../components/dialog/dialogStore.js';
 
 /**
  * The draft of the open character or persona. The editor stays mounted while hidden, so the draft survives the
@@ -44,7 +45,7 @@ export function useEntityEditor<T extends Character | Persona>(kind: EntityKind<
     }
   };
   const remove = async () => {
-    if (!draft || !window.confirm(`Delete ${draft.name}?`)) return;
+    if (!draft || !(await confirmDelete(`Delete ${kind.label.toLowerCase()} "${draft.name}"?`))) return;
     try {
       await kind.delete(draft.id);
       clear();

@@ -23,7 +23,7 @@ Plans for building `docs/FRONTEND-UX.md` (the agreed spec). There is one file pe
 
 | Step | Plan | Code |
 |---|---|---|
-| 1. Confirm dialog | [01-confirm-dialog.md](01-confirm-dialog.md) | to do |
+| 1. Confirm dialog | [01-confirm-dialog.md](01-confirm-dialog.md) | done |
 | 2. Unsaved-work guard | [02-unsaved-guard.md](02-unsaved-guard.md) | to do |
 | 3. Escape and shortcuts | [03-escape-and-shortcuts.md](03-escape-and-shortcuts.md) | to do |
 | 4. Shared draft hook and editor header | [04-draft-and-header.md](04-draft-and-header.md) | to do |

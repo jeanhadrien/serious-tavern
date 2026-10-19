@@ -6,6 +6,7 @@ import { providerEditorStore, providersStore, useEditorCommands } from '../../st
 import { useFileSync } from '../useFileSync.js';
 import { deleteProvider, duplicateProvider, saveProvider } from './providerActions.js';
 import { classifyProviderChange, draftChanged, draftToBody, toDraft, type ProviderDraft } from './providerDraft.js';
+import { confirmDelete } from '../../components/dialog/dialogStore.js';
 
 const PROVIDERS = {
   event: 'providers.changed',
@@ -85,7 +86,7 @@ export function useProviderEditor() {
     if (copy) open(copy);
   };
   const remove = async () => {
-    if (!provider || readOnly || !window.confirm(`Delete provider "${provider.name}"?`)) return;
+    if (!provider || readOnly || !(await confirmDelete(`Delete provider "${provider.name}"?`))) return;
     deleting.current = provider.id;
     if (!(await deleteProvider(provider))) {
       deleting.current = undefined;

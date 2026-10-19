@@ -13,6 +13,7 @@ import {
   saveStateDefinition,
   uniqueName,
 } from './stateDefinitionActions.js';
+import { confirmDelete } from '../../components/dialog/dialogStore.js';
 
 const STATE_DEFINITIONS = {
   event: 'stateDefinitions.changed',
@@ -133,7 +134,7 @@ export function useStateDefinitionEditor() {
     setNames(afterKeepName);
   };
   const remove = async () => {
-    if (!definition || !window.confirm(`Delete state definition "${definition.name}"?`)) return;
+    if (!definition || !(await confirmDelete(`Delete state definition "${definition.name}"?`))) return;
     deleting.current = definition.id;
     if (!(await deleteStateDefinition(definition))) {
       deleting.current = undefined;

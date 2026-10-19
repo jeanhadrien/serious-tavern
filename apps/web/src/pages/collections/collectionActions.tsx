@@ -2,6 +2,7 @@ import type { Collection, CollectionFields } from '@st/shared';
 import { ApiError, collectionsApi } from '../../api.js';
 import { notifyError } from '../../api/transport.js';
 import { alerts } from '../../alerts/index.js';
+import { dialogs } from '../../components/dialog/dialogStore.js';
 import { collectionEditorStore, collectionsStore } from '../../stores/index.js';
 
 // Collection writes shared by the list and the editor. Each refreshes the shared list, so every view (the list,
@@ -26,12 +27,22 @@ export const createCollection = () => write(() => collectionsApi.create({ name: 
  * server skips a file that no longer parses, so a hand edit gone wrong answers 404 too, and a new collection
  * would leave the nodes reading the old file without these edits.
  */
-const confirmRecreate = (name: string) =>
-  window.confirm(
-    `"${name}" can't be found on disk: it was deleted, or its file can no longer be read (see any invalid ` +
-      'collection file warning).\n\nSave your edits as a new collection? Recall and Draw nodes using the old ' +
-      'one will not use the new one.\n\nCancel to keep editing: fix the file, then save again.',
-  );
+const confirmRecreate = async (name: string) =>
+  (await dialogs.ask({
+    title: `Save "${name}" as a new collection?`,
+    body: (
+      <>
+        <p>
+          It can't be found on disk: it was deleted, or its file can no longer be read (see any invalid collection file
+          warning).
+        </p>
+        <p>Recall and Draw nodes using the old one will not use the new one.</p>
+        <p>To keep editing instead, fix the file, then save again.</p>
+      </>
+    ),
+    actions: [{ id: 'recreate', label: 'Save as new collection', kind: 'primary' }],
+    cancelLabel: 'Keep editing',
+  })) === 'recreate';
 
 /**
  * Saves the editor's draft. When the server no longer finds the collection, it is recreated as a new one (the
@@ -44,7 +55,7 @@ export const saveCollection = (id: string, body: CollectionFields, confirm = con
     } catch (error) {
       if (!(error instanceof ApiError)) throw error;
       if (error.status !== 404) notifyError(error);
-      else if (confirm(body.name)) return collectionsApi.create(body);
+      else if (await confirm(body.name)) return collectionsApi.create(body);
       throw error;
     }
   }, 'Collection saved');

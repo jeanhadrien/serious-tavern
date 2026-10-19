@@ -17,6 +17,7 @@ import {
   type EntryDraft,
 } from './collectionDraft.js';
 import { selectionAfterLoad, selectionAfterMove, selectionAfterRemove } from './entrySelection.js';
+import { confirmDelete } from '../../components/dialog/dialogStore.js';
 
 const COLLECTIONS = {
   event: 'collections.changed',
@@ -174,7 +175,7 @@ export function useCollectionEditor() {
     closeEditor('collections');
   };
   const remove = async () => {
-    if (!collection || !window.confirm(`Delete collection "${collection.name}"?`)) return;
+    if (!collection || !(await confirmDelete(`Delete collection "${collection.name}"?`))) return;
     deleting.current = collection.id;
     if (!(await deleteCollection(collection))) {
       deleting.current = undefined;

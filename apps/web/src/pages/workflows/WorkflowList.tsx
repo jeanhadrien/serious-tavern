@@ -5,6 +5,7 @@ import { IconButton } from '../../components/IconButton.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
 import { useEditorState, useList, workflowEditorStore, workflowsStore } from '../../stores/index.js';
 import { duplicateWorkflow } from './workflowActions.js';
+import { confirmDelete } from '../../components/dialog/dialogStore.js';
 
 /** The workflow list shown in L: picking a workflow opens it in the editor in M. */
 export function WorkflowList() {
@@ -28,7 +29,7 @@ export function WorkflowList() {
     }
   };
   const remove = async (workflow: Workflow) => {
-    if (!window.confirm(`Delete ${workflow.name}?`)) return;
+    if (!(await confirmDelete(`Delete workflow "${workflow.name}"?`))) return;
     try {
       await workflowsApi.delete(workflow.id);
       workflowEditorStore.discard(workflow.id);

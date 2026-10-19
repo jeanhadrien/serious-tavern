@@ -3,6 +3,7 @@ import { presetsApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
 import { presetEditorStore, presetsStore } from '../../stores/index.js';
 import { copyPresetBody } from './presetImport.js';
+import { confirmDelete } from '../../components/dialog/dialogStore.js';
 
 // Preset operations shared by the list (in L) and the editor (in M). Each opens the result in the editor and
 // resolves with whether it succeeded; API errors are toasted by the transport.
@@ -31,7 +32,7 @@ export async function duplicatePreset(preset: Preset): Promise<boolean> {
 }
 
 export async function deletePreset(preset: Preset): Promise<void> {
-  if (!window.confirm(`Delete ${preset.name}?`)) return;
+  if (!(await confirmDelete(`Delete preset "${preset.name}"?`))) return;
   try {
     await presetsApi.delete(preset.id);
     presetEditorStore.discard(preset.id);
