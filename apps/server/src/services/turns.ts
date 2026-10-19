@@ -7,7 +7,7 @@ export class RunningTurn {
   readonly controller = new AbortController();
   stoppedBy?: TurnStop;
   /**
-   * The execution ids of the post-turn runs (After Reply, one per workflow that has one) this turn leaves behind. Filled
+   * The execution ids of the runs of the turn's after section (the workflows below the last one that replies). Filled
    * before the turn settles, so that a state read can tell the runs are live (`TurnRegistry.hasPostRun`) while the entry
    * already says `running`.
    */
@@ -67,12 +67,12 @@ export class TurnRegistry {
     this.running.get(sessionId)?.stop('user');
   }
 
-  /** Whether a job (a turn, a regenerate or an after-reply run) holds the session's slot right now. */
+  /** Whether a job (a turn, a regenerate or a run after the reply) holds the session's slot right now. */
   isRunning(sessionId: string): boolean {
     return this.running.has(sessionId);
   }
 
-  /** Whether the post-turn run `executionId` of the session is still to run or running (its turn holds the slot). */
+  /** Whether the run `executionId` of a turn's after section is still to run or running (its turn holds the slot). */
   hasPostRun(sessionId: string, executionId: string): boolean {
     return this.running.get(sessionId)?.postRunIds.has(executionId) ?? false;
   }

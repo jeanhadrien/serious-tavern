@@ -22,8 +22,8 @@ function detailText(details: unknown): string | undefined {
     return details.map((item) => `${item.path ? `${item.path}: ` : ''}${item.message}`).join('\n');
   const invalid = workflowInvalidDetailsSchema.safeParse(details);
   if (invalid.success) return invalid.data.issues.map((issue) => issue.message).join('\n');
-  if (typeof details === 'object' && 'execution' in details) {
-    const execution = (details as { execution: ExecutionLog }).execution;
+  if (typeof details === 'object' && 'execution' in details && details.execution) {
+    const execution = details.execution as ExecutionLog;
     return (
       Object.entries(execution.nodes)
         .filter(([, node]) => node.status === 'error')

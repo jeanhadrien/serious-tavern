@@ -1,11 +1,10 @@
-import { randomUUID } from 'node:crypto';
 import type { ChatMessage, ExecutionLog, StateSnapshot } from '@st/shared';
 import { executeWorkflow, ExecutionFailure } from '@st/engine';
 import type { AppContext } from '../context.js';
 import { errorMessage, notFound } from '../errors.js';
 import { failureMessage, stopWarning } from './failure.js';
 import { settleTurn, type RunEnd } from './settle-turn.js';
-import type { PlannedRun, StartedTurn } from './turn-start.js';
+import { announcedRuns, type PlannedRun, type StartedTurn } from './turn-start.js';
 import { TurnStream, type TurnFrame } from './turn-stream.js';
 import type { RunningTurn } from './turns.js';
 
@@ -20,8 +19,6 @@ export type RunResult = {
   stopped: boolean;
   /** The assistant messages the run saved, partial rows included. */
   replies: ChatMessage[];
-  /** The history the run had: its after-reply run keeps it. */
-  history: ChatMessage[];
   /** How many replies the run's Chat Outputs produced (`replies` has them as saved, with partial rows). */
   produced: number;
   /** The turn's user message as saved: only the first run of a turn has it. */
@@ -35,10 +32,13 @@ export type ReplyRunInput = {
   history: ChatMessage[];
   /** What it starts from: the turn-start state plus what the runs above it committed. */
   start: { state: StateSnapshot; issues: string[] };
+  /** The replies the runs above it saved (Chat Input's `replies`), in chat order. */
+  replies: ChatMessage[];
   /** Only for the first run of the turn, which stores the message. */
   userMessage?: ChatMessage;
   /** The runs above it. */
   earlier: readonly RunResult[];
+  /** The turn's last reply-section run announces the after section in the write that settles it. */
   isLast: boolean;
   emit?: (frame: TurnFrame) => void;
 };
@@ -54,20 +54,20 @@ function runEnd(failure: unknown, turn: RunningTurn): RunEnd {
 }
 
 /**
- * Runs the reply part of one workflow of the turn and settles it into the session in its own update (the turn's first
- * run creates the entry, later ones add to it). When this is the turn's last run and nothing was stopped, the
- * after-reply runs the turn leaves are announced in that same write (`running` in the entry): the ids come back in
- * `announced`, by the id of the reply run they follow. Never throws for the workflow's own failure.
+ * Runs one workflow of the reply section and settles it into the session in its own update (the turn's first run
+ * creates the entry, later ones add to it). When this is the section's last run and nothing was stopped, the runs of the
+ * after section are announced in that same write (`running` in the entry), and `announced` says so: they then run once
+ * the turn's result is sent. Never throws for the workflow's own failure.
  */
-export async function runReplyPart(
+export async function runReplyRun(
   context: AppContext,
   sessionId: string,
   turn: RunningTurn,
-  { started, planned, history, start, userMessage, earlier, isLast, emit }: ReplyRunInput,
-): Promise<{ result: RunResult; announced?: Map<string, string> }> {
+  { started, planned, history, start, replies: above, userMessage, earlier, isLast, emit }: ReplyRunInput,
+): Promise<{ result: RunResult; announced: boolean }> {
   const { sessions, executions, secrets } = context;
   const { prepared, runId, workflow } = planned;
-  const turnId = started.runs[0]!.runId;
+  const turnId = started.turnId;
   const stream = emit
     ? new TurnStream({
         sessions: sessions.silent,
@@ -91,6 +91,7 @@ export async function runReplyPart(
       persona: started.persona,
       settings: planned.settings,
       state: start.state,
+      replies: above,
       signal: turn.controller.signal,
       executionId: runId,
       onEvent: stream?.onEvent,
@@ -109,27 +110,15 @@ export async function runReplyPart(
   const stoppedNow = !outcome && !!turn.stoppedBy;
   if (stoppedNow && execution) execution.warnings.push(stopWarning('turn', turn.stoppedBy!));
   if (execution) await executions.save(execution);
-  // The after-reply runs follow a turn whose reply runs all ended without a stop: one per workflow that has one and
-  // whose reply run ran to the end. A regenerate that left no reply at all changes nothing in the chat: its turn is
-  // not present, so there is nothing to follow.
-  const all = [
-    ...earlier.map((item) => ({
-      planned: item.planned,
-      completed: !item.failure,
-      stopped: item.stopped,
-      produced: item.produced,
-    })),
-    { planned, completed: !!outcome, stopped: stoppedNow, produced: replies.length },
-  ];
+  // The after section follows a turn whose reply section ended without a stop, whether or not a workflow of it failed. A
+  // regenerate that left no reply at all changes nothing in the chat: its turn is not present, so there is nothing to follow.
+  const all = [...earlier, { stopped: stoppedNow, produced: replies.length }];
   const announced =
-    isLast && !all.some((item) => item.stopped) && !(started.rootId && all.every((item) => !item.produced))
-      ? new Map(
-          all
-            .filter((item) => item.completed && item.planned.prepared.parts.postSinks.length)
-            .map((item) => [item.planned.runId, randomUUID()] as const),
-        )
-      : undefined;
-  for (const id of announced?.values() ?? []) turn.postRunIds.add(id);
+    isLast &&
+    started.after.length > 0 &&
+    !all.some((item) => item.stopped) &&
+    !(started.rootId && all.every((item) => !item.produced));
+  if (announced) for (const { runId: id } of started.after) turn.postRunIds.add(id);
   const end = runEnd(outcome ? undefined : (failure ?? new Error('The run failed')), turn);
   const settled: { value?: { userMessage?: ChatMessage; assistantMessages: ChatMessage[]; linkWarnings: string[] } } =
     {};
@@ -143,10 +132,7 @@ export async function runReplyPart(
       streamed,
       writes,
       definitions: started.definitions,
-      postRuns: [...(announced ?? [])].map(([replyRunId, executionId]) => ({
-        executionId,
-        workflowId: all.find((item) => item.planned.runId === replyRunId)!.planned.workflow.id,
-      })),
+      postRuns: announced ? announcedRuns(started) : [],
       ...(started.rootId ? { regenerate: { rootId: started.rootId } } : {}),
     });
     return current;
@@ -166,7 +152,6 @@ export async function runReplyPart(
       ...(outcome ? {} : { failure }),
       stopped: stoppedNow,
       replies: assistantMessages,
-      history,
       produced: replies.length,
       userMessage: saved,
     },

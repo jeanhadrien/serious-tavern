@@ -130,7 +130,7 @@ describe('definitions edited by hand', () => {
       const body = apiContract.sendMessage.response.parse(result.json());
       // The oldest keeps the name: its default is 0, not the copy's 4.
       expect(body.assistantMessages[0]!.content).toBe('n=0 turn=1');
-      expect((await readExecution(app, body.execution.id)).warnings).toEqual([
+      expect((await readExecution(app, body.execution!.id)).warnings).toEqual([
         'State definition name "counter" is used twice; only the oldest is available to templates.',
       ]);
     } finally {

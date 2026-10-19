@@ -29,7 +29,7 @@ describe('regenerate', () => {
       { content: 'alt=1 n=0 turn=1 msg=hello hist=0', executionId: rootId, alternativeOf: undefined, inactive: true },
       {
         content: 'alt=2 n=0 turn=1 msg=hello hist=0',
-        executionId: result.execution.id,
+        executionId: result.execution!.id,
         alternativeOf: rootId,
         inactive: undefined,
       },
@@ -40,7 +40,7 @@ describe('regenerate', () => {
     // Both turns have an entry; only the shown alternative's writes apply.
     expect(entriesOf(saved).map((entry) => [entry.executionId, entry.replies])).toEqual([
       [rootId, 1],
-      [result.execution.id, 1],
+      [result.execution!.id, 1],
     ]);
     expect(await counterN(app, session.id)).toBe(2);
     expect(saved.updatedAt >= first.updatedAt).toBe(true);
@@ -53,7 +53,7 @@ describe('regenerate', () => {
     expect(alternativesOfLastTurn(third.messages)).toMatchObject({
       rootId,
       activeIndex: 2,
-      alternatives: [{ executionId: rootId }, { executionId: result.execution.id }, {}],
+      alternatives: [{ executionId: rootId }, { executionId: result.execution!.id }, {}],
     });
     expect(altRows(third).map((row) => row.inactive)).toEqual([true, true, undefined]);
     expect(await counterN(app, session.id)).toBe(3);

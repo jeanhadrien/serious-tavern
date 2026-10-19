@@ -195,6 +195,6 @@ export const freshTexture: ExamplePack = {
   collections: () => [forestCollection()],
   definitions: () => [sceneDefinition()],
   presets: () => [narratorPreset()],
-  workflow: freshTextureWorkflow,
+  workflows: (definitionIds) => [freshTextureWorkflow(definitionIds)],
   uses: { scene: ['injected', 'lastInjectionLevel'] },
 };

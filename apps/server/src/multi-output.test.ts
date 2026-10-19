@@ -260,14 +260,14 @@ it('persists completed messages on partial failure and returns them in the error
     expect(error.message).toMatch(/^HTTP Request \(fail with spaces\):/);
     const details = sendMessageResultSchema.parse(error.details);
     expect(details.assistantMessages).toMatchObject([{ name: 'foo', content: 'hello' }]);
-    expect(details.execution.status).toBe('error');
+    expect(details.execution!.status).toBe('error');
     expect((await load()).messages).toEqual([details.userMessage, ...details.assistantMessages]);
     expect(
       apiContract.getExecution.response.parse(
         (
           await app.inject({
             method: 'GET',
-            url: `/api/executions/${details.execution.id}`,
+            url: `/api/executions/${details.execution!.id}`,
           })
         ).json(),
       ),
@@ -291,8 +291,8 @@ it('allows a turn without assistant messages, persists its execution warning and
     expect(response.statusCode).toBe(200);
     const result = apiContract.sendMessage.response.parse(response.json());
     expect(result.assistantMessages).toEqual([]);
-    expect(result.execution.warnings).toHaveLength(1);
-    expect(result.userMessage!.executionId).toBe(result.execution.id);
+    expect(result.execution!.warnings).toHaveLength(1);
+    expect(result.userMessage!.executionId).toBe(result.execution!.id);
     expect((await load()).messages).toEqual([result.userMessage]);
   } finally {
     await app.close();

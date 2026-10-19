@@ -3,12 +3,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { Composer } from './Composer.js';
 import { ExecutionDetails } from './ExecutionDetails.js';
 import { MessageList } from './MessageList.js';
-import { buildView, entry, reply, userMessage } from './story/test-fixtures.js';
+import { afterRun, buildView, entry, reply, userMessage } from './story/test-fixtures.js';
 import { watchResize } from './useStickToBottom.js';
 
-// The chat's after-reply behaviour: the waiting indicator, the composer's cancel, the thread watching its viewport.
+// The chat's behaviour around runs after the reply: the waiting indicator, the composer's cancel, the thread watching its viewport.
 
-it('says a message is waiting for the after-reply steps while the previous turn’s run works', () => {
+it('says a message is waiting for the workflows after the reply while the previous turn’s run works', () => {
   const messages = [reply('e1'), userMessage('u2')];
   const render = (story: ReturnType<typeof buildView>, busy = true) =>
     renderToStaticMarkup(
@@ -26,20 +26,20 @@ it('says a message is waiting for the after-reply steps while the previous turn�
         onSwipe={async () => true}
       />,
     );
-  const entries = (status: 'running' | 'completed') => [{ ...entry('e1'), postStatus: status, postExecutionId: 'p1' }];
+  const entries = (status: 'running' | 'completed') => [{ ...entry('e1'), ...afterRun(status) }];
   expect(render(buildView({ messages, entries: entries('running') }))).toContain(
-    'Waiting for the after-reply steps to finish',
+    'Waiting for the workflows after the reply to finish',
   );
   const done = render(buildView({ messages, entries: entries('completed') }));
   expect(done).toContain('Preparing a reply');
-  expect(done).not.toContain('Waiting for the after-reply steps');
+  expect(done).not.toContain('Waiting for the workflows after the reply');
   // Not waiting for a reply at all: no indicator.
   expect(render(buildView({ messages, entries: entries('running') }), false)).not.toContain('typing-dots');
 });
 
 it('shows the label the caller gives an execution log', () => {
-  const html = renderToStaticMarkup(<ExecutionDetails id="x" label="After-reply run details" optional />);
-  expect(html).toContain('<summary>After-reply run details</summary>');
+  const html = renderToStaticMarkup(<ExecutionDetails id="x" label="Run details" optional />);
+  expect(html).toContain('<summary>Run details</summary>');
   expect(renderToStaticMarkup(<ExecutionDetails id="x" />)).toContain('<summary>Execution details</summary>');
 });
 
@@ -71,7 +71,7 @@ it('watches every element it is given, skips missing ones, and stops watching on
   expect(watchResize([content], () => {}, undefined)).toBeTypeOf('function');
 });
 
-it('labels the composer button for a message that waits behind an after-reply run', () => {
+it('labels the composer button for a message that waits behind a run after the reply', () => {
   const render = (queued: boolean) =>
     renderToStaticMarkup(
       <Composer content="" busy queued={queued} locked onChange={() => {}} onSend={async () => {}} onStop={() => {}} />,

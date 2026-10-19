@@ -126,14 +126,34 @@ describe('sinks', () => {
     expect(result.replies.map((reply) => reply.content)).toEqual(['hello']);
   });
 
-  it('does not let a sink replace the required Chat Output, and replies only come from Chat Outputs', async () => {
+  it('accepts a workflow whose only sink is not a Chat Output, and rejects one with no sink at all', async () => {
     registry.set('sink-test', testType('sink-test', { sink: true, outputs: [], execute: async () => ({}) }));
-    const graph = workflow(
+    registry.set('pass-test', testType('pass-test', {}));
+    const sinkOnly = workflow(
       [node('input', 'chat-input'), node('sink', 'sink-test')],
       [edge('input', 'message', 'sink', 'value')],
     );
-    const issues = await validateWorkflow(graph);
-    expect(issues.map((issue) => issue.message)).toContain('A workflow must contain at least one chat-output node.');
+    expect(await validateWorkflow(sinkOnly)).toEqual([]);
+    const noSink = workflow(
+      [node('input', 'chat-input'), node('pass', 'pass-test')],
+      [edge('input', 'message', 'pass', 'value')],
+    );
+    const issues = await validateWorkflow(noSink);
+    expect(issues.map((issue) => issue.message)).toEqual([
+      'A workflow must contain at least one node that writes something, such as a Chat Output or a State Write.',
+    ]);
+  });
+
+  it('runs a workflow without a Chat Output to the end with no reply and no warning about one', async () => {
+    registry.set('sink-test', testType('sink-test', { sink: true, outputs: [], execute: async () => ({}) }));
+    const sinkOnly = workflow(
+      [node('input', 'chat-input'), node('sink', 'sink-test')],
+      [edge('input', 'message', 'sink', 'value')],
+    );
+    const result = await executeWorkflow(sinkOnly, options);
+    expect(result.replies).toEqual([]);
+    expect(result.execution.status).toBe('completed');
+    expect(result.execution.warnings).toEqual([]);
   });
 
   it('records no reply and warns when only a non-output sink ran', async () => {

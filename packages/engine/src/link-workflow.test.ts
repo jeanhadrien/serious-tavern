@@ -2,28 +2,34 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { foldStoryState, oldestFirst, type ChatMessage } from '@st/shared';
 import { edge, graph, node } from './test-collections.js';
 import { MEMORY_ID, idRange, memoryDefinition, messagesOf, withEdit } from './test-links.js';
-import { register, testType, unregister } from './test-post.js';
-import { deleteReplies, newChat, playPost, playTurn } from './test-state.js';
+import { register, testType, unregister } from './test-types.js';
+import { deleteReplies, newChat, playLater, playTurn } from './test-state.js';
 
 afterEach(unregister);
 
-// "Summaries, wired" (STATE-DESIGN-AMENDMENT-1): After Reply -> Next Chunk -> LLM -> State Write add with the link,
-// played turn by turn the way the server does (fold, snapshot with links, run, store), with a fake LLM.
-const wired = () =>
+// "Summaries, wired" (STATE-DESIGN-AMENDMENT-1): a narrator workflow, then a summarizer below it (Next Chunk -> LLM ->
+// State Write add with the link), played turn by turn the way the server does (fold, snapshot with links, run, store),
+// with a fake LLM.
+const narrator = () =>
   graph(
     [
       node('input', 'chat-input'),
       node('output', 'chat-output', {
         template: 'status: {{#each state.memory.summaries}}{{this.link.status}}{{/each}}',
       }),
-      node('after', 'after-reply'),
+    ],
+    [edge('input', 'message', 'output', 'value')],
+  );
+
+const summarizer = () =>
+  graph(
+    [
+      node('input', 'chat-input'),
       node('chunk', 'next-chunk', { definitionId: MEMORY_ID, key: 'summaries', chunkSize: 4, rawWindow: 2 }),
       node('llm', 'fake-llm'),
       node('save', 'state-write', { definitionId: MEMORY_ID, key: 'summaries', op: 'add' }),
     ],
     [
-      edge('input', 'message', 'output', 'value'),
-      edge('after', 'turn', 'chunk', 'after'),
       edge('chunk', 'text', 'llm', 'value'),
       edge('llm', 'value', 'save', 'value'),
       edge('chunk', 'link', 'save', 'messages'),
@@ -45,8 +51,8 @@ const items = (chat: ReturnType<typeof newChat>) =>
   summariesOf(chat).value as { id: string; text: string; messages: { ids: string[]; fingerprint: string } }[];
 
 async function turn(chat: ReturnType<typeof newChat>, id: string, history: ChatMessage[]) {
-  const reply = await playTurn(chat, wired(), id, 'go', history);
-  const post = await playPost(chat, wired(), reply, 'go', history);
+  const reply = await playTurn(chat, narrator(), id, 'go', history);
+  const post = await playLater(chat, summarizer(), reply, 'go', history);
   return { reply, post };
 }
 
@@ -70,7 +76,7 @@ describe('summaries as story state, wired', () => {
     const [stored] = items(chat);
     expect(stored).toMatchObject({ text: 'Summary: user: text 1', messages: { ids: idRange(1, 4) } });
     expect(stored!.messages.fingerprint).toMatch(/^[0-9a-f]{32}$/);
-    expect(stored!.id).toBe('e1-post:save:1');
+    expect(stored!.id).toBe('e1-later:save:1');
     // Six eligible messages, four covered: the next chunk needs four, so nothing happens yet.
     const next = await turn(chat, 'e2', messagesOf(8));
     expect(next.post.writes).toEqual([]);
@@ -87,7 +93,7 @@ describe('summaries as story state, wired', () => {
     const history = messagesOf(8);
     await turn(chat, 'e1', history);
     const status = async (messages: ChatMessage[]) =>
-      (await playTurn(chat, wired(), 'e2', 'go', messages)).replies.map((reply) => reply.content);
+      (await playTurn(chat, narrator(), 'e2', 'go', messages)).replies.map((reply) => reply.content);
     expect(await status(history)).toEqual(['status: intact']);
     expect(await status(withEdit(history, 'm2', 'edited'))).toEqual(['status: changed']);
     expect(await status(withEdit(history, 'm2'))).toEqual(['status: partial']);
@@ -102,7 +108,7 @@ describe('summaries as story state, wired', () => {
     const edited = withEdit(history, 'm2', 'edited');
     const redo = await turn(chat, 'e2', edited);
     expect(redo.post.writes).toHaveLength(1);
-    expect(items(chat).map((item) => item.id)).toEqual(['e2-post:save:1', 'e1-post:save:1']);
+    expect(items(chat).map((item) => item.id)).toEqual(['e2-later:save:1', 'e1-later:save:1']);
     // The old item is still stored (broken), but replaced: the next turn has nothing to do.
     const quiet = await turn(chat, 'e3', edited);
     expect(quiet.post.writes).toEqual([]);
@@ -138,41 +144,17 @@ describe('summaries as story state, wired', () => {
   });
 });
 
-describe('a linked write of a node both parts run', () => {
-  it('is stored once, in the reply part: the post run does not repeat it', async () => {
-    register(
-      testType('link-source', { execute: async () => ({ value: { ids: ['m1', 'm2'] } }) }),
-      testType('note-source', { execute: async () => ({ value: 'a fact' }) }),
-    );
-    // `fact` is a reply sink (it stores this turn) and also feeds `consumer`, which waits for After Reply.
-    const wf = graph(
-      [
-        node('input', 'chat-input'),
-        node('output', 'chat-output'),
-        node('src', 'link-source'),
-        node('text', 'note-source'),
-        node('fact', 'state-write', { definitionId: MEMORY_ID, key: 'facts', op: 'add' }),
-        node('after', 'after-reply'),
-        node('consumer', 'state-write', { definitionId: MEMORY_ID, key: 'note', op: 'set' }),
-      ],
-      [
-        edge('input', 'message', 'output', 'value'),
-        edge('text', 'value', 'fact', 'value'),
-        edge('src', 'value', 'fact', 'messages'),
-        edge('fact', 'value', 'consumer', 'value'),
-        edge('after', 'turn', 'consumer', 'when'),
-      ],
+describe('a workflow below the reply workflow', () => {
+  it('links an item to the replies of the workflow above, through Chat Input', async () => {
+    const note = graph(
+      [node('input', 'chat-input'), node('fact', 'state-write', { definitionId: MEMORY_ID, key: 'facts', op: 'add' })],
+      [edge('input', 'message', 'fact', 'value'), edge('input', 'replies', 'fact', 'messages')],
     );
     const chat = newChat([memoryDefinition]);
-    const history = messagesOf(4);
-    const reply = await playTurn(chat, wf, 'e1', 'go', history);
-    expect(reply.writes).toHaveLength(1);
-    expect(reply.writes[0]).toMatchObject({ op: 'add', item: { text: 'a fact', messages: { ids: ['m1', 'm2'] } } });
-    const post = await playPost(chat, wf, reply, 'go', history);
-    expect(post.execution.nodes.fact?.status).toBe('completed');
-    expect(post.writes.map((write) => write.nodeId)).toEqual(['consumer']);
-    expect(post.execution.warnings).toEqual([
-      '"State Write #1 (state-write)" also ran in the reply run, so its state writes were not repeated in this run.',
-    ]);
+    const reply = await playTurn(chat, narrator(), 'e1', 'go', messagesOf(4));
+    expect(reply.replies).toHaveLength(1);
+    const later = await playLater(chat, note, reply, 'a fact', messagesOf(4));
+    expect(later.writes).toHaveLength(1);
+    expect(later.writes[0]).toMatchObject({ op: 'add', item: { text: 'a fact', messages: { ids: ['e1-0'] } } });
   });
 });

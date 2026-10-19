@@ -27,8 +27,11 @@ export type RunEnd = { status: 'completed' | 'error' | 'stopped'; error?: string
 export type Settlement = {
   /** The turn: the execution id of its first run. Every message of the turn carries it. */
   executionId: string;
-  /** The reply run being settled. The turn's first run (its id is the turn's) creates the entry; later ones update it. */
-  run: { executionId: string; workflowId: string } & RunEnd;
+  /**
+   * The reply-section run being settled. The turn's first run (its id is the turn's) creates the entry; later ones
+   * update it. Absent when the reply section is empty: the entry is created with no reply run (and no reply).
+   */
+  run?: { executionId: string; workflowId: string } & RunEnd;
   userMessage?: ChatMessage;
   replies: ChatReply[];
   streamed: StreamedRow[];
@@ -36,8 +39,8 @@ export type Settlement = {
   // checked against the chat as it is at settle time (`commitLinks`); `definitions` name its key in the warnings.
   writes?: StateWrite[];
   definitions?: readonly StateDefinition[];
-  // The after-reply runs this turn leaves behind, known when its last reply run settles: the entry lists them as
-  // `running` from the moment it is saved, so the runs never have a gap in which the chat shows none.
+  // The runs of the after section this turn leaves behind, known when its last reply-section run settles: the entry lists
+  // them as `running` from the moment it is saved, so the turn never shows a gap in which none is listed.
   postRuns?: readonly { executionId: string; workflowId: string }[];
   // Set when the turn is a regenerate of the last turn (`rootId`: the `executionId` of its first alternative). Its
   // replies join that turn's alternatives and, if there are any, replace the shown ones in this same write.
@@ -63,8 +66,9 @@ export function settleTurn(
     regenerate,
   }: Settlement,
 ) {
-  const interrupted = run.status !== 'completed';
+  const interrupted = run !== undefined && run.status !== 'completed';
   const alternativeOf = regenerate ? { alternativeOf: regenerate.rootId } : {};
+  const runId = run ? { runId: run.executionId } : {};
   const streamedIds = new Set(streamed.map((row) => row.id));
   const streamedByOutput = new Map(streamed.map((row) => [row.outputId, row]));
   const repliedOutputs = new Set(replies.map((reply) => reply.nodeId));
@@ -78,7 +82,7 @@ export function settleTurn(
       ...(reply.characterId === undefined ? {} : { characterId: reply.characterId }),
       createdAt: live?.createdAt ?? now(),
       executionId,
-      runId: run.executionId,
+      ...runId,
       ...alternativeOf,
       ...(live ? { nodeId: live.outputId, status: 'final' as const } : {}),
       ...(live?.reasoning ? { reasoning: live.reasoning } : {}),
@@ -96,7 +100,7 @@ export function settleTurn(
             ...(row.characterId === undefined ? {} : { characterId: row.characterId }),
             createdAt: row.createdAt,
             executionId,
-            runId: run.executionId,
+            ...runId,
             ...alternativeOf,
             nodeId: row.outputId,
             status: 'partial',
@@ -118,7 +122,7 @@ export function settleTurn(
   // counts later depends on its replies (see `turnPresence`); `completed` is "every reply run ran to the end, no error or
   // stop". A regenerate with no reply row leaves the shown alternative in place, so its entry must not count as a turn of
   // its own (a turn without replies counts when it completed): it is recorded as not completed.
-  const record: TurnRun = {
+  const record: TurnRun | undefined = run && {
     executionId: run.executionId,
     workflowId: run.workflowId,
     part: 'reply',
@@ -133,7 +137,7 @@ export function settleTurn(
       status: 'running',
     }),
   );
-  if (run.executionId === executionId)
+  if (!record || record.executionId === executionId)
     current.state = withTurnEntry(current.state, {
       executionId,
       at: now(),
@@ -145,7 +149,7 @@ export function settleTurn(
           .map((text) => text.slice(0, LINK_WARNING_LIMITS.length))
           .slice(-LINK_WARNING_LIMITS.count),
       }),
-      runs: [record, ...announce],
+      runs: [...(record ? [record] : []), ...announce],
     });
   else
     current.state = withRunSettled(current.state, executionId, {

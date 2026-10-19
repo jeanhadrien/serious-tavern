@@ -46,15 +46,6 @@ export class StateWriteBuffer {
     node.wave ??= wave;
   }
 
-  /** The node completed in `wave`, but its requests must not count: they are dropped, and how many there were is returned. */
-  discard(nodeId: string, wave: number): number {
-    const node = this.node(nodeId);
-    node.wave ??= wave;
-    const dropped = node.requests.length;
-    node.requests = [];
-    return dropped;
-  }
-
   /**
    * The stored writes of every committed node, in order: by wave, then node id, then call order. A fresh
    * array each time, so later calls (detached work that ignored an abort) cannot change one already returned.
@@ -77,13 +68,6 @@ export class StateWriteBuffer {
 }
 
 /**
- * Nodes whose writes a run must not repeat. The after-reply run runs again the nodes the reply run needed too (an
- * After Reply consumer can be fed by a reply-part State Write or Draw); their writes were committed with the reply,
- * so only the nodes exclusive to the after-reply run write there.
- */
-export type RepeatedNodes = { ids: ReadonlySet<string>; nameOf: (nodeId: string) => string };
-
-/**
  * The story state of one run: the frozen template values, the write buffer, and the state members each node's
  * context gets. Keeps `executeWorkflow` free of state plumbing.
  */
@@ -95,7 +79,6 @@ export class StateRun {
     private readonly snapshot: StateSnapshot | undefined,
     private readonly execution: Pick<ExecutionLog, 'id' | 'warnings'>,
     workflowId: string,
-    private readonly repeated?: RepeatedNodes,
   ) {
     this.buffer = new StateWriteBuffer(snapshot, execution.id, workflowId);
     this.values = frozenStateValues(snapshot);
@@ -115,16 +98,9 @@ export class StateRun {
     };
   }
 
-  /** The node completed in `wave`: only now do its writes count (a node the reply run already ran contributes none). */
+  /** The node completed in `wave`: only now do its writes count. */
   commit(nodeId: string, wave: number): void {
-    if (!this.repeated?.ids.has(nodeId)) {
-      this.buffer.commit(nodeId, wave);
-      return;
-    }
-    if (this.buffer.discard(nodeId, wave))
-      this.execution.warnings.push(
-        `"${this.repeated.nameOf(nodeId)}" also ran in the reply run, so its state writes were not repeated in this run.`,
-      );
+    this.buffer.commit(nodeId, wave);
   }
 
   /** The stored writes of the nodes that completed; resolver warnings join the execution's. Call once per outcome. */

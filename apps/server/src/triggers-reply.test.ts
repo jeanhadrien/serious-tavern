@@ -47,7 +47,7 @@ describe('a turn of two workflows', () => {
       ]);
       // `execution` is the first run's log, `executions` all of them in order; the turn is the first run's id.
       expect(result.executions!.map((log) => log.workflowId)).toEqual([one.id, two.id]);
-      expect(result.execution.id).toBe(result.executions![0]!.id);
+      expect(result.execution!.id).toBe(result.executions![0]!.id);
       const [first, second] = result.executions!;
       const saved = await readSession(app, session.id);
       expect(saved.messages.map((message) => [message.role, message.executionId])).toEqual([

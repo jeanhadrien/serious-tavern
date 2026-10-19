@@ -38,7 +38,7 @@ Each Escape press does exactly one thing, the first one that applies:
 
 Rules:
 - Escape **never discards** a draft. Every editor stays mounted, so closing one only hides it.
-- Escape **never stops an after-reply run**. It runs quietly and the user may not know it is there; its own Stop button stays the way to stop it. This may be revisited.
+- Escape **never stops workflows running after the reply**. They run quietly and the user may not know it is there; its own Stop button stays the way to stop it. This may be revisited.
 - Escape only stops a reply when **the chat is the area with focus**. Escape inside the workflow editor while a reply streams in R acts on the editor.
 - Escape is not browser Back. Back keeps stepping through layout history in the URL (`useLayoutUrl`).
 
@@ -145,7 +145,7 @@ Rules:
   - One save is in flight at a time; changes made meanwhile are sent together as the newest list, so what the panel shows is always the last thing the user did, and a failed save (toasted) falls back to what the server holds.
   - Escape and focus follow the chat panel's rules: the select and checkboxes are fields (Escape leaves them first), and Escape then closes the panel.
   - A new chat copies the open chat's list, order and switches included.
-- **Several runs in a turn.** The chip under the last reply of a turn that ran more than one workflow (or a workflow with After Reply steps) lists each run, in order, with its result and log. The "waiting" indicator names the running workflow when the chat runs several.
+- **Several runs in a turn.** The chip under the last reply of a turn that ran more than one workflow (including the workflows listed below the one that replies, which run after it) lists each run, in order, with its result and log. The "waiting" indicator names the running workflow when the chat runs several.
 - **Swipes and regenerate.** Agreed, but they change stored messages and must fit story state (a regenerated turn replaces the old turn's writes). They get their own short spec before any code.
 
 ## Not now (decided)
@@ -155,7 +155,7 @@ Rules:
 - List extras: inline rename, duplicate everywhere, sorting and pinning.
 - Dragging a character or persona onto the chat.
 - Focus mode (hiding L and R).
-- Escape stopping an after-reply run.
+- Escape stopping workflows running after the reply.
 - Undo after a delete through a server trash.
 
 ## Build order
@@ -176,7 +176,7 @@ Not scheduled; found while building:
 
 - `pages/chat/useChat.ts` is about 310 lines (the shared send/regenerate stream stays inside the hook for its refs). Split it by concern.
 - Provider overrides are YAML text, so they are not a reorderable list; only the reasoning fields are.
-- Later, as decided: collapsing a side column by dragging, Escape stopping an after-reply run, swiping older turns, deleting one alternative, a help list built from `SHORTCUTS`.
+- Later, as decided: collapsing a side column by dragging, Escape stopping workflows running after the reply, swiping older turns, deleting one alternative, a help list built from `SHORTCUTS`.
 - `apps/server/src/storage/directory-watcher.test.ts` ("reports a burst of writes once") failed once under load during this work and passed on reruns; it predates it.
 
 ## Testing

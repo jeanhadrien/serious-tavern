@@ -102,7 +102,7 @@ function linkInput(def: StateKeyDef, op: StateNodeOp): PortDef[] {
       dataType: 'any',
       requiredIfConnected: true,
       description:
-        "Optional. Links the item to chat messages: a link ({ ids, fingerprint }, e.g. Next Chunk's link), a message or a list of messages (e.g. After Reply's replies). The item stops being used when one of them is edited or deleted.",
+        "Optional. Links the item to chat messages: a link ({ ids, fingerprint }, e.g. Next Chunk's link), a message or a list of messages (e.g. Chat Input's replies). The item stops being used when one of them is edited or deleted.",
     },
   ];
 }

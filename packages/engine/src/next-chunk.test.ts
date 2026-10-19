@@ -20,7 +20,7 @@ const idsOf = (messages: unknown) => (messages as { id: string }[]).map((message
 describe('Next Chunk: ports and setup', () => {
   it('has the same ports whatever the key, once the key is a collection', async () => {
     const ports = await nextChunk.resolvePorts!(config(), resources);
-    expect(ports.inputs.map((port) => port.name)).toEqual(['after']);
+    expect(ports.inputs).toEqual([]);
     expect(ports.outputs.map((port) => `${port.name}:${port.dataType}${port.optional ? '?' : ''}`)).toEqual([
       'messages:messages?',
       'text:text?',

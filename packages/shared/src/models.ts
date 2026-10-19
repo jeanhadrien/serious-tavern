@@ -138,9 +138,9 @@ export const executionLogSchema = z
     seed: z.string().optional(),
     /** The resolved chat settings the run used; absent in older logs. */
     settings: z.record(z.string(), z.unknown()).optional(),
-    /** `post` for the after-reply run of a turn (only its nodes are listed); absent for the reply run and in older logs. */
+    /** `post` for a run of a turn's after section (the workflows below the last one that replies); absent for a reply-section run. */
     part: z.enum(['reply', 'post']).optional(),
-    /** On a post run's log: the execution id of the turn it follows. */
+    /** On a post run's log: the execution id of the turn it belongs to. */
     turnExecutionId: z.string().optional(),
     nodes: z.record(z.string(), nodeExecutionSchema),
     warnings: z.array(z.string()).default([]),

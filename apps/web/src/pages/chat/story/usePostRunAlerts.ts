@@ -4,7 +4,7 @@ import { alerts } from '../../../alerts/index.js';
 import { nextAlerts, type AlertMemory } from './postRuns.js';
 import { postFailureToast } from './postRunText.js';
 
-/** Toasts each failed after-reply run of the open chat once (see `nextAlerts`). Renders nothing. */
+/** Toasts each failed run after the reply of the open chat once (see `nextAlerts`). Renders nothing. */
 export function usePostRunAlerts(sessionId: string | undefined, view: SessionStateView | undefined): void {
   const memory = useRef<AlertMemory | undefined>(undefined);
   useEffect(() => {

@@ -27,7 +27,7 @@ it('adds the note when a reply was edited after its turn stored state', () => {
   expect(html).toContain('Edited after it was stored');
 });
 
-describe('a turn whose after-reply run did not finish well', () => {
+describe('a turn whose run after the reply did not finish well', () => {
   const failed = {
     turnNumber: 2,
     lines: [],
@@ -35,10 +35,10 @@ describe('a turn whose after-reply run did not finish well', () => {
     post: { status: 'error' as const, message: 'HTTP Request (fetch): HTTP 500', executionId: 'p1' },
   };
 
-  it('names the button for the after-reply run when the turn stored nothing, and warns', () => {
+  it('names the button for the run after the reply when the turn stored nothing, and warns', () => {
     const html = renderToStaticMarkup(<TurnChip chip={failed} />);
     const button = html.match(/<button[^>]*>/)?.[0] ?? '';
-    expect(button).toContain('aria-label="After-reply steps details"');
+    expect(button).toContain('aria-label="Run details"');
     expect(button).toContain('chip-alert');
     expect(button).toContain('aria-expanded="false"');
   });
@@ -52,19 +52,19 @@ describe('a turn whose after-reply run did not finish well', () => {
     const html = renderToStaticMarkup(<TurnChipCard chip={failed} />);
     expect(html).toContain('<strong>Turn 2</strong>');
     expect(html).not.toContain('stored:');
-    expect(html).toContain('After-reply steps failed: HTTP Request (fetch): HTTP 500');
-    expect(html).toContain('<summary>After-reply run details</summary>');
+    expect(html).toContain('A workflow failed after the reply: HTTP Request (fetch): HTTP 500');
+    expect(html).toContain('<summary>Run details</summary>');
   });
 
   it('lists the writes above the error when there are some', () => {
     const html = renderToStaticMarkup(<TurnChipCard chip={{ ...failed, lines: ['scene.tension → 9'] }} />);
     expect(html).toContain('Turn 2 stored:');
-    expect(html.indexOf('scene.tension → 9')).toBeLessThan(html.indexOf('After-reply steps failed'));
+    expect(html.indexOf('scene.tension → 9')).toBeLessThan(html.indexOf('A workflow failed after the reply'));
   });
 
   it('has no disclosure for a run without a log id', () => {
     const html = renderToStaticMarkup(<TurnChipCard chip={{ ...failed, post: { status: 'error' } }} />);
-    expect(html).toContain('After-reply steps failed.');
+    expect(html).toContain('A workflow failed after the reply.');
     expect(html).not.toContain('<details');
   });
 
@@ -72,7 +72,7 @@ describe('a turn whose after-reply run did not finish well', () => {
     const html = renderToStaticMarkup(
       <TurnChipCard chip={{ ...failed, post: { status: 'stopped', executionId: 'p1' } }} />,
     );
-    expect(html).toContain('After-reply steps were stopped before they finished.');
+    expect(html).toContain('The workflows after the reply were stopped before they finished.');
     expect(html).not.toContain('class="error"');
     expect(renderToStaticMarkup(<TurnChip chip={{ ...failed, post: { status: 'stopped' } }} />)).not.toContain(
       'chip-alert',
@@ -82,12 +82,12 @@ describe('a turn whose after-reply run did not finish well', () => {
   it('offers the log of a completed run too, and says so when it stored nothing', () => {
     const done = { ...failed, post: { status: 'completed' as const, executionId: 'p1' } };
     const empty = renderToStaticMarkup(<TurnChipCard chip={done} />);
-    expect(empty).toContain('The after-reply steps ran and stored nothing.');
-    expect(empty).toContain('<summary>After-reply run details</summary>');
+    expect(empty).toContain('The workflows after the reply ran and stored nothing.');
+    expect(empty).toContain('<summary>Run details</summary>');
     expect(renderToStaticMarkup(<TurnChip chip={done} />)).not.toContain('chip-alert');
     const stored = renderToStaticMarkup(<TurnChipCard chip={{ ...done, lines: ['scene.tension → 9'] }} />);
     expect(stored).not.toContain('stored nothing');
-    expect(stored).toContain('<summary>After-reply run details</summary>');
+    expect(stored).toContain('<summary>Run details</summary>');
   });
 
   it('leaves out the edited note for a chip with no stored lines', () => {
@@ -128,7 +128,7 @@ describe('a turn of several runs', () => {
     const html = renderToStaticMarkup(<TurnChipCard chip={several} />);
     expect(html).toContain('Runs:');
     expect(html).toContain('<strong>Narrator</strong> · reply · completed');
-    expect(html).toContain('<strong>Memory</strong> · after reply · completed');
+    expect(html).toContain('<strong>Memory</strong> · after the reply · completed');
     // A deleted workflow keeps its run.
     expect(html).toContain('<strong>Unknown workflow</strong> · reply · error');
     expect(html).toContain('HTTP 500');
@@ -150,11 +150,11 @@ describe('a turn of several runs', () => {
     expect(calm).not.toContain('chip-alert');
   });
 
-  it('does not repeat the after-reply details above the list', () => {
+  it('does not repeat the details of the run above the list', () => {
     const html = renderToStaticMarkup(
       <TurnChipCard chip={{ ...several, post: { status: 'error', message: 'boom', executionId: 'p3' } }} />,
     );
-    expect(html).not.toContain('After-reply run details');
-    expect(html).not.toContain('After-reply steps failed: boom');
+    expect(html).not.toContain('Run details');
+    expect(html).not.toContain('A workflow failed after the reply: boom');
   });
 });

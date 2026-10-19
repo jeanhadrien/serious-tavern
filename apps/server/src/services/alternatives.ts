@@ -5,7 +5,7 @@ import { HttpError, notFound } from '../errors.js';
 /**
  * Swipe: shows another alternative of the chat's last turn. Flipping which replies are active is the whole change
  * (story state follows through turn presence), so nothing runs. It is refused while a job holds the session's queue
- * slot (a turn, a regenerate or an after-reply run, which would otherwise lose the turn it works on), checked inside
+ * slot (a turn, a regenerate or a run after the reply, which would otherwise lose the turn it works on), checked inside
  * the session's `update` so a job starting meanwhile waits for the write. Like an edit it leaves `updatedAt` alone.
  */
 export async function setAlternative(

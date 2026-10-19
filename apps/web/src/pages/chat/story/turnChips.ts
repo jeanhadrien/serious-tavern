@@ -1,9 +1,9 @@
-import type { ChatMessage, PostStatus, SessionStateView } from '@st/shared';
+import type { ChatMessage, RunStatus, SessionStateView } from '@st/shared';
 import { describeWrite, itemTexts } from './describeWrite.js';
 import { postRunOf } from './postRuns.js';
 
-/** A turn's after-reply run once it ended: the chip says how and links to its log (a running one has none yet). */
-type PostNote = { status: Exclude<PostStatus, 'running'>; message?: string; executionId?: string };
+/** A turn's run after the reply once it ended: the chip says how and links to its log (a running one has none yet). */
+type PostNote = { status: Exclude<RunStatus, 'running'>; message?: string; executionId?: string };
 
 /** One run of a turn that ran several, as the card lists it. `workflowName` is absent when the workflow was deleted. */
 export type RunNote = {
@@ -33,7 +33,7 @@ export type StoryChip = DescribedTurn & {
 };
 
 /**
- * The turns of a view that still count and stored something, or whose after-reply run has ended (the chip is how
+ * The turns of a view that still count and stored something, or whose run after the reply has ended (the chip is how
  * its log is reached, whatever came of it), or that lost an item at commit time, by execution id, described once per view. `lines` is one plain-words line per
  * write, in write order.
  */

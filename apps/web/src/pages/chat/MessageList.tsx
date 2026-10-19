@@ -64,7 +64,7 @@ export function MessageList({
   const links = useMemo(() => messageLinks(story), [story]);
   // Once a reply row is streaming the text itself is the progress indicator.
   const waiting = busy && !messages.some((message) => message.status === 'streaming');
-  // A message sent while the previous turn's after-reply run works is queued behind it by the server.
+  // A message sent while the previous turn's run after the reply works is queued behind it by the server.
   const queued = useMemo(() => runningPostRun(story) !== undefined, [story]);
   // After a swipe the controls move to another message; focus follows them to the same direction's button.
   const refocus = useRef<-1 | 1>(undefined);

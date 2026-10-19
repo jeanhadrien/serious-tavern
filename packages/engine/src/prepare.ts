@@ -1,7 +1,7 @@
 import { findBuiltInProvider, nodeDisplayName, workflowSettingIssues } from '@st/shared';
 import { canConnect } from '@st/shared/ports';
 import type { Edge, PortDef, ValidationIssue, Workflow } from '@st/shared';
-import { partitionWorkflow, type WorkflowParts } from './parts.js';
+import { upstreamOf } from './replies.js';
 import { registry } from './registry.js';
 import type { NodeDefinition, NodeResources } from './types.js';
 
@@ -12,10 +12,8 @@ export type PreparedWorkflow = {
   ports: Map<string, { inputs: PortDef[]; outputs: PortDef[] }>;
   incoming: Map<string, Edge[]>;
   upstream: Map<string, string[]>;
-  // Nodes some sink depends on, sinks included: the only nodes that run (the union of both parts).
+  // Nodes some sink depends on, sinks included: the only nodes that run.
   reachable: Set<string>;
-  // The reply part and the post-turn part, computed once: see `WorkflowParts`.
-  parts: WorkflowParts;
 };
 
 export const labelOf = (type: string) => registry.get(type)?.label ?? type;
@@ -102,8 +100,11 @@ export async function prepareWorkflow(
       message: 'A workflow must contain exactly one chat-input node.',
       nodeIds: chatInputs.map((node) => node.id),
     });
-  if (!workflow.nodes.some((node) => node.type === 'chat-output'))
-    errors.push({ message: 'A workflow must contain at least one chat-output node.' });
+  if (!workflow.nodes.some((node) => definitions.get(node.id)?.sink))
+    errors.push({
+      message:
+        'A workflow must contain at least one node that writes something, such as a Chat Output or a State Write.',
+    });
   const edgeIds = new Set<string>();
   const inbound = new Map<string, number>(workflow.nodes.map((node) => [node.id, 0]));
   const adjacency = new Map<string, string[]>(workflow.nodes.map((node) => [node.id, []]));
@@ -196,8 +197,6 @@ export async function prepareWorkflow(
   if (visited !== workflow.nodes.length)
     errors.push({ message: 'The connections form a loop; a workflow cannot contain a cycle.' });
   errors.push(...workflowSettingIssues(workflow.settings).map(({ message }) => ({ message })));
-  const { parts, issues } = partitionWorkflow(workflow, definitions, upstream, nameOf);
-  errors.push(...issues);
   if (errors.length) {
     const seen = new Set<string>();
     return {
@@ -210,8 +209,13 @@ export async function prepareWorkflow(
     };
   }
   // Sinks (Chat Output, State Write) decide what runs: they and their upstream nodes.
-  const reachable = new Set([...parts.reply, ...parts.post]);
-  return { errors: [], prepared: { workflow, resources, definitions, ports, incoming, upstream, reachable, parts } };
+  const reachable = new Set<string>();
+  for (const node of workflow.nodes) {
+    if (!definitions.get(node.id)?.sink) continue;
+    reachable.add(node.id);
+    for (const id of upstreamOf(upstream, node.id)) reachable.add(id);
+  }
+  return { errors: [], prepared: { workflow, resources, definitions, ports, incoming, upstream, reachable } };
 }
 
 export async function validateWorkflow(workflow: Workflow, resources?: NodeResources): Promise<ValidationIssue[]> {

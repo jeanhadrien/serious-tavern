@@ -48,9 +48,11 @@ export const sendMessageResultSchema = z.object({
   // Absent when the turn was sent empty.
   userMessage: messageSchema.optional(),
   assistantMessages: z.array(messageSchema),
-  // The first run's log on success, the failing run's log on failure.
-  execution: executionLogSchema,
-  // The log of every run of the streamed section, in order (one per enabled workflow). Absent in older answers.
+  // The first run's log on success, the failing run's log on failure. Absent when no workflow of the chat's list has a
+  // Chat Output: the reply section is empty, and every workflow runs after the result (see `executions`).
+  execution: executionLogSchema.optional(),
+  // The log of every run of the reply section, in order (the workflows down to the last one that replies). The runs after
+  // the result have their own logs (`GET /api/executions/:id`, the ids are in the state view's `runs`).
   executions: z.array(executionLogSchema).optional(),
 });
 // `details` of a failed or stopped turn (`WORKFLOW_EXECUTION_FAILED`, `TURN_STOPPED`): what was saved before it ended.

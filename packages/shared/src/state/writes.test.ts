@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { sessionSchema } from '../models.js';
 import { item, nodeAddWrite, setWrite, turnEntry } from './test-fixtures.js';
 import {
-  postStatusSchema,
   readTurnEntries,
+  runStatusSchema,
   stateWriteSchema,
   turnEntrySchema,
   withTurnEntry,
@@ -124,37 +124,34 @@ describe('turnEntrySchema', () => {
   });
 });
 
-describe('the post-turn run fields of an entry', () => {
+describe('the runs of an entry', () => {
   const base = { executionId: 'e', at: 't', completed: true, replies: 1 };
+  const run = { executionId: 'r', workflowId: 'w', part: 'post', status: 'running' };
 
-  it.each(postStatusSchema.options)('keeps the fields of a run that is %s', (postStatus) => {
-    const entry = { ...base, writes: [], postExecutionId: 'p', postStatus, postError: 'boom' };
+  it.each(runStatusSchema.options)('keeps a run that is %s', (status) => {
+    const entry = { ...base, writes: [], runs: [{ ...run, status, error: 'boom' }] };
     expect(turnEntrySchema.parse(entry)).toStrictEqual(entry);
   });
 
-  it('parses an entry without them to an object without those keys', () => {
+  it('parses an entry without runs to an object without that key', () => {
     expect(turnEntrySchema.parse({ ...base, writes: [] })).toStrictEqual({ ...base, writes: [] });
     expect(readTurnEntries({ turns: [{ ...base, writes: [] }] })).toStrictEqual([{ ...base, writes: [] }]);
   });
 
-  it.each([
-    ['a status that is not one', { postStatus: 'paused' }],
-    ['a status that is a number', { postStatus: 7 }],
-    ['an error that is an object', { postError: {} }],
-    ['an error that is a number', { postError: 3 }],
-    ['an empty execution id', { postExecutionId: '' }],
-    ['an execution id that is a list', { postExecutionId: ['p'] }],
-  ])('drops %s and still reads the turn', (_, over) => {
-    const [name] = Object.keys(over);
-    const [entry] = readTurnEntries({ turns: [{ ...base, writes: [setWrite('n', 1)], ...over }] });
-    expect(entry).toMatchObject({ executionId: 'e', completed: true, replies: 1, writes: [setWrite('n', 1)] });
-    expect(entry?.[name as 'postStatus']).toBeUndefined();
+  it('skips a run it cannot read and keeps the turn, its writes and the other runs', () => {
+    const good = { ...run, executionId: 'ok' };
+    const [entry] = readTurnEntries({
+      turns: [{ ...base, writes: [setWrite('n', 1)], runs: [{ ...run, status: 'paused' }, good] }],
+    });
+    expect(entry).toMatchObject({ executionId: 'e', writes: [setWrite('n', 1)], runs: [good] });
   });
 
-  it('keeps the good fields next to a bad one', () => {
-    const [entry] = readTurnEntries({ turns: [{ ...base, postExecutionId: 'p', postStatus: 'bogus' }] });
-    expect(entry?.postExecutionId).toBe('p');
-    expect(entry?.postStatus).toBeUndefined();
+  it('reads an entry whose runs are all unreadable, or not a list, as one without runs', () => {
+    for (const runs of [[{ nope: 1 }], 'oops']) {
+      const [entry] = readTurnEntries({ turns: [{ ...base, writes: [], runs }] });
+      expect(entry).toMatchObject({ executionId: 'e' });
+      expect(entry?.runs).toBeUndefined();
+    }
   });
 
   it('keeps the dropped-link warnings of a turn, and drops a bad value without losing the turn', () => {
@@ -166,7 +163,7 @@ describe('the post-turn run fields of an entry', () => {
   });
 
   it('accepts a session that stores them', () => {
-    const state = { turns: [{ ...base, writes: [], postExecutionId: 'p', postStatus: 'running' }] };
+    const state = { turns: [{ ...base, writes: [], runs: [run] }] };
     const session = { id: 's', title: 'T', workflowId: 'w', messages: [], createdAt: '', updatedAt: '', state };
     expect(sessionSchema.parse(session)).toEqual(session);
   });

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { POST_ERROR_LIMIT, POST_INTERRUPTED_MESSAGE } from './post-run.js';
-import { effectiveRuns, postOfEntry, withRunSettled } from './runs.js';
+import { effectiveRuns, POST_ERROR_LIMIT, POST_INTERRUPTED_MESSAGE, postOfEntry, withRunSettled } from './runs.js';
 import { addWrite, item, setWrite, turnEntry } from './test-fixtures.js';
 import { readTurnEntries, withTurnEntry, type TurnRun } from './writes.js';
 
@@ -34,7 +33,7 @@ describe('withRunSettled', () => {
     expect(entry.completed).toBe(true);
   });
 
-  it('replaces the record of a run the entry already lists (an announced after-reply run), keeping the order', () => {
+  it('replaces the record of a run the entry already lists (an announced run of the after section), keeping the order', () => {
     const state = withRunSettled(
       stateWith(run('t', 'reply', 'completed'), run('p', 'post', 'running'), run('q', 'post', 'running')),
       't',
@@ -151,7 +150,7 @@ describe('effectiveRuns', () => {
     ]);
   });
 
-  it('is undefined for a legacy entry', () => {
+  it('is undefined for an entry without runs', () => {
     expect(effectiveRuns({}, () => true)).toBeUndefined();
   });
 });
@@ -193,10 +192,7 @@ describe('postOfEntry', () => {
     });
   });
 
-  it('reads a legacy entry as it says, with the restart rule', () => {
-    const legacy = { postExecutionId: 'p', postStatus: 'running' as const };
-    expect(postOfEntry(legacy, (id) => id === 'p')).toEqual({ status: 'running', executionId: 'p' });
-    expect(postOfEntry(legacy, () => false)).toMatchObject({ status: 'error', error: POST_INTERRUPTED_MESSAGE });
+  it('is undefined for an entry without runs', () => {
     expect(postOfEntry({}, live)).toBeUndefined();
   });
 });

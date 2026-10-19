@@ -5,9 +5,10 @@ import { afterEach, beforeEach, expect, it, vi, type MockInstance } from 'vitest
 import type { ChatRequest } from '@st/engine';
 import { apiContract, type SessionStateView } from '@st/shared';
 import { createApp } from './app.js';
-import { ROLLING_SUMMARIES_WORKFLOW_ID } from './examples/rolling-summaries.js';
+import { ROLLING_SUMMARIES_WORKFLOW_ID, SUMMARIZE_WORKFLOW_ID } from './examples/rolling-summaries.js';
 import { restoreAdapter, useAdapter } from './test-support/adapter.js';
-import { makeSession, readSession, turn, type App } from './test-support/story.js';
+import { readSession, turn, type App } from './test-support/story.js';
+import { makeListSession } from './test-support/triggers.js';
 
 let directory: string;
 let app: App | undefined;
@@ -36,7 +37,7 @@ const summaries = (view: SessionStateView) =>
     link?: { status: string; count: number; firstIndex?: number; lastIndex?: number };
   }[];
 
-it('summarizes the oldest chunk after the reply, uses the summary instead of those messages and redoes it after an edit', async () => {
+it('summarizes the oldest chunk in the workflow below the narrator, uses the summary instead of those messages and redoes it after an edit', async () => {
   const narrator: ChatRequest[] = [];
   const summarizer: ChatRequest[] = [];
   useAdapter({
@@ -51,10 +52,14 @@ it('summarizes the oldest chunk after the reply, uses the summary instead of tho
   });
   app = await createApp(directory, { seed: true, examples: true });
   await app.inject({ method: 'PUT', url: '/api/secrets/openrouter', payload: { value: 'test-key' } });
-  const session = await makeSession(app, ROLLING_SUMMARIES_WORKFLOW_ID);
+  // The narrator, and below it the summarizer, which has no Chat Output and so runs after the reply.
+  const session = await makeListSession(app, [
+    { workflowId: ROLLING_SUMMARIES_WORKFLOW_ID },
+    { workflowId: SUMMARIZE_WORKFLOW_ID },
+  ]);
 
-  // 21 turns. A post run sees the history before its own turn, so the 19th turn's run is the first to see 36 messages,
-  // 20 of them older than the newest 16.
+  // 21 turns. A run after the reply sees the chat as it stands, the turn's own messages included, so the 18th turn's run
+  // is the first to see 36 messages, 20 of them older than the newest 16.
   for (let n = 1; n <= 21; n++) expect(await turn(app, session.id, `message ${n}`)).toEqual([`reply ${n}`]);
   expect(summarizer).toHaveLength(1);
   const excerpt = summarizer[0]!.messages.map((m) => m.content).join('\n');
@@ -71,6 +76,9 @@ it('summarizes the oldest chunk after the reply, uses the summary instead of tho
   const system = (request: ChatRequest) => request.messages.filter((m) => m.role === 'system').map((m) => m.content);
   const raw = (request: ChatRequest) => request.messages.filter((m) => m.role !== 'system').map((m) => m.content);
   expect(narrator[17]!.messages.some((m) => m.content.includes(SUMMARY_HEADER))).toBe(false);
+  expect(system(narrator[18]!).filter((content) => content.includes('SUMMARY'))).toEqual([
+    `${SUMMARY_HEADER}\nSUMMARY 1`,
+  ]);
   expect(system(narrator[20]!).filter((content) => content.includes('SUMMARY'))).toEqual([
     `${SUMMARY_HEADER}\nSUMMARY 1`,
   ]);
@@ -92,7 +100,7 @@ it('summarizes the oldest chunk after the reply, uses the summary instead of tho
   const after = narrator[21]!;
   expect(after.messages.some((m) => m.content.includes('SUMMARY 1'))).toBe(false);
   expect(raw(after)).toContain('message five');
-  // The next post run redid the chunk; one more turn waits for it, so the new summary is in place by then.
+  // The next run of the summarizer redid the chunk; one more turn waits for it, so the new summary is in place by then.
   expect(await turn(app, session.id, 'message 23')).toEqual(['reply 23']);
   expect(summarizer).toHaveLength(2);
   expect(system(narrator[22]!).some((content) => content.includes('SUMMARY 2'))).toBe(true);

@@ -71,11 +71,6 @@ export type FoldInput = {
   /** The stored `session.state`; any shape (older sessions have none). */
   state: unknown;
   /**
-   * Read the state as of this turn instead of the next one (present turns + 1): a post-turn run reads at the turn
-   * it follows, so `turnsSinceWrite` of a key that turn wrote is 0.
-   */
-  turn?: number;
-  /**
    * Scopes the nodes' own state to this workflow (what a run of it reads): node writes of other workflows are left out
    * and the ones without a workflow id are merged into its own. Without it every workflow's nodes are listed apart (the
    * state view's). Definition keys are shared by all workflows either way.
@@ -100,17 +95,10 @@ export type FoldInput = {
  *   a key the definition no longer has, or for another key type, are ignored (and reported); writes for a
  *   definition that no longer exists are ignored silently. Restoring the definition brings them back.
  */
-export function foldStoryState({
-  definitions,
-  messages,
-  state,
-  turn: readAt,
-  workflowId,
-  including,
-}: FoldInput): StoryState {
+export function foldStoryState({ definitions, messages, state, workflowId, including }: FoldInput): StoryState {
   const turns = turnPresence(messages, readTurnEntries(state), including);
   const own = including === undefined ? undefined : turns.find(({ entry }) => entry.executionId === including)?.turn;
-  const turn = readAt ?? own ?? turns.filter((presence) => presence.turn !== null).length + 1;
+  const turn = own ?? turns.filter((presence) => presence.turn !== null).length + 1;
   const { byDefinition, byNode } = collectWrites(turns, workflowId);
   return {
     turn,

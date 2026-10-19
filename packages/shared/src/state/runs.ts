@@ -1,11 +1,5 @@
 import {
-  appendLinkWarnings,
-  effectivePostRun,
-  POST_ERROR_LIMIT,
-  POST_INTERRUPTED_MESSAGE,
-  type PostRun,
-} from './post-run.js';
-import {
+  type RunStatus,
   type SessionState,
   type StateWrite,
   type TurnEntry,
@@ -14,10 +8,39 @@ import {
   withUpdatedTurnEntry,
 } from './writes.js';
 
+/** A run's error text is cut to this many characters in the entry (the full text is in its execution log). */
+export const POST_ERROR_LIMIT = 500;
+export const POST_INTERRUPTED_MESSAGE = 'The run was interrupted by a server restart.';
+
+/** The entry keeps at most this many dropped-link warnings, each cut to this many characters. */
+export const LINK_WARNING_LIMITS = { count: 5, length: 300 };
+
+/** How a run of the after section ended: its status, error, writes and link warnings, as settled into the entry. */
+export type PostRunResult = {
+  status: Exclude<RunStatus, 'running'>;
+  /** Cut to `POST_ERROR_LIMIT`; only kept when the status is `error`. */
+  error?: string;
+  /** The run's resolved writes, also of a failed or stopped run (the nodes that completed). */
+  writes: StateWrite[];
+  /** Warnings of linked writes this run lost at commit time; appended to the entry's (see `LINK_WARNING_LIMITS`). */
+  linkWarnings?: string[];
+};
+
+/** What the turn's after section stands at, derived from its runs (see `postOfEntry`). */
+export type PostRun = { status: RunStatus; executionId?: string; error?: string };
+
+/** `raw.linkWarnings` with `warnings` appended, cut like the entry keeps them (see `LINK_WARNING_LIMITS`). */
+function appendLinkWarnings(raw: Record<string, unknown>, warnings: readonly string[]): unknown[] {
+  return [
+    ...(Array.isArray(raw.linkWarnings) ? raw.linkWarnings : []),
+    ...warnings.map((text) => text.slice(0, LINK_WARNING_LIMITS.length)),
+  ].slice(-LINK_WARNING_LIMITS.count);
+}
+
 /** What a run of a turn leaves in the turn's entry when it settles. */
 export type RunSettlement = {
   /**
-   * The run's record. A run the entry already lists (an after-reply run announced as `running`) is replaced in place; a
+   * The run's record. A run the entry already lists (a run of the after section announced as `running`) is replaced in place; a
    * run it does not list (a reply run after the first) is appended, so `runs` stays in the order the runs happened.
    */
   run: TurnRun;
@@ -28,8 +51,8 @@ export type RunSettlement = {
   /** Warnings of linked writes the run lost at commit time (see `LINK_WARNING_LIMITS`). */
   linkWarnings?: readonly string[];
   /**
-   * Further runs of the turn that will follow, announced as `running` in the same write (the after-reply runs, known
-   * when the last reply run settles), appended after the run's record.
+   * Further runs of the turn that will follow, announced as `running` in the same write (the runs of the after section, known
+   * when the last reply-section run settles), appended after the run's record.
    */
   announce?: readonly TurnRun[];
   /**
@@ -43,8 +66,8 @@ const isRun = (raw: unknown): raw is Record<string, unknown> =>
   typeof raw === 'object' && raw !== null && !Array.isArray(raw);
 
 /**
- * `state` with a run of the turn `turnExecutionId` settled into its entry, the way `withPostRun` settles an after-reply
- * run (the one place runs are recorded after the entry exists; the first reply run creates the entry itself):
+ * `state` with a run of the turn `turnExecutionId` settled into its entry, (the one place runs are
+ * recorded after the entry exists; the turn's first settle creates the entry itself):
  * `writes` appended AFTER everything earlier, so a later write to a key wins and deleting the turn's replies undoes all
  * of them; `replies` added; `linkWarnings` appended; the run's record appended or replaced; and, when the run is a reply
  * run, `completed` recomputed: true only while every reply run of the entry ran to the end (and, for a regenerate, the
@@ -86,7 +109,7 @@ export function withRunSettled(state: unknown, turnExecutionId: string, settleme
 
 /**
  * The entry's runs as they should be shown: a run stored as `running` that the server no longer holds (`isLive` false:
- * it restarted) reads as an error. Undefined for a legacy entry (no `runs`). Pure; stored data is never rewritten.
+ * it restarted) reads as an error. Undefined for an entry without `runs`. Pure; stored data is never rewritten.
  */
 export function effectiveRuns(
   entry: Pick<TurnEntry, 'runs'>,
@@ -99,18 +122,15 @@ export function effectiveRuns(
 }
 
 /**
- * The turn's after-reply status in the one shape older readers know (`postStatus`, `postExecutionId`, `postError`),
- * derived from the post runs of a new entry: any `running` reads as running; else the first `error` with its text; else
- * `stopped` if any; else `completed`; the id is the first post run's. A legacy entry says it itself
- * (`effectivePostRun`, `live` being whether the server holds its run). Undefined when the turn left no after-reply run.
+ * What the turn's after section stands at, derived from its post runs: any `running` reads as running; else the first
+ * `error` with its text; else `stopped` if any; else `completed`; the id is the first post run's. Undefined when the turn
+ * has no run of the after section (or an entry without `runs`). The restart rule applies per run (`effectiveRuns`).
  */
 export function postOfEntry(
-  entry: Pick<TurnEntry, 'runs' | 'postExecutionId' | 'postStatus' | 'postError'>,
+  entry: Pick<TurnEntry, 'runs'>,
   isLive: (executionId: string) => boolean,
 ): PostRun | undefined {
-  const runs = effectiveRuns(entry, isLive);
-  if (!runs) return effectivePostRun(entry, entry.postExecutionId !== undefined && isLive(entry.postExecutionId));
-  const post = runs.filter((run) => run.part === 'post');
+  const post = effectiveRuns(entry, isLive)?.filter((run) => run.part === 'post') ?? [];
   const first = post[0];
   if (!first) return undefined;
   const failed = post.find((run) => run.status === 'error');

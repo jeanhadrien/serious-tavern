@@ -33,7 +33,7 @@ function RunItem({ run }: { run: RunNote }) {
 
 /**
  * The card under the chip: the turn's writes in plain words, the note for a reply edited afterwards, and how its
- * after-reply run ended when that was badly, with the run's log (fetched when the card opens).
+ * run after the reply ended when that was badly, with the run's log (fetched when the card opens).
  */
 export function TurnChipCard({ chip, id }: { chip: StoryChip; id?: string }) {
   const { post } = chip;
@@ -82,7 +82,7 @@ export function TurnChipCard({ chip, id }: { chip: StoryChip; id?: string }) {
 }
 
 /**
- * "What this turn stored": a small button on the last reply of a turn that wrote story state or whose after-reply
+ * "What this turn stored": a small button on the last reply of a turn that wrote story state or whose run after the reply
  * run failed or that lost a linked item (the icon then warns). It discloses an inline
  * card under the button (not a floating layer: the thread scrolls, and an inline card needs no placement on a
  * phone); Escape or a second click closes it.
@@ -92,7 +92,7 @@ export function TurnChip({ chip }: { chip: StoryChip }) {
   const cardId = useId();
   const wrapper = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
-  // A failed after-reply run or an item that was dropped: the icon warns.
+  // A failed run after the reply or an item that was dropped: the icon warns.
   const alert =
     chip.post?.status === 'error' || !!chip.warnings?.length || !!chip.runs?.some((run) => run.status === 'error');
   useEffect(() => {

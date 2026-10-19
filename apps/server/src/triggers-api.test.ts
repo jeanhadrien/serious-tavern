@@ -45,7 +45,7 @@ describe('creating a chat', () => {
     try {
       const session = await makeSession(app, one.id);
       expect(session).not.toHaveProperty('triggers');
-      expect((await sendTurn(app, session.id)).execution.workflowId).toBe(one.id);
+      expect((await sendTurn(app, session.id)).execution!.workflowId).toBe(one.id);
     } finally {
       await app.close();
     }

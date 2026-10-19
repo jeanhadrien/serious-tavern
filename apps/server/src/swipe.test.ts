@@ -16,7 +16,7 @@ describe('swipe', () => {
   it('shows another alternative, and the story state follows it', async () => {
     const { app, session } = await harness.setup();
     await turn(app, session.id, 'hello');
-    const second = apiContract.regenerate.response.parse((await regenerate(app, session.id)).json()).execution.id;
+    const second = apiContract.regenerate.response.parse((await regenerate(app, session.id)).json()).execution!.id;
     const saved = await readSession(app, session.id);
     const root = saved.messages[1]!.executionId!;
     expect(await counterN(app, session.id)).toBe(2);

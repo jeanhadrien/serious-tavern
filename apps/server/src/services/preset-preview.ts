@@ -41,7 +41,7 @@ export async function previewPreset(
   // the next turn would get gives linked items their `link` (what `linked` and `{{link.status}}` read).
   const definitions = await listDefinitions(stateDefinitions);
   const state = session
-    ? foldSession(definitions, session, undefined, historyMessages(session.messages)).snapshot
+    ? foldSession(definitions, session, historyMessages(session.messages)).snapshot
     : emptyStateSnapshot(definitions);
   const values: Record<string, unknown> = { ...inputs };
   const sample = [

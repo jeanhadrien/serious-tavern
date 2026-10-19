@@ -35,7 +35,7 @@ export function registerSessions(app: FastifyInstance, context: AppContext) {
   });
   app.delete<ApiRoute<'deleteSession'>>('/api/sessions/:id', async (request, reply) => {
     const { id } = apiContract.deleteSession.params.parse(request.params);
-    // A running after-reply run (or turn) of the chat would only work for a chat that is gone: stop it first.
+    // A running turn (or a run after its reply) of the chat would only work for a chat that is gone: stop it first.
     context.turns.stop(id);
     await sessions.delete(id);
     return reply.code(204).send();

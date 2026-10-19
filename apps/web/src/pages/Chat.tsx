@@ -22,7 +22,7 @@ export function Chat({ chat }: { chat: ChatState }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const closePanel = useCallback(() => setPanelOpen(false), []);
   // Escape in the chat: the panel first, then the reply. `busy` is true only while this page's own message is in
-  // flight (generating, or waiting for its turn), never during a lone after-reply run, which Escape leaves alone.
+  // flight (generating, or waiting for its turn), never during a lone run after the reply, which Escape leaves alone.
   useEscapeArea('chat', () => {
     if (panelOpen) setPanelOpen(false);
     else if (chat.busy) chat.stop();
@@ -39,7 +39,7 @@ export function Chat({ chat }: { chat: ChatState }) {
   const revealed = useCallback(() => setReveal(undefined), []);
   // One fetch of the chat's story state; it reloads when a turn or a message change finishes, never per token.
   const story = useStoryState(session?.id, !locked);
-  // The after-reply run of the latest turn: a quiet status row while it works, one toast if it fails.
+  // The workflows running after the latest reply: a quiet status row while one works, one toast if it fails.
   const postRun = useMemo(() => runningPostRun(story.view), [story.view]);
   usePostRunAlerts(session?.id, story.view);
   // What deleting a reply would undo; the shared fold runs only when the trash button is clicked.

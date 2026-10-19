@@ -60,7 +60,7 @@ export function useChat() {
   };
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
-  // A sent message the server has not started yet: it may wait behind another turn or an after-reply run.
+  // A sent message the server has not started yet: it may wait behind another turn or a run after the reply.
   const [queued, setQueued] = useState(false);
   const queuedRef = useRef(false);
   const cancelledRef = useRef(false);
@@ -196,7 +196,7 @@ export function useChat() {
   // Asks the server to stop; the open stream then ends with the partial rows, which `send` settles.
   // Aborting the connection is only the fallback, for when the stop request itself cannot get through. A message
   // that has not started yet is not what the server's Stop would stop (it ends the job that runs, e.g. an
-  // after-reply run), so it is cancelled by aborting its request instead; the server then drops it unstored.
+  // run after the reply), so it is cancelled by aborting its request instead; the server then drops it unstored.
   const stop = () => {
     if (!busyRef.current || !session) return;
     if (queuedRef.current) {

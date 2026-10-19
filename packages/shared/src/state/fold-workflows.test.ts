@@ -131,11 +131,7 @@ describe('foldStoryState including', () => {
     expect(read('t2').definitions[0]!.keys.mood!.meta.turnsSinceWrite).toBe(0);
   });
 
-  it('lets an explicit turn win, and ignores an id that is not an entry', () => {
-    expect(
-      foldStoryState({ definitions: [scene], messages: only, state: { turns: entries }, including: 't2', turn: 5 })
-        .turn,
-    ).toBe(5);
+  it('ignores an id that is not an entry', () => {
     expect(read('nope').turn).toBe(2);
   });
 });

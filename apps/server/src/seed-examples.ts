@@ -5,8 +5,8 @@ import { LEDGER_FILE, readLedger, type SeedLedger } from './seed-ledger.js';
 import type { Repository } from './storage/repository.js';
 
 /**
- * A set of example records that belong together: a workflow, the preset and collection it uses and the state
- * definitions it reads or writes. Every record has a FIXED id.
+ * A set of example records that belong together: its workflows, the presets and collection they use and the state
+ * definitions they read or write. Every record has a FIXED id.
  */
 export type ExamplePack = {
   /** Names the pack's lines in the ledger (`fresh-texture/workflow:<id>`); never changes once shipped. */
@@ -15,9 +15,9 @@ export type ExamplePack = {
   collections(): Collection[];
   definitions(): StateDefinition[];
   presets(): Preset[];
-  /** `definitionIds` maps each of the pack's definition names to the id the workflow must use (see `seedExamples`). */
-  workflow(definitionIds: Record<string, string>): Workflow;
-  /** The keys of each definition (by name) the workflow reads or writes: what an existing definition must have. */
+  /** `definitionIds` maps each of the pack's definition names to the id the workflows must use (see `seedExamples`). */
+  workflows(definitionIds: Record<string, string>): Workflow[];
+  /** The keys of each definition (by name) the workflows read or write: what an existing definition must have. */
   uses: Record<string, string[]>;
 };
 
@@ -56,7 +56,7 @@ function misfit(ours: StateDefinition, theirs: StateDefinition, keys: string[]):
  * restart does nothing. A record found by id is added to the ledger as well. A definition whose name is taken by
  * another definition is not created; the pack uses the existing one when it has the keys the workflow needs
  * (`uses`), and is skipped, with a log line, when it doesn't. A pack is all or nothing: nothing of it is created
- * when its workflow can't be built.
+ * when its workflows can't be built.
  */
 export async function seedExamples(
   stores: ExampleStores,
@@ -133,13 +133,14 @@ async function seedPack(pack: ExamplePack, stores: ExampleStores, ledger: SeedLe
       found: !!(await stores.presets.get(preset.id)),
       create: () => stores.presets.save(preset),
     });
-  const workflow = pack.workflow(definitionIds);
-  const main: Item = {
-    key: `workflow:${workflow.id}`,
-    found: !!(await stores.workflows.get(workflow.id)),
-    create: () => stores.workflows.save(workflow),
-  };
-  const all = [...items, main];
+  const workflows: Item[] = [];
+  for (const workflow of pack.workflows(definitionIds))
+    workflows.push({
+      key: `workflow:${workflow.id}`,
+      found: !!(await stores.workflows.get(workflow.id)),
+      create: () => stores.workflows.save(workflow),
+    });
+  const all = [...items, ...workflows];
 
   if (blocked) {
     // Said only while there is something to create: a pack that was seeded long ago has nothing left to say.
@@ -147,9 +148,9 @@ async function seedPack(pack: ExamplePack, stores: ExampleStores, ledger: SeedLe
       log.warn(`Example "${pack.name}" not added: ${blocked}.`);
     return;
   }
-  // A record seeded earlier and since deleted is not created again, so the workflow would point at nothing:
-  // a pack whose workflow is still to be created is left alone then.
-  const creating = !main.found && !ledger.has(pack.id, main.key);
+  // A record seeded earlier and since deleted is not created again, so a workflow would point at nothing:
+  // a pack with a workflow still to be created is left alone then.
+  const creating = workflows.some((item) => !item.found && !ledger.has(pack.id, item.key));
   if (creating && items.some((item) => !item.found && ledger.has(pack.id, item.key))) {
     log.warn(`Example "${pack.name}" not added: a record it uses was deleted after it was first seeded.`);
     return;

@@ -35,12 +35,14 @@ export const messageLogId = (message: Pick<ChatMessage, 'runId' | 'executionId'>
   message.runId ?? message.executionId;
 
 /**
- * Every log a settled turn brings: each run of the reply list (`executions`), or the one `execution` of a result from
- * before reply lists. On a failure `execution` is the failing run's, which `executions` lists too.
+ * Every log a settled turn brings: each run of the reply section (`executions`), or the one `execution` of a result from
+ * before reply lists. On a failure `execution` is the failing run's, which `executions` lists too. None when no
+ * workflow of the chat replies.
  */
-export function resultLogs(result: { execution: ExecutionLog; executions?: readonly ExecutionLog[] }): ExecutionLog[] {
+export function resultLogs(result: { execution?: ExecutionLog; executions?: readonly ExecutionLog[] }): ExecutionLog[] {
   const all = result.executions ?? [];
-  return all.some((log) => log.id === result.execution.id) ? [...all] : [...all, result.execution];
+  const { execution } = result;
+  return !execution || all.some((log) => log.id === execution.id) ? [...all] : [...all, execution];
 }
 
 /**

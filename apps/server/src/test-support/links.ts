@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { registry } from '@st/engine';
 import { apiContract, type Session } from '@st/shared';
-import { define, edge, makeSession, makeWorkflow, node, send, tempApps, type App } from './story.js';
+import { define, edge, makeWorkflow, node, send, tempApps, type App } from './story.js';
 import { stateView, waitForPostRun } from './post.js';
+import { makeListSession } from './triggers.js';
 
 // Helpers of the message link tests: a workflow that wires summaries the way the README does, stand-ins for the
 // summarizing LLM and for nodes that fail or hold a run, and checks over the items a chat's summaries key holds.
@@ -71,51 +72,59 @@ function linkNodes() {
 export type LinkWorkflowOptions = {
   /** Where the chunk's text goes on its way to State Write (default: the test summarizer). */
   via?: { type: string; id?: string };
-  /** Run Next Chunk and State Write in the reply part instead of after the reply. */
+  /** List the summarizing workflow above the narrator, so it runs in the reply section instead of after the reply. */
   inReply?: boolean;
-  /** Link the item to After Reply's replies (no fingerprint) instead of Next Chunk's link; after the reply only. */
+  /** Link the item to Chat Input's `replies` (no fingerprint) instead of Next Chunk's link; after the reply only. */
   linkToReplies?: boolean;
-  /** A node that fails once State Write has completed (in the part that holds it). */
+  /** A node that fails once State Write has completed (in the summarizing workflow). */
   failAfterSave?: boolean;
   /** A sink that holds the run (until it is stopped) once State Write has completed. */
   holdAfterSave?: boolean;
 };
 
 /**
- * input; Memory (all) -> Unlinked Messages (memory.summaries) -> Chat Output replying
- * `S[<intact summaries in chat order>] H[<messages no summary stands for>]`; Next Chunk (chunks of 2, raw window 2) ->
- * summarizer -> State Write (add to memory.summaries, linked), after the reply unless `inReply`. At turn k the
- * history has 2(k-1) messages, so turn 3 is the first with a chunk to link.
+ * Two workflows: the narrator (input; Memory (all) -> Unlinked Messages (memory.summaries) -> Chat Output replying
+ * `S[<intact summaries in chat order>] H[<messages no summary stands for>]`) and the summarizer (Next Chunk (chunks of
+ * 2, raw window 2 in the reply section, 4 after it) -> summarizer -> State Write (add to memory.summaries, linked)), which has no Chat Output and is
+ * listed below the narrator, so it runs after the reply (above it with `inReply`). At turn k the history has 2(k-1)
+ * messages, so turn 3 is the first with a chunk to link.
  */
-function linkWorkflow(definitionId: string, options: LinkWorkflowOptions = {}) {
+function linkWorkflows(definitionId: string, options: LinkWorkflowOptions = {}) {
   const via = options.via ?? { type: SUMMARIZER };
   const viaId = via.id ?? 'llm';
   const target = { definitionId, key: 'summaries' };
+  // A run after the reply sees the chat as it stands, the turn's own two messages included, so the window is two
+  // messages wider there: a chunk is planned at the same turn as in the reply section.
+  const rawWindow = options.inReply ? 2 : 4;
   return {
-    nodes: [
-      node('input', 'chat-input'),
-      node('mem', 'memory', { all: true, format: 'messages' }),
-      node('un', 'unlinked-messages', target),
-      node('output', 'chat-output', {
-        template: 'S[{{#each (linked state.memory.summaries)}}{{text}};{{/each}}] H[{{input.value}}]',
-      }),
-      ...(options.inReply ? [] : [node('after', 'after-reply')]),
-      node('next', 'next-chunk', { ...target, chunkSize: 2, rawWindow: 2 }),
-      node(viaId, via.type),
-      node('save', 'state-write', { ...target, op: 'add' }),
-      ...(options.failAfterSave ? [node('fail', FAILER)] : []),
-      ...(options.holdAfterSave ? [node('hold', HOLDER)] : []),
-    ],
-    edges: [
-      edge('mem', 'history', 'un', 'messages'),
-      edge('un', 'text', 'output', 'value'),
-      ...(options.inReply ? [] : [edge('after', 'turn', 'next', 'after')]),
-      edge('next', 'text', viaId, 'value'),
-      edge(options.linkToReplies ? 'after' : 'next', options.linkToReplies ? 'replies' : 'link', 'save', 'messages'),
-      edge(viaId, 'value', 'save', 'value'),
-      ...(options.failAfterSave ? [edge('save', 'value', 'fail', 'value')] : []),
-      ...(options.holdAfterSave ? [edge('save', 'value', 'hold', 'value')] : []),
-    ],
+    narrator: {
+      nodes: [
+        node('input', 'chat-input'),
+        node('mem', 'memory', { all: true, format: 'messages' }),
+        node('un', 'unlinked-messages', target),
+        node('output', 'chat-output', {
+          template: 'S[{{#each (linked state.memory.summaries)}}{{text}};{{/each}}] H[{{input.value}}]',
+        }),
+      ],
+      edges: [edge('mem', 'history', 'un', 'messages'), edge('un', 'text', 'output', 'value')],
+    },
+    summarizer: {
+      nodes: [
+        node('input', 'chat-input'),
+        node('next', 'next-chunk', { ...target, chunkSize: 2, rawWindow }),
+        node(viaId, via.type),
+        node('save', 'state-write', { ...target, op: 'add' }),
+        ...(options.failAfterSave ? [node('fail', FAILER)] : []),
+        ...(options.holdAfterSave ? [node('hold', HOLDER)] : []),
+      ],
+      edges: [
+        edge('next', 'text', viaId, 'value'),
+        options.linkToReplies ? edge('input', 'replies', 'save', 'messages') : edge('next', 'link', 'save', 'messages'),
+        edge(viaId, 'value', 'save', 'value'),
+        ...(options.failAfterSave ? [edge('save', 'value', 'fail', 'value')] : []),
+        ...(options.holdAfterSave ? [edge('save', 'value', 'hold', 'value')] : []),
+      ],
+    },
   };
 }
 
@@ -132,9 +141,15 @@ export function linkHarness(prefix: string) {
     },
     async chat(options: LinkWorkflowOptions = {}) {
       const { app, directory, definition } = await this.open();
-      const { nodes: graphNodes, edges } = linkWorkflow(definition.id, options);
-      const workflow = await makeWorkflow(app, graphNodes, edges);
-      return { app, directory, definition, workflow, session: await makeSession(app, workflow.id) };
+      const { narrator, summarizer } = linkWorkflows(definition.id, options);
+      const workflow = await makeWorkflow(app, narrator.nodes, narrator.edges, 'Narrator');
+      const summarize = await makeWorkflow(app, summarizer.nodes, summarizer.edges, 'Summarizer');
+      const listed = options.inReply ? [summarize, workflow] : [workflow, summarize];
+      const session = await makeListSession(
+        app,
+        listed.map(({ id }) => ({ workflowId: id })),
+      );
+      return { app, directory, definition, workflow, summarize, session };
     },
     async cleanup() {
       nodes?.dispose();
@@ -145,7 +160,7 @@ export function linkHarness(prefix: string) {
   };
 }
 
-/** Sends a message, and waits for the turn's after-reply run when it has one. Returns the reply text. */
+/** Sends a message, and waits for the turn's runs after the reply when it has some. Returns the reply text. */
 export async function say(app: App, session: Session, content: string, post = true): Promise<string> {
   const response = await send(app, session.id, content);
   if (response.statusCode !== 200) throw new Error(`turn failed: ${response.statusCode} ${response.body}`);

@@ -1,4 +1,4 @@
-/* The row shown while an after-reply run works: one quiet line above the composer. */
+/* The row shown while a run after the reply works: one quiet line above the composer. */
 .post-run-status {
   display: flex;
   align-items: center;

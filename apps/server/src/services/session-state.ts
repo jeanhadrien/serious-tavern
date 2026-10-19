@@ -53,22 +53,16 @@ function nodeKeyViews(keys: Record<string, FoldedKey>) {
   return { ...views, omitted };
 }
 
-// The execution ids of an entry's post-turn runs: the runs it lists, or the one a legacy entry says.
+// The execution ids of the runs of an entry's after section.
 const postRunIds = (entry: TurnEntry): string[] =>
-  entry.runs
-    ? entry.runs.filter((run) => run.part === 'post').map((run) => run.executionId)
-    : entry.postExecutionId === undefined
-      ? []
-      : [entry.postExecutionId];
+  entry.runs?.filter((run) => run.part === 'post').map((run) => run.executionId) ?? [];
 
-// Whether the entry lists a run (or says a legacy post run) stored as `running`, whichever the server holds.
+// Whether the entry lists a run stored as `running` that the server does not hold.
 const hasRunning = (entry: TurnEntry, isLive: (executionId: string) => boolean) =>
-  entry.runs
-    ? entry.runs.some((run) => run.status === 'running' && !isLive(run.executionId))
-    : entry.postStatus === 'running' && !(entry.postExecutionId !== undefined && isLive(entry.postExecutionId));
+  entry.runs?.some((run) => run.status === 'running' && !isLive(run.executionId)) ?? false;
 
 /**
- * The session, and which of its post-turn runs the server holds, judged right when the session was read. A run
+ * The session, and which of its runs after the reply the server holds, judged right when the session was read. A run
  * commits its result to the entry before the server lets go of it, so a `running` run the server does not hold can
  * only be a lost run, or a run that finished after this read: then read again. Deciding liveness later than the
  * read (while the view is still being built) would let a run that finishes meanwhile show up as interrupted.

@@ -1,22 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import type { PostStatus } from '@st/shared';
-import { buildView, entry, reply, userMessage } from './test-fixtures.js';
+import type { RunStatus } from '@st/shared';
+import { afterRun, buildView, entry, reply, userMessage } from './test-fixtures.js';
 import { nextAlerts, postFailures, postRunOf, runningPostRun, type AlertMemory } from './postRuns.js';
 import { postFailureSubject, postFailureToast } from './postRunText.js';
 
-const turn = (id: string, post?: { status: PostStatus; error?: string; executionId?: string }) => ({
+const turn = (id: string, post?: { status: RunStatus; error?: string; executionId?: string }) => ({
   ...entry(id),
-  ...(post && {
-    postStatus: post.status,
-    postExecutionId: post.executionId ?? `post-${id}`,
-    ...(post.error && { postError: post.error }),
-  }),
+  ...(post && afterRun(post.status, { executionId: post.executionId ?? `post-${id}`, error: post.error })),
 });
 const viewOf = (...entries: ReturnType<typeof turn>[]) =>
   buildView({ messages: [userMessage(), ...entries.map((item) => reply(item.executionId))], entries });
 
 describe('runningPostRun', () => {
-  it('is the newest turn whose after-reply run is running', () => {
+  it('is the newest turn whose run after the reply is running', () => {
     const view = viewOf(turn('e1', { status: 'running' }), turn('e2', { status: 'running' }));
     expect(runningPostRun(view)).toEqual({ status: 'running', turnNumber: 2, executionId: 'post-e2' });
   });
@@ -79,7 +75,7 @@ describe('nextAlerts', () => {
     expect(second(during.memory, turn('e0', { status: 'completed' }), failed('e1')).failures).toHaveLength(1);
   });
 
-  it.each<[string, PostStatus]>([
+  it.each<[string, RunStatus]>([
     ['completes', 'completed'],
     ['is stopped', 'stopped'],
   ])('never toasts for a run that %s', (_name, status) => {
@@ -100,20 +96,28 @@ describe('nextAlerts', () => {
     expect(second(base, turn('e1', { status: 'completed' }), interrupted).failures).toHaveLength(1);
   });
 
-  it('tells two failures of one view apart and keys a run without an id by its turn', () => {
+  it('tells two failures of one view apart, keyed by the failing run', () => {
     const base = nextAlerts(undefined, 's', viewOf()).memory;
-    const noId = { ...failed('e2'), postExecutionId: undefined };
-    const result = second(base, failed('e1'), noId as never);
+    const result = second(base, failed('e1'), failed('e2'));
     expect(result.failures).toHaveLength(2);
-    expect([...result.memory.seen].sort()).toEqual(['e2', 'post-e1']);
+    expect([...result.memory.seen].sort()).toEqual(['post-e1', 'post-e2']);
   });
 });
 
 describe('postFailureToast', () => {
   it.each([
-    [{ status: 'error', turnNumber: 3, error: 'HTTP 500' }, 'After-reply steps failed on turn 3: HTTP 500'],
-    [{ status: 'error', turnNumber: null, error: 'HTTP 500' }, 'After-reply steps failed: HTTP 500'],
-    [{ status: 'error', turnNumber: 1 }, 'After-reply steps failed on turn 1: unknown error'],
+    [
+      { executionId: 'p', status: 'error', turnNumber: 3, error: 'HTTP 500' },
+      'A workflow failed after the reply on turn 3: HTTP 500',
+    ],
+    [
+      { executionId: 'p', status: 'error', turnNumber: null, error: 'HTTP 500' },
+      'A workflow failed after the reply: HTTP 500',
+    ],
+    [
+      { executionId: 'p', status: 'error', turnNumber: 1 },
+      'A workflow failed after the reply on turn 1: unknown error',
+    ],
   ] as const)('words %j', (run, text) => {
     expect(postFailureToast(run)).toBe(text);
   });
@@ -166,7 +170,7 @@ describe('postFailureSubject', () => {
 
 describe('a turn with runs (a chat that lists several workflows)', () => {
   type Part = 'reply' | 'post';
-  const run = (executionId: string, workflowId: string, part: Part, status: PostStatus, error?: string) => ({
+  const run = (executionId: string, workflowId: string, part: Part, status: RunStatus, error?: string) => ({
     executionId,
     workflowId,
     part,
@@ -183,7 +187,7 @@ describe('a turn with runs (a chat that lists several workflows)', () => {
     });
   const replies = [run('e1', 'a', 'reply', 'completed'), run('r2', 'b', 'reply', 'completed')];
 
-  it('names the workflow whose after-reply steps run now: the first run still running', () => {
+  it('names the workflow running after the reply now: the first run still running', () => {
     const view = viewWith(
       withRuns('e1', [
         ...replies,
@@ -200,7 +204,7 @@ describe('a turn with runs (a chat that lists several workflows)', () => {
     });
   });
 
-  it('points at the run that failed, not the first after-reply run the derived fields name', () => {
+  it('points at the run that failed, not the first run after the reply the derived fields name', () => {
     const view = viewWith(
       withRuns('e1', [...replies, run('p-a', 'a', 'post', 'completed'), run('p-b', 'b', 'post', 'error', 'boom')]),
     );
@@ -216,13 +220,13 @@ describe('a turn with runs (a chat that lists several workflows)', () => {
     expect(postFailures(view).map((failure) => failure.executionId)).toEqual(['p-b']);
   });
 
-  it('has no after-reply run when the turn ran reply parts only', () => {
+  it('has no run after the reply when the turn ran reply runs only', () => {
     const view = viewWith(withRuns('e1', replies));
     expect(postRunOf(view.turns[0]!)).toBeUndefined();
     expect(runningPostRun(view)).toBeUndefined();
   });
 
-  it.each<[PostStatus, PostStatus[]]>([
+  it.each<[RunStatus, RunStatus[]]>([
     ['running', ['completed', 'running']],
     ['error', ['completed', 'error', 'stopped']],
     ['stopped', ['completed', 'stopped']],
@@ -242,7 +246,7 @@ describe('a turn with runs (a chat that lists several workflows)', () => {
   it('toasts a failure once, keyed by the failing run, and says whose steps failed', () => {
     const failed = viewWith(withRuns('e1', [...replies, run('p-b', 'b', 'post', 'error', 'boom')]));
     const next = nextAlerts({ sessionId: 's', seen: new Set() }, 's', failed);
-    expect(next.failures.map(postFailureToast)).toEqual(['After-reply steps of Memory failed on turn 1: boom']);
+    expect(next.failures.map(postFailureToast)).toEqual(['Workflow Memory failed after the reply on turn 1: boom']);
     expect(nextAlerts(next.memory, 's', failed).failures).toEqual([]);
   });
 });

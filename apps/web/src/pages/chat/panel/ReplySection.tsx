@@ -77,7 +77,7 @@ export function ReplySection({
     <div className="reply-list">
       <p className="hint">
         Each reply runs these workflows one after another, top to bottom, and each sees what the ones above it wrote.
-        Changes apply from the next message.
+        Workflows below the last one that replies run after the reply is complete. Changes apply from the next message.
       </p>
       <SortableList
         as="ul"

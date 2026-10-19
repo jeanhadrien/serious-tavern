@@ -3,9 +3,9 @@ import { JsonRepository } from './storage/repository.js';
 import { isRepository, postHarness, postRunOf, stateView, watchSettles } from './test-support/post.js';
 import { entriesOf, readSession, send, turn } from './test-support/story.js';
 
-// The write that records a post run's result can fail: the run's outcome must not be lost to "interrupted".
+// The write that records the result of a run after the reply can fail: the run's outcome must not be lost to "interrupted".
 
-const harness = postHarness('post-turn-settle');
+const harness = postHarness('after-section-settle');
 afterEach(async () => {
   vi.restoreAllMocks();
   await harness.cleanup();
@@ -52,7 +52,7 @@ describe('a failing settle write', () => {
     // The settle is announced once, after the minimal write that follows the two failures.
     await settles.first;
     const failed = await postRunOf(app, session.id);
-    expect(failed.postError).toBe('The result of the after-reply run could not be saved: disk full');
+    expect(failed.postError).toBe('The result of the run could not be saved: disk full');
     const [entry] = entriesOf(await readSession(app, session.id));
     expect(entry).toMatchObject({ completed: true, replies: 1 });
     expect(entry!.runs!.find((run) => run.part === 'post')).toMatchObject({ status: 'error' });
@@ -65,13 +65,13 @@ describe('a failing settle write', () => {
     const { app, directory, session, gate } = await heldRun();
     failUpdates(directory, session.id, 3);
     gate.release();
-    // The next message waits for the post run to end; its own updates are past the three failures.
+    // The next message waits for the run after the reply to end; its own updates are past the three failures.
     expect(await turn(app, session.id)).toEqual(['n=1 turn=2']);
     const [view] = (await stateView(app, session.id)).turns;
     expect(view).toMatchObject({ postStatus: 'error' });
     expect(view!.postError).toMatch(/interrupted by a server restart/);
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('Could not record the after-reply run'),
+      expect.stringContaining('Could not record a run after the reply'),
       expect.any(Error),
     );
   });

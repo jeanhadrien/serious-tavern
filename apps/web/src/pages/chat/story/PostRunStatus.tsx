@@ -6,7 +6,7 @@ import { POST_STOP_LABEL, postRunningLabel } from './postRunText.js';
 import type { PostRunRef } from './postRuns.js';
 import './postRun.css';
 
-// Stop is the chat's one stop: it ends whichever job runs, here the after-reply run. A message waiting behind the run is
+// Stop is the chat's one stop: it ends whichever job runs, here a run after the reply. A message waiting behind the run is
 // cancelled by the composer instead. Whatever the answer, the state is read again: the row is only as true as the last
 // view, which a server that was killed and restarted may have outdated without any event reaching this page.
 const stop = (sessionId: string, onStopped: () => void) =>
@@ -16,7 +16,7 @@ const stop = (sessionId: string, onStopped: () => void) =>
     .finally(onStopped);
 
 /**
- * A quiet row between the thread and the composer while an after-reply run works: the reply is already complete, so
+ * A quiet row between the thread and the composer while a run after the reply works: the reply is already complete, so
  * the composer stays usable. It is `memo` and gets the run by reference, so streamed tokens of the next turn do not
  * re-render it.
  */

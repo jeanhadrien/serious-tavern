@@ -3,7 +3,7 @@ import {
   foldStoryState,
   oldestFirst,
   stateSnapshot,
-  withPostRun,
+  withRunSettled,
   withTurnEntry,
   type ChatMessage,
   type StateDefinition,
@@ -12,16 +12,19 @@ import {
   type Workflow,
 } from '@st/shared';
 import { executeWorkflow } from './executor.js';
-import { postRunSeed } from './parts.js';
 import { createStateAccess } from './state-access.js';
 import type { ExecutionContext, NodeResources } from './types.js';
 
 // Fixtures for tests that build an `ExecutionContext` by hand or need a story state to run against.
 
-/** The state members of a context for a run that tracks no story state: reads find nothing, writes vanish. */
-export const stateless = (nodeId: string): Pick<ExecutionContext, 'state' | 'writeState'> => ({
+/**
+ * The members of a hand-built context that depend on the turn: a run that tracks no story state (reads find nothing,
+ * writes vanish) and has no replies from workflows above it.
+ */
+export const stateless = (nodeId: string): Pick<ExecutionContext, 'state' | 'writeState' | 'replies'> => ({
   state: createStateAccess(undefined, nodeId),
   writeState: () => ({}),
+  replies: [],
 });
 
 type Override = Partial<Omit<StateKeyView, 'meta'>> & { meta?: Partial<StateKeyView['meta']> };
@@ -132,11 +135,12 @@ export async function playTurn(
 }
 
 /**
- * Runs the after-reply part of the turn `playTurn` just played, the way the server does: the state is folded
- * from the chat as it stands (the turn's own writes included) read at that turn, the seed is derived with
- * `postRunSeed` and the run's writes join the turn's entry. A failing run throws before the entry changes.
+ * Runs another workflow of the turn `playTurn` just played, the way the server runs the workflows below the one that
+ * replied: the state is folded from the chat as it stands with that turn counted (its writes included), the replies
+ * of the turn are Chat Input's `replies`, and the run's writes join the turn's entry after everything earlier. A
+ * failing run throws before the entry changes.
  */
-export async function playPost(
+export async function playLater(
   chat: Chat,
   workflow: Workflow,
   turn: Awaited<ReturnType<typeof playTurn>>,
@@ -147,8 +151,8 @@ export async function playPost(
     definitions: oldestFirst(chat.definitions),
     messages: chat.messages,
     state: chat.state,
-    turn: turn.turn,
     workflowId: workflow.id,
+    including: turn.execution.id,
   });
   const replies = chat.messages.filter(
     (reply) => reply.role === 'assistant' && reply.executionId === turn.execution.id,
@@ -159,13 +163,14 @@ export async function playPost(
     history,
     secrets: { get: async () => undefined },
     resources: chat.resources,
-    executionId: `${turn.execution.id}-post`,
-    seed: postRunSeed(turn.execution.seed!),
+    executionId: `${turn.execution.id}-later`,
     state: stateSnapshot(story, chat.definitions, history),
-    part: 'post',
-    afterReply: { replies, text: replies.map((reply) => reply.content).join('\n\n'), turn: turn.turn },
+    replies,
   });
-  chat.state = withPostRun(chat.state, turn.execution.id, { status: 'completed', writes: result.writes });
+  chat.state = withRunSettled(chat.state, turn.execution.id, {
+    run: { executionId: result.execution.id, workflowId: workflow.id, part: 'post', status: 'completed' },
+    writes: result.writes,
+  });
   return result;
 }
 

@@ -1,13 +1,9 @@
 import type { ChatMessage } from '@st/shared';
-import { withoutLastTurnReplies } from '@st/shared';
-import { postRunSeed } from '@st/engine';
 import type { AppContext } from '../context.js';
 import { notFound } from '../errors.js';
-import type { PostTurn } from './post-turn.js';
-import { runReplyPart, type RunResult } from './reply-run.js';
-import { historyMessages } from './settle-turn.js';
-import { foldSession } from './story-state.js';
-import type { StartedTurn } from './turn-start.js';
+import { runReplyRun, type RunResult } from './reply-run.js';
+import { historyMessages, settleTurn } from './settle-turn.js';
+import { announcedRuns, foldRun, type StartedTurn } from './turn-start.js';
 import type { TurnFrame } from './turn-stream.js';
 import type { RunningTurn } from './turns.js';
 
@@ -17,16 +13,17 @@ export type ReplySection = {
   userMessage?: ChatMessage;
   /** A stop ended the section: the running run, and the runs after it that therefore did not run. */
   stopped: boolean;
-  /** The after-reply runs the turn leaves, announced in the entry and still to run, in list order. */
-  posts: PostTurn[];
+  /** The runs of the after section are announced in the turn's entry and still to run (`runAfterSection`). */
+  announced: boolean;
 };
 
 /**
- * The streamed section of a turn: the reply part of each enabled workflow, one after another, in list order. Run k
- * starts from the turn-start state plus what the runs above it committed (their writes), and from the turn-start history
- * plus the replies they saved; each run settles in its own update of the session. A run that fails keeps what it
- * completed and the runs after it still run; a stop ends the running run and the rest do not run. A workflow's failure is
- * in the results, never thrown.
+ * The streamed section of a turn: the enabled workflows from the top of the list down to the last one that replies, one
+ * after another, in list order. Run k starts from the turn-start state plus what the runs above it committed (their
+ * writes), and from the turn-start history plus the replies they saved; each run settles in its own update of the
+ * session. A run that fails keeps what it completed and the runs after it still run; a stop ends the running run and the
+ * rest do not run. A workflow's failure is in the results, never thrown. With no workflow that replies the section is
+ * empty: the turn's entry is created at once, with the after section announced.
  */
 export async function runReplySection(
   context: AppContext,
@@ -35,14 +32,15 @@ export async function runReplySection(
   started: StartedTurn,
   emit?: (frame: TurnFrame) => void,
 ): Promise<ReplySection> {
-  const { runs, rootId, definitions } = started;
-  const turnId = runs[0]!.runId;
+  const { reply: runs } = started;
+  if (!runs.length) return settleEmptySection(context, sessionId, turn, started);
   const results: RunResult[] = [];
   let history = started.history;
   let userMessage = started.userMessage;
   let start = { state: started.state, issues: started.stateIssues };
+  let replies: ChatMessage[] = [];
   let stopped = false;
-  let announced: Map<string, string> | undefined;
+  let announced = false;
   for (const [index, planned] of runs.entries()) {
     if (index > 0) {
       // A stop between two runs ends the section: the runs that are left do not run (and are not recorded).
@@ -52,12 +50,7 @@ export async function runReplySection(
       }
       const session = await context.sessions.silent.get(sessionId);
       if (!session) throw notFound('Session');
-      // The turn counts as present whatever its replies, and a regenerate is judged without the shown alternatives.
-      const messages = rootId ? (withoutLastTurnReplies(session.messages) ?? session.messages) : session.messages;
-      const story = foldSession(definitions, { messages, state: session.state }, undefined, history, {
-        workflowId: planned.workflow.id,
-        including: turnId,
-      });
+      const story = foldRun(started, session, planned, history);
       start = { state: story.snapshot, issues: story.issues };
     }
     emit?.({
@@ -66,11 +59,12 @@ export async function runReplySection(
       workflowId: planned.workflow.id,
       workflowName: planned.workflow.name,
     });
-    const done = await runReplyPart(context, sessionId, turn, {
+    const done = await runReplyRun(context, sessionId, turn, {
       started,
       planned,
       history,
       start,
+      replies,
       userMessage: index === 0 ? userMessage : undefined,
       earlier: results,
       isLast: index === runs.length - 1,
@@ -80,34 +74,41 @@ export async function runReplySection(
     announced = done.announced;
     userMessage = done.result.userMessage ?? userMessage;
     // Like the chat itself: from the first reply on, the turn's user message precedes the replies the next runs read.
-    const replied = historyMessages(done.result.replies);
+    const saved = historyMessages(done.result.replies);
     const asked = userMessage ?? started.asked;
-    const ask = replied.length && asked && !history.some((message) => message.id === asked.id) ? [asked] : [];
-    history = [...history, ...ask, ...replied];
+    const ask = saved.length && asked && !history.some((message) => message.id === asked.id) ? [asked] : [];
+    history = [...history, ...ask, ...saved];
+    replies = [...replies, ...saved];
     if (done.result.stopped) {
       stopped = true;
       break;
     }
   }
-  const posts = results.flatMap(({ planned, execution, replies, history: had }): PostTurn[] => {
-    const executionId = announced?.get(planned.runId);
-    if (!executionId) return [];
-    return [
-      {
-        prepared: planned.prepared,
-        workflowId: planned.workflow.id,
-        definitions,
-        turnExecutionId: turnId,
-        executionId,
-        seed: postRunSeed(execution?.seed ?? planned.runId),
-        message: started.content,
-        history: had,
-        settings: planned.settings,
-        character: started.character,
-        persona: started.persona,
-        replies,
-      },
-    ];
+  return { results, userMessage, stopped, announced };
+}
+
+// No workflow can reply: the turn is complete at once (a regenerate, which must reply to change the chat, is not). The
+// write that creates its entry announces the after section, which then holds every workflow of the list.
+async function settleEmptySection(
+  context: AppContext,
+  sessionId: string,
+  turn: RunningTurn,
+  started: StartedTurn,
+): Promise<ReplySection> {
+  const announced = started.after.length > 0 && !started.rootId;
+  if (announced) for (const { runId } of started.after) turn.postRunIds.add(runId);
+  const settled: { userMessage?: ChatMessage } = {};
+  const session = await context.sessions.silent.update(sessionId, (current) => {
+    settled.userMessage = settleTurn(current, {
+      executionId: started.turnId,
+      userMessage: started.userMessage,
+      replies: [],
+      streamed: [],
+      postRuns: announced ? announcedRuns(started) : [],
+      ...(started.rootId ? { regenerate: { rootId: started.rootId } } : {}),
+    }).userMessage;
+    return current;
   });
-  return { results, userMessage, stopped, posts };
+  if (!session) throw notFound('Session');
+  return { results: [], userMessage: settled.userMessage, stopped: false, announced };
 }

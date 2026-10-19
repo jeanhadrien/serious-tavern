@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { linkStatuses } from '../links/status.js';
 import { stateDefinitionSchema, stateDefinitionWriteSchema } from '../state/definition.js';
 import { historyPointSchema, keyMetaSchema, stateWarningSchema } from '../state/fold-types.js';
-import { postStatusSchema, stateWriteSchema, turnRunSchema } from '../state/writes.js';
+import { runStatusSchema, stateWriteSchema, turnRunSchema } from '../state/writes.js';
 import { endpoint, idParamsSchema, noContentSchema } from './common.js';
 
 /**
@@ -105,18 +105,16 @@ export const turnStateSchema = z.object({
   // 1-based among the turns that still count; null when its replies were deleted (it no longer counts).
   turnNumber: z.number().nullable(),
   writes: z.array(stateWriteViewSchema),
-  // The turn's runs in the order they ran (the reply part of each enabled workflow, then the after-reply parts); absent
-  // for an entry stored before chats ran several workflows.
+  // The turn's runs in the order they ran (the workflows of the reply section, then those of the after section).
   runs: z.array(turnRunViewSchema).optional(),
-  // The turn's after-reply status, absent when it left none. For an entry with `runs` it is derived from its post runs:
-  // any running reads as running; else the first error with its text; else stopped if any; else completed;
-  // `postExecutionId` is the first post run's. Otherwise it is as stored. A run stored as `running` that the
-  // server no longer holds (it restarted) is reported as `error`. `postExecutionId` names the run's execution log;
-  // `postError` is cut to a few hundred characters (the log has the full text).
-  postStatus: postStatusSchema.optional(),
+  // How the turn's after section stands, absent when it has none. Derived from the post runs: any running reads as
+  // running; else the first error with its text; else stopped if any; else completed. `postExecutionId` is the first
+  // post run's and names its execution log; `postError` is cut to a few hundred characters (the log has the full text).
+  // A run stored as `running` that the server no longer holds (it restarted) is reported as `error`.
+  postStatus: runStatusSchema.optional(),
   postExecutionId: z.string().optional(),
   postError: z.string().optional(),
-  // Items the turn's runs (reply or after-reply) asked to store with a link to chat messages and that were dropped at
+  // Items the turn's runs asked to store with a link to chat messages and that were dropped at
   // commit time because those messages changed, in plain words (at most a few, each cut); absent when none were. The
   // run's execution log has them too.
   linkWarnings: z.array(z.string()).optional(),

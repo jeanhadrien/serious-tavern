@@ -237,7 +237,7 @@ it('takes chat settings as a partial map with null resets, and keeps workflow de
   expect(apiContract.createWorkflow.body.parse({ name: 'W', settings: [] })).toEqual({ name: 'W', settings: [] });
 });
 
-it("describes a turn's post-turn run in the state view and in execution logs, all additive", () => {
+it("describes a turn's runs after the reply in the state view and in execution logs, all additive", () => {
   const turn = { executionId: 'e1', at: 'a', completed: true, replies: 1, turnNumber: 1, writes: [] };
   const view = { turn: 2, definitions: [], nodes: [], turns: [turn] };
   expect(apiContract.getSessionState.response.parse(view)).toEqual(view);

@@ -12,7 +12,7 @@ type EventStream = { send(frame: TurnFrame): void; end(): void };
 
 /**
  * Aborts when the client goes away before its response is done. It listens from the moment the request arrives,
- * not from the first turn event: a message waiting in the queue (behind another turn or an after-reply run) has
+ * not from the first turn event: a message waiting in the queue (behind another turn or a run after its reply) has
  * sent nothing yet, and its client leaving must still cancel it.
  */
 function clientLifetime({ raw }: FastifyReply): AbortController {

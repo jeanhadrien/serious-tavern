@@ -16,7 +16,7 @@ import {
 
 // A client that leaves cancels its message while it waits in the queue; a plain request that already runs finishes.
 
-const harness = postHarness('post-turn-disconnect');
+const harness = postHarness('after-section-disconnect');
 const listening: App[] = [];
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -41,7 +41,7 @@ const post = (url: string, content: string, signal: AbortSignal) =>
     signal,
   }).catch((error: unknown) => error);
 
-describe('a message waiting behind a post run', () => {
+describe('a message waiting behind a run after the reply', () => {
   it.each([
     ['stream', '/messages/stream'],
     ['plain', '/messages'],
@@ -55,7 +55,7 @@ describe('a message waiting behind a post run', () => {
       await gate.started;
       const leaving = new AbortController();
       const queued = post(`${base}/api/sessions/${session.id}${path}`, 'two', leaving.signal);
-      // The request has reached the turn queue (`one` was the first job) and waits behind the post run.
+      // The request has reached the turn queue (`one` was the first job) and waits behind the run after the reply.
       await queue.reached(2);
       expect(await contents(app, session.id)).toEqual(['one', 'n=0 turn=1']);
       leaving.abort();
@@ -64,7 +64,7 @@ describe('a message waiting behind a post run', () => {
       await clientsGone(app);
       gate.release();
       await waitForPostRun(app, session.id, 'completed');
-      // The cancelled message went through the queue without running: `three` is turn 2 and sees the post writes.
+      // The cancelled message went through the queue without running: `three` is turn 2 and sees the writes of the run after the reply.
       expect(await turn(app, session.id, 'three')).toEqual(['n=2 turn=2']);
       expect(await contents(app, session.id)).toEqual(['one', 'n=0 turn=1', 'three', 'n=2 turn=2']);
     },

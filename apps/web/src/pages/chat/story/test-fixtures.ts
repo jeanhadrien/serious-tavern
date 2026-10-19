@@ -1,7 +1,6 @@
 import {
   DRAW_STATE_KEY,
   analyzeLinks,
-  effectivePostRun,
   effectiveRuns,
   postOfEntry,
   fingerprintMessages,
@@ -12,6 +11,7 @@ import {
   type FoldedKey,
   type ItemLink,
   type ItemLinkView,
+  type RunStatus,
   type SessionStateView,
   type StateDefinition,
   type StateWrite,
@@ -67,6 +67,14 @@ export const entry = (executionId: string, writes: StateWrite[] = [], replies = 
   completed,
   replies,
   writes,
+});
+
+/** The record of a run after the reply, as the turn's entry stores it (merge it into an entry). */
+export const afterRun = (
+  status: RunStatus,
+  { executionId = 'p1', error, workflowId = 'w' }: { executionId?: string; error?: string; workflowId?: string } = {},
+): Pick<TurnEntry, 'runs'> => ({
+  runs: [{ executionId, workflowId, part: 'post', status, ...(error && { error }) }],
 });
 
 export const reply = (executionId: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({
@@ -158,7 +166,7 @@ export function buildView({
     turns: story.turns.map(({ entry: stored, turn }) => {
       // As the server reports it: the run is live (no restart happened), so a stored `running` stays running.
       const runs = effectiveRuns(stored, () => true);
-      const post = runs ? postOfEntry(stored, () => true) : effectivePostRun(stored, true);
+      const post = postOfEntry(stored, () => true);
       return {
         executionId: stored.executionId,
         at: stored.at,

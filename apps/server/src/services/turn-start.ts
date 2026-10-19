@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import type { Character, ChatMessage, Persona, StateDefinition, StateSnapshot, Workflow } from '@st/shared';
-import { replyWorkflows, resolveChatSettings, workflowSettings, type WorkflowInvalidDetails } from '@st/shared';
+import type { Character, ChatMessage, Persona, Session, StateDefinition, StateSnapshot, Workflow } from '@st/shared';
+import {
+  replyWorkflows,
+  resolveChatSettings,
+  withoutLastTurnReplies,
+  workflowSettings,
+  type WorkflowInvalidDetails,
+} from '@st/shared';
 import { prepareWorkflow, type PreparedWorkflow } from '@st/engine';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
@@ -12,7 +18,7 @@ import { foldSession, listDefinitions } from './story-state.js';
 /** What starts a turn: a message (possibly empty), or a regenerate of the last turn, which stores no user message. */
 export type TurnRequest = { content: string; regenerate?: false } | { content?: undefined; regenerate: true };
 
-/** One enabled workflow of the chat's reply list, ready to run its reply part. */
+/** One enabled workflow of the chat's reply list, ready to run. */
 export type PlannedRun = {
   workflow: Workflow;
   prepared: PreparedWorkflow;
@@ -24,13 +30,24 @@ export type PlannedRun = {
 };
 
 export type StartedTurn = {
-  /** The enabled workflows in list order, at least one. Every one was prepared before anything was stored. */
-  runs: PlannedRun[];
+  /**
+   * The reply section: the enabled workflows from the top of the list down to the last one that has a Chat Output node,
+   * in list order. They run while the turn is answered. Empty when no enabled workflow has a Chat Output.
+   */
+  reply: PlannedRun[];
+  /**
+   * The after section: the enabled workflows below the reply section (none has a Chat Output). They run after the
+   * turn's result is sent. Together with `reply` they are every enabled workflow, at least one, each prepared before
+   * anything was stored.
+   */
+  after: PlannedRun[];
+  /** The turn's id: the execution id of its first run, in whichever section it is. */
+  turnId: string;
   // `trigger.message`: the sent text, or a regenerate's user message (`''` when there is none).
   content: string;
   // A regenerate only: the root of the alternatives its replies join.
   rootId?: string;
-  // The listing the ports were resolved with: later runs and the after-reply runs fold their state against the same one.
+  // The listing the ports were resolved with: later runs fold their state against the same one.
   definitions: StateDefinition[];
   userMessage?: ChatMessage;
   // The turn's user message as the chat holds it: the one this send stores, or a regenerate's. Absent for an empty send.
@@ -85,6 +102,10 @@ export async function startTurn(context: AppContext, sessionId: string, request:
       });
     }
     const first = runs[0]!;
+    // The reply section ends at the last workflow that can reply: what is below it cannot, so it runs after the reply.
+    const lastReplying = runs
+      .map((run) => run.workflow.nodes.some((node) => node.type === 'chat-output'))
+      .lastIndexOf(true);
     const character = current.characterId
       ? await first.prepared.resources.characters?.get(current.characterId)
       : undefined;
@@ -95,15 +116,13 @@ export async function startTurn(context: AppContext, sessionId: string, request:
     // The state the turn starts from: the turns still present, folded against the definitions as they are now.
     // A regenerate runs as if the last turn's replies (whichever alternative is shown) were not there.
     const history = target?.history ?? historyMessages(current.messages);
-    const story = foldSession(
-      definitions,
-      target ? { ...current, messages: target.messages } : current,
-      undefined,
-      history,
-      { workflowId: first.workflow.id },
-    );
+    const story = foldSession(definitions, target ? { ...current, messages: target.messages } : current, history, {
+      workflowId: first.workflow.id,
+    });
     started.value = {
-      runs,
+      reply: runs.slice(0, lastReplying + 1),
+      after: runs.slice(lastReplying + 1),
+      turnId: first.runId,
       content,
       rootId: target?.rootId,
       definitions,
@@ -122,3 +141,25 @@ export async function startTurn(context: AppContext, sessionId: string, request:
   if (!session) throw notFound('Session');
   return started.value!;
 }
+
+/**
+ * What a run after the turn's first starts from: the state folded over the chat as it stands, with the turn counted as
+ * present whatever its replies (so it sees the writes of the runs above it, and `trigger.turn` is the turn's number).
+ * A regenerate folds over the chat without the last turn's replies, whichever alternative is shown, like its first run.
+ */
+export function foldRun(
+  started: Pick<StartedTurn, 'definitions' | 'rootId' | 'turnId'>,
+  session: Pick<Session, 'messages' | 'state'>,
+  planned: PlannedRun,
+  history: ChatMessage[],
+) {
+  const messages = started.rootId ? (withoutLastTurnReplies(session.messages) ?? session.messages) : session.messages;
+  return foldSession(started.definitions, { messages, state: session.state }, history, {
+    workflowId: planned.workflow.id,
+    including: started.turnId,
+  });
+}
+
+/** The after section's runs as the turn's entry announces them while they are still to run. */
+export const announcedRuns = (started: Pick<StartedTurn, 'after'>) =>
+  started.after.map(({ runId: executionId, workflow }) => ({ executionId, workflowId: workflow.id }));

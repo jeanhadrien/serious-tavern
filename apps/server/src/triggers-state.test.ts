@@ -127,20 +127,19 @@ describe('a chat as it was before several workflows', () => {
     const stored = JSON.parse(await readFile(path, 'utf8'));
     for (const write of stored.state.turns[0].writes) if (write.target.kind === 'node') delete write.target.workflowId;
     delete stored.triggers;
-    // An after-reply run the old version recorded on the entry.
-    Object.assign(stored.state.turns[0], { postExecutionId: 'post-1', postStatus: 'completed' });
+    // The entry as it was stored before entries listed their runs.
     delete stored.state.turns[0].runs;
     await writeFile(path, JSON.stringify(stored));
     return { app, workflow, session, path, before: stored.state.turns[0] };
   }
 
-  it('reads as it did: the post fields as stored, no runs, its node’s state under no workflow', async () => {
+  it('reads as it did: no runs, its node’s state under no workflow', async () => {
     const { app, session, path } = await legacyChat();
     try {
       const before = await readFile(path);
       const view = await stateView(app, session.id);
-      expect(view.turns[0]).toMatchObject({ postStatus: 'completed', postExecutionId: 'post-1' });
       expect(view.turns[0]).not.toHaveProperty('runs');
+      expect(view.turns[0]).not.toHaveProperty('postStatus');
       expect(view.nodes.map((item) => [item.nodeId, item.workflowId, item.label])).toEqual([
         ['pick', undefined, 'Draw #1 (draw)'],
       ]);
@@ -166,12 +165,9 @@ describe('a chat as it was before several workflows', () => {
         { workflowId: workflow.id, part: 'reply', status: 'completed' },
       ]);
       expect(stored.state.turns[1]).not.toHaveProperty('postStatus');
-      // Its legacy post fields still read as stored next to the new entry's runs.
+      // The old entry has no runs to show next to the new entry's.
       const view = await stateView(app, session.id);
-      expect(view.turns.map((item) => [item.postStatus, item.runs?.length])).toEqual([
-        ['completed', undefined],
-        [undefined, 1],
-      ]);
+      expect(view.turns.map((item) => item.runs?.length)).toEqual([undefined, 1]);
     } finally {
       await app.close();
     }
