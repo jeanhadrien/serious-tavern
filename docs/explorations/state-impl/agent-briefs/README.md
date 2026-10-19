@@ -1,6 +1,6 @@
 # Agent briefs: how phases 4a, 4b and 5 were run
 
-Phases 1–3 used the Workflow-tool script in [../PHASE-WORKFLOW.md](../PHASE-WORKFLOW.md). Phases 4a, 4b
+Phases 1–3 used an older Workflow-tool script (removed, in git history). Phases 4a, 4b
 and 5 ran it by hand with the Agent tool (Sonnet sub-agents), driven by short prompts that point at
 brief files, and phase 5 slimmed it down (below). Use either; this folder holds what the Agent-tool
 route needs.
@@ -37,7 +37,7 @@ every fresh agent spends much of its budget re-reading the code, so from phase 5
    all findings plus the orchestrator's decisions, then `npm run check`, the conventions and docs pass
    (`roles/verify.md`), a short live re-check, and the user-facing "how to try it" note.
 6. **Checkpoint** (orchestrator): clean tree, `npm run check` green, skim the core diffs, copy the how-to
-   to [../howto/](../howto/) (without scratch paths), update [../HANDOFF.md](../HANDOFF.md), push the
+   into the user guide `docs/STATE-AND-LORE.md` (current behaviour only, without scratch paths), update [../HANDOFF.md](../HANDOFF.md), push the
    working branch and `claude/state-impl-phase-<N>`.
 
 ## Lessons

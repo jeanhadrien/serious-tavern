@@ -446,6 +446,10 @@ The pencil next to a definition's name in the Story state section opens that def
 - **Levels are 1 to 5 and cooldowns count turns,** not messages. A turn counts only while one of its replies exists.
 - **A Draw entry has no stable id.** Nodes report `entry-<n>` (its position), so reordering changes it; avoid-recent
   recognizes entries by text.
+- **A summary goes with the turn that wrote it.** Deleting or regenerating that reply removes the summary; the next
+  turn writes it again (one extra LLM call).
+- **Linked items can't be edited or discarded by hand** from the panel; a broken one is ignored and redone.
+- **Template macros inside collection entries are not rendered**: an entry's text is used as written.
 - **Very long text** written to a key is cut in the chip and the delete dialog (the state itself is complete).
 - **The examples need an LLM key** (see [Try the examples](#try-the-examples)) and are written in English.
 - **On a phone** everything is one column at a time: the chat panel covers the messages and the editors open

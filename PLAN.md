@@ -152,7 +152,7 @@ Checked live against OpenRouter (462 models) and abliteration.ai (3 models). The
 - Character cards (V2/V3 spec, embedded in PNG): name, description, personality, scenario, first message, example dialogue, system prompt, post-history instructions, alternate greetings, embedded lorebook.
 - Persona: `{ name, description, position, depth }`.
 - Lorebook / world info: keyword-triggered entries scanned over the last N messages, inserted at a set position or depth, with their own token budget.
-- **For us:** add a **Lorebook node** (keyword scan → injections). (V2/V3 card import and field exposure are done.)
+- **For us:** add a **Lorebook node** (keyword scan → injections). (V2/V3 card import and field exposure are done.) *Done as authored collections read by Recall (keywords) and Draw (weighted random); collections attached to a chat or character and World Info import are follow-ups (`docs/explorations/state-impl/FOLLOW-UPS.md`).*
 
 ### Chat storage *(unverified)*
 - One JSONL file per chat: a header line (metadata, chat variables), then one message per line with `swipes[]`, `swipe_id` and `extra` (reasoning, model, token count, tool invocations).
@@ -170,10 +170,10 @@ Checked live against OpenRouter (462 models) and abliteration.ai (3 models). The
 ### Other valuable ideas *(unverified)*
 - **Regex scripts** that rewrite text for display or prompt, with a scope → **Regex / Transform node**.
 - **Vector storage / RAG** (embeddings via OpenRouter, top-k retrieval inserted at a depth) → **Embed / Retrieve nodes**.
-- **Summarization** every N messages, stored in chat metadata → a Memory node with a summarize strategy.
+- **Summarization** every N messages, stored in chat metadata → a Memory node with a summarize strategy. *Done differently: summaries are story state items linked to the messages they cover (Next Chunk, Unlinked Messages, After Reply); see `docs/STATE-AND-LORE.md`.*
 - **Tool calling** with recorded invocations → an LLM node with tool-call outputs routed to HTTP nodes.
 - **Reasoning** kept separate from the reply (folded in the UI, removed from the prompt).
-- **Per-chat variables & author's note** → per-session key/value state that nodes can read and write.
+- **Per-chat variables & author's note** → per-session key/value state that nodes can read and write. *Done as chat settings (user-owned) and story state (written by turns, undone with their replies); see `docs/STATE-AND-LORE.md`.*
 
 ## Decided deviations from the original plan
 

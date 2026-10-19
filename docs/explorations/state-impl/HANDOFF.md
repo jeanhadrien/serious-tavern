@@ -65,7 +65,7 @@ story state and post-turn runs.
 | 6b. Message links; summaries as story state | Per [amendment 1](../STATE-DESIGN-AMENDMENT-1.md): the phase 6 store removed; collection items may carry `messages: { ids, fingerprint }` (only through State Write's new `messages` input on `add`: a link, a message or a list of messages); link status `intact/changed/partial/gone` computed on read (`packages/shared/src/links/`), with the shared `replaced` and chat-order (`repeated`) rules; commit-time link check in `settleTurn`/`settlePostRun` (`linkWarnings` on the turn entry and chip); snapshot items carry a read-only `link`; generic **Next Chunk** (collection key) and new **Unlinked Messages**; the `linked` template helper and State Read's `linked` mode; Memory restored plus `all`; Save Summary dropped; linked items, message markers ("Show in Story state"), edit/delete notes and the cap note in the web; checkbox hints in the generic form | 2881 |
 | 7. Trigger, examples, guide | **Trigger** (score `clamp01((baseChance + growthPerTurn × turnsSinceLastFiring + Σ weight × signal) × (0.5 + volatility))`, per-level cooldowns and weights, implicit node state `fires`, dynamic `neverSkips` signal ports, a custom panel); **Pick Fields** (generic: keep named fields of an object); **example packs** for existing users too (`seed-examples.ts`, ledger `data/.seeded.json` with `<pack>/<kind>:<id>` lines: never overwrite, deleted stays deleted, fit rules for name clashes, all or nothing, never blocks startup): "Fresh texture" (Chat Settings → Trigger → Draw → Pick Fields → State Write, leveled preset) and "Rolling summaries" (`memory` definition, amendment 1 wiring); example presets = Default + extras; user guide `docs/STATE-AND-LORE.md`; readable edge labels on the dark canvas | 3012 |
 
-How to try each one, written for the user: [howto/](howto/).
+How to use all of it, written for the user: [docs/STATE-AND-LORE.md](../../STATE-AND-LORE.md) (the per-phase how-to notes were folded into it and removed).
 
 ## Remaining work
 
@@ -83,9 +83,7 @@ the placeholders, write `<scratch>/briefs/phase-<N>.md` (header, then the spec f
 pipeline described in the briefs' README. Every agent prompt is short: "read common.md, the phase brief
 and your role file, then …".
 
-**Alternative: the Workflow-tool script** in [PHASE-WORKFLOW.md](PHASE-WORKFLOW.md) (phases 1–3). It runs
-the older 12-agent pipeline; trim its review lenses to spec, correctness and ui first. It needs the user
-to opt into workflows explicitly.
+Phases 1–3 used an older 12-agent Workflow-tool script (removed; it is in the git history before the phase 7 checkpoint).
 
 Either way:
 
@@ -117,30 +115,14 @@ Either way:
 
 ## Open notes
 
-- **Preset inputs are only text or messages**, so `{{input.seed.level}}` can't work in a preset. Draw has
-  a `level` output; phase 7's seeded example must word the seed by level through wiring (see the note
-  at the top of [phase-7.md](specs/phase-7.md)).
-- Template macros inside collection entry text are not rendered (documented in `docs/COLLECTIONS.md`).
-- AGENTS.md says the orchestrator owns it; agents update its key contracts as part of each phase, and the
-  orchestrator reviews those edits. Keep doing that, and keep PLAN.md untouched.
-- Known limitations carried forward from phase 5: a message waiting behind a post run gets no response
-  bytes until the run ends; nodes needed by both parts run (and cost) twice; there is no retry for a
-  failed or interrupted post run.
-- Phase 6's summary store was replaced in phase 6b (README, AGENTS.md and the how-tos describe 6b; the
-  phase 6 how-to carries a "superseded" note).
-- Known limitations from phase 7 (details in [howto/phase-7-howto.md](howto/phase-7-howto.md)): a skipped
-  example is only reported in the server log; a Fresh texture seeded before Pick Fields keeps its old
-  wiring (works, logs dropped fields); Pick Fields names are comma-separated.
-- Known limitations from phase 6b (details in [howto/phase-6b-howto.md](howto/phase-6b-howto.md)):
-  deleting or regenerating the turn that wrote a summary removes it (the next turn redoes it); linked items
-  can't be edited by hand; the cap note can't check workflows; linked text is sent whole in the state view.
-  Pre-existing issues seen in the 6b live check, not fixed: a fresh LLM node toasts "Preset (none) not
-  found", and Validate saves an invalid draft first (the chat then fails with "Workflow is invalid").
-- Known limitations from phase 6 (details in [howto/phase-6-howto.md](howto/phase-6-howto.md)): Memory with a
-  summary set sends older, not-yet-summarized history raw (Last N bounds only the raw part); chunks lag one
-  turn (the post part sees the reply part's history); a failed post run stays listed in the panel after a
-  later turn succeeds; post-run failure text names the node by its UUID (`failureMessage` in
-  `apps/server/src/services/failure.ts`, predates phase 6; AGENTS.md wants `nodeDisplayName`); summaries
-  can't be deleted by hand; `packages/engine/src/executor.ts` is ~390 lines, over the file-size guideline.
-- Phase 6 ran the lean pipeline with one change worth keeping: the backend reviewer ran in parallel with
-  implementer B (backend commits were final), then a web reviewer and the live UI reviewer ran together.
+- **Process:** AGENTS.md is the orchestrator's; agents update its key contracts as part of each phase and
+  the orchestrator reviews those edits. Coding agents never touch PLAN.md (the orchestrator marks finished
+  backlog items there). Run the backend reviewer in parallel with implementer B once the backend commits
+  are final, then the web reviewer and the live UI reviewer together (phases 6–7).
+- **Preset inputs are only text or messages**, so a preset can't read an object such as `{{input.seed.level}}`;
+  wire the parts in separately (the Fresh texture example passes Draw's `text` and `level` as two inputs).
+- **Limitations:** the user-facing ones are in the guide's "Known limitations"; the ones worth work, and
+  the pre-existing issues seen in the live checks, are in [FOLLOW-UPS.md](FOLLOW-UPS.md). Implementation
+  notes not in either: a skipped example pack is only reported in the server log; a Fresh texture seeded
+  before Pick Fields keeps its old wiring (it works, and logs dropped fields); Pick Fields names are
+  comma-separated; the definitions editor's cap note can't check which workflows use a key.
