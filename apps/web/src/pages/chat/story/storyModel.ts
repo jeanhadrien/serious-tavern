@@ -7,7 +7,7 @@ import {
   type StateWarning,
 } from '@st/shared';
 import { formatValue, itemFields, itemText } from './format.js';
-import { groupLinked, itemLinkOf, type LinkGroups } from './linkedItems.js';
+import { groupLinked, itemLinkOf, type LinkGroups } from './linkedGroups.js';
 import { sparklinePoints, type Sparkline } from './sparklinePoints.js';
 
 // The view model of the Story state section: pure functions over the `GET /api/sessions/:id/state` answer. The

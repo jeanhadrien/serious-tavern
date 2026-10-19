@@ -9,7 +9,7 @@ import {
   STATUS_LABELS,
   linkLabel,
   type LinkGroups,
-} from './linkedItems.js';
+} from './linkedGroups.js';
 import type { LinkedItem } from './storyModel.js';
 import './linked.css';
 

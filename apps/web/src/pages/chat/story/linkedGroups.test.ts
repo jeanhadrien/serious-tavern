@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ItemLinkView } from '@st/shared';
-import { groupLinked, itemLinkOf, linkLabel } from './linkedItems.js';
+import { groupLinked, itemLinkOf, linkLabel } from './linkedGroups.js';
 
 const view = (patch: Partial<ItemLinkView> = {}): ItemLinkView => ({
   status: 'intact',

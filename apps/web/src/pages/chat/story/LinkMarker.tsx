@@ -2,7 +2,7 @@ import { useId, useRef, useState, type ReactNode } from 'react';
 import { Link2 } from 'lucide-react';
 import { useEscapeLayer } from '../../../keyboard/escapeRegistry.js';
 import { IconButton } from '../../../components/IconButton.js';
-import { STATUS_LABELS } from './linkedItems.js';
+import { STATUS_LABELS } from './linkedGroups.js';
 import type { MessageLinkNote } from './linkMarkers.js';
 
 /** The inline card of a marker: the items that link to the message, each with a jump to its row in the panel. */
