@@ -22,6 +22,7 @@ chosen by the user"). Written October 2026 from web sources; see the caveats at 
 | [CREATIVITY.md](CREATIVITY.md) | Design notes from the brainstorm this research supports | Trigger → source → selection → integration, with an intensity dial; open questions |
 | [STATE-DESIGN-PROPOSAL-3.md](STATE-DESIGN-PROPOSAL-3.md) | The state design as built (phases 1–7); earlier proposals and reviews are in git history | Chat settings (user-owned), story state (follows replies), summaries as linked story state items, authored collections read by Recall and Draw, post-turn runs, a Trigger node |
 | [STATE-DESIGN-AMENDMENT-1.md](STATE-DESIGN-AMENDMENT-1.md) | Amendment to proposal 3 after phase 6 | Any collection item can link to chat messages; summaries become linked story state items, written by State Write and read through generic nodes (Next Chunk, Unlinked Messages, a `linked` helper) |
+| [TRIGGERS-PROPOSAL-1.md](TRIGGERS-PROPOSAL-1.md) | Several workflows per reply, per chat, sharing state; what else may start a workflow | Fixed triggers with an ordered workflow list per chat; a workflow waits only for earlier ones whose writes it reads; state replaces custom events; After Reply goes |
 
 ## Legend: verification tags
 
