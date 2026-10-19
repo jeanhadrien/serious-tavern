@@ -16,6 +16,7 @@ import { registerExecutions } from './routes/executions.js';
 import { registerSecrets } from './routes/secrets.js';
 import { registerNodeTypes } from './routes/node-types.js';
 import { registerImports } from './routes/imports.js';
+import { registerAppSettings } from './routes/app-settings.js';
 import { registerEvents } from './routes/events.js';
 import { watchResourceFiles } from './services/change-events.js';
 
@@ -49,6 +50,7 @@ export async function createApp(
   registerSecrets(app, context);
   registerImports(app, context);
   registerEvents(app, context);
+  registerAppSettings(app, context);
   registerErrors(app);
   // Runs after the reply outlive their HTTP response: stop them and wait for them, or they would write after the server
   // is gone (and a test that removes its data directory right after would find the files back).

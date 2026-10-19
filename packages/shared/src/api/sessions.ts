@@ -43,6 +43,9 @@ export const sendMessageSchema = z.object({ content: z.string().trim().default('
 export const editMessageSchema = z.object({ content: z.string().trim().min(1) });
 // Swipe: show another alternative of the chat's last turn (alternatives.ts). `executionId` is the alternative's own.
 export const setAlternativeSchema = z.object({ executionId: z.string().min(1) });
+// Fork: a new chat holding this chat up to (and including) the turn of this reply (fork.ts). `messageId` must be one of
+// `forkPoints`: the last shown reply of a turn.
+export const forkSessionSchema = z.object({ messageId: z.string().min(1) });
 const messageParamsSchema = idParamsSchema.extend({ messageId: z.string().uuid() });
 export const sendMessageResultSchema = z.object({
   // Absent when the turn was sent empty.
@@ -92,6 +95,8 @@ export const sessionEndpoints = {
   streamRegenerate: endpoint(turnEventSchema, undefined, idParamsSchema),
   // Swipe: the whole session, as `updateSession` answers.
   setAlternative: endpoint(sessionSchema, setAlternativeSchema, idParamsSchema),
+  // Fork: the new session, with `forkedFrom` set. The source chat is not changed.
+  forkSession: endpoint(sessionSchema, forkSessionSchema, idParamsSchema),
   stopTurn: endpoint(noContentSchema, undefined, idParamsSchema),
   updateMessage: endpoint(messageSchema, editMessageSchema, messageParamsSchema),
   deleteMessage: endpoint(noContentSchema, undefined, messageParamsSchema),

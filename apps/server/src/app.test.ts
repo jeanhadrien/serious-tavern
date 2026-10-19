@@ -8,6 +8,7 @@ import { placeholderPng, writePngCard } from './card.js';
 import {
   apiContract,
   errorEnvelopeSchema,
+  forkPoints,
   type ApiEndpoint,
   type ApiResponse,
   type Character,
@@ -244,6 +245,21 @@ it('returns payloads conforming to every shared endpoint response contract', asy
       payload: { executionId: regenerated.execution!.id },
     });
     expect(swiped.messages.filter((item) => item.inactive).length).toBe(2);
+    // A fork after the shown reply, and the app-wide preference that decides whether it keeps the alternatives.
+    const forkPoint = forkPoints(swiped.messages).at(-1)!;
+    const forked = await request('forkSession', {
+      method: 'POST',
+      url: `/api/sessions/${session.id}/fork`,
+      payload: { messageId: forkPoint },
+    });
+    expect(forked.forkedFrom).toEqual({ sessionId: session.id, messageId: forkPoint });
+    await request('getAppSettings', { method: 'GET', url: '/api/app-settings' });
+    const settings = await request('updateAppSettings', {
+      method: 'PATCH',
+      url: '/api/app-settings',
+      payload: { forkKeepsAlternatives: false },
+    });
+    expect(settings.forkKeepsAlternatives).toBe(false);
     await request('stopTurn', { method: 'POST', url: `/api/sessions/${session.id}/stop` });
     await request('updateMessage', {
       method: 'PATCH',
@@ -263,6 +279,7 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     await request('listSecrets', { method: 'GET', url: '/api/secrets' });
     await request('deleteSecret', { method: 'DELETE', url: '/api/secrets/contract' });
     await request('deleteSession', { method: 'DELETE', url: `/api/sessions/${session.id}` });
+    await request('deleteSession', { method: 'DELETE', url: `/api/sessions/${forked.id}` });
     await request('deleteWorkflow', { method: 'DELETE', url: `/api/workflows/${workflow.id}` });
     await request('deletePreset', { method: 'DELETE', url: `/api/presets/${preset.id}` });
     await request('deleteCharacter', { method: 'DELETE', url: `/api/characters/${character.id}` });
