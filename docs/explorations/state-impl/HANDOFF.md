@@ -1,9 +1,9 @@
 # State and creativity implementation: handoff
 
-First written 2026-10-16 (after phase 3), updated 2026-10-19 after phase 6b. It is everything a fresh
+First written 2026-10-16 (after phase 3), updated 2026-10-19 after phase 7 (the plan is complete). It is everything a fresh
 orchestrator needs to finish the plan in [STATE-DESIGN-PROPOSAL-3.md](../STATE-DESIGN-PROPOSAL-3.md).
-Start a new session on this repository and tell it: *"Read docs/explorations/state-impl/HANDOFF.md and
-continue with phase 7."*
+All phases are done. Next work is chosen from [FOLLOW-UPS.md](FOLLOW-UPS.md); a new session can be told:
+*"Read docs/explorations/state-impl/HANDOFF.md and FOLLOW-UPS.md, then do <item>."*
 
 ## The mandate
 
@@ -33,7 +33,7 @@ the user:
 | `main` | The design docs (proposals 1–3, reviews 1–2). Do not push implementation work here unless the user asks. |
 | `claude/state-impl` | Working branch for phases 1–3 and the first version of this handoff. |
 | `ccr-b85e38c4-41l3eu` | Working branch for phases 4a–5 (the second session's designated branch). |
-| `ccr-461e3fdb-9k78xl` | Working branch for phase 6 (the third session's designated branch): all phases so far. A new session gets its own designated branch: start it from this one (or from `claude/state-impl-phase-6`) and continue there. |
+| `ccr-461e3fdb-9k78xl` | Working branch for phases 6–7 (the third session's designated branch): all phases; a PR to `main` is open from it. A new session gets its own designated branch: start it from this one (or from `claude/state-impl-phase-6`) and continue there. |
 | `claude/state-impl-phase-1` | Checkpoint after phase 1 (`b3fd32b`) |
 | `claude/state-impl-phase-2` | Checkpoint after phase 2 (`4465609`) |
 | `claude/state-impl-phase-3` | Checkpoint after phase 3 (`9d852a9`) |
@@ -42,6 +42,7 @@ the user:
 | `claude/state-impl-phase-5` | Checkpoint after phase 5 |
 | `claude/state-impl-phase-6` | Checkpoint after phase 6 (the separate summary store, superseded by 6b) |
 | `claude/state-impl-phase-6b` | Checkpoint after phase 6b |
+| `claude/state-impl-phase-7` | Checkpoint after phase 7: the whole plan |
 
 After each phase, push the working branch and create the next checkpoint:
 `git push origin HEAD:refs/heads/claude/state-impl-phase-<N>`.
@@ -62,21 +63,17 @@ story state and post-turn runs.
 | 5. Post-turn runs | The **After Reply** node and the reply/post partition (`PreparedWorkflow.parts`; a Chat Output depending on After Reply is a validation issue); the post part runs after the reply is delivered, inside the turn's queue slot (the next message waits; Stop stops it; a queued message can be cancelled); seed `${seed}:post`; its writes join the turn's entry (undone with its replies), and nodes that also ran in the reply part write nothing in the post part; `postStatus`/`postError` per turn (a stored `running` the server no longer holds reads as "interrupted by a server restart", computed on read); status row above the composer, one failure toast, post details on the chip and failed runs listed in the Story state panel | 2541 |
 | 6. History summaries | `session.summaries` per set (tolerant read, additive), a pure fingerprint/validity/chunk planner/composer in `packages/shared/src/summaries/` (the engine's seed hash moved to `shared/src/hash.ts`, output unchanged); **Next Chunk** (one chunk per run: the first invalid summary re-planned, else the next `chunkSize` uncovered messages outside `rawWindow`; optional `after` input for After Reply) and **Save Summary** (a sink; buffered like state writes via `SummaryRun`, `summaryWrites` on the result and on failures); Memory `summarySet` (a summary is used only when valid and wholly before the last-N raw part); commit in `settleTurn`/`settlePostRun` with a commit-time fingerprint re-check (dropped writes become `summaryWarnings` on the turn entry, shown on the turn chip), `replaces`, pruning of summaries with no message left; summaries are not turn state; `summaries` in `GET /api/sessions/:id/state`; a "Summaries" section in the chat panel (valid/invalid badge, markdown text, click scrolls to the first covered message via `data-message-id`) | 2768 |
 | 6b. Message links; summaries as story state | Per [amendment 1](../STATE-DESIGN-AMENDMENT-1.md): the phase 6 store removed; collection items may carry `messages: { ids, fingerprint }` (only through State Write's new `messages` input on `add`: a link, a message or a list of messages); link status `intact/changed/partial/gone` computed on read (`packages/shared/src/links/`), with the shared `replaced` and chat-order (`repeated`) rules; commit-time link check in `settleTurn`/`settlePostRun` (`linkWarnings` on the turn entry and chip); snapshot items carry a read-only `link`; generic **Next Chunk** (collection key) and new **Unlinked Messages**; the `linked` template helper and State Read's `linked` mode; Memory restored plus `all`; Save Summary dropped; linked items, message markers ("Show in Story state"), edit/delete notes and the cap note in the web; checkbox hints in the generic form | 2881 |
+| 7. Trigger, examples, guide | **Trigger** (score `clamp01((baseChance + growthPerTurn × turnsSinceLastFiring + Σ weight × signal) × (0.5 + volatility))`, per-level cooldowns and weights, implicit node state `fires`, dynamic `neverSkips` signal ports, a custom panel); **Pick Fields** (generic: keep named fields of an object); **example packs** for existing users too (`seed-examples.ts`, ledger `data/.seeded.json` with `<pack>/<kind>:<id>` lines: never overwrite, deleted stays deleted, fit rules for name clashes, all or nothing, never blocks startup): "Fresh texture" (Chat Settings → Trigger → Draw → Pick Fields → State Write, leveled preset) and "Rolling summaries" (`memory` definition, amendment 1 wiring); example presets = Default + extras; user guide `docs/STATE-AND-LORE.md`; readable edge labels on the dark canvas | 3012 |
 
 How to try each one, written for the user: [howto/](howto/).
 
-## Remaining work, in order
+## Remaining work
 
-Specs are in [specs/](specs/). Each starts with a context note written at a checkpoint (phase 6 for 6b,
-phase 5 for 7, with a 6b addendum); re-read the AGENTS.md sections it names and adjust it to what the code actually holds.
-
-| Phase | Spec | UI | Notes |
-| --- | --- | --- | --- |
-| 4a–6b (**done**) | [phase-4a.md](specs/phase-4a.md), [phase-4b.md](specs/phase-4b.md), [phase-5.md](specs/phase-5.md), [phase-6.md](specs/phase-6.md), [phase-6b.md](specs/phase-6b.md) | | |
-| 7. Trigger + example + guide | [phase-7.md](specs/phase-7.md) | yes | Trigger node (implicit node state like Draw's); seeded "Fresh texture" example (collection, preset, workflow; idempotent seeds; seeded-workflows test; decide how `scene` is seeded for users who already have definitions); user guide `docs/STATE-AND-LORE.md` folding in the howto files |
-
-Then finish with a summary for the user: what is testable and how (`npm run dev`), the checkpoint
-branches, known limitations, and links to the guide.
+None in this plan. Follow-ups (fixes deferred by the user, small features, proposal 3's Part 7 and
+amendment 1's "Later") are listed with sizes and a suggested order in [FOLLOW-UPS.md](FOLLOW-UPS.md).
+User decisions of 2026-10-19: the pre-existing issues and the post-run retry are for later; the next
+features are picked from the follow-up plan after the user has tried the build; examples are seeded into
+existing data (once, never overwritten); the work reaches `main` through one PR the user merges.
 
 ## How to run a phase
 
@@ -118,7 +115,7 @@ Either way:
 - Never run anything against `apps/server/data`.
 - Server tests leave an empty `.test-data/` directory; it is gitignored.
 
-## Open notes for the remaining phases
+## Open notes
 
 - **Preset inputs are only text or messages**, so `{{input.seed.level}}` can't work in a preset. Draw has
   a `level` output; phase 7's seeded example must word the seed by level through wiring (see the note
@@ -131,6 +128,9 @@ Either way:
   failed or interrupted post run.
 - Phase 6's summary store was replaced in phase 6b (README, AGENTS.md and the how-tos describe 6b; the
   phase 6 how-to carries a "superseded" note).
+- Known limitations from phase 7 (details in [howto/phase-7-howto.md](howto/phase-7-howto.md)): a skipped
+  example is only reported in the server log; a Fresh texture seeded before Pick Fields keeps its old
+  wiring (works, logs dropped fields); Pick Fields names are comma-separated.
 - Known limitations from phase 6b (details in [howto/phase-6b-howto.md](howto/phase-6b-howto.md)):
   deleting or regenerating the turn that wrote a summary removes it (the next turn redoes it); linked items
   can't be edited by hand; the cap note can't check workflows; linked text is sent whole in the state view.
