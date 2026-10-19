@@ -159,6 +159,16 @@ export function useWorkflowCanvas(
   const selectedEdges = edges.filter((edge) => edge.selected);
   const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
   const deleteSelection = () => void deleteElements({ nodes: selectedNodes, edges: selectedEdges });
+  // Clears the node whose config is open and the canvas selection (the highlight is not part of the draft).
+  const deselect = () => {
+    setSelected(undefined);
+    setNodes((prev) =>
+      prev.some((node) => node.selected) ? prev.map((node) => ({ ...node, selected: false })) : prev,
+    );
+    setEdges((prev) =>
+      prev.some((edge) => edge.selected) ? prev.map((edge) => ({ ...edge, selected: false })) : prev,
+    );
+  };
   const deleteNode = (id: string) => void deleteElements({ nodes: [{ id }] });
   const current = nodes.find((n) => n.id === selected);
   const updateConfig = (config: NodeInstance['config']) => {
@@ -184,6 +194,7 @@ export function useWorkflowCanvas(
     onDrop,
     updateConfig,
     hasSelection,
+    deselect,
     deleteSelection,
     deleteNode,
   };

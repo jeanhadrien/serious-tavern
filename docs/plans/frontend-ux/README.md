@@ -27,7 +27,7 @@ Plans for building `docs/FRONTEND-UX.md` (the agreed spec). There is one file pe
 |---|---|---|
 | 1. Confirm dialog | [01-confirm-dialog.md](01-confirm-dialog.md) | done |
 | 2. Unsaved-work guard | [02-unsaved-guard.md](02-unsaved-guard.md) | done |
-| 3. Escape and shortcuts | [03-escape-and-shortcuts.md](03-escape-and-shortcuts.md) | to do |
+| 3. Escape and shortcuts | [03-escape-and-shortcuts.md](03-escape-and-shortcuts.md) | done |
 | 4. Shared draft hook and editor header | [04-draft-and-header.md](04-draft-and-header.md) | to do |
 | 5. SortableList (dnd-kit) | [05-sortable-list.md](05-sortable-list.md) | to do |
 | 6. Splitter | [06-splitter.md](06-splitter.md) | to do |

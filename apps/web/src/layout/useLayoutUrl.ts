@@ -2,24 +2,17 @@ import { useEffect, useRef, useState, useSyncExternalStore, type Dispatch } from
 import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import type { Session } from '@st/shared';
 import {
-  charactersStore,
   characterEditorStore,
   collectionEditorStore,
-  collectionsStore,
   personaEditorStore,
-  personasStore,
   presetEditorStore,
-  presetsStore,
   providerEditorStore,
-  providersStore,
   sessionsStore,
   stateDefinitionEditorStore,
-  stateDefinitionsStore,
   workflowEditorStore,
-  workflowsStore,
 } from '../stores/index.js';
 import type { EditorStore } from '../stores/editorStore.js';
-import type { ListStore } from '../stores/listStore.js';
+import { ITEM_SOURCES, type Item } from './itemSources.js';
 import { legacySearch } from './routes.js';
 import type { LayoutAction, LayoutState, ResourceId } from './state.js';
 import {
@@ -31,20 +24,6 @@ import {
   urlTarget,
   type LayoutUrl,
 } from './url.js';
-
-interface Item {
-  id: string;
-}
-/** A resource that opens items by id: its list, and the editor store that opens them. */
-const ITEM_SOURCES: Partial<Record<ResourceId, { list: ListStore<Item>; editor: EditorStore<Item> }>> = {
-  workflows: { list: workflowsStore, editor: workflowEditorStore },
-  presets: { list: presetsStore, editor: presetEditorStore },
-  providers: { list: providersStore, editor: providerEditorStore },
-  stateDefinitions: { list: stateDefinitionsStore, editor: stateDefinitionEditorStore },
-  characters: { list: charactersStore, editor: characterEditorStore },
-  personas: { list: personasStore, editor: personaEditorStore },
-  collections: { list: collectionsStore, editor: collectionEditorStore },
-};
 
 /** What the hook needs from the chat; `busy` turns must never be disturbed. */
 interface ChatControls {

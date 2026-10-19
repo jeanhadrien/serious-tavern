@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { useEscapeArea } from '../keyboard/escapeRegistry.js';
 import type { ChatState } from './chat/useChat.js';
 import { ChatHeader } from './chat/ChatHeader.js';
 import { MessageList } from './chat/MessageList.js';
@@ -19,6 +20,14 @@ export function Chat({ chat }: { chat: ChatState }) {
   const locked = chat.busy || chat.mutating;
   const [panelOpen, setPanelOpen] = useState(false);
   const closePanel = useCallback(() => setPanelOpen(false), []);
+  // Escape in the chat: the panel first, then the reply. `busy` is true only while this page's own message is in
+  // flight (generating, or waiting for its turn), never during a lone after-reply run, which Escape leaves alone.
+  useEscapeArea('chat', () => {
+    if (panelOpen) setPanelOpen(false);
+    else if (chat.busy) chat.stop();
+    else return false;
+    return true;
+  });
   // A message marker's "Show in Story state": open the panel and let it scroll to the item. Both callbacks keep their
   // identity, so the thread and the panel are not re-rendered by them.
   const [reveal, setReveal] = useState<Reveal>();

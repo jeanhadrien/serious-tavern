@@ -1,5 +1,6 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { Link2 } from 'lucide-react';
+import { useEscapeLayer } from '../../../keyboard/escapeRegistry.js';
 import { IconButton } from '../../../components/IconButton.js';
 import { STATUS_LABELS } from './linkedItems.js';
 import type { MessageLinkNote } from './linkMarkers.js';
@@ -50,20 +51,19 @@ export function useLinkMarker(
 ): { button: ReactNode; card: ReactNode } {
   const [open, setOpen] = useState(false);
   const cardId = useId();
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('keydown', close);
-    return () => document.removeEventListener('keydown', close);
-  }, [open]);
+  const opener = useRef<HTMLButtonElement>(null);
+  // Escape closes the card and gives focus back to the button that opened it.
+  useEscapeLayer(open, () => {
+    setOpen(false);
+    opener.current?.focus();
+  });
   if (!notes?.length) return { button: null, card: null };
   const label =
     notes.length === 1 ? '1 state item links to this message' : `${notes.length} state items link to this message`;
   return {
     button: (
       <IconButton
+        ref={opener}
         icon={Link2}
         label={label}
         className="message-link-button"

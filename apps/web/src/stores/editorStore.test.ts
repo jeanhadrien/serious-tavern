@@ -128,3 +128,17 @@ it('asks for a switch with no target (create, import) while dirty', async () => 
   expect(await store.confirmSwitch()).toBe(false);
   expect(ask).toHaveBeenCalledOnce();
 });
+
+it('saves the open dirty item through its saver, for the Ctrl/Cmd+S shortcut', async () => {
+  const store = createEditorStore<{ id: string }>();
+  const save = vi.fn(async () => true);
+  expect(await store.save()).toBe(false); // no saver
+  store.setSaver({ label: () => 'Alice', save });
+  expect(await store.save()).toBe(false); // nothing open
+  store.report('a', false);
+  expect(await store.save()).toBe(false); // clean
+  expect(save).not.toHaveBeenCalled();
+  store.report('a', true);
+  expect(await store.save()).toBe(true);
+  expect(save).toHaveBeenCalledOnce();
+});

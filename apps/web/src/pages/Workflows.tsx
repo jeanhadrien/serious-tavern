@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { workflowSettingIssues, workflowSettings, type Workflow } from '@st/shared';
+import { useEscapeArea } from '../keyboard/escapeRegistry.js';
 import { useWorkflowEditor } from './workflows/useWorkflowEditor.js';
 import { WorkflowToolbar } from './workflows/WorkflowToolbar.js';
 import { NodePalette } from './workflows/NodePalette.js';
@@ -45,6 +46,13 @@ function WorkflowEditor() {
     if (next.deselect) canvas.setSelected(undefined);
     setSettingsOpen(next.open);
   };
+  // Escape first closes the selection and the node config or settings panel; the shell's default then closes the editor.
+  useEscapeArea('editor:workflows', () => {
+    if (canvas.current || canvas.hasSelection) canvas.deselect();
+    else if (settingsOpen) setSettingsOpen(false);
+    else return false;
+    return true;
+  });
   return (
     <div className="workflow-layout">
       {workflow ? (

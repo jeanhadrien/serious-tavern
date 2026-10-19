@@ -593,6 +593,12 @@ Per state definition that a present turn wrote (the others are one muted line, "
 
 `GET /api/sessions` leaves `state` out of the summaries; `GET /api/sessions/:id` returns it. `stateDefinitions.changed` (`invalidFiles`) is published by the `data/state/definitions/` watcher and after every API write, like the other YAML resources (see Live reload). The preset preview renders the chat's next-turn state and `trigger.turn` when given a session, and every key at its default at turn 1 without one.
 
+## Keyboard
+
+- `Escape` closes the innermost thing, one step per press: a field's own action (message editor, model list, stopping a reply from the composer), an open popover or card, leaving the focused field, then the view with focus (the chat panel, then a running reply; a node selection or panel, a preset entry selection, then the editor, which keeps its draft). It never discards a draft and never stops an after-reply run.
+- `Ctrl/Cmd+S` saves the editor with focus (the browser's "save page" never opens).
+- All shortcuts are declared in `apps/web/src/keyboard/shortcuts.ts`; the rules are in `docs/FRONTEND-UX.md`.
+
 ## Ports & types
 
 Ports declare `text`, `number`, `boolean`, `object`, `array`, `messages`, `character`, or `any` (legacy ports default to `any`). The same compatibility rule is used in the editor and executor:

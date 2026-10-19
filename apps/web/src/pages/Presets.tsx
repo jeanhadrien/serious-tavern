@@ -11,6 +11,7 @@ import {
   workflowsStore,
 } from '../stores/index.js';
 import { alerts } from '../alerts/index.js';
+import { useEscapeArea } from '../keyboard/escapeRegistry.js';
 import { PresetEditor } from './presets/PresetEditor.js';
 import { PresetEntryEditor } from './presets/PresetEntryEditor.js';
 import { PresetPreview } from './presets/PresetPreview.js';
@@ -85,6 +86,12 @@ export function Presets() {
     }
   };
   useEditorSaver(presetEditorStore, { label: () => draft?.name ?? '', save });
+  // Escape first drops the entry selection; the shell's default then closes the editor.
+  useEscapeArea('editor:presets', () => {
+    if (!selectedEntryId) return false;
+    setSelectedEntryId('');
+    return true;
+  });
   const selectedEntry = draft?.entries.find((entry) => entry.id === selectedEntryId);
 
   return (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Menu } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
+import { useKeyboard } from '../keyboard/useKeyboard.js';
 import { Chat } from '../pages/Chat.js';
 import { ChatSidebar } from '../pages/chat/ChatSidebar.js';
 import { useChat } from '../pages/chat/useChat.js';
@@ -24,6 +25,7 @@ import {
 import { parseLayoutUrl, urlTarget } from './url.js';
 import { useColumnWidths } from './useColumnWidths.js';
 import { useCompactMode, useMobileMode } from './useCompactMode.js';
+import { useDefaultEscapeAreas } from './useEscapeAreas.js';
 import { useDirtySync } from './useDirtySync.js';
 import { searchOf, useLayoutUrl } from './useLayoutUrl.js';
 import { useUnsavedWarning } from './useUnsavedWarning.js';
@@ -58,6 +60,7 @@ export function Shell() {
   }, [mobile]);
 
   useDirtySync(DIRTY_SOURCES, dispatch);
+  useKeyboard();
   const actions = useMemo(
     () => ({
       openEditor: (id: ResourceId) => dispatch({ type: 'openEditor', id }),
@@ -67,6 +70,7 @@ export function Shell() {
     [],
   );
 
+  useDefaultEscapeAreas(layout, actions.closeEditor);
   const gridRef = useRef<HTMLDivElement>(null);
   const { widths, resize } = useColumnWidths(gridRef, compact ? 2 : 3);
   const chat = useChat();
@@ -181,6 +185,7 @@ export function Shell() {
                 key={key}
                 className="view"
                 data-view={key}
+                tabIndex={-1}
                 hidden={!slot}
                 style={slot ? { gridArea: bodyArea[slot] } : undefined}
               >

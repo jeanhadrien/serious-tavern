@@ -42,9 +42,13 @@ export function MessageEditor({ content, disabled, onSave, onCancel }: MessageEd
             keyCode: event.nativeEvent.keyCode,
           });
           if (!action) return;
-          event.preventDefault();
-          if (action === 'save') save();
-          else if (!disabled) onCancel();
+          if (action === 'save') {
+            event.preventDefault();
+            save();
+          } else if (!disabled) {
+            event.preventDefault(); // the field acted: the shell's Escape leaves it alone
+            onCancel();
+          }
         }}
       />
       <div className="message-editor-controls">

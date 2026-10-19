@@ -71,6 +71,7 @@ export function Composer({ content, busy, queued = false, locked, onChange, onSe
         }}
         onKeyDown={(event) => {
           if (busy && event.key === 'Escape') {
+            event.preventDefault(); // the field acted: the shell's Escape leaves it alone
             onStop();
             return;
           }

@@ -184,3 +184,7 @@
   position: static;
   margin-left: auto;
 }
+/* A view takes focus when Escape leaves a field in it (keyboard/useKeyboard.ts); it needs no outline. */
+section.view:focus {
+  outline: none;
+}

@@ -37,6 +37,11 @@ export interface EditorStore<T> {
   /** Editor side: register what the unsaved-work dialog offers; `undefined` unregisters. */
   setSaver(saver: EditorSaver | undefined): void;
   /**
+   * Saves the open item through the registered saver (the Ctrl/Cmd+S shortcut). Does nothing, and resolves false,
+   * when no item is open, the draft is clean or no saver is registered.
+   */
+  save(): Promise<boolean>;
+  /**
    * List side: resolves true when the editor may open `nextId` now. True at once when `nextId` is the open item or
    * the draft is clean; otherwise asks Save / Discard / Cancel. No argument means "something else replaces the open
    * item" (create, import). Callers ask before `open`, and before any server write or layout change.
@@ -82,6 +87,7 @@ export function createEditorStore<T extends { id: string }>(ask: Ask = dialogs.a
     setSaver: (next) => {
       saver = next;
     },
+    save: async () => (saver && state.currentId !== undefined && state.dirty ? saver.save() : false),
     confirmSwitch: async (nextId) => {
       if (!state.dirty || (nextId !== undefined && nextId === state.currentId)) return true;
       const current = saver;

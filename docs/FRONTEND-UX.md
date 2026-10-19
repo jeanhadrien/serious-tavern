@@ -139,7 +139,7 @@ One commit (or a few) per step; each passes `npm run check`.
 
 1. **Confirm dialog** (`components/dialog/`), replacing every `window.confirm`. Done; deleting a chat now asks too.
 2. **Unsaved-work guard**: Save / Discard / Cancel on switching items (editor store) and the `beforeunload` warning. Done.
-3. **Escape and shortcuts**: the pure decision, the document listener, layers, area handlers, `Ctrl+S`; the one-off listeners move onto it; Escape stops a reply in the chat.
+3. **Escape and shortcuts**: the pure decision, the document listener, layers, area handlers, `Ctrl+S`; the one-off listeners move onto it; Escape stops a reply in the chat. Done.
 4. **Shared draft hook and editor header**, one editor at a time.
 5. **`SortableList`** (dnd-kit) across the five reorderable lists.
 6. **Splitter** inside editors.
