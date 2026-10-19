@@ -10,7 +10,8 @@ parts of the app that help with that, and how they fit together:
 - **After-reply work:** steps that run once the reply is on screen, such as writing a summary.
 - **Message links and summaries:** a summary is a remembered text that knows which messages it stands for.
 - **The Trigger:** decides *whether* to inject something this turn and *how strongly*.
-- **Two ready-made examples** that put all of it together: "Fresh texture (example)" and "Rolling summaries (example)".
+- **Stagnation and Pacing:** a built-in signal for "the story is stuck" and a director that gives the story build, peak and rest.
+- **Three ready-made examples** that put all of it together: "Fresh texture (example)", "Rolling summaries (example)" and "Story Director (example)".
 
 You don't need to read it in order. If you want to see it work first, start with [Try the examples](#try-the-examples).
 
@@ -21,8 +22,10 @@ You don't need to read it in order. If you want to see it work first, start with
 - [After-reply work](#after-reply-work)
 - [Message links and summaries](#message-links-and-summaries)
 - [The Trigger](#the-trigger)
+- [Stagnation and Pacing](#stagnation-and-pacing)
 - [Example 1: Fresh texture](#example-1-fresh-texture)
 - [Example 2: Rolling summaries](#example-2-rolling-summaries)
+- [Example 3: Story Director](#example-3-story-director)
 - [Seeing what happened](#seeing-what-happened)
 - [Known limitations](#known-limitations)
 
@@ -32,13 +35,15 @@ Related guides: [docs/COLLECTIONS.md](COLLECTIONS.md) (the file format, Recall a
 
 ## Try the examples
 
-Two example workflows are added to your data the first time the server starts after an upgrade, whether or not you
+Three example workflows are added to your data the first time the server starts after an upgrade, whether or not you
 already have workflows of your own:
 
 - **Fresh texture (example):** now and then a small detail from a deck of forest textures is put into the prompt,
   worded as an offer. The story gets variety without you writing it.
 - **Rolling summaries (example):** older messages are condensed into summaries, so a long chat keeps its memory
   without sending every message every time.
+- **Story Director (example):** a director gives the story build, peak and rest instead of constant random twists,
+  and tells the model which phase it is in.
 
 Each example comes with the records it needs: a collection, state definitions and presets. They are named
 "... (example)" and each record is created once:
@@ -52,21 +57,22 @@ Each example comes with the records it needs: a collection, state definitions an
   just the line of one record). An example with some of its records still deleted and still listed in the file is left
   out, and the server log says "a record it uses was deleted after it was first seeded".
 - **An edited example is never overwritten.** Duplicate an example before changing it if you want to keep a clean copy.
-- **Your own `scene` or `memory` definition wins.** State definition names are unique. If you already have a definition
+- **Your own `scene`, `memory` or `director` definition wins.** State definition names are unique. If you already have a definition
   with the same name, it is used when it has the keys the example needs, with the same types and, for a list key, the
   same item fields; otherwise the example is left out and the server log says why. Nothing of an example is created in
   that case. Fresh texture needs `scene` with `lastInjectionLevel` (a number) and `injected` (a list with the item
-  fields `level:number` and `entryId:text`); Rolling summaries needs `memory` with `summaries` (a list). A list that
+  fields `level:number` and `entryId:text`); Rolling summaries needs `memory` with `summaries` (a list); Story Director needs `director` with `tension` (a number). A list that
   has a **Cap** is accepted but the oldest summaries are dropped by it (the server log hints at this).
 
 **Before sending a message** the examples need an LLM. Their LLM nodes use the built-in OpenRouter provider and the
 model `openai/gpt-4o-mini`. Either save an OpenRouter key under **Settings** (secret name `openrouter`), or open the
 example in the workflow editor, click each **LLM** node, pick your own provider and model, and **Save** (see
 [docs/PROVIDERS.md](PROVIDERS.md)). Rolling summaries has two LLM nodes: the one that answers and the one that
-summarizes.
+summarizes; Story Director has two as well: the one that answers and the one that rates how tense the exchange was.
 
 Then start a **New chat**, pick the example in the workflow dropdown in the chat header, and read the walkthroughs
-below: [Fresh texture](#example-1-fresh-texture), [Rolling summaries](#example-2-rolling-summaries).
+below: [Fresh texture](#example-1-fresh-texture), [Rolling summaries](#example-2-rolling-summaries) and
+[Story Director](#example-3-story-director).
 
 ## Chat settings
 
@@ -311,6 +317,47 @@ which is how cooldowns and growth are computed. As with every story state, **del
 and with it the cooldown and the reset of the growth. The same seed gives the same outcome, so a run can be
 reproduced from its log. The chat panel lists the firings under **Node memory**.
 
+## Stagnation and Pacing
+
+Two nodes (category Creativity) give a story pacing instead of constant random twists. Neither calls a model.
+
+**Stagnation** measures how stuck the recent story is, from 0 (fresh) to 1 (very stagnant), and is meant to be wired into a
+Trigger signal. It compares the last `Window` (default 4) assistant replies: how many runs of `N-gram` (default 3)
+words consecutive replies share, and how few new names (capitalised words inside a sentence, not your character's or
+persona's name) the newest reply brings. Both count towards the `Score` (60% repetition, 40% names; the overlap that
+counts as fully repetitive is `Full repetition` = 0.3, because even a loop rarely repeats more). With fewer than two
+assistant replies it says 0 and why. Other outputs: `Repetition` (the raw overlap), `Novelty` (the share of the newest reply's names that are new)
+and a `Reason` such as `3-gram overlap 0.42 across last 4 replies; 1 new name of 3: stagnation 0.51`. It works on any
+language; scripts without capital letters just have no names to count.
+
+**Pacing** is a director with four phases that repeat: **build** (the story winds up), **peak** (the climax, kept for
+a minimum), **fade** (the aftermath) and **relax** (a quiet window with no new events), then build again. Each phase
+gives the other nodes what they need:
+
+| Phase | Lasts until | Max level | Pressure |
+| --- | --- | --- | --- |
+| build | intensity reaches 0.7, or 8 turns | ramps from 2 to 4 | ramps from 0 to 1 (a stalled build pushes harder) |
+| peak | 2 turns | 5 | 0.1 (no new events on a climax) |
+| fade | intensity falls below 0.3, or 3 turns | 1 | 0 |
+| relax | 3 turns | 1 | 0 |
+
+All numbers are settings of the node. **Intensity** is a number from 0 to 1 that drives the phases. Wire a rating of
+the latest exchange (0 to 1) into **Tension** and it follows `max(intensity × decay, tension)` (decay 0.85): it jumps
+with an intense exchange and falls without one. Leave Tension unconnected and a timed beat clock runs the same cycle:
+8 turns of build, 2 of peak, 3 of fade, 3 of relax. **Hold** (true or false): when true the phase does not advance
+this turn, for example when the user is in the middle of something.
+
+**Outputs:** `Phase` (text), `Intensity`, `Max level` and `Pressure` (numbers), `Turns in phase`, `Guidance` and `Reason`
+(`peak → fade after 2 turns; intensity 0.85 (beat clock); max level 1, pressure 0`). Wire `Max level` into the Trigger's
+`Max level` (and into Draw's, if Draw has no Trigger in front of it) and `Pressure` into a Trigger signal. `Guidance` is
+a sentence per phase that you put into the prompt through a preset input; the four texts are settings, for example the
+relax one is "Relax: let the scene breathe; no new threats, give room for character moments."
+
+**Memory.** Pacing counts one turn each time it runs and records what it was given as its own node state (`beats`,
+one entry per turn, shown under **Node memory**). The phase is worked out again from those entries every turn, so
+**deleting or regenerating a reply takes its turn out and the director goes back with it**, also when the reply is in the
+middle of the chat. Changing a setting changes what the whole chat so far adds up to.
+
 ## Example 1: Fresh texture
 
 **What it does.** On a turn where the Trigger fires, Draw picks a detail from "Forest textures (example)" (20 short
@@ -414,6 +461,38 @@ chat then summarizes messages 1 to 4 after turn 4 and the next four after turn 6
 One caveat: summaries and raw messages are separate prompt inputs. When a summary in the middle is broken, its raw
 messages appear after later summaries until the next turn redoes it.
 
+## Example 3: Story Director
+
+**What it does.** The story builds towards a peak, lets it fade and rests before it builds again. While it builds, the
+Trigger is pushed harder and may offer bigger things; during the peak and the rest it holds back. The model is told
+the phase in every reply ("Story pacing: Build: let the tension rise...").
+
+**The pieces.**
+
+- The workflow: **Chat Input** and the **Stagnation** node (its `Score` goes into the Trigger's `stagnation` signal,
+  weight 0.4); **State Read** `director.tension` into **Pacing**'s `Tension`; Pacing's `Max level` into the Trigger's
+  `Max level` and its `Pressure` into the Trigger's `pressure` signal (weight 0.5); the Trigger's `Level` into **Draw**
+  (collection "Story beats (example)", levels 1 to 5, avoiding the last 10 turns); Draw's `Text` into the LLM's `seed`
+  and Pacing's `Guidance` into its `guidance` preset input; the LLM into **Chat Output**.
+- After the reply: **After Reply** into a second **LLM** that rates how intense the exchange was (the preset
+  "Rate tension (example)": "Answer with only a number from 0 to 1"), **Parse JSON** (a number) and **State Write**
+  `director.tension` (set). Pacing reads the rating at the start of the next turn.
+- The preset "Story Director narrator (example)" is the Default preset plus two depth entries: "Story pacing: ..." (the
+  guidance) and "If it fits, weave in: ..." (Draw's text). Both are empty on turns without their input, and then disappear.
+
+Pacing's `Max level` goes through the Trigger to Draw instead of straight into it: Draw would then run, and remember
+a draw, on every turn, even when nothing is offered.
+
+**Try it.** Send a few messages and open **Execution details** on a reply: Pacing's `Reason` names the phase and why
+it changed, the Trigger's `Reason` shows the pressure it was given, and the prompt carries the guidance. Under **Node
+memory**, `Pacing #1 (pacing)` has one `beats` entry per turn. **Delete the last reply**: its rating and its beat are
+gone and the next turn is that turn again.
+
+**Make it yours.** Edit the four guidance texts and the phase lengths on the Pacing node. Delete the rating branch
+(After Reply, the second LLM, Parse JSON, State Write, State Read) to run on the timed beat clock: it costs no extra call.
+Wire a Condition or a chat setting into `Hold` to freeze the phase while the user is leading a scene. Add entries to
+the deck, especially at levels 4 and 5: the build and the peak only reach them when there is something there.
+
 ## Seeing what happened
 
 | Where | What it shows |
@@ -441,8 +520,10 @@ The pencil next to a definition's name in the Story state section opens that def
 - **Nodes needed by both parts cost twice.** Feed after-reply work from After Reply's outputs.
 - **Summaries: the quality is the model's.** The example's "Summarize" preset is a starting point; edit its
   instruction to change what a summary keeps. Every chunk costs one extra LLM call, and so does redoing a broken one.
-- **The Trigger has no built-in signals.** A signal is any number from 0 to 1 that you wire in; nothing in the app
-  measures "the scene is stuck" for you.
+- **Only one signal is built in.** Stagnation measures repetition and new names with plain text rules (no meaning, no
+  synonyms); any other signal is a number from 0 to 1 that you wire in.
+- **Pacing's tension arrives a turn late** when it comes from an after-reply rating: the rating of turn N is read by
+  turn N+1. A rating outside 0..1 is clamped by the key; an answer that is not a number fails the after-reply run only, and the tension stays.
 - **Levels are 1 to 5 and cooldowns count turns,** not messages. A turn counts only while one of its replies exists.
 - **A Draw entry has no stable id.** Nodes report `entry-<n>` (its position), so reordering changes it; avoid-recent
   recognizes entries by text.
