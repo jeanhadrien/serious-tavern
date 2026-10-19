@@ -216,13 +216,10 @@ LLM-raised custom events are not planned: they are state plus a Condition (see "
    copies the list; runs strictly one after another (no parallelism yet), one turn with several runs.
 2. Access sets (`stateAccess`, template walk, unknown = everything), the scheduler and the list-order
    fold; the "waits for" hints.
-3. Retire After Reply; Chat Input's `replies`; "at least one sink" validation. User workflows and the
-   "Rolling summaries (example)" pack already contain After Reply nodes, so it can't simply go:
-   - it leaves the node palette, but a workflow that has one keeps its post part, run right after that
-     workflow's own reply part, inside its row of the list;
-   - the editor offers "Split into two workflows" (the post part becomes a new workflow, listed below
-     the original in the chats that use it);
-   - the example pack ships the two-workflow version for new installs only (seeds never overwrite).
+3. Remove After Reply; Chat Input's `replies`; "at least one sink" validation. **Decided:** After Reply never
+   reached a release (it exists only on the unmerged PR branches), so it is deleted outright: the node, the
+   post-turn run machinery and its entry fields, with no compatibility path. The "Rolling summaries (example)"
+   pack becomes two workflows.
 4. Later triggers, in the order above.
 
 Phase 1 alone delivers the feature with correct results; phase 2 only makes it faster, so it can be
