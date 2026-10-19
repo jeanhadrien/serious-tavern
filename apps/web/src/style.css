@@ -120,13 +120,6 @@ small {
   height: 100%;
   display: flex;
 }
-.editor-toolbar {
-  padding: 12px 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border-bottom: 1px solid #363b46;
-}
 pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -465,17 +458,9 @@ pre {
   align-content: start;
   gap: 14px;
 }
-.preset-toolbar {
+.editor-header.preset-toolbar {
   margin: -16px -16px 0;
   padding: 12px 16px;
-}
-.preset-toolbar input {
-  flex: 1;
-  /* Shrinks for the "Unsaved changes" note instead of pushing Save out of a narrow column. */
-  min-width: 0;
-}
-.preset-toolbar small {
-  white-space: nowrap;
 }
 .preset-inputs,
 .preset-entry-list {

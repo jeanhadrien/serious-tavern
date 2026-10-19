@@ -85,6 +85,12 @@ export function useProviderEditor() {
     if (saved) open(saved);
     return !!saved;
   };
+  /** Back to the saved provider (what is on disk as far as this editor knows; the live sync keeps that current). */
+  const revert = () => {
+    if (!provider) return;
+    setDraft(toDraft(provider));
+    setErrors([]);
+  };
   useEditorSaver(providerEditorStore, { label: () => draft?.name ?? provider?.name ?? '', save });
   const duplicate = async () => {
     if (!provider || !(await providerEditorStore.confirmSwitch())) return;
@@ -110,6 +116,7 @@ export function useProviderEditor() {
     secretNames,
     change,
     save,
+    revert,
     duplicate,
     remove,
     back: () => closeEditor('providers'),

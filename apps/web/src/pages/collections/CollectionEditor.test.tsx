@@ -27,7 +27,7 @@ const render = (props: { dirty?: boolean; saving?: boolean; errors?: string[]; s
       onRemoveEntry={noop}
       onMoveEntry={noop}
       onSave={noop}
-      onDiscard={noop}
+      onRevert={noop}
       onDelete={noop}
       onBack={noop}
     />,
@@ -53,14 +53,14 @@ it('expands the selected entry into its fields', () => {
   expect(html).toContain('0 = never drawn');
 });
 
-it('saves only when dirty and offers Discard then', () => {
+it('saves only when dirty and offers Revert then', () => {
   const clean = render({});
   expect(clean).toMatch(/<button type="button" class="primary" disabled="">Save<\/button>/);
-  expect(clean).not.toContain('>Discard<');
+  expect(clean).not.toContain('>Revert<');
   const dirty = render({ dirty: true });
   expect(dirty).toMatch(/<button type="button" class="primary">Save<\/button>/);
-  expect(dirty).toContain('>Discard<');
-  expect(dirty).toContain('Unsaved');
+  expect(dirty).toContain('>Revert<');
+  expect(dirty).toContain('Unsaved changes');
   // A save in flight: a second click must not send another.
   expect(render({ dirty: true, saving: true })).toMatch(
     /<button type="button" class="primary" disabled="">Save<\/button>/,

@@ -56,6 +56,7 @@ it('retains entity dirty/save state and versioned avatar URLs', () => {
       onBack={() => {}}
       onDelete={async () => {}}
       onSave={async () => {}}
+      onRevert={() => {}}
     >
       <EntityPortrait type="personas" item={persona} large />
     </EntityDetail>,

@@ -110,7 +110,17 @@ Rules:
 
 ## Editors
 
-- **Shared draft hook** (`useDraft`): holds the draft and the saved snapshot, computes `dirty`, offers `load`/`clear`/`revert`, reports to the editor store, applies its commands and registers the save used by the unsaved-work dialog. The six editors (characters and personas, providers, collections, state definitions, presets, workflows) move onto it one at a time, without behaviour changes beyond this design.
+- **Shared draft hook** (`useDraft`): holds the draft and the saved snapshot, computes `dirty` (a key per value, JSON by default), offers `load`/`set`/`clear`/`revert` and reports to the editor store. It does not apply the store's commands or register the saver: each editor does that, because what "open" and "save" mean differs. Not every editor fits it, so it is used where the draft is a plain copy of the saved item:
+
+  | Editor | `useDraft` | Why |
+  |---|---|---|
+  | Characters, personas | yes | plain draft vs saved snapshot |
+  | Presets | yes | the draft is the saved `Preset`; the live sync reads the saved key and the selected entry stays local |
+  | Providers | header only | the draft is a text form (`ProviderDraft`) of a different type than the saved record; dirty and the live sync are keyed on that pair |
+  | Collections | header only | async load, text drafts, Revert re-reads from disk |
+  | State definitions | header only | compiled text drafts, name lock |
+  | Workflows | header only | the canvas holds the draft |
+
 - **Shared editor header**: back or close, the item name, the same unsaved marker ("Unsaved changes"), then actions in a fixed order: Save, Revert, Duplicate, Delete. Read-only items (built-in providers, imported presets) show why and keep only what applies.
 
 ## Features in this round
@@ -140,7 +150,7 @@ One commit (or a few) per step; each passes `npm run check`.
 1. **Confirm dialog** (`components/dialog/`), replacing every `window.confirm`. Done; deleting a chat now asks too.
 2. **Unsaved-work guard**: Save / Discard / Cancel on switching items (editor store) and the `beforeunload` warning. Done.
 3. **Escape and shortcuts**: the pure decision, the document listener, layers, area handlers, `Ctrl+S`; the one-off listeners move onto it; Escape stops a reply in the chat. Done.
-4. **Shared draft hook and editor header**, one editor at a time.
+4. **Shared draft hook and editor header**, one editor at a time. Done.
 5. **`SortableList`** (dnd-kit) across the five reorderable lists.
 6. **Splitter** inside editors.
 7. **Features**: composer draft, copy message, then the canvas (drag to empty space, undo/redo, copy/paste), then the swipes spec.

@@ -33,7 +33,7 @@ export function Collections() {
       onRemoveEntry={editor.removeEntry}
       onMoveEntry={editor.moveEntry}
       onSave={() => void editor.save()}
-      onDiscard={() => void editor.discard()}
+      onRevert={() => void editor.revert()}
       onDelete={() => void editor.remove()}
       onBack={editor.back}
     />

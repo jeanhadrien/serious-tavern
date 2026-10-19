@@ -171,7 +171,7 @@ export function useCollectionEditor() {
   useEditorSaver(collectionEditorStore, { label: () => draft?.name ?? collection?.name ?? '', save });
   // Re-read first: the disk may have moved on while the draft was dirty (the live sync only warned), and
   // restoring the older baseline would let a later save overwrite that edit.
-  const discard = async () => {
+  const revert = async () => {
     if (!collection) return;
     const id = collection.id;
     const [fresh] = await readOpen(id).catch(() => [collection]);
@@ -200,7 +200,7 @@ export function useCollectionEditor() {
     change,
     ...entryActions,
     save,
-    discard,
+    revert,
     remove,
     back: () => closeEditor('collections'),
   };

@@ -15,7 +15,7 @@
     z-index: 5;
     box-shadow: -6px 0 16px rgba(0, 0, 0, 0.35);
   }
-  .workflow-layout .editor-toolbar {
+  .workflow-layout .editor-header {
     padding: 10px 12px;
   }
 }
@@ -50,11 +50,10 @@
     left: 0;
     width: auto;
   }
-  .workflow-layout .editor-toolbar {
-    flex-wrap: wrap;
+  .workflow-layout .editor-header {
     gap: 8px;
   }
-  .workflow-layout .editor-toolbar input {
+  .workflow-layout .editor-header-title {
     flex: 1 1 100%;
   }
 }

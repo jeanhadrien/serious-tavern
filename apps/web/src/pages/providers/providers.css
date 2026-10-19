@@ -50,31 +50,6 @@
   display: flex;
   flex-direction: column;
 }
-.provider-toolbar {
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  border-bottom: 1px solid #363b46;
-}
-.provider-toolbar .toolbar {
-  flex-wrap: wrap;
-  justify-content: flex-start;
-}
-.provider-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.provider-title h1 {
-  font-size: 1.2rem;
-  margin: 0;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .provider-banner {
   margin: 12px 14px 0;
   padding: 8px 10px;

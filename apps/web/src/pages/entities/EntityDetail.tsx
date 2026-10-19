@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
-import { ArrowLeft } from 'lucide-react';
-import { IconButton } from '../../components/IconButton.js';
+import { EditorHeader } from '../../components/EditorHeader.js';
 
 export function EntityDetail({
   title,
@@ -9,6 +8,7 @@ export function EntityDetail({
   onBack,
   onDelete,
   onSave,
+  onRevert,
   actions,
   children,
 }: {
@@ -19,27 +19,23 @@ export function EntityDetail({
   onBack: () => void;
   onDelete: () => Promise<void>;
   onSave: () => Promise<unknown>;
+  onRevert: () => void;
   actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <section className="entity-editor">
-      <div className="entity-toolbar">
-        <div className="entity-title">
-          <IconButton icon={ArrowLeft} label={backLabel} onClick={onBack} />
-          <h1>{title}</h1>
-          {dirty && <span className="dirty-dot">Unsaved</span>}
-        </div>
-        <div className="toolbar">
-          {actions}
-          <button type="button" onClick={() => void onDelete()}>
-            Delete
-          </button>
-          <button type="button" className="primary" onClick={() => void onSave()} disabled={!dirty}>
-            Save
-          </button>
-        </div>
-      </div>
+      <EditorHeader
+        title={title}
+        back={{ label: backLabel, onClick: onBack }}
+        dirty={dirty}
+        extra={actions}
+        actions={{
+          save: { onClick: () => void onSave(), disabled: !dirty },
+          revert: { onClick: onRevert },
+          remove: { onClick: () => void onDelete() },
+        }}
+      />
       {children}
     </section>
   );

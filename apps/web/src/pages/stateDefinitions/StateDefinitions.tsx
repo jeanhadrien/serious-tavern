@@ -23,6 +23,7 @@ export function StateDefinitions() {
       saving={editor.saving}
       onChange={editor.change}
       onSave={() => void editor.save()}
+      onRevert={editor.revert}
       onDelete={() => void editor.remove()}
       onDuplicate={() => void editor.duplicate()}
       onDuplicateAs={() => void editor.duplicateAs()}

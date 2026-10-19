@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Edge } from '@xyflow/react';
 import { workflowInvalidDetailsSchema, type Workflow, type NodeTypeDescriptor } from '@st/shared';
 import { ApiError, workflowsApi, nodeTypesApi } from '../../api.js';
@@ -51,14 +51,19 @@ export function useWorkflowEditor() {
       .finally(() => setTypesReady(true));
   }, []);
 
-  const load = (stored: Workflow) => {
-    const next = withDraftSettings(stored);
+  // The workflow as last loaded or saved: what Revert goes back to.
+  const stored = useRef<Workflow | undefined>(undefined);
+
+  const load = (item: Workflow) => {
+    stored.current = item;
+    const next = withDraftSettings(item);
     setWorkflow(next);
     canvas.load(next);
     const loaded = workflowToCanvas(next, types);
     setSaved(snapshot(next, loaded.nodes, loaded.edges));
   };
   const close = () => {
+    stored.current = undefined;
     setWorkflow(undefined);
     setSaved('');
     canvas.clear();
@@ -101,6 +106,7 @@ export function useWorkflowEditor() {
     try {
       const updated = await workflowsApi.update(workflow.id, current);
       setWorkflow((prev) => (prev?.id === updated.id ? { ...prev, updatedAt: updated.updatedAt } : prev));
+      stored.current = { ...current, updatedAt: updated.updatedAt };
       setSaved(snapshot({ ...workflow, updatedAt: updated.updatedAt }, canvas.nodes, canvas.edges));
       if (showToast) alerts.success('Workflow saved');
       await workflowsStore.refresh();
@@ -108,6 +114,10 @@ export function useWorkflowEditor() {
     } catch {
       return false;
     }
+  };
+  /** Back to the saved workflow, through the same load that opening uses. */
+  const revert = () => {
+    if (stored.current) load(stored.current);
   };
   useEditorSaver(workflowEditorStore, { label: () => workflow?.name ?? '', save: () => save() });
   const validate = async () => {
@@ -136,7 +146,9 @@ export function useWorkflowEditor() {
     workflow,
     setWorkflow,
     canvas,
+    dirty,
     save,
+    revert,
     validate,
   };
 }

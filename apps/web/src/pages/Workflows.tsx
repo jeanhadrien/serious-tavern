@@ -32,7 +32,9 @@ function WorkflowEditor() {
     workflow,
     setWorkflow,
     canvas,
+    dirty,
     save,
+    revert,
     validate,
   } = useWorkflowEditor();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -60,12 +62,14 @@ function WorkflowEditor() {
           <WorkflowToolbar
             name={workflow.name}
             onNameChange={(name) => setWorkflow((prev) => prev && { ...prev, name })}
+            dirty={dirty}
             settingsOpen={settingsShown}
             settingsIssues={workflowSettingIssues(settings).length}
             onToggleSettings={toggleSettings}
             onValidate={() => void validate()}
             onDuplicate={() => void duplicateWorkflow(canvasToWorkflow(workflow, canvas.nodes, canvas.edges))}
             onSave={() => void save()}
+            onRevert={revert}
           />
           <div className="editor-body">
             <NodePalette types={types} onAdd={canvas.addAtCenter} />

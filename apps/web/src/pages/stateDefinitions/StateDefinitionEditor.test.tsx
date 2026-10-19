@@ -32,6 +32,7 @@ const render = (
         saving={props.saving ?? false}
         onChange={() => {}}
         onSave={() => {}}
+        onRevert={() => {}}
         onDelete={() => {}}
         onDuplicate={() => {}}
         onDuplicateAs={() => {}}

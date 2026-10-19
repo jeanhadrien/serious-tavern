@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
 import type { Character, Persona } from '@st/shared';
 import { alerts } from '../../alerts/index.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
 import { useEditorCommands, useEditorSaver } from '../../stores/index.js';
+import { useDraft } from '../useDraft.js';
 import { importEntityFiles } from './entityActions.js';
 import type { EntityKind } from './entityKinds.js';
 import { confirmDelete } from '../../components/dialog/dialogStore.js';
@@ -13,20 +13,8 @@ import { confirmDelete } from '../../components/dialog/dialogStore.js';
  */
 export function useEntityEditor<T extends Character | Persona>(kind: EntityKind<T>) {
   const { closeEditor } = useLayoutActions();
-  const [draft, setDraft] = useState<T>();
-  const [saved, setSaved] = useState('');
-  const dirty = !!draft && JSON.stringify(draft) !== saved;
-  const choose = (item: T) => {
-    setDraft(structuredClone(item));
-    setSaved(JSON.stringify(item));
-  };
-  const clear = () => {
-    setDraft(undefined);
-    setSaved('');
-  };
+  const { draft, dirty, set, load: choose, clear, revert } = useDraft(kind.editorStore);
 
-  const openId = draft?.id;
-  useEffect(() => kind.editorStore.report(openId, dirty), [kind, openId, dirty]);
   useEditorCommands(kind.editorStore, {
     open: choose,
     close: (id) => {
@@ -77,6 +65,6 @@ export function useEntityEditor<T extends Character | Persona>(kind: EntityKind<
       /* API errors are toasted. */
     }
   };
-  const change = (field: keyof T, value: unknown) => draft && setDraft({ ...draft, [field]: value });
-  return { draft, dirty, change, save, remove, importFiles, uploadAvatar, back: () => closeEditor(kind.type) };
+  const change = (field: keyof T, value: unknown) => draft && set({ ...draft, [field]: value });
+  return { draft, dirty, change, save, revert, remove, importFiles, uploadAvatar, back: () => closeEditor(kind.type) };
 }

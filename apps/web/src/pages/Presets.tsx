@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { presetSchema, settingsCatalog, stateHints, type Preset } from '@st/shared';
 import { presetsApi } from '../api.js';
 import {
@@ -12,6 +12,7 @@ import {
 } from '../stores/index.js';
 import { alerts } from '../alerts/index.js';
 import { useEscapeArea } from '../keyboard/escapeRegistry.js';
+import { useDraft } from './useDraft.js';
 import { PresetEditor } from './presets/PresetEditor.js';
 import { PresetEntryEditor } from './presets/PresetEntryEditor.js';
 import { PresetPreview } from './presets/PresetPreview.js';
@@ -21,10 +22,8 @@ import { usePresetLiveSync } from './presets/usePresetLiveSync.js';
 import './presets/presets.css';
 
 export function Presets() {
-  const [draft, setDraft] = useState<Preset>();
-  const [saved, setSaved] = useState('');
+  const { draft, saved, savedKey, dirty, set, load, clear, revert } = useDraft(presetEditorStore);
   const [selectedEntryId, setSelectedEntryId] = useState('');
-  const dirty = !!draft && JSON.stringify(draft) !== saved;
   const readOnly = draft !== undefined && isImportedPreset(draft);
   const refresh = () => presetsStore.refresh();
   // A preset isn't tied to one workflow, so its hints offer every key any workflow declares.
@@ -35,18 +34,14 @@ export function Presets() {
   const state = useMemo(() => stateHints(definitions), [definitions]);
 
   const openPreset = (preset: Preset, entryId: string) => {
-    setDraft(structuredClone(preset));
-    setSaved(JSON.stringify(preset));
+    load(preset);
     setSelectedEntryId(entryId);
   };
   const choose = (preset: Preset) => openPreset(preset, preset.entries[0]?.id ?? '');
   const closeEditor = () => {
-    setDraft(undefined);
-    setSaved('');
+    clear();
     setSelectedEntryId('');
   };
-  const openId = draft?.id;
-  useEffect(() => presetEditorStore.report(openId, dirty), [openId, dirty]);
   useEditorCommands(presetEditorStore, {
     open: choose,
     close: (id) => {
@@ -54,14 +49,14 @@ export function Presets() {
     },
   });
   usePresetLiveSync({
-    editor: { draft, saved, selectedEntryId },
+    editor: { draft, saved: savedKey ?? '', selectedEntryId },
     refresh: () => presetsStore.refresh(),
     onReload: openPreset,
     onClose: closeEditor,
   });
   // Imported presets never change in the editor, so no edit can make them dirty.
   const change = (next: Preset) => {
-    if (!readOnly) setDraft(next);
+    if (!readOnly) set(next);
   };
   /** Resolves true when saved; false on a validation failure, an API error (toasted) or a read-only preset. */
   const save = async (): Promise<boolean> => {
@@ -85,6 +80,12 @@ export function Presets() {
       return false;
     }
   };
+  /** Back to the saved preset; the selected entry stays unless the revert removes it. */
+  const revertDraft = () => {
+    revert();
+    if (saved && !saved.entries.some((entry) => entry.id === selectedEntryId))
+      setSelectedEntryId(saved.entries[0]?.id ?? '');
+  };
   useEditorSaver(presetEditorStore, { label: () => draft?.name ?? '', save });
   // Escape first drops the entry selection; the shell's default then closes the editor.
   useEscapeArea('editor:presets', () => {
@@ -104,6 +105,7 @@ export function Presets() {
             readOnly={readOnly}
             onChange={change}
             onSave={() => void save()}
+            onRevert={revertDraft}
             onDuplicate={() => void duplicatePreset(draft)}
             selectedEntryId={selectedEntryId}
             onSelectEntry={setSelectedEntryId}

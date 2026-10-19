@@ -1,0 +1,46 @@
+.editor-header {
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  border-bottom: 1px solid #363b46;
+}
+.editor-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+.editor-header-title h1 {
+  font-size: 1.2rem;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A name input as the title takes the free width; the marker never wraps. */
+.editor-header-title input {
+  flex: 1;
+  min-width: 0;
+}
+.editor-header-title .dirty-dot {
+  white-space: nowrap;
+}
+.editor-header .editor-header-actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+/* Narrow editors (in a side column): the title row, then the actions under it. */
+.editor-header-stacked {
+  padding: 10px 14px;
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 10px;
+}
+.editor-header-stacked .editor-header-title {
+  flex: 0 0 auto;
+}

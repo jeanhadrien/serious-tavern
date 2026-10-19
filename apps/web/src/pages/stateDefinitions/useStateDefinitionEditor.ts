@@ -144,6 +144,12 @@ export function useStateDefinitionEditor() {
     setDraft({ ...draft, name: definition.name });
     setNames(afterKeepName);
   };
+  /** Back to the saved definition. A refused rename stays locked, but its banner and the name answers go. */
+  const revert = () => {
+    if (!definition) return;
+    setDraft(toDraft(definition));
+    setNames((current) => ({ locked: current.locked }));
+  };
   const remove = async () => {
     if (!definition || !(await confirmDelete(`Delete state definition "${definition.name}"?`))) return;
     deleting.current = definition.id;
@@ -167,6 +173,7 @@ export function useStateDefinitionEditor() {
     duplicate,
     duplicateAs,
     keepName,
+    revert,
     remove,
     back: () => closeEditor('stateDefinitions'),
   };

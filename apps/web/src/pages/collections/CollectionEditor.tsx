@@ -1,5 +1,4 @@
-import { ArrowLeft } from 'lucide-react';
-import { IconButton } from '../../components/IconButton.js';
+import { EditorHeader } from '../../components/EditorHeader.js';
 import type { CollectionDraft, EntryDraft } from './collectionDraft.js';
 import { CollectionEntryList } from './CollectionEntryList.js';
 
@@ -19,7 +18,8 @@ interface CollectionEditorProps {
   onRemoveEntry(index: number): void;
   onMoveEntry(index: number, offset: number): void;
   onSave(): void;
-  onDiscard(): void;
+  /** Back to what is on disk (re-read, see `useCollectionEditor`). */
+  onRevert(): void;
   onDelete(): void;
   onBack(): void;
 }
@@ -29,26 +29,16 @@ export function CollectionEditor(props: CollectionEditorProps) {
   const { draft, dirty, errors, onChange } = props;
   return (
     <section className="collection-editor">
-      <div className="collection-toolbar">
-        <div className="collection-title">
-          <IconButton icon={ArrowLeft} label="Back to collections" onClick={props.onBack} />
-          <h1>{draft.name.trim() || 'Collection'}</h1>
-          {dirty && <span className="dirty-dot">Unsaved</span>}
-        </div>
-        <div className="toolbar">
-          {dirty && (
-            <button type="button" onClick={props.onDiscard}>
-              Discard
-            </button>
-          )}
-          <button type="button" onClick={props.onDelete}>
-            Delete
-          </button>
-          <button type="button" className="primary" disabled={!dirty || props.saving} onClick={props.onSave}>
-            Save
-          </button>
-        </div>
-      </div>
+      <EditorHeader
+        title={draft.name.trim() || 'Collection'}
+        back={{ label: 'Back to collections', onClick: props.onBack }}
+        dirty={dirty}
+        actions={{
+          save: { onClick: props.onSave, disabled: !dirty || props.saving },
+          revert: { onClick: props.onRevert },
+          remove: { onClick: props.onDelete },
+        }}
+      />
       {errors.length > 0 && (
         <ul className="collection-errors error" role="alert">
           {errors.map((error) => (
