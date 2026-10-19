@@ -22,6 +22,7 @@ import {
 import { alerts } from '../../alerts/index.js';
 import { checkConnection } from '../../connection.js';
 import { workflowToCanvas, type CanvasNode } from './model.js';
+import { useCanvasHistory } from './useCanvasHistory.js';
 import { useConnectPicker } from './useConnectPicker.js';
 import { useDynamicPorts } from './useDynamicPorts.js';
 
@@ -39,6 +40,15 @@ export function useWorkflowCanvas(
   // Ports depend on what the node reads from presets, characters and state definitions: they are resolved
   // again when any of those lists changes.
   useDynamicPorts(nodes, setNodes, edges, setEdges, types, presets, characters, stateDefinitions, canvasVersion);
+  // The config panel closes when undo takes its node away.
+  const history = useCanvasHistory({
+    nodes,
+    edges,
+    setNodes,
+    setEdges,
+    onRestore: ({ nodes: restored }) =>
+      setSelected((prev) => (prev && restored.some((node) => node.id === prev) ? prev : undefined)),
+  });
   const canvasRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, deleteElements } = useReactFlow();
   const visibleEdges = useMemo(
@@ -67,6 +77,7 @@ export function useWorkflowCanvas(
     [edges, nodes, highlightedEdge],
   );
   const load = (next: Workflow) => {
+    history.reset();
     setCanvasVersion((version) => version + 1);
     const canvas = workflowToCanvas(next, types);
     setNodes(canvas.nodes);
@@ -77,32 +88,47 @@ export function useWorkflowCanvas(
       alerts.warning(`Unknown node types are preserved read-only: ${canvas.unknownTypes.join(', ')}`);
   };
   const clear = () => {
+    history.reset();
     setCanvasVersion((version) => version + 1);
     setNodes([]);
     setEdges([]);
     setSelected(undefined);
     setHighlightedEdge(undefined);
   };
-  const onNodesChange: OnNodesChange<CanvasNode> = useCallback((changes) => {
-    setNodes((prev) => applyNodeChanges(changes, prev));
-    const removed = changes.filter((change) => change.type === 'remove').map((change) => change.id);
-    if (removed.length) {
-      setEdges((prev) => prev.filter((e) => !removed.includes(e.source) && !removed.includes(e.target)));
-      setSelected((prev) => (prev && removed.includes(prev) ? undefined : prev));
-    }
-  }, []);
-  const onEdgesChange: OnEdgesChange = useCallback((changes) => {
-    setEdges((prev) => applyEdgeChanges(changes, prev));
-  }, []);
+  // Only removals are steps here: selection, measurements and drags (recorded on drag stop) are not.
+  const { record } = history;
+  const onNodesChange: OnNodesChange<CanvasNode> = useCallback(
+    (changes) => {
+      const removed = changes.filter((change) => change.type === 'remove').map((change) => change.id);
+      if (removed.length) record();
+      setNodes((prev) => applyNodeChanges(changes, prev));
+      if (removed.length) {
+        setEdges((prev) => prev.filter((e) => !removed.includes(e.source) && !removed.includes(e.target)));
+        setSelected((prev) => (prev && removed.includes(prev) ? undefined : prev));
+      }
+    },
+    [record],
+  );
+  const onEdgesChange: OnEdgesChange = useCallback(
+    (changes) => {
+      if (changes.some((change) => change.type === 'remove')) record();
+      setEdges((prev) => applyEdgeChanges(changes, prev));
+    },
+    [record],
+  );
   // The edge rules of a manual connection: one edge per target handle, a new one replaces the old.
-  const linkEdge = useCallback((connection: Connection) => {
-    setEdges((prev) =>
-      addEdge(
-        { ...connection, id: crypto.randomUUID() },
-        prev.filter((e) => e.target !== connection.target || e.targetHandle !== connection.targetHandle),
-      ),
-    );
-  }, []);
+  const linkEdge = useCallback(
+    (connection: Connection) => {
+      record();
+      setEdges((prev) =>
+        addEdge(
+          { ...connection, id: crypto.randomUUID() },
+          prev.filter((e) => e.target !== connection.target || e.targetHandle !== connection.targetHandle),
+        ),
+      );
+    },
+    [record],
+  );
   const connect = useCallback(
     (connection: Connection) => {
       if (!connection.sourceHandle || !connection.targetHandle) return;
@@ -118,6 +144,7 @@ export function useWorkflowCanvas(
   // Returns the new node's id, for callers that connect it right away.
   const addNode = (descriptor: NodeTypeDescriptor, position: { x: number; y: number }): string => {
     const id = crypto.randomUUID();
+    record();
     setNodes((prev) => {
       const next: CanvasNode[] = [
         ...prev,
@@ -183,7 +210,9 @@ export function useWorkflowCanvas(
   };
   const deleteNode = (id: string) => void deleteElements({ nodes: [{ id }] });
   const current = nodes.find((n) => n.id === selected);
+  // Changes to one node's config that follow each other closely are a single step.
   const updateConfig = (config: NodeInstance['config']) => {
+    if (selected) record(undefined, `config:${selected}`);
     setNodes((prev) => prev.map((n) => (n.id === selected ? { ...n, data: { ...n.data, config } } : n)));
   };
   return {
@@ -212,5 +241,12 @@ export function useWorkflowCanvas(
     deselect,
     deleteSelection,
     deleteNode,
+    undo: history.undo,
+    redo: history.redo,
+    canUndo: history.canUndo,
+    canRedo: history.canRedo,
+    recordStep: history.record,
+    onDragStart: history.onDragStart,
+    onDragStop: history.onDragStop,
   };
 }

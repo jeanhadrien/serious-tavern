@@ -4,7 +4,8 @@ import { ITEM_SOURCES } from '../layout/itemSources.js';
 import { RESOURCE_IDS, type ResourceId } from '../layout/state.js';
 import { escapeStep, isFieldElement } from './escape.js';
 import { areaOf, closeNewestLayer, layerCount, runArea } from './escapeRegistry.js';
-import { matchShortcut } from './shortcuts.js';
+import { runShortcut } from './shortcutAreas.js';
+import { areaShortcutAllowed, matchShortcut, type AreaShortcut } from './shortcuts.js';
 
 const viewSection = (key: ViewKey | undefined) =>
   key ? document.querySelector<HTMLElement>(`section.view[data-view="${key}"]`) : null;
@@ -56,6 +57,18 @@ function onSave(event: KeyboardEvent, lastPointer: ViewKey | undefined) {
   if (resource) void ITEM_SOURCES[resource]?.editor.save();
 }
 
+/** Undo and redo of the view with the keyboard; inside a field the browser's own text undo keeps working. */
+function onAreaShortcut(shortcut: AreaShortcut, event: KeyboardEvent, lastPointer: ViewKey | undefined) {
+  const target = event.target instanceof Element ? event.target : null;
+  const allowed = areaShortcutAllowed({
+    handled: event.defaultPrevented,
+    inDialog: !!target?.closest('dialog[open]'),
+    inField: isFieldElement(target),
+  });
+  const view = allowed ? focusedView(lastPointer) : undefined;
+  if (view && runShortcut(view, shortcut)) event.preventDefault();
+}
+
 /**
  * The app's one keyboard listener (call it once, in the shell): Escape and the shortcuts of `SHORTCUTS`. It is on the
  * document in the bubble phase, so React's handlers on the root run first and a field that acted has already
@@ -69,8 +82,13 @@ export function useKeyboard() {
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.isComposing || event.keyCode === 229) return;
-      if (event.key === 'Escape') onEscape(event, lastPointer);
-      else if (matchShortcut(event) === 'save') onSave(event, lastPointer);
+      if (event.key === 'Escape') {
+        onEscape(event, lastPointer);
+        return;
+      }
+      const shortcut = matchShortcut(event);
+      if (shortcut === 'save') onSave(event, lastPointer);
+      else if (shortcut) onAreaShortcut(shortcut, event, lastPointer);
     };
     document.addEventListener('pointerdown', onPointer, true);
     document.addEventListener('keydown', onKeyDown);

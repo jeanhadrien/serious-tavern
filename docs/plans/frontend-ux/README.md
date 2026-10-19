@@ -9,7 +9,7 @@ Plans for building `docs/FRONTEND-UX.md` (the agreed spec). There is one file pe
 3. The orchestrator verifies the work: reads the diff against the plan, runs `npm run check`, and runs a live check when the step changes behaviour on screen. Then it commits and pushes, or sends the work back to a new agent with the gaps listed.
 4. The status table below is updated in the same commit.
 5. While an agent's work is in the tree (a stash apply may have staged files), the orchestrator commits plan files with an explicit pathspec only (`git commit -- docs/plans/...`), never `git commit` on the whole index.
-6. Live checks run on a temp data dir with a fake OpenAI-compatible backend; never against `apps/server/data`.
+6. Live checks run on a temp data dir with a fake OpenAI-compatible backend; never against `apps/server/data`. Agents that run their own throwaway browser checks delete only what they created themselves, never anything else in the scratchpad.
 
 ## Rules every agent follows
 
@@ -33,7 +33,7 @@ Plans for building `docs/FRONTEND-UX.md` (the agreed spec). There is one file pe
 | 6. Splitter | [06-splitter.md](06-splitter.md) | done |
 | 7a. Composer draft, copy message | [07a-composer-draft-and-copy.md](07a-composer-draft-and-copy.md) | done |
 | 7b. Canvas: drag to empty space | [07b-canvas.md](07b-canvas.md) | done |
-| 7c. Canvas: undo/redo | [07b-canvas.md](07b-canvas.md) | to do |
+| 7c. Canvas: undo/redo | [07b-canvas.md](07b-canvas.md) | done |
 | 7d. Canvas: copy/paste | [07b-canvas.md](07b-canvas.md) | to do |
 | 7e. Regenerate and swipes (shared, server, web) | [07e-swipes.md](07e-swipes.md) | to do |
 

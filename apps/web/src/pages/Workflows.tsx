@@ -2,6 +2,7 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { workflowSettingIssues, workflowSettings, type Workflow } from '@st/shared';
 import { useEscapeArea } from '../keyboard/escapeRegistry.js';
+import { useShortcutArea } from '../keyboard/shortcutAreas.js';
 import { Splitter } from '../components/splitter/Splitter.js';
 import { useStoredSize } from '../components/splitter/useStoredSize.js';
 import { useWorkflowEditor } from './workflows/useWorkflowEditor.js';
@@ -63,6 +64,8 @@ function WorkflowEditor() {
     else return false;
     return true;
   });
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or +Y step through the canvas history (never inside a field).
+  useShortcutArea('editor:workflows', { undo: canvas.undo, redo: canvas.redo });
   return (
     <div className="workflow-layout">
       {workflow ? (

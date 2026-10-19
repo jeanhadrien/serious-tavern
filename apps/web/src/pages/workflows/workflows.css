@@ -70,6 +70,10 @@
     flex: 1 1 100%;
   }
 }
+.canvas-actions {
+  display: flex;
+  gap: 6px;
+}
 .delete-button {
   background: #4a2d33;
   border-color: #7d4049;
