@@ -6,6 +6,7 @@ import { stateDefinitionSchema, type StateDefinition } from '@st/shared';
 import { createContext } from './context.js';
 import { FRESH_TEXTURE_WORKFLOW_ID, NARRATOR_PRESET_ID } from './examples/fresh-texture.js';
 import { ROLLING_SUMMARIES_WORKFLOW_ID, SUMMARIES_NARRATOR_PRESET_ID } from './examples/rolling-summaries.js';
+import { DIRECTOR_NARRATOR_PRESET_ID } from './examples/story-director.js';
 import { seedExamples } from './seed-examples.js';
 import { LEDGER_FILE } from './seed-ledger.js';
 import { defaultPreset } from './seed.js';
@@ -40,8 +41,13 @@ describe("a definition with the example's own id", () => {
     const context = await open({ seed: false });
     await context.stateDefinitions.save(userDefinition('scene', misfit, SCENE_DEFINITION_ID));
     const again = await open();
-    expect(await names(again)).toEqual(['Default Assistant', 'Parallel demo', 'Rolling summaries (example)']);
-    expect(await again.collections.list()).toEqual([]);
+    expect(await names(again)).toEqual([
+      'Default Assistant',
+      'Parallel demo',
+      'Rolling summaries (example)',
+      'Story Director (example)',
+    ]);
+    expect((await again.collections.list()).map((item) => item.name)).toEqual(['Story beats (example)']);
     expect(warn).toHaveBeenCalledWith(
       'Example "Fresh texture (example)" not added: the state definition "scene" exists but it has no key "injected".',
     );
@@ -96,13 +102,17 @@ describe('seeding never stops the server from starting', () => {
       seedExamples(stores, directory, { info: () => {}, warn: (message) => console.warn(message) }),
     ).resolves.toBeUndefined();
     expect(warn).toHaveBeenCalledWith('Example "Fresh texture (example)" not added: disk is full');
-    expect(await names(context)).toEqual(['Rolling summaries (example)']);
+    expect(await names(context)).toEqual(['Rolling summaries (example)', 'Story Director (example)']);
     // The records the failed pack did create are recorded, the workflow is not; the next start finishes it.
     const recorded = (await ledger()).seeded;
     expect(recorded).toContain(`fresh-texture/preset:${NARRATOR_PRESET_ID}`);
     expect(recorded).not.toContain(`fresh-texture/workflow:${FRESH_TEXTURE_WORKFLOW_ID}`);
     expect(recorded).toContain(`rolling-summaries/workflow:${ROLLING_SUMMARIES_WORKFLOW_ID}`);
-    expect(await names(await open())).toEqual(['Fresh texture (example)', 'Rolling summaries (example)']);
+    expect(await names(await open())).toEqual([
+      'Fresh texture (example)',
+      'Rolling summaries (example)',
+      'Story Director (example)',
+    ]);
   });
 });
 
@@ -116,7 +126,7 @@ describe('the ledger file', () => {
     const again = await open();
     expect(await names(again)).not.toContain('Rolling summaries (example)');
     const upgraded = (await ledger()).seeded;
-    expect(upgraded.every((entry) => /^(fresh-texture|rolling-summaries)\//.test(entry))).toBe(true);
+    expect(upgraded.every((entry) => /^(fresh-texture|rolling-summaries|story-director)\//.test(entry))).toBe(true);
     expect(upgraded).toHaveLength(bare.length);
   });
 
@@ -127,7 +137,13 @@ describe('the ledger file', () => {
     await first.presets.delete(SUMMARIES_NARRATOR_PRESET_ID);
     await rm(join(directory, LEDGER_FILE));
     const again = await open();
-    expect(await names(again)).toEqual(['Default Assistant', 'Mine', 'Parallel demo', 'Rolling summaries (example)']);
+    expect(await names(again)).toEqual([
+      'Default Assistant',
+      'Mine',
+      'Parallel demo',
+      'Rolling summaries (example)',
+      'Story Director (example)',
+    ]);
     expect(await again.presets.get(SUMMARIES_NARRATOR_PRESET_ID)).toBeDefined();
   });
 
@@ -150,7 +166,7 @@ describe('the example presets', () => {
     const contents = (entries: { kind: string; content?: string }[]) =>
       entries.filter((entry) => entry.kind === 'message').map((entry) => entry.content);
     const wanted = contents(defaultPreset().entries);
-    for (const id of [NARRATOR_PRESET_ID, SUMMARIES_NARRATOR_PRESET_ID]) {
+    for (const id of [NARRATOR_PRESET_ID, SUMMARIES_NARRATOR_PRESET_ID, DIRECTOR_NARRATOR_PRESET_ID]) {
       const preset = (await context.presets.get(id))!;
       expect(contents(preset.entries)).toEqual(expect.arrayContaining(wanted));
     }
