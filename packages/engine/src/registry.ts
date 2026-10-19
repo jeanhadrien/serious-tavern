@@ -21,6 +21,7 @@ import { nextChunk } from './nodes/next-chunk/index.js';
 import { unlinkedMessages } from './nodes/unlinked-messages/index.js';
 import { trigger } from './nodes/trigger/index.js';
 import { pickFields } from './nodes/pick-fields/index.js';
+import { pacing } from './nodes/pacing/index.js';
 import { stagnation } from './nodes/stagnation/index.js';
 
 // Register a new backend node here; the UI uses its descriptor and generic editor automatically.
@@ -47,6 +48,7 @@ export const registry = new Map<string, NodeDefinition>(
     trigger,
     pickFields,
     stagnation,
+    pacing,
   ].map((node) => [node.type, node]),
 );
 export function descriptors(): NodeTypeDescriptor[] {
