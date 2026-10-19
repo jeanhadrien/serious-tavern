@@ -66,6 +66,13 @@ export function workflowToCanvas(
   };
 }
 
+/** Gives every node its display name (`Label #k (type)`): numbered among the nodes of its type, in array order. */
+export function withDisplayNames(nodes: CanvasNode[], types: NodeTypeDescriptor[]): CanvasNode[] {
+  const labelOf = (type: string) => types.find((item) => item.type === type)?.label ?? type;
+  const list = nodes.map((node) => ({ id: node.id, type: node.data.descriptor.type }));
+  return nodes.map((node) => ({ ...node, data: { ...node.data, name: nodeDisplayName(list, labelOf, node.id) } }));
+}
+
 export function canvasToWorkflow(workflow: Workflow, nodes: CanvasNode[], edges: FlowEdge[]): Workflow {
   return {
     ...workflow,

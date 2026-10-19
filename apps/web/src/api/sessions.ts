@@ -16,6 +16,9 @@ export const sessionsApi = {
     api<ApiResponse<'updateMessage'>>(`/sessions/${id}/messages/${messageId}`, { ...json('PATCH', body), ...options }),
   deleteMessage: (id: string, messageId: string, options?: RequestOptions) =>
     api<ApiResponse<'deleteMessage'>>(`/sessions/${id}/messages/${messageId}`, { ...json('DELETE'), ...options }),
+  /** Shows another alternative of the last turn; the answer is the whole stored session. */
+  setAlternative: (id: string, body: ApiBody<'setAlternative'>, options?: RequestOptions) =>
+    api<ApiResponse<'setAlternative'>>(`/sessions/${id}/alternative`, { ...json('PATCH', body), ...options }),
   /** The chat's computed story state (read-only; the fold the next turn starts from). */
   state: (id: string, options?: RequestOptions) =>
     api<ApiResponse<'getSessionState'>>(`/sessions/${id}/state`, options),

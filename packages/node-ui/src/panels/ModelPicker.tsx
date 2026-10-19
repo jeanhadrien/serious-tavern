@@ -51,8 +51,7 @@ export function ModelPicker({ providerId, value, onChange, loadModels }: ModelPi
       const model = shown[active];
       if (model) choose(model);
     } else if (event.key === 'Escape' && open) {
-      event.preventDefault();
-      event.stopPropagation();
+      event.preventDefault(); // the field acted: the shell's Escape leaves it alone
       close();
     }
   };

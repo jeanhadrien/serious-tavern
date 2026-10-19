@@ -20,6 +20,7 @@ export function Characters() {
           onBack={editor.back}
           onDelete={editor.remove}
           onSave={editor.save}
+          onRevert={editor.revert}
           actions={
             <>
               <button type="button" onClick={() => window.open(charactersApi.exportUrl(draft.id, 'json'), '_blank')}>

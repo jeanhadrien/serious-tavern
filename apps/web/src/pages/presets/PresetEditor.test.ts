@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { presetSchema, type PresetEntry } from '@st/shared';
-import { entryIcon, entryPreview, moveEntry, reorderEntries } from './PresetEntryList.js';
+import { entryIcon, entryPreview } from './PresetEntryList.js';
 
 const preset = presetSchema.parse({
   id: '8f1fe1a9-3480-4e52-834c-f25d90684d71',
@@ -36,39 +36,4 @@ it('previews compact entry content and uses the role icon', () => {
   };
   expect(entryPreview(message)).toBe('Hello there');
   expect(entryIcon(message, preset)).toBe('🤖');
-});
-
-const reorderFixture = () =>
-  ['a', 'b', 'c'].map(
-    (key): PresetEntry => ({
-      id: key,
-      displayName: key,
-      kind: 'slot',
-      enabled: true,
-      inputKey: key,
-      role: 'user',
-    }),
-  );
-
-it('moves entries before or after the drop target', () => {
-  expect(reorderEntries(reorderFixture(), 'c', 'a', false).map((entry) => entry.id)).toEqual(['c', 'a', 'b']);
-  expect(reorderEntries(reorderFixture(), 'a', 'c', true).map((entry) => entry.id)).toEqual(['b', 'c', 'a']);
-  expect(reorderEntries(reorderFixture(), 'a', null, false).map((entry) => entry.id)).toEqual(['b', 'c', 'a']);
-});
-
-it('leaves the order unchanged for unknown or self drops', () => {
-  const entries = reorderFixture();
-  expect(reorderEntries(entries, 'missing', 'a', false)).toBe(entries);
-  expect(reorderEntries(entries, 'a', 'missing', false)).toBe(entries);
-  expect(reorderEntries(entries, 'b', 'b', false)).toBe(entries);
-});
-
-it('moves an entry one place up or down, and not past either end', () => {
-  const ids = (entries: PresetEntry[]) => entries.map((entry) => entry.id);
-  expect(ids(moveEntry(reorderFixture(), 'b', -1))).toEqual(['b', 'a', 'c']);
-  expect(ids(moveEntry(reorderFixture(), 'b', 1))).toEqual(['a', 'c', 'b']);
-  const entries = reorderFixture();
-  expect(moveEntry(entries, 'a', -1)).toBe(entries);
-  expect(moveEntry(entries, 'c', 1)).toBe(entries);
-  expect(moveEntry(entries, 'missing', 1)).toBe(entries);
 });

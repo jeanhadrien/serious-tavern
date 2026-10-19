@@ -66,6 +66,11 @@ export class TurnRegistry {
     this.running.get(sessionId)?.stop('user');
   }
 
+  /** Whether a job (a turn, a regenerate or an after-reply run) holds the session's slot right now. */
+  isRunning(sessionId: string): boolean {
+    return this.running.has(sessionId);
+  }
+
   /** Whether the post-turn run `executionId` of the session is still to run or running (its turn holds the slot). */
   hasPostRun(sessionId: string, executionId: string): boolean {
     return this.running.get(sessionId)?.postExecutionId === executionId;

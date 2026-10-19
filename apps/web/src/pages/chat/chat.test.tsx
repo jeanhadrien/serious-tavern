@@ -127,6 +127,8 @@ it('renders a busy multiline composer, an empty edit guard and an accessible pen
       disabled
       onEdit={async () => true}
       onDelete={async () => true}
+      onRegenerate={() => {}}
+      onSwipe={async () => true}
     />,
   );
   expect(list).toContain('role="status"');
@@ -156,6 +158,8 @@ it('shows reasoning, a stopped note, and no pending indicator once a reply row i
       disabled
       onEdit={async () => true}
       onDelete={async () => true}
+      onRegenerate={() => {}}
+      onSwipe={async () => true}
     />,
   );
   expect(list).not.toContain('typing-dots');
@@ -254,6 +258,8 @@ it('shows the story chip on a message only when it is given one, and puts it on 
       disabled={false}
       onEdit={async () => true}
       onDelete={async () => true}
+      onRegenerate={() => {}}
+      onSwipe={async () => true}
     />,
   );
   expect(list.match(/What this turn stored/g)).toHaveLength(2); // aria-label and title of the one button
@@ -274,4 +280,23 @@ it('keeps the inline delete step until the trash button is clicked, even when de
   );
   expect(html).toContain('aria-label="Delete message"');
   expect(html).not.toContain('Delete message?');
+});
+
+it('offers Copy on stored messages with content, with or without edit and delete', () => {
+  const base = { id: 'm', role: 'assistant' as const, createdAt: '' };
+  const copyOnly = renderToStaticMarkup(<ChatMessageView message={{ ...base, content: 'Hi' }} />);
+  expect(copyOnly).toContain('aria-label="Copy message"');
+  expect(copyOnly).not.toContain('aria-label="Edit message"');
+  const all = renderToStaticMarkup(
+    <ChatMessageView message={{ ...base, content: 'Hi' }} onEdit={async () => true} onDelete={async () => true} />,
+  );
+  for (const label of ['Copy message', 'Edit message', 'Delete message'])
+    expect(all).toContain(`aria-label="${label}"`);
+});
+
+it('shows no Copy on a streaming row or a message without content', () => {
+  const base = { id: 'm', role: 'assistant' as const, createdAt: '' };
+  const streaming = { ...base, content: 'Hel', status: 'streaming' as const };
+  expect(renderToStaticMarkup(<ChatMessageView message={streaming} />)).not.toContain('Copy message');
+  expect(renderToStaticMarkup(<ChatMessageView message={{ ...base, content: '' }} />)).not.toContain('Copy message');
 });

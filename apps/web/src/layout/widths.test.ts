@@ -6,6 +6,7 @@ import {
   loadWidths,
   MIN_MIDDLE,
   MIN_SIDE,
+  resetSide,
   resizeSide,
   saveWidths,
 } from './widths.js';
@@ -34,6 +35,14 @@ it('clamps a resized column between its minimum and what the others leave', () =
 
 it('lets the left column use the whole budget in two-column mode', () => {
   expect(resizeSide(DEFAULT_WIDTHS, 'left', 5000, 1000, 2).left).toBe(1000 - MIN_MIDDLE - HANDLE_WIDTH);
+});
+
+it('resets one column to its default and leaves the other alone', () => {
+  const widths = { left: 400, right: 500 };
+  expect(resetSide(widths, 'left', 1600, 3)).toEqual({ left: DEFAULT_WIDTHS.left, right: 500 });
+  expect(resetSide(widths, 'right', 1600, 3)).toEqual({ left: 400, right: DEFAULT_WIDTHS.right });
+  // Still clamped when the other column leaves less room than the default.
+  expect(resetSide({ left: 800, right: 180 }, 'right', 1500, 3).right).toBe(1500 - MIN_MIDDLE - 2 * HANDLE_WIDTH - 800);
 });
 
 it('round-trips widths through storage and survives broken storage', () => {

@@ -3,14 +3,18 @@ import type { Collection } from '@st/shared';
 
 const collectionsApi = { get: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() };
 const refresh = vi.fn(async () => []);
-const editor = { currentId: undefined as string | undefined, open: vi.fn() };
+const editor = { currentId: undefined as string | undefined, open: vi.fn(), confirmSwitch: vi.fn(async () => true) };
 const alerts = { success: vi.fn(), info: vi.fn(), error: vi.fn() };
 const notifyError = vi.fn();
 vi.mock('../../api.js', async (original) => ({ ...(await original<object>()), collectionsApi }));
 vi.mock('../../api/transport.js', async (original) => ({ ...(await original<object>()), notifyError }));
 vi.mock('../../stores/index.js', () => ({
   collectionsStore: { refresh },
-  collectionEditorStore: { getSnapshot: () => ({ currentId: editor.currentId }), open: editor.open },
+  collectionEditorStore: {
+    getSnapshot: () => ({ currentId: editor.currentId }),
+    open: editor.open,
+    confirmSwitch: editor.confirmSwitch,
+  },
 }));
 vi.mock('../../alerts/index.js', () => ({ alerts }));
 
@@ -36,7 +40,7 @@ it('recreates a collection the server no longer finds only when the user agrees'
   const missing = new ApiError(404, 'NOT_FOUND', 'Collection not found');
   collectionsApi.update.mockRejectedValue(missing);
   collectionsApi.create.mockResolvedValue({ ...lore, id: 'c2' });
-  const confirm = vi.fn(() => true);
+  const confirm = vi.fn(async () => true);
   expect(await saveCollection('c1', body, confirm)).toMatchObject({ id: 'c2' });
   expect(confirm).toHaveBeenCalledWith('Lore');
   expect(collectionsApi.create).toHaveBeenCalledWith(body);
@@ -47,7 +51,7 @@ it('recreates a collection the server no longer finds only when the user agrees'
 it('keeps the draft unsaved when the user declines the recreate (the file may only be unreadable)', async () => {
   // The server answers 404 for a file that no longer parses as well as for a deleted one.
   collectionsApi.update.mockRejectedValue(new ApiError(404, 'NOT_FOUND', 'Collection not found'));
-  expect(await saveCollection('c1', body, () => false)).toBeUndefined();
+  expect(await saveCollection('c1', body, async () => false)).toBeUndefined();
   expect(collectionsApi.create).not.toHaveBeenCalled();
   expect(refresh).not.toHaveBeenCalled();
   expect(alerts.success).not.toHaveBeenCalled();
@@ -94,6 +98,7 @@ it('opens a collection only once its whole record has arrived, and only the late
   let answer: (value: Collection) => void = () => {};
   collectionsApi.get.mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
   const first = openCollection('c1', show);
+  await vi.waitFor(() => expect(collectionsApi.get).toHaveBeenCalledTimes(1));
   expect(editor.open).not.toHaveBeenCalled();
   collectionsApi.get.mockResolvedValueOnce({ ...lore, id: 'c2' });
   await openCollection('c2', show);
@@ -115,4 +120,14 @@ it('shows the open collection without fetching it again (its draft stays), and o
   await openCollection('c3', show);
   expect(editor.open).not.toHaveBeenCalled();
   expect(show).toHaveBeenCalledTimes(1);
+});
+
+it('asks before fetching, and a Cancel leaves everything as it was', async () => {
+  const show = vi.fn();
+  editor.confirmSwitch.mockResolvedValueOnce(false);
+  await openCollection('c1', show);
+  expect(editor.confirmSwitch).toHaveBeenCalledWith('c1');
+  expect(collectionsApi.get).not.toHaveBeenCalled();
+  expect(editor.open).not.toHaveBeenCalled();
+  expect(show).not.toHaveBeenCalled();
 });

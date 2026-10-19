@@ -7,14 +7,15 @@ import {
   type ApiBody,
   type ChatMessage,
 } from '@st/shared';
-import { sessionsApi, streamMessage } from '../../api.js';
+import { sessionsApi, streamMessage, streamRegenerate } from '../../api.js';
 import { ApiError, notifyError } from '../../api/transport.js';
-import type { TurnResult } from '../../api/turnStream.js';
+import type { TurnHandlers, TurnResult } from '../../api/turnStream.js';
 import { alerts } from '../../alerts/index.js';
 import { charactersStore, personasStore, sessionsStore, useList, workflowsStore } from '../../stores/index.js';
+import { createDraftSaver, loadDraft, pruneDrafts, saveDraft } from './composerDraft.js';
 import { withStoredMetadata, withStoredSettings } from './openSession.js';
 import type { SaveOptions } from './panel/useSettingSaver.js';
-import { applyDelta, settleTurn } from './turnMessages.js';
+import { applyDelta, lastTurnReplyIds, replaceLastTurnReplies, settleRegenerate, settleTurn } from './turnMessages.js';
 import { useMessageActions } from './useMessageActions.js';
 
 export function useChat() {
@@ -23,7 +24,31 @@ export function useChat() {
   const personas = useList(personasStore);
   const sessions = useList(sessionsStore);
   const [session, setSession] = useState<Session>();
-  const [content, setContent] = useState('');
+  const [content, setContentState] = useState('');
+  // The composer text per chat: saved to localStorage debounced and on leaving a chat, never per streamed token
+  // (typing is the only writer; a turn's tokens never touch it).
+  const contentRef = useRef('');
+  const sessionIdRef = useRef<string | undefined>(undefined);
+  const [draftSaver] = useState(createDraftSaver);
+  const show = (text: string) => {
+    contentRef.current = text;
+    setContentState(text);
+  };
+  const setContent = useCallback(
+    (text: string) => {
+      contentRef.current = text;
+      setContentState(text);
+      if (sessionIdRef.current) draftSaver.schedule(sessionIdRef.current, text);
+    },
+    [draftSaver],
+  );
+  // Opens a chat (or none): the previous draft is written first, the new chat's draft is shown.
+  const enter = (next: Session | undefined) => {
+    draftSaver.flush();
+    sessionIdRef.current = next?.id;
+    setSession(next);
+    show(next ? loadDraft(next.id) : '');
+  };
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   // A sent message the server has not started yet: it may wait behind another turn or an after-reply run.
@@ -44,15 +69,29 @@ export function useChat() {
       streamControllerRef.current?.abort();
     };
   }, []);
+  useEffect(() => {
+    const flush = () => draftSaver.flush();
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      flush();
+    };
+  }, [draftSaver]);
+  // Drafts of deleted chats do not stay behind.
+  useEffect(() => {
+    sessionsStore
+      .refresh()
+      .then((list) =>
+        pruneDrafts([...list.map((item) => item.id), ...(sessionIdRef.current ? [sessionIdRef.current] : [])]),
+      )
+      .catch(() => {});
+  }, []);
   const open = async (id: string) => {
     if (busyRef.current || messageActions.isPending()) return;
     const request = ++opening.current;
     try {
       const next = await sessionsApi.get(id);
-      if (opening.current === request) {
-        setSession(next);
-        setContent('');
-      }
+      if (opening.current === request) enter(next);
     } catch {
       /* API errors are toasted. */
     }
@@ -61,8 +100,7 @@ export function useChat() {
   const close = () => {
     if (busyRef.current || messageActions.isPending()) return;
     ++opening.current;
-    setSession(undefined);
-    setContent('');
+    enter(undefined);
   };
   const create = async () => {
     if (busyRef.current || messageActions.isPending()) return;
@@ -74,10 +112,7 @@ export function useChat() {
         workflowId: initialWorkflow.id,
         personaId: session?.personaId ?? personas[0]?.id,
       });
-      if (request === opening.current) {
-        setSession(next);
-        setContent('');
-      }
+      if (request === opening.current) enter(next);
       alerts.info('Chat created');
       await refresh();
     } catch {
@@ -117,6 +152,11 @@ export function useChat() {
     ++opening.current;
     try {
       await sessionsApi.delete(id);
+      if (sessionIdRef.current === id) {
+        draftSaver.cancel();
+        enter(undefined);
+      }
+      saveDraft(id, '');
       setSession((current) => (current?.id === id ? undefined : current));
       alerts.info('Chat deleted');
       await refresh();
@@ -137,23 +177,21 @@ export function useChat() {
     }
     sessionsApi.stopTurn(session.id, { silent: true }).catch(() => streamControllerRef.current?.abort());
   };
-  const send = async () => {
-    if (!session || busyRef.current || messageActions.isPending()) return;
-    busyRef.current = true;
-    const sessionId = session.id;
-    const text = content.trim();
-    setContent('');
-    setBusy(true);
-    setWaiting(true);
-
-    // An empty send adds no user message; the turn runs on the history as it is.
-    const optimisticUser: ChatMessage | undefined = text
-      ? { id: crypto.randomUUID(), role: 'user', content: text, createdAt: new Date().toISOString() }
-      : undefined;
+  // The streaming path of a send and of a regenerate: rows are local (`streaming`) until the turn settles, errors
+  // are decided here (never toasted by the stream), and a failure without saved details falls back to the server's
+  // copy of the chat.
+  const runStream = async (
+    sessionId: string,
+    stream: (handlers: TurnHandlers, signal: AbortSignal) => Promise<void>,
+    kind: { optimisticUser?: ChatMessage; replaced?: readonly string[]; cancelled?: () => void },
+  ) => {
+    const { optimisticUser, replaced } = kind;
     const patchMessages = (change: (messages: ChatMessage[]) => ChatMessage[]) =>
       setSession((prev) => (prev?.id === sessionId ? { ...prev, messages: change(prev.messages) } : prev));
     const settle = (result: TurnResult | TurnFailureDetails) => {
-      patchMessages((messages) => settleTurn(messages, optimisticUser?.id, result));
+      patchMessages((messages) =>
+        replaced ? settleRegenerate(messages, replaced, result) : settleTurn(messages, optimisticUser?.id, result),
+      );
       setLogs((prev) => ({ ...prev, [result.execution.id]: result.execution }));
     };
     const resync = () =>
@@ -166,16 +204,18 @@ export function useChat() {
     const controller = new AbortController();
     streamControllerRef.current = controller;
     try {
-      await streamMessage(
-        sessionId,
-        text,
+      await stream(
         {
-          onStart: () => setWaiting(false),
+          onStart: () => {
+            setWaiting(false);
+            // A regenerate shows only its own rows once the server runs it; until then (queued) the reply stays.
+            if (replaced) patchMessages((messages) => replaceLastTurnReplies(messages, replaced));
+          },
           onDelta: (nodeId, textDelta, reasoningDelta) =>
             patchMessages((messages) => applyDelta(messages, nodeId, textDelta, reasoningDelta)),
           onComplete: settle,
         },
-        { signal: controller.signal },
+        controller.signal,
       );
     } catch (error) {
       const failure = error instanceof ApiError ? turnFailureDetailsSchema.safeParse(error.details) : undefined;
@@ -187,8 +227,7 @@ export function useChat() {
       } else {
         if (error instanceof ApiError) notifyError(error);
         else if (!(error instanceof Error && error.name === 'AbortError')) alerts.error(String(error));
-        // A message cancelled while it waited goes back to the composer, to be edited or sent again.
-        if (cancelledRef.current) setContent((current) => current || text);
+        if (cancelledRef.current) kind.cancelled?.();
         // Whatever the server kept (the user message, partial rows) is the truth; drop local rows.
         await resync();
       }
@@ -200,6 +239,45 @@ export function useChat() {
       setWaiting(false);
       refresh().catch(() => {});
     }
+  };
+  const send = async () => {
+    if (!session || busyRef.current || messageActions.isPending()) return;
+    busyRef.current = true;
+    const sessionId = session.id;
+    const text = content.trim();
+    // Sending clears the stored draft at once; only a message cancelled while queued is put back.
+    draftSaver.cancel();
+    saveDraft(sessionId, '');
+    show('');
+    setBusy(true);
+    setWaiting(true);
+    // An empty send adds no user message; the turn runs on the history as it is.
+    const optimisticUser: ChatMessage | undefined = text
+      ? { id: crypto.randomUUID(), role: 'user', content: text, createdAt: new Date().toISOString() }
+      : undefined;
+    await runStream(sessionId, (handlers, signal) => streamMessage(sessionId, text, handlers, { signal }), {
+      optimisticUser,
+      // A message cancelled while it waited goes back to the composer, to be edited or sent again.
+      cancelled: () => {
+        if (contentRef.current) return;
+        show(text);
+        saveDraft(sessionId, text);
+      },
+    });
+  };
+  // Runs the last turn again on the same history. The composer and its draft are not involved. The current replies
+  // stay until the server starts the run; then they are hidden (the new rows stream in their place), and they come
+  // back if the run leaves no reply at all (`settleRegenerate`).
+  const regenerate = async () => {
+    if (!session || busyRef.current || messageActions.isPending()) return;
+    const replaced = lastTurnReplyIds(session.messages);
+    if (!replaced.length) return;
+    busyRef.current = true;
+    setBusy(true);
+    setWaiting(true);
+    await runStream(session.id, (handlers, signal) => streamRegenerate(session.id, handlers, { signal }), {
+      replaced,
+    });
   };
   return {
     workflows,
@@ -219,6 +297,8 @@ export function useChat() {
     updateSettings,
     remove,
     send,
+    regenerate,
+    swipe: messageActions.swipe,
     stop,
     mutating: messageActions.mutating,
     editMessage: messageActions.editMessage,

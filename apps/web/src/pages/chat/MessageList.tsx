@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import type { Character, ChatMessage, ExecutionLog, Persona, SessionStateView } from '@st/shared';
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import type { Character, ChatMessage, ExecutionLog, LastTurnAlternatives, Persona, SessionStateView } from '@st/shared';
 import { ChatMessageView } from './ChatMessageView.js';
 import { messageLinks } from './story/linkMarkers.js';
 import { runningPostRun } from './story/postRuns.js';
@@ -9,6 +9,7 @@ import { useStickToBottom } from './useStickToBottom.js';
 
 interface MessageListProps {
   sessionId: string;
+  /** The messages in the chat: the shared `activeMessages` of the session's (inactive alternatives are not shown). */
   messages: ChatMessage[];
   characters: Character[];
   persona?: Persona;
@@ -21,6 +22,15 @@ interface MessageListProps {
   disabled: boolean;
   onEdit: (id: string, content: string) => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
+  /**
+   * The last turn's alternatives (`alternativesOfLastTurn` over ALL the session's messages: the inactive ones are
+   * what make an alternative), or none while a run is in flight. Only its `lastReplyId` message gets the controls.
+   */
+  lastTurn?: LastTurnAlternatives | null;
+  /** Runs the last turn again; shown with the swipe controls on the last reply of the last turn. */
+  onRegenerate: () => void;
+  /** Shows another alternative of the last turn (by its `executionId`); true when it was saved. */
+  onSwipe: (executionId: string) => Promise<boolean>;
   /** "Show in Story state" on a message's marker: the id of the state item to show. */
   onShowLinked?: (itemId: string) => void;
 }
@@ -37,6 +47,9 @@ export function MessageList({
   disabled,
   onEdit,
   onDelete,
+  lastTurn: last = null,
+  onRegenerate,
+  onSwipe,
   onShowLinked,
 }: MessageListProps) {
   const { viewport, content, onScroll } = useStickToBottom(sessionId, messages);
@@ -49,6 +62,31 @@ export function MessageList({
   const waiting = busy && !messages.some((message) => message.status === 'streaming');
   // A message sent while the previous turn's after-reply run works is queued behind it by the server.
   const queued = useMemo(() => runningPostRun(story) !== undefined, [story]);
+  // After a swipe the controls move to another message; focus follows them to the same direction's button.
+  const refocus = useRef<-1 | 1>(undefined);
+  const swipe = useCallback(
+    async (direction: -1 | 1) => {
+      if (!last) return;
+      const target = last.alternatives[last.activeIndex + direction];
+      if (!target) return;
+      refocus.current = direction;
+      if (!(await onSwipe(target.executionId))) refocus.current = undefined;
+    },
+    [last, onSwipe],
+  );
+  const lastReplyId = last?.lastReplyId;
+  useLayoutEffect(() => {
+    const direction = refocus.current;
+    if (direction === undefined || disabled || !lastReplyId) return;
+    refocus.current = undefined;
+    const buttons = viewport.current?.querySelectorAll<HTMLButtonElement>(
+      `[data-message-id="${lastReplyId}"] [data-swipe]`,
+    );
+    const wanted = [...(buttons ?? [])].find(
+      (button) => button.dataset.swipe === String(direction) && !button.disabled,
+    );
+    (wanted ?? [...(buttons ?? [])].find((button) => !button.disabled))?.focus();
+  }, [lastReplyId, disabled, viewport]);
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: A scrollable history region must be reachable for keyboard scrolling.
     <section ref={viewport} className="thread" onScroll={onScroll} aria-label="Message history" tabIndex={0}>
@@ -63,6 +101,18 @@ export function MessageList({
             storyChip={chips.get(message.id)}
             links={links.get(message.id)}
             undoOnDelete={undoOnDelete && (() => undoOnDelete(message.id))}
+            alternatives={
+              last && message.id === last.lastReplyId
+                ? {
+                    index: last.activeIndex,
+                    count: last.alternatives.length,
+                    disabled,
+                    swipeDisabled: queued,
+                    onRegenerate,
+                    onSwipe: (direction) => void swipe(direction),
+                  }
+                : undefined
+            }
             disabled={disabled}
             onEdit={onEdit}
             onDelete={onDelete}

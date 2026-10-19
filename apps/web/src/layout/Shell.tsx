@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Menu } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
+import { useKeyboard } from '../keyboard/useKeyboard.js';
 import { Chat } from '../pages/Chat.js';
 import { ChatSidebar } from '../pages/chat/ChatSidebar.js';
 import { useChat } from '../pages/chat/useChat.js';
@@ -24,8 +25,10 @@ import {
 import { parseLayoutUrl, urlTarget } from './url.js';
 import { useColumnWidths } from './useColumnWidths.js';
 import { useCompactMode, useMobileMode } from './useCompactMode.js';
+import { useDefaultEscapeAreas } from './useEscapeAreas.js';
 import { useDirtySync } from './useDirtySync.js';
 import { searchOf, useLayoutUrl } from './useLayoutUrl.js';
+import { useUnsavedWarning } from './useUnsavedWarning.js';
 import { VIEW_INFO } from './views.js';
 import { HANDLE_WIDTH } from './widths.js';
 import './shell.css';
@@ -57,6 +60,7 @@ export function Shell() {
   }, [mobile]);
 
   useDirtySync(DIRTY_SOURCES, dispatch);
+  useKeyboard();
   const actions = useMemo(
     () => ({
       openEditor: (id: ResourceId) => dispatch({ type: 'openEditor', id }),
@@ -66,8 +70,9 @@ export function Shell() {
     [],
   );
 
+  useDefaultEscapeAreas(layout, actions.closeEditor);
   const gridRef = useRef<HTMLDivElement>(null);
-  const { widths, resize } = useColumnWidths(gridRef, compact ? 2 : 3);
+  const { widths, resize, reset } = useColumnWidths(gridRef, compact ? 2 : 3);
   const chat = useChat();
   useLayoutUrl(layout, dispatch, chat);
 
@@ -101,6 +106,7 @@ export function Shell() {
   const selectMobile = (view: MobileView) =>
     view === 'chat' || view === 'editor' ? dispatch({ type: 'showMiddle', chat: view === 'chat' }) : select(view);
   const anyDirty = Object.values(layout.dirty).some(Boolean);
+  useUnsavedWarning(anyDirty);
   const titleId = shown === 'editor' ? layout.wide : shown;
   const mobileTitle = titleId && VIEW_INFO[titleId].label;
   const gridStyle: CSSProperties = mobile
@@ -159,6 +165,7 @@ export function Shell() {
               value={widths.left}
               direction={1}
               onResize={(width) => resize('left', width)}
+              onReset={() => reset('left')}
             />
           )}
           {!compact && (
@@ -168,6 +175,7 @@ export function Shell() {
               value={widths.right}
               direction={-1}
               onResize={(width) => resize('right', width)}
+              onReset={() => reset('right')}
             />
           )}
           {/* Views never change position in this list: moving one between columns only changes its grid
@@ -179,6 +187,7 @@ export function Shell() {
                 key={key}
                 className="view"
                 data-view={key}
+                tabIndex={-1}
                 hidden={!slot}
                 style={slot ? { gridArea: bodyArea[slot] } : undefined}
               >

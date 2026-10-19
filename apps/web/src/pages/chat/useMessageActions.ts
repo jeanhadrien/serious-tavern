@@ -38,8 +38,27 @@ export function useMessageActions(
       setMutating(false);
     }
   };
+  // Shows another alternative of the last turn. The answer is the whole stored session; only its messages are
+  // taken, so the local settings (the chat panel's saves) are untouched, like the other message changes.
+  const swipe = async (executionId: string): Promise<boolean> => {
+    if (!session || pending.current || workflowBusy()) return false;
+    pending.current = true;
+    setMutating(true);
+    try {
+      const stored = await sessionsApi.setAlternative(session.id, { executionId });
+      setSession((current) => (current?.id === stored.id ? { ...current, messages: stored.messages } : current));
+      await refresh().catch(() => {});
+      return true;
+    } catch {
+      return false;
+    } finally {
+      pending.current = false;
+      setMutating(false);
+    }
+  };
   return {
     mutating,
+    swipe,
     isPending: () => pending.current,
     editMessage: (id: string, content: string) => mutate(id, content),
     deleteMessage: (id: string) => mutate(id),

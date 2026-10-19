@@ -7,10 +7,13 @@ export function selectionAfterRemove(selected: number | undefined, removed: numb
   return selected > removed ? selected - 1 : selected;
 }
 
-/** After swapping entries `from` and `to` (a move by one): the selection follows its entry. */
+/** After moving entry `from` to index `to` (any distance): the selection follows its entry, and the ones in between shift. */
 export function selectionAfterMove(selected: number | undefined, from: number, to: number): number | undefined {
+  if (selected === undefined) return undefined;
   if (selected === from) return to;
-  return selected === to ? from : selected;
+  if (from < to && selected > from && selected <= to) return selected - 1;
+  if (from > to && selected >= to && selected < from) return selected + 1;
+  return selected;
 }
 
 /** After loading a collection of `length` entries: kept by position (clamped) when asked, else closed. */

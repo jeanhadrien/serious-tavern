@@ -1,6 +1,6 @@
 /* The workflow editor's chat settings panel: one compact card per declaration. */
 .config-panel.workflow-settings-panel {
-  width: 340px;
+  width: var(--config-panel-width, 340px);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -64,12 +64,12 @@
   justify-content: center;
   gap: 6px;
 }
-.editor-toolbar .toolbar-toggle {
+.editor-header .toolbar-toggle {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
-.editor-toolbar .toolbar-toggle[aria-pressed="true"] {
+.editor-header .toolbar-toggle[aria-pressed="true"] {
   background: #3d4560;
   border-color: #6f7fd8;
 }

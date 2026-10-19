@@ -16,14 +16,23 @@ export function EntityListView<T extends Character | Persona>({ kind }: { kind: 
   const importInput = useRef<HTMLInputElement>(null);
   const filtered = list.filter((item) => item.name.toLowerCase().includes(search.toLowerCase()));
 
-  const open = (item: T) => {
+  const show = (item: T) => {
     kind.editorStore.open(structuredClone(item));
     openEditor(kind.type);
   };
-  const create = () => void createEntity(kind).then((item) => item && open(item));
+  const open = async (item: T) => {
+    if (await kind.editorStore.confirmSwitch(item.id)) show(item);
+  };
+  // Create and import write on the server, so the question comes first.
+  const create = async () => {
+    if (!(await kind.editorStore.confirmSwitch())) return;
+    const item = await createEntity(kind);
+    if (item) show(item);
+  };
   const importFiles = async (files: File[]) => {
+    if (!kind.prepareFiles(files).length || !(await kind.editorStore.confirmSwitch())) return;
     const item = await importEntityFiles(kind, files);
-    if (item) open(item);
+    if (item) show(item);
   };
 
   return (
@@ -31,7 +40,7 @@ export function EntityListView<T extends Character | Persona>({ kind }: { kind: 
       <aside className="entity-list" aria-label={kind.title}>
         <div className="toolbar">
           <h2>{kind.title}</h2>
-          <button type="button" className="primary" onClick={create}>
+          <button type="button" className="primary" onClick={() => void create()}>
             + New
           </button>
         </div>
@@ -60,7 +69,7 @@ export function EntityListView<T extends Character | Persona>({ kind }: { kind: 
             type="button"
             className={`entity-row ${currentId === item.id ? 'selected' : ''}`}
             key={item.id}
-            onClick={() => open(item)}
+            onClick={() => void open(item)}
           >
             <EntityPortrait type={kind.type} item={item} />
             <span>

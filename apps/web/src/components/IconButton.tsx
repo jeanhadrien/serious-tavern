@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from 'react';
+import type { ButtonHTMLAttributes, Ref } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import './icon-button.css';
 
@@ -7,6 +7,7 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   label: string;
   /** Shows a small dot on the button, e.g. for unsaved changes. */
   dot?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export function IconButton({ icon: Icon, label, dot = false, className = '', ...props }: IconButtonProps) {

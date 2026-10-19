@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { entryUsesInput, presetSchema, presetWarnings, type Preset, type PresetInput } from '@st/shared';
 import { EntryList, newId } from './PresetEntryList.js';
+import { EditorHeader } from '../../components/EditorHeader.js';
 import { ImportedBanner } from './ImportedBanner.js';
 
 const newInput = (inputs: PresetInput[]): PresetInput => {
@@ -131,6 +132,7 @@ export function PresetEditor(props: {
   readOnly: boolean;
   onChange(preset: Preset): void;
   onSave(): void;
+  onRevert(): void;
   onDuplicate(): void;
   selectedEntryId: string;
   onSelectEntry(id: string): void;
@@ -138,18 +140,19 @@ export function PresetEditor(props: {
   return (
     <section className="preset-editor-column">
       {props.preset.source && <ImportedBanner source={props.preset.source} onDuplicate={props.onDuplicate} />}
-      <div className="editor-toolbar preset-toolbar">
-        <input
-          aria-label="Preset name"
-          disabled={props.readOnly}
-          value={props.preset.name}
-          onChange={(event) => props.onChange({ ...props.preset, name: event.target.value })}
-        />
-        {props.dirty && <small>Unsaved changes</small>}
-        <button className="primary" disabled={props.readOnly} onClick={props.onSave}>
-          Save
-        </button>
-      </div>
+      <EditorHeader
+        className="preset-toolbar"
+        title={
+          <input
+            aria-label="Preset name"
+            disabled={props.readOnly}
+            value={props.preset.name}
+            onChange={(event) => props.onChange({ ...props.preset, name: event.target.value })}
+          />
+        }
+        dirty={props.dirty}
+        actions={{ save: { onClick: props.onSave, disabled: props.readOnly }, revert: { onClick: props.onRevert } }}
+      />
       <label>
         Description{' '}
         <input

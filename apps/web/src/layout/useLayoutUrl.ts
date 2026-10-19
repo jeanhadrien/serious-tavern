@@ -2,24 +2,17 @@ import { useEffect, useRef, useState, useSyncExternalStore, type Dispatch } from
 import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import type { Session } from '@st/shared';
 import {
-  charactersStore,
   characterEditorStore,
   collectionEditorStore,
-  collectionsStore,
   personaEditorStore,
-  personasStore,
   presetEditorStore,
-  presetsStore,
   providerEditorStore,
-  providersStore,
   sessionsStore,
   stateDefinitionEditorStore,
-  stateDefinitionsStore,
   workflowEditorStore,
-  workflowsStore,
 } from '../stores/index.js';
 import type { EditorStore } from '../stores/editorStore.js';
-import type { ListStore } from '../stores/listStore.js';
+import { ITEM_SOURCES, type Item } from './itemSources.js';
 import { legacySearch } from './routes.js';
 import type { LayoutAction, LayoutState, ResourceId } from './state.js';
 import {
@@ -31,20 +24,6 @@ import {
   urlTarget,
   type LayoutUrl,
 } from './url.js';
-
-interface Item {
-  id: string;
-}
-/** A resource that opens items by id: its list, and the editor store that opens them. */
-const ITEM_SOURCES: Partial<Record<ResourceId, { list: ListStore<Item>; editor: EditorStore<Item> }>> = {
-  workflows: { list: workflowsStore, editor: workflowEditorStore },
-  presets: { list: presetsStore, editor: presetEditorStore },
-  providers: { list: providersStore, editor: providerEditorStore },
-  stateDefinitions: { list: stateDefinitionsStore, editor: stateDefinitionEditorStore },
-  characters: { list: charactersStore, editor: characterEditorStore },
-  personas: { list: personasStore, editor: personaEditorStore },
-  collections: { list: collectionsStore, editor: collectionEditorStore },
-};
 
 /** What the hook needs from the chat; `busy` turns must never be disturbed. */
 interface ChatControls {
@@ -115,12 +94,14 @@ export function useLayoutUrl(layout: LayoutState, dispatch: Dispatch<LayoutActio
       const open = source.editor.getSnapshot();
       if (open.currentId === id && !edge) return;
       // Back/Forward never discards an unsaved draft (the URL then follows what is shown); a clicked link,
-      // like a click in a list, replaces it.
+      // like a click in a list, asks Save / Discard / Cancel first. Cancel leaves the editor alone and the URL is
+      // then written back to what is shown.
       if (fromHistory && open.dirty && open.currentId !== id) return;
       const items = await source.list.refresh().catch(() => undefined);
       if (!items || !isCurrent()) return;
       const item = items.find((candidate) => candidate.id === id);
       if (!item) return dispatch({ type: 'closeEditor', id: resource }); // deleted since the link was made
+      if (!(await source.editor.confirmSwitch(id)) || !isCurrent()) return;
       source.editor.open(structuredClone(item), edge);
       await whenOpen(source.editor, id);
     };

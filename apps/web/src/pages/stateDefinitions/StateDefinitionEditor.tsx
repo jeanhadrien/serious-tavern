@@ -1,6 +1,5 @@
-import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { IconButton } from '../../components/IconButton.js';
+import { EditorHeader } from '../../components/EditorHeader.js';
 import { layoutHref } from '../../layout/url.js';
 import { newKeyDraft, type DefinitionDraft, type KeyDraft } from './definitionDraft.js';
 import type { DraftProblems } from './definitionCompile.js';
@@ -19,6 +18,7 @@ interface StateDefinitionEditorProps {
   saving: boolean;
   onChange(draft: DefinitionDraft): void;
   onSave(): void;
+  onRevert(): void;
   onDelete(): void;
   onDuplicate(): void;
   onDuplicateAs(): void;
@@ -41,29 +41,22 @@ export function StateDefinitionEditor(props: StateDefinitionEditorProps) {
     onChange({ ...draft, keys: draft.keys.map((item) => (item.uid === uid ? key : item)) });
   return (
     <section className="state-editor">
-      <div className="state-toolbar">
-        <div className="state-title">
-          <IconButton icon={ArrowLeft} label="Back to state definitions" onClick={props.onBack} />
-          <h1>{draft.name || 'State definition'}</h1>
-          {dirty && <span className="dirty-dot">Unsaved</span>}
-        </div>
-        <div className="toolbar">
-          <button
-            type="button"
-            disabled={dirty}
-            title={dirty ? 'Duplicate copies the saved definition: save or undo your changes first' : undefined}
-            onClick={props.onDuplicate}
-          >
-            Duplicate…
-          </button>
-          <button type="button" onClick={props.onDelete}>
-            Delete
-          </button>
-          <button type="button" className="primary" disabled={!canSave} title={saveTitle} onClick={props.onSave}>
-            Save
-          </button>
-        </div>
-      </div>
+      <EditorHeader
+        title={draft.name || 'State definition'}
+        back={{ label: 'Back to state definitions', onClick: props.onBack }}
+        dirty={dirty}
+        actions={{
+          save: { onClick: props.onSave, disabled: !canSave, title: saveTitle },
+          revert: { onClick: props.onRevert },
+          duplicate: {
+            label: 'Duplicate…',
+            onClick: props.onDuplicate,
+            disabled: dirty,
+            title: dirty ? 'Duplicate copies the saved definition: save or undo your changes first' : undefined,
+          },
+          remove: { onClick: props.onDelete },
+        }}
+      />
       {blocked && (
         <div className="state-banner" role="alert">
           <p>{blocked.message}</p>

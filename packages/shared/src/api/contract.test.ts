@@ -298,3 +298,11 @@ it("describes the items a turn could not store and the link of a state view's it
   ])
     expect(itemLinkViewSchema.safeParse(bad).success).toBe(false);
 });
+
+it('describes regenerate (no body, the send result) and the swipe body', () => {
+  expect(apiContract.regenerate.response).toBe(apiContract.sendMessage.response);
+  expect(apiContract.streamRegenerate.response).toBe(apiContract.streamTurn.response);
+  expect(apiContract.setAlternative.body.parse({ executionId: 'e1' })).toEqual({ executionId: 'e1' });
+  expect(apiContract.setAlternative.body.safeParse({ executionId: '' }).success).toBe(false);
+  expect(apiContract.setAlternative.body.safeParse({}).success).toBe(false);
+});

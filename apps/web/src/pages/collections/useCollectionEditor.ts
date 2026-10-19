@@ -2,14 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Collection, CollectionSummary } from '@st/shared';
 import { ApiError, collectionsApi } from '../../api.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
-import { collectionEditorStore, collectionsStore, useEditorCommands } from '../../stores/index.js';
+import { collectionEditorStore, collectionsStore, useEditorCommands, useEditorSaver } from '../../stores/index.js';
 import { useFileSync } from '../useFileSync.js';
 import { deleteCollection, saveCollection } from './collectionActions.js';
 import {
   classifyCollectionChange,
   draftChanged,
   draftToBody,
-  moveEntry,
   newEntry,
   storedForm,
   toDraft,
@@ -17,6 +16,9 @@ import {
   type EntryDraft,
 } from './collectionDraft.js';
 import { selectionAfterLoad, selectionAfterMove, selectionAfterRemove } from './entrySelection.js';
+import { confirmDelete } from '../../components/dialog/dialogStore.js';
+import { moveItem } from '../../components/sortable/moveItem.js';
+import { useRowIds } from '../../components/sortable/useRowIds.js';
 
 const COLLECTIONS = {
   event: 'collections.changed',
@@ -114,6 +116,8 @@ export function useCollectionEditor() {
     },
   });
 
+  // Stable row ids for dragging; the entries have none, and their position is not stable while one moves.
+  const rows = useRowIds(draft?.entries.length ?? 0);
   const change = (next: CollectionDraft) => {
     setDraft(next);
     setErrors([]);
@@ -129,15 +133,16 @@ export function useCollectionEditor() {
       updateEntry: (index: number, patch: Partial<EntryDraft>) =>
         setEntries((entries) => entries.map((entry, at) => (at === index ? { ...entry, ...patch } : entry))),
       removeEntry: (index: number) => {
+        rows.remove(index);
         setEntries((entries) => entries.filter((_, at) => at !== index));
         setSelected((current) => selectionAfterRemove(current, index));
       },
-      moveEntry: (index: number, offset: number) => {
-        const to = index + offset;
+      moveEntry: (from: number, to: number) => {
         const length = latest.current.draft?.entries.length ?? 0;
-        if (to < 0 || to >= length) return;
-        setEntries((entries) => moveEntry(entries, index, to));
-        setSelected((current) => selectionAfterMove(current, index, to));
+        if (from === to || from < 0 || to < 0 || from >= length || to >= length) return;
+        rows.move(from, to);
+        setEntries((entries) => moveItem(entries, from, to));
+        setSelected((current) => selectionAfterMove(current, from, to));
       },
       addEntry: () => {
         const length = latest.current.draft?.entries.length;
@@ -146,25 +151,31 @@ export function useCollectionEditor() {
         setSelected(length);
       },
     };
-  }, []);
+  }, [rows.move, rows.remove]);
 
-  const save = async () => {
-    if (!collection || !draft || savingRef.current) return;
+  /** Resolves true when saved; false on validation errors, an API error, a declined recreate or a save in flight. */
+  const save = async (): Promise<boolean> => {
+    if (!collection || !draft || savingRef.current) return false;
     const result = draftToBody(draft);
-    if (!result.ok) return setErrors(result.errors);
+    if (!result.ok) {
+      setErrors(result.errors);
+      return false;
+    }
     savingRef.current = true;
     setSaving(true);
     try {
       const saved = await saveCollection(collection.id, result.body);
       if (saved) load(saved, true);
+      return !!saved;
     } finally {
       savingRef.current = false;
       setSaving(false);
     }
   };
+  useEditorSaver(collectionEditorStore, { label: () => draft?.name ?? collection?.name ?? '', save });
   // Re-read first: the disk may have moved on while the draft was dirty (the live sync only warned), and
   // restoring the older baseline would let a later save overwrite that edit.
-  const discard = async () => {
+  const revert = async () => {
     if (!collection) return;
     const id = collection.id;
     const [fresh] = await readOpen(id).catch(() => [collection]);
@@ -174,7 +185,7 @@ export function useCollectionEditor() {
     closeEditor('collections');
   };
   const remove = async () => {
-    if (!collection || !window.confirm(`Delete collection "${collection.name}"?`)) return;
+    if (!collection || !(await confirmDelete(`Delete collection "${collection.name}"?`))) return;
     deleting.current = collection.id;
     if (!(await deleteCollection(collection))) {
       deleting.current = undefined;
@@ -190,10 +201,11 @@ export function useCollectionEditor() {
     dirty,
     errors,
     selected,
+    entryIds: rows.ids,
     change,
     ...entryActions,
     save,
-    discard,
+    revert,
     remove,
     back: () => closeEditor('collections'),
   };

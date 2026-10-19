@@ -46,6 +46,7 @@ const editorHtml = (readOnly: boolean, value: Preset = preset()) =>
       readOnly={readOnly}
       onChange={() => {}}
       onSave={() => {}}
+      onRevert={() => {}}
       onDuplicate={() => {}}
       selectedEntryId=""
       onSelectEntry={() => {}}
@@ -56,7 +57,7 @@ it('disables the preset name, description, inputs and save for an imported prese
   const html = editorHtml(true);
   expect(html).toMatch(/aria-label="Preset name"[^>]*disabled=""/);
   expect(html).toMatch(/aria-label="Input key 1"[^>]*disabled=""/);
-  expect(html).toMatch(/<button class="primary" disabled="">Save<\/button>/);
+  expect(html).toMatch(/<button type="button" class="primary" disabled="">Save<\/button>/);
   expect(html).toContain('Duplicate to edit');
   expect(html).toContain('Imported from SillyTavern');
 });
@@ -74,7 +75,8 @@ it('disables entry changes but keeps entries selectable in a read-only list', ()
   expect(html).toMatch(/\+ Message<\/button>/);
   expect(html.match(/aria-label="Delete entry"[^>]*disabled=""/g)).toHaveLength(2);
   expect(html.match(/aria-label="Duplicate entry"[^>]*disabled=""/g)).toHaveLength(2);
-  expect(html).toContain('draggable="false"');
+  expect(html).not.toContain('Drag to reorder');
+  expect(html).not.toContain('sortable-handle');
   expect(html).not.toMatch(/class="preset-entry-select"[^>]*disabled/);
 });
 

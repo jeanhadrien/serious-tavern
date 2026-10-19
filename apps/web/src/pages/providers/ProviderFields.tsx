@@ -1,5 +1,8 @@
 import { ArrowDown, ArrowUp, X } from 'lucide-react';
 import { IconButton } from '../../components/IconButton.js';
+import { moveItem } from '../../components/sortable/moveItem.js';
+import { SortableList } from '../../components/sortable/SortableList.js';
+import { useRowIds } from '../../components/sortable/useRowIds.js';
 import type { ProviderDraft } from './providerDraft.js';
 
 interface ProviderFieldsProps {
@@ -87,33 +90,41 @@ function MessageNameField({ value, onChange }: { value: string | null; onChange(
 
 /** An ordered list of response fields read for the reasoning trace; the first non-empty one wins. */
 function ReasoningFields({ fields, onChange }: { fields: readonly string[]; onChange(fields: string[]): void }) {
+  // The fields are plain strings: the ids that drag needs live beside the list, not in the draft.
+  const rows = useRowIds(fields.length);
   const replace = (index: number, value: string) => onChange(fields.map((field, i) => (i === index ? value : field)));
-  const remove = (index: number) => onChange(fields.filter((_, i) => i !== index));
-  const move = (index: number, by: -1 | 1) => {
-    const next = [...fields];
-    [next[index], next[index + by]] = [next[index + by]!, next[index]!];
-    onChange(next);
+  const remove = (index: number) => {
+    rows.remove(index);
+    onChange(fields.filter((_, i) => i !== index));
+  };
+  const move = (from: number, to: number) => {
+    rows.move(from, to);
+    onChange(moveItem(fields, from, to));
   };
   return (
     <fieldset className="provider-field provider-reasoning">
       <legend>Reasoning fields</legend>
-      {fields.map((field, index) => (
-        <div className="provider-reasoning-row" key={index}>
-          <input
-            aria-label={`Reasoning field ${index + 1}`}
-            value={field}
-            onChange={(event) => replace(index, event.target.value)}
-          />
-          <IconButton icon={ArrowUp} label="Move up" disabled={index === 0} onClick={() => move(index, -1)} />
-          <IconButton
-            icon={ArrowDown}
-            label="Move down"
-            disabled={index === fields.length - 1}
-            onClick={() => move(index, 1)}
-          />
-          <IconButton icon={X} label="Remove field" onClick={() => remove(index)} />
-        </div>
-      ))}
+      <SortableList
+        className="sortable-contents"
+        rowClassName={() => 'provider-reasoning-row'}
+        items={fields}
+        getId={(_, index) => rows.ids[index] as string}
+        label={(field) => field.trim() || 'empty field'}
+        onMove={move}
+        renderItem={(field, row) => (
+          <>
+            {row.handle}
+            <input
+              aria-label={`Reasoning field ${row.index + 1}`}
+              value={field}
+              onChange={(event) => replace(row.index, event.target.value)}
+            />
+            <IconButton icon={ArrowUp} label="Move up" disabled={!row.moveUp} onClick={row.moveUp} />
+            <IconButton icon={ArrowDown} label="Move down" disabled={!row.moveDown} onClick={row.moveDown} />
+            <IconButton icon={X} label="Remove field" onClick={() => remove(row.index)} />
+          </>
+        )}
+      />
       <button type="button" onClick={() => onChange([...fields, ''])}>
         + Field
       </button>

@@ -47,31 +47,9 @@
   display: flex;
   flex-direction: column;
 }
-.state-toolbar {
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  border-bottom: 1px solid #363b46;
-}
-.state-toolbar .toolbar,
 .state-banner .toolbar {
   flex-wrap: wrap;
   justify-content: flex-start;
-}
-.state-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.state-title h1 {
-  font-size: 1.2rem;
-  margin: 0;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .state-banner {
   margin: 12px 14px 0;

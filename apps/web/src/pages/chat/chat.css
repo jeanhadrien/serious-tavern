@@ -133,6 +133,18 @@
 .message-actions.confirming {
   opacity: 1;
 }
+.message-alternatives {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+.alternative-count {
+  min-width: 3ch;
+  text-align: center;
+  color: #a0a6b4;
+  font-variant-numeric: tabular-nums;
+}
 .message-content {
   line-height: 1.6;
 }

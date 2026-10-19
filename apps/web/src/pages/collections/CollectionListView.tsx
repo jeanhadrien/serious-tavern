@@ -17,6 +17,7 @@ export function CollectionListView() {
 
   const show = () => openEditor('collections');
   const create = async () => {
+    if (!(await collectionEditorStore.confirmSwitch())) return;
     const created = await createCollection();
     if (created) showCollection(created, show);
   };

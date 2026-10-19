@@ -1,8 +1,14 @@
-import { expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { ChatMessage } from '@st/shared';
-import { applyDelta, settleTurn } from './turnMessages.js';
+import { applyDelta, lastTurnReplyIds, replaceLastTurnReplies, settleRegenerate, settleTurn } from './turnMessages.js';
 
-const user = (id: string): ChatMessage => ({ id, role: 'user', content: 'hi', createdAt: '' });
+const user = (id: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({
+  id,
+  role: 'user',
+  content: 'hi',
+  createdAt: '',
+  ...extra,
+});
 const assistant = (id: string, extra: Partial<ChatMessage> = {}): ChatMessage => ({
   id,
   role: 'assistant',
@@ -33,4 +39,56 @@ it('settles an empty send, which has no user message, without adding one', () =>
   const messages = [user('old'), assistant('live', { status: 'streaming', nodeId: 'out' })];
   const saved = { assistantMessages: [assistant('final', { status: 'final' })] };
   expect(settleTurn(messages, undefined, saved).map((message) => message.id)).toEqual(['old', 'final']);
+});
+
+describe('regenerate bookkeeping', () => {
+  const turn = [
+    user('u', { executionId: 'e1' }),
+    assistant('a1', { executionId: 'e1' }),
+    assistant('a2', { executionId: 'e1' }),
+  ];
+  const ids = (messages: ChatMessage[]) => messages.map((message) => `${message.id}${message.inactive ? '*' : ''}`);
+
+  it('finds the shown replies of the last turn, whichever alternative is shown', () => {
+    expect(lastTurnReplyIds(turn)).toEqual(['a1', 'a2']);
+    const swiped = [
+      ...turn.map((message) => (message.role === 'assistant' ? { ...message, inactive: true as const } : message)),
+      assistant('b1', { executionId: 'e2', alternativeOf: 'e1' }),
+    ];
+    expect(lastTurnReplyIds(swiped)).toEqual(['b1']);
+  });
+
+  it('has nothing to replace in an empty chat, after a user message or while a row streams', () => {
+    expect(lastTurnReplyIds([])).toEqual([]);
+    expect(lastTurnReplyIds([...turn, user('next')])).toEqual([]);
+    expect(lastTurnReplyIds([user('u'), assistant('live', { status: 'streaming' })])).toEqual([]);
+  });
+
+  it('hides the replies without touching the user message or other rows', () => {
+    const hidden = replaceLastTurnReplies(turn, ['a1', 'a2']);
+    expect(ids(hidden)).toEqual(['u', 'a1*', 'a2*']);
+    expect(hidden[0]).toBe(turn[0]);
+    expect(replaceLastTurnReplies(turn, [])).toBe(turn);
+  });
+
+  it('keeps the old replies hidden and appends the new alternative when the run saved replies', () => {
+    const live = assistant('live', { status: 'streaming', nodeId: 'out' });
+    const hidden = [...replaceLastTurnReplies(turn, ['a1', 'a2']), live];
+    const saved = { assistantMessages: [assistant('n1', { executionId: 'e2', alternativeOf: 'e1', status: 'final' })] };
+    expect(ids(settleRegenerate(hidden, ['a1', 'a2'], saved))).toEqual(['u', 'a1*', 'a2*', 'n1']);
+  });
+
+  it('shows the old replies again when the run saved none', () => {
+    const live = assistant('live', { status: 'streaming', nodeId: 'out' });
+    const hidden = [...replaceLastTurnReplies(turn, ['a1', 'a2']), live];
+    const settled = settleRegenerate(hidden, ['a1', 'a2'], { assistantMessages: [] });
+    expect(ids(settled)).toEqual(['u', 'a1', 'a2']);
+    expect('inactive' in settled[1]!).toBe(false);
+  });
+
+  it('leaves replies that were already inactive before the run alone', () => {
+    const older = assistant('old', { executionId: 'e0', inactive: true });
+    const settled = settleRegenerate([older, ...turn], ['a1'], { assistantMessages: [] });
+    expect(ids(settled)).toEqual(['old*', 'u', 'a1', 'a2']);
+  });
 });

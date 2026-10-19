@@ -1,4 +1,5 @@
-/* In a narrow middle column the palette shrinks and the config panel floats over the canvas. */
+/* In a narrow middle column the palette shrinks and the config panel floats over the canvas (its remembered width
+   still applies; the splitter follows it). */
 @container editor (max-width: 820px) {
   .workflow-layout .palette {
     width: 150px;
@@ -15,11 +16,19 @@
     z-index: 5;
     box-shadow: -6px 0 16px rgba(0, 0, 0, 0.35);
   }
-  .workflow-layout .editor-toolbar {
+  /* The floating panel is out of the flow, so its splitter sits on the panel's left edge. */
+  .workflow-layout .splitter.config-panel-splitter {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: calc(min(var(--config-panel-width), 70%) - 3px);
+    margin: 0;
+  }
+  .workflow-layout .editor-header {
     padding: 10px 12px;
   }
 }
-/* On a phone the palette becomes a scrolling strip over the canvas and the config panel covers the canvas. */
+/* On a phone the palette becomes a scrolling strip over the canvas and the config panel covers the canvas: no splitter, and the remembered width does not apply. */
 @container editor (max-width: 560px) {
   .workflow-layout .editor-body {
     flex-direction: column;
@@ -49,14 +58,21 @@
   .workflow-layout .config-panel {
     left: 0;
     width: auto;
+    max-width: none;
   }
-  .workflow-layout .editor-toolbar {
-    flex-wrap: wrap;
+  .workflow-layout .config-panel-splitter {
+    display: none;
+  }
+  .workflow-layout .editor-header {
     gap: 8px;
   }
-  .workflow-layout .editor-toolbar input {
+  .workflow-layout .editor-header-title {
     flex: 1 1 100%;
   }
+}
+.canvas-actions {
+  display: flex;
+  gap: 6px;
 }
 .delete-button {
   background: #4a2d33;

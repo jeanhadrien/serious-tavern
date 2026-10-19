@@ -19,6 +19,7 @@ export function Personas() {
           onBack={editor.back}
           onDelete={editor.remove}
           onSave={editor.save}
+          onRevert={editor.revert}
         >
           <div className="persona-form">
             <EntityAvatar type="personas" item={draft} onUpload={editor.uploadAvatar} />

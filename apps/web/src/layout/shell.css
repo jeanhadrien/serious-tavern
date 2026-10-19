@@ -62,17 +62,6 @@
   border-color: #59617a;
   color: #c5cdff;
 }
-.resize-handle {
-  cursor: col-resize;
-  background: #343844;
-  touch-action: none;
-}
-.resize-handle:hover,
-.resize-handle:focus-visible,
-.resize-handle:active {
-  background: #6f7ddf;
-  outline: none;
-}
 .view {
   min-width: 0;
   min-height: 0;
@@ -183,4 +172,8 @@
 .mobile-menu-item .icon-button-dot {
   position: static;
   margin-left: auto;
+}
+/* A view takes focus when Escape leaves a field in it (keyboard/useKeyboard.ts); it needs no outline. */
+section.view:focus {
+  outline: none;
 }

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Database, ListChecks, TriangleAlert } from 'lucide-react';
+import { useEscapeLayer } from '../../../keyboard/escapeRegistry.js';
 import { IconButton } from '../../../components/IconButton.js';
 import { ExecutionDetails } from '../ExecutionDetails.js';
 import {
@@ -58,21 +59,23 @@ export function TurnChip({ chip }: { chip: StoryChip }) {
   const [open, setOpen] = useState(false);
   const cardId = useId();
   const wrapper = useRef<HTMLDivElement>(null);
+  const opener = useRef<HTMLButtonElement>(null);
   // A failed after-reply run or an item that was dropped: the icon warns.
   const alert = chip.post?.status === 'error' || !!chip.warnings?.length;
   useEffect(() => {
     if (!open) return;
     // The card grows the message: keep it on screen when the reply sits at the bottom of the thread.
     wrapper.current?.scrollIntoView?.({ block: 'nearest' });
-    const close = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('keydown', close);
-    return () => document.removeEventListener('keydown', close);
   }, [open]);
+  // Escape closes the card and gives focus back to the button that opened it.
+  useEscapeLayer(open, () => {
+    setOpen(false);
+    opener.current?.focus();
+  });
   return (
     <div className="message-story" ref={wrapper}>
       <IconButton
+        ref={opener}
         icon={alert ? TriangleAlert : chip.lines.length ? Database : ListChecks}
         label={chipLabel(chip.lines.length > 0, !!chip.warnings?.length)}
         className={alert ? 'chip-alert' : ''}

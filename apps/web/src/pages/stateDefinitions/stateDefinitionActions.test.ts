@@ -5,13 +5,14 @@ const stateDefinitionsApi = { create: vi.fn(), update: vi.fn(), delete: vi.fn() 
 const refresh = vi.fn(async () => []);
 let listed: { name: string }[] = [];
 const open = vi.fn();
+const confirmSwitch = vi.fn(async () => true);
 const alerts = { success: vi.fn(), info: vi.fn(), error: vi.fn(), warning: vi.fn() };
 const notifyError = vi.fn();
 vi.mock('../../api.js', async (original) => ({ ...(await original<object>()), stateDefinitionsApi }));
 vi.mock('../../api/transport.js', async (original) => ({ ...(await original<object>()), notifyError }));
 vi.mock('../../stores/index.js', () => ({
   stateDefinitionsStore: { refresh, getSnapshot: () => listed },
-  stateDefinitionEditorStore: { open },
+  stateDefinitionEditorStore: { open, confirmSwitch },
 }));
 vi.mock('../../alerts/index.js', () => ({ alerts }));
 
@@ -147,6 +148,16 @@ it('opens a definition by id from the shared list', async () => {
   expect(open).toHaveBeenCalledOnce();
   expect(show).toHaveBeenCalledOnce();
   expect(refresh).not.toHaveBeenCalled();
+});
+
+it('asks before opening by id, and a Cancel opens nothing', async () => {
+  const show = vi.fn();
+  listed = [scene as unknown as { name: string }];
+  confirmSwitch.mockResolvedValueOnce(false);
+  await openStateDefinition('d1', show);
+  expect(confirmSwitch).toHaveBeenCalledWith('d1');
+  expect(open).not.toHaveBeenCalled();
+  expect(show).not.toHaveBeenCalled();
 });
 
 it('fetches the list once when the id is not there yet, and warns when it is still gone', async () => {

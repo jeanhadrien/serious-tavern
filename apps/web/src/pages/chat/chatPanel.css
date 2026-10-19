@@ -12,7 +12,10 @@
   flex-direction: column;
 }
 .chat-panel {
-  width: 320px;
+  /* Set by ChatPanel from its remembered size; only this side-by-side rule reads it. */
+  width: var(--chat-panel-width, 320px);
+  /* The messages keep at least 320px, whatever size was remembered. */
+  max-width: calc(100% - 320px);
   flex-shrink: 0;
   overflow: auto;
   padding: 14px 16px;
@@ -103,12 +106,16 @@
   background: #3d4560;
   border-color: #6f7fd8;
 }
-/* In a narrow chat column the panel covers the messages instead of squeezing them. */
+/* In a narrow chat column the panel covers the messages instead of squeezing them: no splitter, no remembered size. */
 @container chat (max-width: 760px) {
+  .chat-panel-splitter {
+    display: none;
+  }
   .chat-panel {
     position: absolute;
     inset: 0 0 0 auto;
     width: min(360px, 100%);
+    max-width: none;
     z-index: 5;
     box-shadow: -6px 0 16px rgba(0, 0, 0, 0.35);
   }

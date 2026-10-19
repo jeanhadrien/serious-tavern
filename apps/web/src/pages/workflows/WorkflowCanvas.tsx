@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { ReactFlow, Background, Controls, Panel, useNodesInitialized, useReactFlow } from '@xyflow/react';
-import { Trash2 } from 'lucide-react';
+import { Redo2, Trash2, Undo2 } from 'lucide-react';
 import { IconButton } from '../../components/IconButton.js';
 import { checkConnection } from '../../connection.js';
+import { ConnectPicker } from './ConnectPicker.js';
 import { WorkflowNode } from './WorkflowNode.js';
 import type { useWorkflowCanvas } from './useWorkflowCanvas.js';
 
@@ -45,6 +46,10 @@ export function WorkflowCanvas({ canvas }: { canvas: ReturnType<typeof useWorkfl
         onConnect={canvas.connect}
         onConnectEnd={canvas.onConnectEnd}
         isValidConnection={(connection) => checkConnection(connection, canvas.nodes).ok}
+        onNodeDragStart={canvas.onDragStart}
+        onNodeDragStop={(_event, _node, dragged) => canvas.onDragStop(dragged)}
+        onSelectionDragStart={canvas.onDragStart}
+        onSelectionDragStop={(_event, dragged) => canvas.onDragStop(dragged)}
         onNodeClick={(_, node) => canvas.setSelected(node.id)}
         onPaneClick={() => canvas.setSelected(undefined)}
         deleteKeyCode={['Backspace', 'Delete']}
@@ -53,17 +58,22 @@ export function WorkflowCanvas({ canvas }: { canvas: ReturnType<typeof useWorkfl
         <FitWhenMeasured />
         <Background color="#414652" gap={20} />
         <Controls />
-        {canvas.hasSelection && (
-          <Panel position="top-right">
+        <Panel position="top-right" className="canvas-actions">
+          <IconButton icon={Undo2} label="Undo" disabled={!canvas.canUndo} onClick={() => canvas.undo()} />
+          <IconButton icon={Redo2} label="Redo" disabled={!canvas.canRedo} onClick={() => canvas.redo()} />
+          {canvas.hasSelection && (
             <IconButton
               icon={Trash2}
               label="Delete selection"
               className="delete-button"
               onClick={canvas.deleteSelection}
             />
-          </Panel>
-        )}
+          )}
+        </Panel>
       </ReactFlow>
+      {canvas.picker && (
+        <ConnectPicker picker={canvas.picker} onPick={canvas.pickCandidate} onClose={canvas.closePicker} />
+      )}
     </div>
   );
 }

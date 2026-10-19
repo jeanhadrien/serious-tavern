@@ -63,6 +63,8 @@ it('shows the settings toggle in the toolbar with a problem count', () => {
     onValidate: () => {},
     onDuplicate: () => {},
     onSave: () => {},
+    onRevert: () => {},
+    dirty: false,
   };
   const open = renderToStaticMarkup(<WorkflowToolbar {...props} settingsOpen settingsIssues={2} />);
   expect(open).toContain('aria-pressed="true"');

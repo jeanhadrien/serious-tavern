@@ -78,15 +78,6 @@ export const newEntry = (): EntryDraft => ({
   original: {},
 });
 
-/** Moves one entry; out-of-range moves leave the list as it is. */
-export function moveEntry<T>(entries: readonly T[], from: number, to: number): T[] {
-  if (from === to || from < 0 || to < 0 || from >= entries.length || to >= entries.length) return [...entries];
-  const next = [...entries];
-  const [moved] = next.splice(from, 1);
-  next.splice(to, 0, moved!);
-  return next;
-}
-
 /** A one-line label for an entry: its title, else the first line of its text. */
 export function entryPreview(entry: Pick<EntryDraft, 'title' | 'text'>): string {
   const label =

@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { Check, Pencil, Trash2, X } from 'lucide-react';
+import { Check, Copy, Pencil, Trash2, X } from 'lucide-react';
 import { IconButton } from '../../components/IconButton.js';
+import { copyMessageText } from './copyText.js';
 import { deleteClick } from './story/deleteConfirm.js';
 
 interface MessageActionsProps {
   disabled: boolean;
-  onEdit: () => void;
-  onDelete: () => Promise<boolean>;
+  /** The message's raw text (Markdown): shows the Copy button. */
+  copyText?: string;
+  /** Edit and Delete are shown together, only when both are given. */
+  onEdit?: () => void;
+  onDelete?: () => Promise<boolean>;
   /**
    * What deleting this message would undo of the chat's story state, asked when the trash button is clicked (never
    * while rendering). Lines mean the delete is confirmed with a dialog that lists them, instead of the inline step.
@@ -20,6 +24,7 @@ interface MessageActionsProps {
 
 export function MessageActions({
   disabled,
+  copyText,
   onEdit,
   onDelete,
   undoOnDelete,
@@ -31,9 +36,10 @@ export function MessageActions({
     setConfirmingState(value);
     onConfirming?.(value);
   };
+  const editable = onEdit && onDelete;
   return (
     <div className={`message-actions${confirming ? ' confirming' : ''}`}>
-      {confirming ? (
+      {confirming && onDelete ? (
         <>
           <small>Delete message?</small>
           <IconButton
@@ -48,17 +54,25 @@ export function MessageActions({
         </>
       ) : (
         <>
-          <IconButton icon={Pencil} label="Edit message" disabled={disabled} onClick={onEdit} />
-          <IconButton
-            icon={Trash2}
-            label="Delete message"
-            disabled={disabled}
-            onClick={() => {
-              const click = deleteClick(undoOnDelete?.(), (text) => window.confirm(text), deleteNote);
-              if (click === 'inline') setConfirming(true);
-              else if (click === 'delete') void onDelete();
-            }}
-          />
+          {copyText !== undefined && (
+            <IconButton icon={Copy} label="Copy message" onClick={() => void copyMessageText(copyText)} />
+          )}
+          {editable && (
+            <>
+              <IconButton icon={Pencil} label="Edit message" disabled={disabled} onClick={onEdit} />
+              <IconButton
+                icon={Trash2}
+                label="Delete message"
+                disabled={disabled}
+                onClick={() =>
+                  void deleteClick(undoOnDelete?.(), deleteNote).then((click) => {
+                    if (click === 'inline') setConfirming(true);
+                    else if (click === 'delete') void onDelete();
+                  })
+                }
+              />
+            </>
+          )}
         </>
       )}
     </div>

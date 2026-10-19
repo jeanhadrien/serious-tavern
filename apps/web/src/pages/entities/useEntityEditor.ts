@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
 import type { Character, Persona } from '@st/shared';
 import { alerts } from '../../alerts/index.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
-import { useEditorCommands } from '../../stores/index.js';
+import { useEditorCommands, useEditorSaver } from '../../stores/index.js';
+import { useDraft } from '../useDraft.js';
 import { importEntityFiles } from './entityActions.js';
 import type { EntityKind } from './entityKinds.js';
+import { confirmDelete } from '../../components/dialog/dialogStore.js';
 
 /**
  * The draft of the open character or persona. The editor stays mounted while hidden, so the draft survives the
@@ -12,20 +13,8 @@ import type { EntityKind } from './entityKinds.js';
  */
 export function useEntityEditor<T extends Character | Persona>(kind: EntityKind<T>) {
   const { closeEditor } = useLayoutActions();
-  const [draft, setDraft] = useState<T>();
-  const [saved, setSaved] = useState('');
-  const dirty = !!draft && JSON.stringify(draft) !== saved;
-  const choose = (item: T) => {
-    setDraft(structuredClone(item));
-    setSaved(JSON.stringify(item));
-  };
-  const clear = () => {
-    setDraft(undefined);
-    setSaved('');
-  };
+  const { draft, dirty, set, load: choose, clear, revert } = useDraft(kind.editorStore);
 
-  const openId = draft?.id;
-  useEffect(() => kind.editorStore.report(openId, dirty), [kind, openId, dirty]);
   useEditorCommands(kind.editorStore, {
     open: choose,
     close: (id) => {
@@ -33,18 +22,22 @@ export function useEntityEditor<T extends Character | Persona>(kind: EntityKind<
     },
   });
 
-  const save = async () => {
-    if (!draft || !kind.validate(draft)) return;
+  /** Resolves true when saved; false on a validation failure or an API error (toasted). */
+  const save = async (): Promise<boolean> => {
+    if (!draft || !kind.validate(draft)) return false;
     try {
       choose(await kind.save(draft));
       await kind.listStore.refresh();
       alerts.success(`${kind.label} saved`);
+      return true;
     } catch {
       /* API errors are toasted. */
+      return false;
     }
   };
+  useEditorSaver(kind.editorStore, { label: () => draft?.name ?? '', save });
   const remove = async () => {
-    if (!draft || !window.confirm(`Delete ${draft.name}?`)) return;
+    if (!draft || !(await confirmDelete(`Delete ${kind.label.toLowerCase()} "${draft.name}"?`))) return;
     try {
       await kind.delete(draft.id);
       clear();
@@ -72,6 +65,6 @@ export function useEntityEditor<T extends Character | Persona>(kind: EntityKind<
       /* API errors are toasted. */
     }
   };
-  const change = (field: keyof T, value: unknown) => draft && setDraft({ ...draft, [field]: value });
-  return { draft, dirty, change, save, remove, importFiles, uploadAvatar, back: () => closeEditor(kind.type) };
+  const change = (field: keyof T, value: unknown) => draft && set({ ...draft, [field]: value });
+  return { draft, dirty, change, save, revert, remove, importFiles, uploadAvatar, back: () => closeEditor(kind.type) };
 }

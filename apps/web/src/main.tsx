@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { AlertsProvider } from './alerts/index.js';
 import { Toaster } from './alerts/Toaster.js';
+import { DialogHost } from './components/dialog/DialogHost.js';
 import { Shell } from './layout/Shell.js';
 import '@xyflow/react/dist/style.css';
 import './style.css';
@@ -13,6 +14,7 @@ createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
         <Shell />
         <Toaster />
+        <DialogHost />
       </BrowserRouter>
     </AlertsProvider>
   </React.StrictMode>,

@@ -118,7 +118,8 @@ export function showStateDefinition(definition: StateDefinition, show: () => voi
 /**
  * Opens a definition by id (a node panel's link): from the shared list, fetched once more when it is not there
  * yet (just created elsewhere). It warns when the list cannot be loaded, and only says the definition no longer
- * exists after a list that was loaded does not have it. The open one keeps its draft.
+ * exists after a list that was loaded does not have it. The open one keeps its draft; a dirty draft of another one
+ * asks Save / Discard / Cancel before the editor changes.
  */
 export async function openStateDefinition(id: string, show: () => void): Promise<void> {
   const find = (list: readonly StateDefinition[]) => list.find((item) => item.id === id);
@@ -128,6 +129,7 @@ export async function openStateDefinition(id: string, show: () => void): Promise
     if (!fresh) return void alerts.warning('Could not load the state definitions');
     definition = find(fresh);
   }
-  if (definition) showStateDefinition(definition, show);
-  else alerts.warning('That state definition no longer exists');
+  if (definition) {
+    if (await stateDefinitionEditorStore.confirmSwitch(id)) showStateDefinition(definition, show);
+  } else alerts.warning('That state definition no longer exists');
 }

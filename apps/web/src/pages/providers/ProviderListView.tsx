@@ -10,13 +10,17 @@ export function ProviderListView() {
   const { currentId, dirty } = useEditorState(providerEditorStore);
   const { openEditor } = useLayoutActions();
 
-  const open = (provider: ProviderView) => {
+  const show = (provider: ProviderView) => {
     providerEditorStore.open(structuredClone(provider));
     openEditor('providers');
   };
+  const open = async (provider: ProviderView) => {
+    if (await providerEditorStore.confirmSwitch(provider.id)) show(provider);
+  };
   const create = async () => {
+    if (!(await providerEditorStore.confirmSwitch())) return;
     const created = await createProvider();
-    if (created) open(created);
+    if (created) show(created);
   };
 
   return (
@@ -33,7 +37,7 @@ export function ProviderListView() {
           type="button"
           key={provider.id}
           className={`provider-row ${currentId === provider.id ? 'selected' : ''}`}
-          onClick={() => open(provider)}
+          onClick={() => void open(provider)}
         >
           <span className="provider-row-name">
             {provider.name}

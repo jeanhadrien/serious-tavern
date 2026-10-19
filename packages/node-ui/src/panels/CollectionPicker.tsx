@@ -1,6 +1,7 @@
+import type { KeyboardEvent } from 'react';
 import { ArrowDown, ArrowUp, X } from 'lucide-react';
 import type { NodePanelContext } from './types.js';
-import { addId, moveId, pickerRows, removeId } from './collectionConfig.js';
+import { addId, altArrowOffset, moveId, pickerRows, removeId } from './collectionConfig.js';
 
 interface CollectionPickerProps {
   ids: unknown;
@@ -20,18 +21,28 @@ export function CollectionPicker({ ids, onChange, context, ordered = false }: Co
     const to = `/collections?id=${encodeURIComponent(id)}`;
     return context?.renderLink ? context.renderLink(to, 'Edit ↗') : <a href={to}>Edit ↗</a>;
   };
+  const movable = ordered && rows.length > 1;
+  // The same move as the buttons, from the keyboard. Focus follows the row (its element may be re-inserted).
+  const moveByKey = (event: KeyboardEvent<HTMLElement>, index: number) => {
+    const offset = movable ? altArrowOffset(event) : undefined;
+    if (offset === undefined || index + offset < 0 || index + offset >= rows.length) return;
+    event.preventDefault();
+    const target = event.target as HTMLElement;
+    onChange(moveId(picked, index, offset));
+    requestAnimationFrame(() => target.isConnected && target.focus());
+  };
   return (
     <div className="config-field collection-picker">
       <span>Collections</span>
       {rows.length > 0 && (
         <ul className="collection-picker-rows">
           {rows.map((row, index) => (
-            <li key={row.id} className={row.known ? undefined : 'unknown'}>
+            <li key={row.id} className={row.known ? undefined : 'unknown'} onKeyDown={(e) => moveByKey(e, index)}>
               <span className="collection-picker-name" title={row.name}>
                 {row.name}
               </span>
               {row.known && link(row.id)}
-              {ordered && rows.length > 1 && (
+              {movable && (
                 <>
                   <button
                     type="button"

@@ -120,13 +120,6 @@ small {
   height: 100%;
   display: flex;
 }
-.editor-toolbar {
-  padding: 12px 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border-bottom: 1px solid #363b46;
-}
 pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -168,7 +161,9 @@ pre {
   text-align: left;
 }
 .config-panel {
-  width: 300px;
+  /* Set on .editor-body from the remembered size; the container queries (workflows.css) decide where it applies. */
+  width: var(--config-panel-width, 300px);
+  max-width: 70%;
   border-right: 0;
   border-left: 1px solid #363b46;
 }
@@ -254,6 +249,7 @@ pre {
   color: #b9cae9;
 }
 .canvas {
+  position: relative;
   flex: 1;
   min-width: 0;
   height: 100%;
@@ -465,17 +461,9 @@ pre {
   align-content: start;
   gap: 14px;
 }
-.preset-toolbar {
+.editor-header.preset-toolbar {
   margin: -16px -16px 0;
   padding: 12px 16px;
-}
-.preset-toolbar input {
-  flex: 1;
-  /* Shrinks for the "Unsaved changes" note instead of pushing Save out of a narrow column. */
-  min-width: 0;
-}
-.preset-toolbar small {
-  white-space: nowrap;
 }
 .preset-inputs,
 .preset-entry-list {
@@ -563,21 +551,6 @@ pre {
 }
 .preset-entry-row button:not(.preset-entry-select) {
   padding: 5px 8px;
-}
-.preset-entry-row {
-  cursor: grab;
-}
-.preset-entry-row:active {
-  cursor: grabbing;
-}
-.preset-entry-row.dragging {
-  opacity: 0.4;
-}
-.preset-entry-row.drop-above {
-  box-shadow: 0 -2px 0 0 #95a4ff;
-}
-.preset-entry-row.drop-below {
-  box-shadow: 0 2px 0 0 #95a4ff;
 }
 .depth-badge {
   white-space: nowrap;

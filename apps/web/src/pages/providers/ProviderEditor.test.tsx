@@ -15,6 +15,7 @@ const render = (props: { readOnly?: boolean; dirty?: boolean; errors?: string[] 
       secretNames={['openrouter', 'deepseek']}
       onChange={() => {}}
       onSave={() => {}}
+      onRevert={() => {}}
       onDelete={() => {}}
       onDuplicate={() => {}}
       onBack={() => {}}

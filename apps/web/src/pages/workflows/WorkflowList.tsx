@@ -5,6 +5,7 @@ import { IconButton } from '../../components/IconButton.js';
 import { useLayoutActions } from '../../layout/LayoutActions.js';
 import { useEditorState, useList, workflowEditorStore, workflowsStore } from '../../stores/index.js';
 import { duplicateWorkflow } from './workflowActions.js';
+import { confirmDelete } from '../../components/dialog/dialogStore.js';
 
 /** The workflow list shown in L: picking a workflow opens it in the editor in M. */
 export function WorkflowList() {
@@ -12,23 +13,26 @@ export function WorkflowList() {
   const { currentId, dirty } = useEditorState(workflowEditorStore);
   const { openEditor } = useLayoutActions();
 
-  const open = (workflow: Workflow) => {
+  const show = (workflow: Workflow) => {
     workflowEditorStore.open(structuredClone(workflow));
     openEditor('workflows');
   };
+  const open = async (workflow: Workflow) => {
+    if (await workflowEditorStore.confirmSwitch(workflow.id)) show(workflow);
+  };
   const create = async () => {
     const name = window.prompt('Workflow name');
-    if (!name?.trim()) return;
+    if (!name?.trim() || !(await workflowEditorStore.confirmSwitch())) return;
     try {
       const created = await workflowsApi.create({ name });
       await workflowsStore.refresh();
-      open(created);
+      show(created);
     } catch {
       /* API errors are toasted. */
     }
   };
   const remove = async (workflow: Workflow) => {
-    if (!window.confirm(`Delete ${workflow.name}?`)) return;
+    if (!(await confirmDelete(`Delete workflow "${workflow.name}"?`))) return;
     try {
       await workflowsApi.delete(workflow.id);
       workflowEditorStore.discard(workflow.id);
@@ -52,7 +56,7 @@ export function WorkflowList() {
             type="button"
             className="session-link"
             aria-current={currentId === workflow.id ? 'true' : undefined}
-            onClick={() => open(workflow)}
+            onClick={() => void open(workflow)}
           >
             {workflow.name}
             {dirty && currentId === workflow.id && (

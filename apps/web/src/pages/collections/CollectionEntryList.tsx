@@ -1,22 +1,21 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 import { IconButton } from '../../components/IconButton.js';
+import { SortableList, type SortableRow } from '../../components/sortable/SortableList.js';
 import { entryPreview, listFromText, type EntryDraft } from './collectionDraft.js';
 import { CollectionEntryForm } from './CollectionEntryForm.js';
 
-/** What a row does; the editor keeps these stable, so a row re-renders only when its own entry changes. */
-interface EntryActions {
-  onSelect(index: number | undefined): void;
-  onChange(index: number, patch: Partial<EntryDraft>): void;
-  onRemove(index: number): void;
-  onMove(index: number, offset: number): void;
-}
-
-interface CollectionEntryListProps extends EntryActions {
+interface CollectionEntryListProps {
   entries: readonly EntryDraft[];
+  /** One stable id per entry (see `useRowIds`). */
+  ids: readonly string[];
   /** The expanded entry. */
   selected?: number;
   onAdd(): void;
+  onSelect(index: number | undefined): void;
+  onChange(index: number, patch: Partial<EntryDraft>): void;
+  onRemove(index: number): void;
+  onMove(from: number, to: number): void;
 }
 
 /** Small facts about an entry, shown next to its preview. */
@@ -31,25 +30,29 @@ function badges(entry: EntryDraft): string[] {
   ].filter(Boolean);
 }
 
-interface EntryRowProps extends EntryActions {
+interface EntryRowProps {
   entry: EntryDraft;
   index: number;
   open: boolean;
-  last: boolean;
+  row: Pick<SortableRow, 'handle' | 'moveUp' | 'moveDown'>;
+  onSelect(index: number | undefined): void;
+  onChange(index: number, patch: Partial<EntryDraft>): void;
+  onRemove(index: number): void;
 }
 
 // Memoized: large lorebooks have hundreds of rows, and typing elsewhere must not re-render them all.
-const EntryRow = memo(function EntryRow({ entry, index, open, last, ...actions }: EntryRowProps) {
+const EntryRow = memo(function EntryRow({ entry, index, open, row, onSelect, onChange, onRemove }: EntryRowProps) {
   const Chevron = open ? ChevronDown : ChevronRight;
   const facts = badges(entry);
   return (
-    <li className={`collection-entry ${open ? 'open' : ''} ${entry.enabled ? '' : 'disabled'}`}>
+    <>
       <div className="collection-entry-row">
+        {row.handle}
         <button
           type="button"
           className="collection-entry-toggle"
           aria-expanded={open}
-          onClick={() => actions.onSelect(open ? undefined : index)}
+          onClick={() => onSelect(open ? undefined : index)}
         >
           <Chevron size={16} aria-hidden="true" />
           <span className="collection-entry-preview">{entryPreview(entry)}</span>
@@ -63,22 +66,42 @@ const EntryRow = memo(function EntryRow({ entry, index, open, last, ...actions }
             </span>
           )}
         </button>
-        <IconButton
-          icon={ArrowUp}
-          label="Move entry up"
-          disabled={index === 0}
-          onClick={() => actions.onMove(index, -1)}
-        />
-        <IconButton icon={ArrowDown} label="Move entry down" disabled={last} onClick={() => actions.onMove(index, 1)} />
-        <IconButton icon={Trash2} label="Delete entry" onClick={() => actions.onRemove(index)} />
+        <IconButton icon={ArrowUp} label="Move entry up" disabled={!row.moveUp} onClick={row.moveUp} />
+        <IconButton icon={ArrowDown} label="Move entry down" disabled={!row.moveDown} onClick={row.moveDown} />
+        <IconButton icon={Trash2} label="Delete entry" onClick={() => onRemove(index)} />
       </div>
-      {open && <CollectionEntryForm entry={entry} onChange={(patch) => actions.onChange(index, patch)} />}
-    </li>
+      {open && <CollectionEntryForm entry={entry} onChange={(patch) => onChange(index, patch)} />}
+    </>
   );
 });
 
-/** The entries as an accordion: one row each, the selected one expanded into its form. */
-export function CollectionEntryList({ entries, selected, onAdd, ...actions }: CollectionEntryListProps) {
+const entryLabel = (entry: EntryDraft) => entryPreview(entry);
+
+/** The entries as an accordion: one row each, the selected one expanded into its form. Rows reorder by drag. */
+export function CollectionEntryList({
+  entries,
+  ids,
+  selected,
+  onAdd,
+  onSelect,
+  onChange,
+  onRemove,
+  onMove,
+}: CollectionEntryListProps) {
+  const renderItem = useCallback(
+    (entry: EntryDraft, { index, ...row }: SortableRow) => (
+      <EntryRow
+        entry={entry}
+        index={index}
+        open={selected === index}
+        row={row}
+        onSelect={onSelect}
+        onChange={onChange}
+        onRemove={onRemove}
+      />
+    ),
+    [selected, onSelect, onChange, onRemove],
+  );
   return (
     <section className="collection-entries" aria-label="Entries">
       <div className="toolbar">
@@ -88,19 +111,19 @@ export function CollectionEntryList({ entries, selected, onAdd, ...actions }: Co
         </button>
       </div>
       {!entries.length && <p className="hint">No entries yet.</p>}
-      <ol>
-        {entries.map((entry, index) => (
-          // Entries have no stable id: their position is their identity, here as on the server.
-          <EntryRow
-            key={index}
-            entry={entry}
-            index={index}
-            open={selected === index}
-            last={index === entries.length - 1}
-            {...actions}
-          />
-        ))}
-      </ol>
+      <SortableList
+        as="ol"
+        rowAs="li"
+        items={entries}
+        // Entries have no id of their own: the editor keeps one per position, moving it with the entry.
+        getId={(_, index) => ids[index] as string}
+        label={entryLabel}
+        onMove={onMove}
+        renderItem={renderItem}
+        rowClassName={(entry, index) =>
+          `collection-entry ${selected === index ? 'open' : ''} ${entry.enabled ? '' : 'disabled'}`
+        }
+      />
     </section>
   );
 }

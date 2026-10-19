@@ -6,7 +6,6 @@ import {
   draftToBody,
   entryPreview,
   listFromText,
-  moveEntry,
   newEntry,
   storedForm,
   toDraft,
@@ -112,13 +111,6 @@ describe('collection drafts', () => {
     // A hand-written title with spaces or an empty description is not an edit.
     const hand = collection({ description: '', entries: [entry({ title: ' Inn ' })] });
     expect(draftChanged(toDraft(hand), hand)).toBe(false);
-  });
-
-  it('moves entries within bounds only', () => {
-    expect(moveEntry(['a', 'b', 'c'], 0, 2)).toEqual(['b', 'c', 'a']);
-    expect(moveEntry(['a', 'b', 'c'], 2, 1)).toEqual(['a', 'c', 'b']);
-    expect(moveEntry(['a', 'b'], 0, -1)).toEqual(['a', 'b']);
-    expect(moveEntry(['a', 'b'], 1, 2)).toEqual(['a', 'b']);
   });
 
   it.each([

@@ -63,15 +63,6 @@ export function withType(setting: WorkflowSetting, type: WorkflowSettingType): W
   }
 }
 
-/** Moves one setting up (`-1`) or down (`1`); a no-op at either end. */
-export function moveSetting<T>(list: readonly T[], index: number, delta: -1 | 1): T[] {
-  const target = index + delta;
-  if (target < 0 || target >= list.length) return [...list];
-  const next = [...list];
-  [next[index], next[target]] = [next[target]!, next[index]!];
-  return next;
-}
-
 export const removeSetting = <T>(list: readonly T[], index: number): T[] => list.filter((_, i) => i !== index);
 
 /** Enum options from a textarea: one per line, trimmed, blank lines and repeats dropped. */

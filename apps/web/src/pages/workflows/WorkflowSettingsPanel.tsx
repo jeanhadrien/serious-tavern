@@ -1,8 +1,11 @@
 import { Plus, Trash2, X } from 'lucide-react';
-import { parseWorkflowSetting, workflowSettingIssues, type WorkflowSetting } from '@st/shared';
+import { parseWorkflowSetting, settingLabel, workflowSettingIssues, type WorkflowSetting } from '@st/shared';
 import { IconButton } from '../../components/IconButton.js';
+import { moveItem } from '../../components/sortable/moveItem.js';
+import { SortableList, type SortableRow } from '../../components/sortable/SortableList.js';
+import { useRowIds } from '../../components/sortable/useRowIds.js';
 import { SettingRow } from './SettingRow.js';
-import { draftList, moveSetting, newSetting, removeSetting } from './settingsDraft.js';
+import { draftList, newSetting, removeSetting } from './settingsDraft.js';
 import './settingsPanel.css';
 
 /**
@@ -22,6 +25,16 @@ export function WorkflowSettingsPanel({
   const list = draftList(settings);
   const issues = workflowSettingIssues(settings);
   const notAList = issues.find((issue) => issue.index === -1);
+  // Declarations have no id of their own (and the stored value is kept raw): the ids live beside the list.
+  const rows = useRowIds(list.length);
+  const move = (from: number, to: number) => {
+    rows.move(from, to);
+    onChange(moveItem(list, from, to));
+  };
+  const remove = (index: number) => {
+    rows.remove(index);
+    onChange(removeSetting(list, index));
+  };
   const update = (index: number, setting: WorkflowSetting) =>
     onChange(list.map((item, i) => (i === index ? setting : item)));
   return (
@@ -44,31 +57,27 @@ export function WorkflowSettingsPanel({
       ) : (
         list.length === 0 && <p className="hint">No chat settings yet.</p>
       )}
-      {list.map((item, index) => {
-        const parsed = parseWorkflowSetting(item, index);
-        const rowIssues = issues.filter((issue) => issue.index === index);
-        return 'setting' in parsed ? (
-          <SettingRow
-            // Rows have no id of their own; the position is what moves and removals change.
-            key={index}
-            setting={parsed.setting}
-            first={index === 0}
-            last={index === list.length - 1}
-            issues={rowIssues}
-            onChange={(next) => update(index, next)}
-            onMove={(delta) => onChange(moveSetting(list, index, delta))}
-            onRemove={() => onChange(removeSetting(list, index))}
-          />
-        ) : (
-          <InvalidSettingRow
-            key={index}
-            item={item}
-            index={index}
-            problem={parsed.problem}
-            onRemove={() => onChange(removeSetting(list, index))}
-          />
-        );
-      })}
+      <SortableList
+        className="sortable-contents"
+        items={list}
+        getId={(_, index) => rows.ids[index] as string}
+        label={(item) => settingName(item)}
+        onMove={move}
+        renderItem={(item, row) => {
+          const parsed = parseWorkflowSetting(item, row.index);
+          return 'setting' in parsed ? (
+            <SettingRow
+              setting={parsed.setting}
+              row={row}
+              issues={issues.filter((issue) => issue.index === row.index)}
+              onChange={(next) => update(row.index, next)}
+              onRemove={() => remove(row.index)}
+            />
+          ) : (
+            <InvalidSettingRow item={item} row={row} problem={parsed.problem} onRemove={() => remove(row.index)} />
+          );
+        }}
+      />
       {!notAList && (
         <button type="button" className="setting-add" onClick={() => onChange([...list, newSetting(list)])}>
           <Plus size={16} aria-hidden="true" /> Add setting
@@ -84,20 +93,22 @@ export function WorkflowSettingsPanel({
  */
 function InvalidSettingRow({
   item,
-  index,
+  row,
   problem,
   onRemove,
 }: {
   item: unknown;
-  index: number;
+  row: Pick<SortableRow, 'index' | 'handle'>;
   problem: string;
   onRemove(): void;
 }) {
+  const index = row.index;
   return (
     <fieldset className="setting-row setting-row-invalid">
       <div className="setting-row-head">
         <span>Chat setting #{index + 1} (read-only)</span>
         <span className="setting-row-actions">
+          {row.handle}
           <IconButton
             icon={Trash2}
             label={`Remove chat setting #${index + 1}`}
@@ -111,4 +122,10 @@ function InvalidSettingRow({
       <pre>{JSON.stringify(item, null, 2)}</pre>
     </fieldset>
   );
+}
+
+/** A row's name for its drag handle: the setting's label or key, else its place (an unreadable one has no name). */
+function settingName(item: unknown): string {
+  const parsed = parseWorkflowSetting(item, 0);
+  return ('setting' in parsed && settingLabel(parsed.setting)) || 'chat setting';
 }

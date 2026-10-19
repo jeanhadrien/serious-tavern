@@ -43,6 +43,19 @@ export function pickerRows(ids: unknown, catalog: readonly { id: string; name: s
 export const addId = (ids: readonly string[], id: string) => (ids.includes(id) ? [...ids] : [...ids, id]);
 export const removeId = (ids: readonly string[], id: string) => ids.filter((item) => item !== id);
 
+/** Which way `Alt+ArrowUp` / `Alt+ArrowDown` moves a row (-1 up, 1 down); undefined for any other key. */
+export function altArrowOffset(event: {
+  key: string;
+  altKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+}): -1 | 1 | undefined {
+  if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return undefined;
+  if (event.key === 'ArrowUp') return -1;
+  return event.key === 'ArrowDown' ? 1 : undefined;
+}
+
 /** Moves an id one place up (-1) or down (+1); out-of-range moves change nothing. */
 export function moveId(ids: readonly string[], index: number, offset: -1 | 1): string[] {
   const to = index + offset;
