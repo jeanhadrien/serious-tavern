@@ -75,6 +75,9 @@ export const turnEventSchema = z.discriminatedUnion('type', [
     type: z.literal('node.delta'),
     nodeId: z.string(),
     runId: z.string().optional(),
+    // True: clear the row's text first, then append `textDelta` (a tool-using model moved on to its next step, and
+    // only the last step's text is the answer). The row's reasoning is never reset.
+    reset: z.boolean().optional(),
     textDelta: z.string().optional(),
     reasoningDelta: z.string().optional(),
   }),

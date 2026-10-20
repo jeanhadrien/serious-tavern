@@ -140,7 +140,7 @@ describe('sinks', () => {
     );
     const issues = await validateWorkflow(noSink);
     expect(issues.map((issue) => issue.message)).toEqual([
-      'A workflow must contain at least one node that writes something, such as a Chat Output or a State Write.',
+      'A workflow must contain at least one node that writes something, such as a Chat Output, a State Write or an LLM with write tools.',
     ]);
   });
 

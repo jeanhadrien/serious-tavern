@@ -1,5 +1,6 @@
 import { reasoningEfforts } from '@st/shared';
 import type { NodeConfigPanelProps } from './types.js';
+import { LlmTools } from './LlmTools.js';
 import { ModelPicker } from './ModelPicker.js';
 import { parseStopSequences, updateNumericOption } from './llmConfig.js';
 
@@ -130,6 +131,7 @@ export function LlmPanel({ config, onChange, context }: NodeConfigPanelProps) {
           onChange={(e) => onChange({ ...config, stop: parseStopSequences(e.target.value) })}
         />
       </label>
+      <LlmTools config={config} onChange={onChange} context={context} />
     </div>
   );
 }

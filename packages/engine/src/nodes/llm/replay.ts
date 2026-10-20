@@ -1,7 +1,4 @@
-import type { PromptMessage } from '@st/shared';
-
-export const replayPolicies = ['never', 'sinceLastUser', 'always'] as const;
-export type ReplayPolicy = (typeof replayPolicies)[number];
+import type { PromptMessage, ReplayPolicy } from '@st/shared';
 
 /**
  * The prompt as the model should see the earlier reasoning: an assistant message keeps its `reasoning` and

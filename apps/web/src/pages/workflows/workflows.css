@@ -92,7 +92,7 @@
   flex-shrink: 0;
 }
 
-/* Recall and Draw: the picked collections (node-ui's CollectionPicker). */
+/* Recall and Draw: the picked collections (node-ui's CollectionPicker); the LLM node's tool key lists reuse the rows. */
 .collection-picker-rows {
   list-style: none;
   margin: 0;

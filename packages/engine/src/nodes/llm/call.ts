@@ -1,5 +1,5 @@
 import type { ChatOptions, ChatRequest, ChatResponse, LlmAdapter } from '../../providers/index.js';
-import type { ExecutionContext } from '../../types.js';
+import type { ExecutionContext, NodeDelta } from '../../types.js';
 
 /**
  * One model call for the LLM node: streamed (text and reasoning go out as deltas as they arrive) or whole,
@@ -7,8 +7,7 @@ import type { ExecutionContext } from '../../types.js';
  * accumulated response.
  */
 export function modelCaller(ctx: ExecutionContext, adapter: LlmAdapter, options: ChatOptions) {
-  const delta = (detail: { textDelta?: string; reasoningDelta?: string }) =>
-    ctx.emit({ type: 'node:delta', nodeId: ctx.nodeId, detail });
+  const delta = (detail: NodeDelta) => ctx.emit({ type: 'node:delta', nodeId: ctx.nodeId, detail });
   return async (request: ChatRequest): Promise<ChatResponse> => {
     if (ctx.config.streaming !== false && adapter.stream != null)
       return adapter.stream(request, {

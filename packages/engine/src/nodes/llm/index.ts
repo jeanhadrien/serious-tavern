@@ -14,7 +14,7 @@ import { runToolLoop } from '../../tools/loop.js';
 import { buildStateTools } from '../../tools/state-tools.js';
 import { modelCaller } from './call.js';
 import { applyReplayPolicy } from './replay.js';
-import { toolSettingsSchema } from './tool-settings.js';
+import { toolSettingsSchema, writesState } from './tool-settings.js';
 
 export function mergeSystemMessages(messages: readonly PromptMessage[]): PromptMessage[] {
   const result: PromptMessage[] = [];
@@ -39,6 +39,8 @@ export const llm: NodeDefinition = {
   category: 'AI',
   // Backstop only: the provider enforces its own idle timeout, so a live stream is not cut at the default 30s.
   timeoutMs: 600_000,
+  // A model that can write state has an effect of its own, so it runs even with no Chat Output downstream.
+  sink: writesState,
   inputs: [{ name: 'character', label: 'Character', dataType: 'character' }],
   outputs: [
     { name: 'text', label: 'Text', dataType: 'text' },

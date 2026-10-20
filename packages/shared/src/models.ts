@@ -168,7 +168,10 @@ export const nodeTypeDescriptorSchema = z.object({
   description: z.string(),
   category: z.string(),
   dynamicPorts: z.boolean(),
-  /** Runs, with its upstream, even when no Chat Output needs it. Always sent by the server. */
+  /**
+   * Runs, with its upstream, even when no Chat Output needs it. Always sent by the server. Static: for a node whose
+   * sink-ness depends on its config (the LLM node, when its tools can write) it describes the default config.
+   */
   sink: z.boolean().optional(),
   inputs: z.array(portSchema),
   outputs: z.array(portSchema),

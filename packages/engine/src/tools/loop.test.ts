@@ -39,6 +39,7 @@ async function run(
   const { ctx, logs } = toolContext();
   const requests: ChatRequest[] = [];
   const beginWire = vi.spyOn(ctx, 'beginWire');
+  const emit = vi.spyOn(ctx, 'emit');
   const result = await runToolLoop({
     request: baseRequest,
     call: async (request) => {
@@ -53,7 +54,13 @@ async function run(
     parallelToolCalls: options.parallelToolCalls,
     ctx,
   });
-  return { ...result, requests, logs, wires: beginWire.mock.calls.length };
+  return {
+    ...result,
+    requests,
+    logs,
+    wires: beginWire.mock.calls.length,
+    events: emit.mock.calls.map(([event]) => event),
+  };
 }
 
 const toolMessages = (exchange: ConversationMessage[]) => exchange.filter((message) => message.role === 'tool');
@@ -79,6 +86,14 @@ describe('runToolLoop', () => {
     expect(contentOf(exchange[1])).toEqual({ echoed: { a: 1 } });
     expect(logs).toEqual(['step 1: echo {"a":1} -> ok']);
     expect(wires).toBe(2);
+  });
+
+  it('announces every step after the first, and nothing for a single call', async () => {
+    const single = await run([chatResponse('hello')], { tools: [] });
+    expect(single.events).toEqual([]);
+    const looped = await run([callsReply(['echo', {}]), callsReply(['echo', {}]), chatResponse('done')]);
+    const stepStart = { type: 'node:delta', nodeId: 'llm', detail: { stepStart: true } };
+    expect(looped.events).toEqual([stepStart, stepStart]);
   });
 
   it('runs several calls of one step one after another, in the order sent', async () => {

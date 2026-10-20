@@ -15,7 +15,7 @@ import {
   type Persona,
 } from '@st/shared';
 import type { InjectOptions } from 'fastify';
-import { registry } from '@st/engine';
+import { isSink, registry } from '@st/engine';
 import { chatResponse, restoreAdapter, useAdapter } from './test-support/adapter.js';
 import { parseEventStream } from './test-support/event-stream.js';
 
@@ -53,8 +53,11 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     ).toEqual(['character', 'llm', 'next-chunk', 'parse-json', 'random', 'state-read', 'state-write', 'trigger']);
     for (const descriptor of nodeTypes) {
       expect(descriptor.dynamicPorts).toBe(!!registry.get(descriptor.type)?.resolvePorts);
-      expect(descriptor.sink).toBe(!!registry.get(descriptor.type)?.sink);
+      // A sink that depends on its config is described with the node's default config.
+      const definition = registry.get(descriptor.type)!;
+      expect(descriptor.sink).toBe(isSink(definition, definition.defaultConfig));
     }
+    expect(nodeTypes.find((descriptor) => descriptor.type === 'llm')?.sink).toBe(false);
     expect(nodeTypes.find((descriptor) => descriptor.type === 'chat-output')?.sink).toBe(true);
     expect(nodeTypes.find((descriptor) => descriptor.type === 'state-write')?.sink).toBe(true);
     const builtIn = await request('listProviders', { method: 'GET', url: '/api/providers' });

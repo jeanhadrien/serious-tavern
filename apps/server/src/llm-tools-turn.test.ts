@@ -10,6 +10,7 @@ import {
   makeSession,
   makeWorkflow,
   node,
+  send,
   tempApps,
   turn,
 } from './test-support/story.js';
@@ -88,3 +89,48 @@ it('stores the writes of a tool-using LLM node on the turn and lets it read them
     await app.close();
   }
 });
+
+it('runs an LLM node with write tools and no Chat Output after the reply, and stores its writes', async () => {
+  const script = [callsTool('write_counter_n', { op: 'set', value: 4 }), chatResponse('Noted.')];
+  let calls = 0;
+  useAdapter({ chat: async () => script[calls++]! });
+  const { app } = await apps.open();
+  try {
+    await app.inject({ method: 'PUT', url: '/api/secrets/openrouter', payload: { value: 'test-key' } });
+    const definition = await define(app);
+    const preset = (
+      await app.inject({ method: 'POST', url: '/api/presets', payload: { name: 'P', inputs: [], entries: [] } })
+    ).json();
+    const llm = (tools: object) =>
+      node('llm', 'llm', { presetId: preset.id, provider: 'openrouter', model: 'm', tools });
+    const workflow = await makeWorkflow(
+      app,
+      [node('input', 'chat-input'), llm({ write: [{ definitionId: definition.id, key: 'n' }] })],
+      [],
+    );
+
+    // Without write tools the same graph has no sink: a turn on it is refused as an invalid workflow.
+    const bad = await makeWorkflow(app, [node('input', 'chat-input'), llm({ read: [] })], [], 'Bad');
+    const refused = await send(app, (await makeSession(app, bad.id)).id);
+    expect(refused.json()).toMatchObject({ error: { code: 'WORKFLOW_INVALID' } });
+
+    const session = await makeSession(app, workflow.id);
+    expect(await turn(app, session.id)).toEqual([]);
+    const entry = await waitForWrites(app, session.id);
+    expect(entry.writes).toEqual([
+      { op: 'set', target: { kind: 'definition', definitionId: definition.id, key: 'n' }, nodeId: 'llm', value: 4 },
+    ]);
+  } finally {
+    await app.close();
+  }
+});
+
+/** The turn's entry once a run after the reply has stored writes on it. */
+async function waitForWrites(app: Parameters<typeof readSession>[0], sessionId: string) {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const [entry] = entriesOf(await readSession(app, sessionId));
+    if (entry?.writes?.length) return entry;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  throw new Error('The run stored no writes');
+}

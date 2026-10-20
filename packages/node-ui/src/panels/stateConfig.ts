@@ -13,9 +13,10 @@ export type Option = { value: string; label: string };
 
 /**
  * What the picker is for: a State Read or State Write (any key), or a node that works on a list (`collection`:
- * Next Chunk, Unlinked Messages), which only offers collection keys and leaves `read`/`op` alone.
+ * Next Chunk, Unlinked Messages), which only offers collection keys and leaves `read`/`op` alone. `target` picks
+ * any key and nothing else (the LLM node's tool lists).
  */
-export type PickerKind = 'read' | 'write' | 'collection';
+export type PickerKind = 'read' | 'write' | 'collection' | 'target';
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
@@ -75,7 +76,8 @@ export function readOptions(type: StateKeyType | undefined, current: string): St
 
 /**
  * The config after the user picks a definition and key. A State Read (`read`) goes back to `value` when its read
- * does not fit the new key's type (`linked` is for collections). A State Write (`write`) also fits `op` to the
+ * does not fit the new key's type (`linked` is for collections). `collection` and `target` only set the target. A
+ * State Write (`write`) also fits `op` to the
  * key's type (the first operation it allows when the current one is not allowed) and drops its fixed `value` when
  * the definition or key changed, because that value was typed for another key.
  */
@@ -86,7 +88,7 @@ export function retarget(
   kind: PickerKind,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...config, definitionId: next.definitionId, key: next.key };
-  if (kind === 'collection') return result;
+  if (kind === 'collection' || kind === 'target') return result;
   const def = catalog.find((definition) => definition.id === next.definitionId)?.keys[next.key];
   if (kind === 'read') {
     const read = text(config.read) || 'value';

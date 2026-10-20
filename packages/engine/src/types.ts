@@ -23,9 +23,12 @@ export type EngineEvent = {
     | 'node:error'
     | 'execution:complete';
   nodeId?: string;
-  // `node:delta` carries `{ textDelta?, reasoningDelta? }`.
+  // `node:delta` carries a `NodeDelta`.
   detail?: unknown;
 };
+// What an LLM node streams. `stepStart` marks the start of every step of a tool loop after the first: the text so
+// far belonged to a step that is not the answer, so the chat clears it (reasoning is kept, see TurnStream).
+export type NodeDelta = { textDelta?: string; reasoningDelta?: string; stepStart?: boolean };
 export type NodeResources = {
   presets: { get(id: string): Promise<Preset | undefined> };
   characters?: { get(id: string): Promise<Character | undefined> };
@@ -122,7 +125,12 @@ export type NodeDefinition = {
   defaultConfig: Record<string, unknown>;
   timeoutMs?: number;
   // A sink always runs (once its inputs are ready), and so does everything it depends on, even when no Chat
-  // Output needs it: nodes that write somewhere. Chat Output is a sink.
-  sink?: boolean;
+  // Output needs it: nodes that write somewhere. Chat Output is a sink. A function decides from the node's config
+  // (an LLM node is a sink when its tools can write state); read it only through `isSink`.
+  sink?: boolean | ((config: Record<string, unknown>) => boolean);
   execute(ctx: ExecutionContext): Promise<Record<string, unknown>>;
 };
+
+/** Whether a node of this type, with this config, is a sink. */
+export const isSink = (definition: NodeDefinition, config: Record<string, unknown>): boolean =>
+  typeof definition.sink === 'function' ? definition.sink(config) : !!definition.sink;

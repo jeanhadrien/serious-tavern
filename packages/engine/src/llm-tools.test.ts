@@ -162,7 +162,7 @@ describe('an LLM node with state tools', () => {
     expect((failure as ExecutionFailure).execution.nodes.llm?.status).toBe('error');
   });
 
-  it('streams every step’s text and reasoning as it does today', async () => {
+  it('streams every step’s text and reasoning, with a stepStart before each step after the first', async () => {
     const stream = vi.fn(async (_request, { onToken, onReasoning }) => {
       onReasoning('r');
       onToken('t');
@@ -174,7 +174,13 @@ describe('an LLM node with state tools', () => {
     const events: EngineEvent[] = [];
     await executeWorkflow(llmWorkflow({ tools }), { ...runOptions, onEvent: (event) => events.push(event) });
     const details = events.filter((event) => event.type === 'node:delta').map((event) => event.detail);
-    expect(details).toEqual([{ reasoningDelta: 'r' }, { textDelta: 't' }, { reasoningDelta: 'r' }, { textDelta: 't' }]);
+    expect(details).toEqual([
+      { reasoningDelta: 'r' },
+      { textDelta: 't' },
+      { stepStart: true },
+      { reasoningDelta: 'r' },
+      { textDelta: 't' },
+    ]);
   });
 
   it('emits a whole reasoning trace once per step when not streaming', async () => {
@@ -188,6 +194,7 @@ describe('an LLM node with state tools', () => {
     });
     expect(events.filter((event) => event.type === 'node:delta').map((event) => event.detail)).toEqual([
       { reasoningDelta: 'one' },
+      { stepStart: true },
       { reasoningDelta: 'two' },
     ]);
   });

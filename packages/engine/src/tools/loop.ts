@@ -1,7 +1,7 @@
 import type { ConversationMessage, ToolCall } from '@st/shared';
 import { shown } from '../nodes/state-key.js';
 import type { ChatRequest, ChatResponse } from '../providers/index.js';
-import type { ExecutionContext } from '../types.js';
+import type { ExecutionContext, NodeDelta } from '../types.js';
 import type { EngineTool } from './types.js';
 
 export type ToolLoopOptions = {
@@ -81,6 +81,8 @@ export async function runToolLoop(options: ToolLoopOptions): Promise<{
     const closing = declared.length > 0 && step > maxSteps;
     if (closing) ctx.log(`Step limit (${maxSteps}) reached: asking for a final answer without tool use`);
     ctx.signal.throwIfAborted();
+    // The text so far was an intermediate step's, not the answer: tell whoever shows the stream to start over.
+    if (step > 1) ctx.emit({ type: 'node:delta', nodeId: ctx.nodeId, detail: { stepStart: true } satisfies NodeDelta });
     // One HTTP call, one wire log entry.
     ctx.beginWire();
     const response = await call({
