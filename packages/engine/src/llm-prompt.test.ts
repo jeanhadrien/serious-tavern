@@ -73,6 +73,15 @@ describe('the prompt before the call', () => {
     ]);
   });
 
+  it('never replays the reasoning of a chat reply, which has no provenance', async () => {
+    const reply = { role: 'assistant', content: 'Hello', reasoning: 'old thought' } as PromptMessage;
+    for (const replayReasoning of ['never', 'sinceLastUser', 'always'])
+      expect(kept((await sent({ replayReasoning }, [{ role: 'user', content: 'hi' }, reply])).messages)).toEqual([
+        false,
+        false,
+      ]);
+  });
+
   it('sends a stored chat history with only the canonical message fields', async () => {
     const stored = [
       { id: 'm1', role: 'user', content: 'hi', executionId: 'e', status: 'done', characterId: 'c', createdAt: '' },
