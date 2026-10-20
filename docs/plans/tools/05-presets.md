@@ -7,6 +7,12 @@ Design: [README.md](README.md). Files: `packages/engine/src/preset.ts`, `package
 This step comes before the Thread node: until slots accept tool messages, a thread could not reach a prompt
 (`renderMessagesSlot` accepts only `system | user | assistant` and rebuilds each message from `role`, `content`, `name`).
 
+**Where things stand (after steps 1–4).** The LLM node (`nodes/llm/index.ts`) already renders the preset, merges
+system messages, applies the reasoning replay policy (`replay.ts`) and runs `repairToolSequence` before the loop; only
+the input is missing, because `renderPreset` still strips slot messages. The flattening below goes in that pipeline,
+after replay and before `repairToolSequence`. `withoutReasoning` in `preset.ts` is today applied to the template
+history and to `messages` inputs.
+
 ## Messages slots
 
 - `renderMessagesSlot` validates with the canonical message schema: `tool` messages, `tool_calls`, `reasoning`,

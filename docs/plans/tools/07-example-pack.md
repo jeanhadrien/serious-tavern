@@ -15,6 +15,9 @@ Design: [README.md](README.md). Files: `apps/server/src/examples/` (new pack, li
   (the scenarist's decisions reach it through state, not through the thread). Its preset parts come from
   `examples/preset-parts.ts` like the other narrators.
 
+Since step 3 an LLM with write tools is a sink on its own; the scenarist still ends in a State Write because its
+exchange must reach the thread. Thread keys are never tool targets, so `notes` stays out of the tool lists.
+
 ## Checks
 
 - `seed-examples.test.ts` validates every seeded workflow, so the pack is covered by the existing test.

@@ -89,6 +89,51 @@ readable. Steps 1 to 3 are useful alone: an LLM can call state tools before thre
 
 Presets come before the Thread node: until slots accept tool messages, a thread cannot reach a prompt.
 
+## Status
+
+| Step | Code |
+|---|---|
+| 1. Canonical conversation | done (`a397992`) |
+| 2. Adapter | done (`58625d3`) |
+| 3. Tool loop and state tools | done: fold with pending writes (`3b26d93`), loop and state tools (`3dd6d15`), panel, step resets, sink rule (`c568047`) |
+| 4. Thread keys | done: shared, engine, server (`67503a1`), web (`cb8298a`) |
+| 5. Presets | to do |
+| 6. Thread node | to do |
+| 7. Example pack | to do |
+
+Process: one fresh Sonnet agent per step (or part of a step), the orchestrator reviews the diff, runs `npm run check`
+and commits. Agents edit files only with the Edit/Write tools: a PowerShell edit once corrupted every line of a
+Markdown file.
+
+## Decisions taken during implementation
+
+These are in the code; the remaining steps build on them.
+
+- **Provenance is stamped by the adapter.** The caller passes `ChatOptions.nodeId` (required), so `provenance` is
+  always `{ providerId, model, nodeId }` (step 2).
+- **Wire log entries:** `ctx.beginWire()` starts the next entry of `nodes[id].wires`; the loop calls it before every
+  call (step 2).
+- **Read-your-own-writes:** `FoldInput.pending`, the server's `foldWithOf` closure (`services/story-state.ts`) passed
+  as `executeWorkflow`'s `foldWith`, and `ctx.pendingState()` (a `StateAccess`) for the writing node (step 3a).
+- **The loop takes a `call(request)` function**, so the node keeps streaming and reasoning emission in
+  `nodes/llm/call.ts`. `toolChoice: 'required'` applies to the first call only. Tool calls sent after the step limit
+  are dropped with a log line (step 3b).
+- **Write tools return the key's value after the write**; collections show `{ handle, text, ...fields }`. A write with
+  nothing to do (removing a gone item) is a tool error (step 3b).
+- **An LLM node with write tools is a sink.** `NodeDefinition.sink` may be a function of the config (`isSink`); the LLM
+  node is a sink exactly when `tools.write` is not empty, so a tools-only LLM runs without a downstream output. The
+  `/api/node-types` descriptor stays static (`sink: false` for the default config) (step 3c).
+- **Step resets:** the loop emits `node:delta { stepStart: true }` between steps; the turn event `node.delta` gains
+  `reset`; reasoning keeps every step, joined by a blank line added by the server (step 3c).
+- **Thread items are stamped by the write buffer.** `StateWriteBuffer.writer` stamps `turnId` (from the new
+  `ctx.trigger.turnId`, passed by the server to every run) and `runId` on adds to a thread key; State Write never
+  stamps, and nothing parses item ids (step 4a).
+- **The state view's thread item** is `{ id, text, steps, toolCalls, turnId, runId }` (`viewThreadItem`); the run
+  snapshot keeps the whole item, exchange included. `GET /api/sessions/:id` still returns `session.state` with the
+  inline exchanges (part of the by-reference TODO) (step 4a).
+- **Thread keys are never tool targets**, and State Write's `remove` on a thread takes its id only from the input
+  (no fixed value) (steps 4a, 4b).
+
 Docs updated along the way: `README.md` (node types, tools, threads), `docs/PROVIDERS.md` (tool support, replay
 fields), `docs/STATE-AND-LORE.md` (thread keys), `AGENTS.md` (contracts listed in each step).
 

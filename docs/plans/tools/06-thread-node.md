@@ -5,6 +5,12 @@ nodes/thread/` (new), `registry.ts`, `packages/shared/src/state/snapshot.ts`, `p
 `apps/server/src/services/turn-stream.ts` and the settle path, `state-definition-usage.ts` (server),
 `packages/node-ui/src/panels/` (panel).
 
+**Where things stand (after steps 1–4).** Thread items already carry `turnId` and `runId` (stamped by the write
+buffer; `ctx.trigger.turnId` exists), and the run snapshot holds whole items, exchange included (`ctx.state.read`).
+Still to add here: `StateSnapshot.turnIds`, `sourceNodeId` on replies, the weave and the node. State Read already
+reads thread items like a collection, and the State Read picker shows thread keys, so the Thread node's picker can
+follow it.
+
 ## The node
 
 - **Thread** (category History). Config: `definitionId` + `key` (a thread key, picked with the State Read picker,
