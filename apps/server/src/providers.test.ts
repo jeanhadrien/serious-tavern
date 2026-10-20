@@ -7,7 +7,7 @@ import type { ChatOptions } from '@st/engine';
 import { apiContract, errorEnvelopeSchema, type ProviderView } from '@st/shared';
 import { createApp } from './app.js';
 import { ProviderRepository } from './storage/provider-repository.js';
-import { restoreAdapter, useAdapter } from './test-support/adapter.js';
+import { chatResponse, restoreAdapter, useAdapter } from './test-support/adapter.js';
 
 let directory: string;
 let warn: MockInstance<typeof console.warn>;
@@ -35,6 +35,8 @@ describe('provider repository', () => {
         ...body,
         headers: { 'X-Test': '1' },
         messageName: null,
+        replayFields: ['reasoning_details'],
+        reasoningReplayField: 'reasoning',
         extraBody: { top_k: 40, nested: { a: [1, 2] } },
         overrides: [{ match: 'deepseek/*', messageName: null, reasoningFields: ['reasoning_content'] }],
         id,
@@ -52,6 +54,8 @@ describe('provider repository', () => {
       name: 'My DeepSeek',
       secret: 'deepseek',
       messageName: null,
+      replayFields: ['reasoning_details'],
+      reasoningReplayField: 'reasoning',
       extraBody: { top_k: 40, nested: { a: [1, 2] } },
       overrides: [{ match: 'deepseek/*', messageName: null, reasoningFields: ['reasoning_content'] }],
       custom: 'kept',
@@ -68,6 +72,8 @@ describe('provider repository', () => {
       kind: 'openai-compatible',
       messageName: 'name',
       reasoningFields: ['reasoning', 'reasoning_content'],
+      replayFields: [],
+      reasoningReplayField: null,
       headers: {},
       extraBody: {},
       overrides: [],
@@ -279,7 +285,7 @@ describe('LLM node provider resolution', () => {
     useAdapter({
       chat: async (_request, options) => {
         calls.push(options);
-        return { text: 'ok', raw: {} };
+        return chatResponse('ok');
       },
     });
     return calls;
@@ -342,13 +348,15 @@ data: [DONE]
         (await app.inject({ method: 'GET', url: `/api/executions/${result.execution!.id}` })).json(),
       );
       const sent = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body));
-      expect(stored.nodes.llm?.wire).toMatchObject({
+      expect(stored.nodes.llm?.wires).toHaveLength(1);
+      expect(stored.nodes.llm?.wires?.[0]).toMatchObject({
         url: 'https://api.deepseek.com/v1/chat/completions',
         headers: { Authorization: 'Bearer [redacted]' },
         body: sent,
         status: 200,
         response: { choices: [{ delta: { content: 'ok' } }] },
       });
+      expect(stored.nodes.llm).not.toHaveProperty('wire');
       expect(sent).toMatchObject({ top_k: 40, stream: true });
       expect(stored.nodes.llm).not.toHaveProperty('request');
       const files = await readdir(join(directory, 'executions'));

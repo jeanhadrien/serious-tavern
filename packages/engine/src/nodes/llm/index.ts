@@ -135,9 +135,11 @@ export const llm: NodeDefinition = {
           .map((field) => [field, ctx.config[field]]),
       ),
     };
-    const options = { provider, apiKey, signal: ctx.signal, onWire: ctx.recordWire };
+    const options = { provider, apiKey, nodeId: ctx.nodeId, signal: ctx.signal, onWire: ctx.recordWire };
     const delta = (detail: { textDelta?: string; reasoningDelta?: string }) =>
       ctx.emit({ type: 'node:delta', nodeId: ctx.nodeId, detail });
+    // One HTTP call, one wire log entry.
+    ctx.beginWire();
     // Deltas are notifications only; the outcome is the accumulated response returned below.
     const stream = adapter.stream;
     let response: ChatResponse;

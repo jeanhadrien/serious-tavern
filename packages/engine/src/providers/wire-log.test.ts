@@ -40,7 +40,13 @@ describe('wire log', () => {
     const upstream = { id: 'gen-1', choices: [{ message: { content: 'ok', reasoning_content: 'Hmm' } }] };
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json(upstream));
     const { reports, onWire } = recorder();
-    await openaiCompatible.chat(request, { provider, apiKey: secret, signal: new AbortController().signal, onWire });
+    await openaiCompatible.chat(request, {
+      provider,
+      apiKey: secret,
+      nodeId: 'llm-1',
+      signal: new AbortController().signal,
+      onWire,
+    });
     expect(reports).toHaveLength(2);
     const [before, after] = reports;
     expect(before).not.toHaveProperty('status');
@@ -79,6 +85,7 @@ describe('wire log', () => {
     const call = openaiCompatible.chat(request, {
       provider,
       apiKey: secret,
+      nodeId: 'llm-1',
       signal: new AbortController().signal,
       onWire,
     });
@@ -93,7 +100,12 @@ describe('wire log', () => {
   it('keeps a non-JSON response as text', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('<html>Bad gateway</html>'));
     const { reports, onWire } = recorder();
-    const call = openaiCompatible.chat(request, { provider, signal: new AbortController().signal, onWire });
+    const call = openaiCompatible.chat(request, {
+      provider,
+      nodeId: 'llm-1',
+      signal: new AbortController().signal,
+      onWire,
+    });
     await expect(call).rejects.toThrow('not JSON');
     expect(reports.at(-1)).toMatchObject({ status: 200, response: '<html>Bad gateway</html>' });
   });
@@ -111,6 +123,7 @@ describe('wire log', () => {
     const response = await openaiCompatible.stream!(request, {
       provider,
       apiKey: secret,
+      nodeId: 'llm-1',
       signal: new AbortController().signal,
       onWire,
       onToken: () => {},
@@ -151,6 +164,7 @@ describe('wire log', () => {
     const call = openaiCompatible.stream!(request, {
       provider,
       apiKey: secret,
+      nodeId: 'llm-1',
       signal: new AbortController().signal,
       onWire,
       onToken: () => {},

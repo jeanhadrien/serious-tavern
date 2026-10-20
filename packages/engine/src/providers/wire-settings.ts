@@ -6,6 +6,10 @@ export type WireSettings = {
   // Wire field for a message's name; null drops names.
   messageName: string | null;
   reasoningFields: string[];
+  // Response message fields kept in `provider_data` and sent back as they are.
+  replayFields: string[];
+  // Wire field a message's `reasoning` is sent back under; null never sends it.
+  reasoningReplayField: string | null;
   extraBody: Record<string, unknown>;
 };
 
@@ -20,7 +24,7 @@ function globMatches(pattern: string, model: string) {
 
 /**
  * Resolves the wire settings of `provider` for `model`. The first override whose `match` fits the model id
- * replaces `messageName`/`reasoningFields` and shallow-merges its `headers`/`extraBody` over the provider's.
+ * replaces `messageName`/`reasoningFields`/`replayFields`/`reasoningReplayField` and shallow-merges its `headers`/`extraBody` over the provider's.
  */
 export function resolveWireSettings(provider: Provider, model: string): WireSettings {
   const override = provider.overrides.find((candidate) => globMatches(candidate.match, model));
@@ -29,6 +33,10 @@ export function resolveWireSettings(provider: Provider, model: string): WireSett
     // An override's explicit null ("never send names") must win, so this is not `??`.
     messageName: override?.messageName !== undefined ? override.messageName : provider.messageName,
     reasoningFields: override?.reasoningFields ?? provider.reasoningFields,
+    replayFields: override?.replayFields ?? provider.replayFields,
+    // Like `messageName`, an explicit null ("never send reasoning back") must win.
+    reasoningReplayField:
+      override?.reasoningReplayField !== undefined ? override.reasoningReplayField : provider.reasoningReplayField,
     extraBody: { ...provider.extraBody, ...override?.extraBody },
   };
 }

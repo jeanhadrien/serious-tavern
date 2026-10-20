@@ -4,7 +4,14 @@ import { httpRequest } from './nodes/http-request/index.js';
 import { character } from './nodes/character/index.js';
 import { llm, mergeSystemMessages } from './nodes/llm/index.js';
 import { openaiCompatible } from './providers/openai-compatible.js';
-import { openrouterProvider, providerRecord, providerResources, restoreAdapter, useAdapter } from './test-providers.js';
+import {
+  chatResponse,
+  openrouterProvider,
+  providerRecord,
+  providerResources,
+  restoreAdapter,
+  useAdapter,
+} from './test-providers.js';
 import type { EngineEvent, ExecutionContext } from './types.js';
 import { stateless } from './test-state.js';
 
@@ -39,6 +46,7 @@ const ctx = (config: Record<string, unknown>): ExecutionContext => ({
   signal: new AbortController().signal,
   resources: { presets: { get: async () => preset }, providers: providerResources(providerRecord('fake')) },
   recordWire: () => {},
+  beginWire: () => {},
   log: () => {},
   random: () => 0.5,
   emit: () => {},
@@ -165,7 +173,7 @@ describe('integration nodes', () => {
     await expect(
       openaiCompatible.chat(
         { model: 'test', messages: [], temperature: 0.7, maxTokens: 10 },
-        { provider: openrouterProvider, apiKey: 'test-key', signal: new AbortController().signal },
+        { provider: openrouterProvider, apiKey: 'test-key', nodeId: 'llm-1', signal: new AbortController().signal },
       ),
     ).rejects.toThrow('OpenRouter 429: limited');
   });
@@ -187,7 +195,7 @@ describe('integration nodes', () => {
           { role: 'system', content: 'Empty name is still set', name: '' },
         ],
       },
-      { provider: openrouterProvider, apiKey: 'test-key', signal: new AbortController().signal },
+      { provider: openrouterProvider, apiKey: 'test-key', nodeId: 'llm-1', signal: new AbortController().signal },
     );
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     expect(body.messages).toEqual([
@@ -289,7 +297,7 @@ describe('integration nodes', () => {
       onReasoning('Plan.');
       onToken('Hel');
       onToken('lo');
-      return { text: 'Hello', raw: { streamed: true } };
+      return chatResponse('Hello', { raw: { streamed: true } });
     });
     useAdapter({ chat, stream });
     const events: EngineEvent[] = [];

@@ -2,13 +2,13 @@ import type { WireExchange } from '@st/shared';
 
 const json = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value, null, 2));
 
-/** One LLM node's HTTP exchange as it went over the wire: URL, redacted headers, body and response. */
-export function WireDetails({ wire }: { wire: WireExchange }) {
+/** One HTTP call of an LLM node as it went over the wire: URL, redacted headers, body and response. */
+export function WireDetails({ wire, call }: { wire: WireExchange; call?: string }) {
   const streamed = (wire.body as { stream?: unknown } | undefined)?.stream === true;
   return (
     <details className="wire">
       <summary>
-        LLM call · {wire.method} {wire.url}
+        {call ?? 'LLM call'} · {wire.method} {wire.url}
         {wire.status === undefined ? ' · no response' : ` · ${wire.status}`}
       </summary>
       <details>
@@ -26,6 +26,21 @@ export function WireDetails({ wire }: { wire: WireExchange }) {
         </details>
       )}
     </details>
+  );
+}
+
+/** All HTTP calls of an LLM node, in order: numbered when there is more than one (a tool loop makes several). */
+export function WireList({ wires }: { wires: readonly WireExchange[] }) {
+  return (
+    <>
+      {wires.map((wire, index) => (
+        <WireDetails
+          key={index}
+          wire={wire}
+          call={wires.length > 1 ? `LLM call ${index + 1} of ${wires.length}` : undefined}
+        />
+      ))}
+    </>
   );
 }
 

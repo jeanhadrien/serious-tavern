@@ -10,6 +10,8 @@ const provider = (extra: Partial<ProviderView> = {}): ProviderView => ({
   headers: { 'X-One': '1' },
   messageName: 'name',
   reasoningFields: ['reasoning', 'reasoning_content'],
+  replayFields: [],
+  reasoningReplayField: null,
   extraBody: {},
   overrides: [{ match: 'deepseek/*', messageName: null }],
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -31,6 +33,8 @@ it('round-trips a provider through the draft', () => {
       secret: 'local',
       messageName: 'name',
       reasoningFields: ['reasoning', 'reasoning_content'],
+      replayFields: [],
+      reasoningReplayField: null,
       headers: { 'X-One': '1' },
       extraBody: {},
       overrides: [{ match: 'deepseek/*', messageName: null }],
@@ -62,7 +66,7 @@ it('reports YAML and validation problems in plain language', () => {
   };
   expect(errors({ advanced: 'headers: [unclosed' })[0]).toMatch(/^YAML: /);
   expect(errors({ advanced: '- just a list' })).toEqual([
-    'YAML: must be a mapping with headers, extraBody and overrides',
+    'YAML: must be a mapping with replayFields, reasoningReplayField, headers, extraBody and overrides',
   ]);
   expect(errors({ advanced: 'headers: {}\nbaseUrl: x' })[0]).toContain('unknown key "baseUrl"');
   expect(errors({ advanced: 'overrides:\n  - messageName: null' })[0]).toMatch(/^YAML overrides\.0\.match: /);

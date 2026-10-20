@@ -147,6 +147,8 @@ export async function executeWorkflow(
           let signal: AbortSignal | undefined;
           let task: Promise<Record<string, unknown>> | undefined;
           let callbacksActive = true;
+          // Set by `ctx.beginWire`: the next recorded exchange is a new call, not an update of the last one.
+          let newWireCall = false;
           let abortListener: (() => void) | undefined;
           try {
             const edges: Edge[] = incoming.get(node.id)!;
@@ -214,8 +216,19 @@ export async function executeWorkflow(
                 },
                 random: createNodeRandom(`${seed}:${node.id}`),
                 ...stateRun.context(node.id, () => callbacksActive),
+                beginWire: () => {
+                  newWireCall = true;
+                },
                 recordWire: (wire) => {
-                  if (callbacksActive) execution.nodes[node.id] = { ...execution.nodes[node.id]!, wire };
+                  if (!callbacksActive) return;
+                  const entry = execution.nodes[node.id]!;
+                  const wires = entry.wires ?? [];
+                  const replacesLast = wires.length > 0 && !newWireCall;
+                  newWireCall = false;
+                  execution.nodes[node.id] = {
+                    ...entry,
+                    wires: [...(replacesLast ? wires.slice(0, -1) : wires), wire],
+                  };
                 },
                 emit: (event) => {
                   if (callbacksActive) emit(event);

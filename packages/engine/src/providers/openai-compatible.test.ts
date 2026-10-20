@@ -11,6 +11,7 @@ const request: ChatRequest = {
 };
 const options = (signal = new AbortController().signal) => ({
   provider: openrouterProvider,
+  nodeId: 'llm-1',
   apiKey: 'test-key',
   signal,
 });
@@ -39,7 +40,7 @@ describe('provider record', () => {
   it('sends to the record base URL with its headers, and no credentials without a secret', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(chatBody));
     const local = providerRecord('local', { baseUrl: 'http://localhost:11434/v1/', headers: { 'X-Local': '1' } });
-    await openaiCompatible.chat(request, { provider: local, signal: new AbortController().signal });
+    await openaiCompatible.chat(request, { provider: local, nodeId: 'llm-1', signal: new AbortController().signal });
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(url).toBe('http://localhost:11434/v1/chat/completions');
     expect((init as RequestInit).headers).toEqual({ 'Content-Type': 'application/json', 'X-Local': '1' });
@@ -47,9 +48,9 @@ describe('provider record', () => {
   it('names the provider in upstream errors', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"error":"nope"}', { status: 401 }));
     const provider = providerRecord('deepseek', { name: 'My DeepSeek' });
-    await expect(openaiCompatible.chat(request, { provider, signal: new AbortController().signal })).rejects.toThrow(
-      'My DeepSeek 401: nope',
-    );
+    await expect(
+      openaiCompatible.chat(request, { provider, nodeId: 'llm-1', signal: new AbortController().signal }),
+    ).rejects.toThrow('My DeepSeek 401: nope');
   });
 });
 
@@ -75,6 +76,13 @@ describe('streaming (built-in OpenRouter record)', () => {
     expect(result).toEqual({
       text: 'Hello world',
       reasoning: 'Think first',
+      message: {
+        role: 'assistant',
+        content: 'Hello world',
+        reasoning: 'Think first',
+        provenance: { providerId: 'openrouter', model: 'test', nodeId: 'llm-1' },
+      },
+      finishReason: 'stop',
       usage: { total_tokens: 3 },
       raw: {
         id: 'gen-1',

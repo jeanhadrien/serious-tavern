@@ -4,7 +4,7 @@ import type { Workflow, Edge, ChatMessage, Preset } from '@st/shared';
 import { executeWorkflow, validateWorkflow } from './executor.js';
 import { renderTemplate } from './template.js';
 import { registry } from './registry.js';
-import { providerRecord, providerResources, restoreAdapter, useAdapter } from './test-providers.js';
+import { chatResponse, providerRecord, providerResources, restoreAdapter, useAdapter } from './test-providers.js';
 import type { EngineEvent } from './types.js';
 
 const node = (id: string, type: string, config: Record<string, unknown> = {}) => ({
@@ -44,6 +44,7 @@ afterEach(() => {
     'fast-fail-test',
     'abort-test',
     'ignore-abort-test',
+    'wire-test',
   ])
     registry.delete(type);
   vi.restoreAllMocks();
@@ -500,7 +501,36 @@ describe('executor', () => {
     const snapshot = structuredClone(failedExecution);
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(failedExecution).toEqual(snapshot);
-    expect(failedExecution?.nodes.slow).not.toHaveProperty('wire');
+    expect(failedExecution?.nodes.slow).not.toHaveProperty('wires');
+  });
+  it('logs one wire entry per HTTP call: recording updates the current call, beginWire starts the next', async () => {
+    const exchange = (url: string, status?: number) => ({ url, method: 'POST', headers: {}, body: {}, status });
+    registry.set('wire-test', {
+      type: 'wire-test',
+      label: 'Wire',
+      description: '',
+      category: '',
+      inputs: [{ name: 'in', label: 'In', dataType: 'any' }],
+      outputs: [{ name: 'out', label: 'Out', dataType: 'any' }],
+      configSchema: z.object({}),
+      defaultConfig: {},
+      async execute({ recordWire, beginWire }) {
+        beginWire(); // before the first call, it changes nothing
+        recordWire(exchange('first'));
+        recordWire(exchange('first', 200));
+        beginWire();
+        recordWire(exchange('second'));
+        recordWire(exchange('second', 500));
+        return { out: 'ok' };
+      },
+    });
+    const graph = workflow(
+      [node('input', 'chat-input'), node('wire', 'wire-test'), node('output', 'chat-output')],
+      [edge('input', 'message', 'wire', 'in'), edge('wire', 'out', 'output', 'value')],
+    );
+    const { execution } = await executeWorkflow(graph, options);
+    expect(execution.nodes.wire?.wires).toEqual([exchange('first', 200), exchange('second', 500)]);
+    expect(execution.nodes.wire).not.toHaveProperty('wire');
   });
   it.each(['never', 'late'] as const)('bounds cleanup of a %s-settling sibling by its deadline', async (settlement) => {
     let finish!: () => void;
@@ -720,7 +750,7 @@ describe('streaming events', () => {
     const stream = vi.fn(async (_request, { onToken, onReasoning }) => {
       onReasoning('Plan');
       onToken('Hi');
-      return { text: 'Hi', raw: {} };
+      return chatResponse('Hi');
     });
     useAdapter({ chat: vi.fn(), stream });
     const graph = workflow(

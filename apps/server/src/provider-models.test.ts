@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ListModelsOptions } from '@st/engine';
 import { apiContract, errorEnvelopeSchema, type ProviderView } from '@st/shared';
 import { createApp } from './app.js';
-import { restoreAdapter, useAdapter } from './test-support/adapter.js';
+import { chatResponse, restoreAdapter, useAdapter } from './test-support/adapter.js';
 
 let directory: string;
 beforeEach(async () => {
@@ -16,7 +16,7 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true });
 });
 
-const fakeChat = async () => ({ text: '', raw: {} });
+const fakeChat = async () => chatResponse('');
 
 /** A started app plus helpers; `calls` records what the fake adapter was asked to list. */
 async function setup(

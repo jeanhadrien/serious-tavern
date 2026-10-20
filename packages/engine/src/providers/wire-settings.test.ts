@@ -24,7 +24,7 @@ const stream = (deltas: Record<string, unknown>[]) =>
     `${deltas.map((delta) => `data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`).join('')}data: [DONE]\n\n`,
   );
 const chat = (provider: Provider, overrides: Partial<ChatRequest> = {}) =>
-  openaiCompatible.chat({ ...request, ...overrides }, { provider, signal: signal() });
+  openaiCompatible.chat({ ...request, ...overrides }, { provider, nodeId: 'llm-1', signal: signal() });
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -35,7 +35,14 @@ describe('resolveWireSettings', () => {
     headers: { 'X-A': 'provider', 'X-B': 'provider' },
     extraBody: { a: 1, b: 1 },
     overrides: [
-      { match: 'deepseek/*', messageName: null, reasoningFields: ['reasoning_content'], headers: { 'X-B': 'o1' } },
+      {
+        match: 'deepseek/*',
+        messageName: null,
+        reasoningFields: ['reasoning_content'],
+        replayFields: ['signature'],
+        reasoningReplayField: null,
+        headers: { 'X-B': 'o1' },
+      },
       { match: 'deepseek/deepseek-r1', messageName: 'speaker', extraBody: { b: 2 } },
       { match: '*-chat', extraBody: { b: 3, c: 3 } },
     ],
@@ -46,12 +53,16 @@ describe('resolveWireSettings', () => {
       headers: { 'X-A': 'provider', 'X-B': 'o1' },
       messageName: null,
       reasoningFields: ['reasoning_content'],
+      replayFields: ['signature'],
+      reasoningReplayField: null,
       extraBody: { a: 1, b: 1 },
     });
     expect(resolveWireSettings(provider, 'openai/gpt-chat')).toEqual({
       headers: { 'X-A': 'provider', 'X-B': 'provider' },
       messageName: 'name',
       reasoningFields: ['reasoning', 'reasoning_content'],
+      replayFields: ['reasoning_details'],
+      reasoningReplayField: 'reasoning',
       extraBody: { a: 1, b: 3, c: 3 },
     });
   });
@@ -61,6 +72,8 @@ describe('resolveWireSettings', () => {
       headers: provider.headers,
       messageName: 'name',
       reasoningFields: ['reasoning', 'reasoning_content'],
+      replayFields: ['reasoning_details'],
+      reasoningReplayField: 'reasoning',
       extraBody: provider.extraBody,
     });
   });
@@ -136,6 +149,7 @@ describe('openai-compatible wire format', () => {
     const onReasoning = vi.fn();
     const result = await openaiCompatible.stream!(request, {
       provider: providerRecord('p', { reasoningFields }),
+      nodeId: 'llm-1',
       signal: signal(),
       onToken: () => {},
       onReasoning,
@@ -152,7 +166,7 @@ describe('openai-compatible wire format', () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(completion({}));
     await openaiCompatible.chat(
       { ...request, reasoningEffort: 'low' },
-      { provider: openrouterProvider, apiKey: 'k', signal: signal() },
+      { provider: openrouterProvider, apiKey: 'k', nodeId: 'llm-1', signal: signal() },
     );
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');

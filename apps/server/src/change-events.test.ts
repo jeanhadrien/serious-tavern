@@ -8,7 +8,7 @@ import { apiContract, type ChangeEvent, type Preset } from '@st/shared';
 import { createApp } from './app.js';
 import { createContext } from './context.js';
 import { registerEvents } from './routes/events.js';
-import { restoreAdapter, useAdapter } from './test-support/adapter.js';
+import { chatResponse, restoreAdapter, useAdapter } from './test-support/adapter.js';
 
 let dataDir: string;
 let warn: MockInstance<typeof console.warn>;
@@ -344,7 +344,7 @@ it('publishes one session event per settled streamed turn, and one per message e
     stream: async (_request, { onToken }) => {
       for (const token of ['a', 'b', 'c', 'd']) onToken(token);
       await new Promise((resolve) => setTimeout(resolve, 400)); // long enough for a periodic flush
-      return { text: 'abcd', raw: {} };
+      return chatResponse('abcd');
     },
   });
   const app = await createApp(dataDir, { seed: false });

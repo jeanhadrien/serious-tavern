@@ -164,6 +164,7 @@ describe('Parse JSON node', () => {
       log: (line) => logs.push(line),
       random: () => 0.5,
       recordWire: () => {},
+      beginWire: () => {},
       emit: () => {},
     };
     return { result: parseJson.execute(ctx), logs };

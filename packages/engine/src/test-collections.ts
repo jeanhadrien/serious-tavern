@@ -68,6 +68,7 @@ export async function runNode(
       return queue.shift()!;
     },
     recordWire: () => {},
+    beginWire: () => {},
     emit: () => {},
   };
   const output = await definition.execute(ctx);

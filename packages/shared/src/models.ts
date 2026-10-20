@@ -125,7 +125,9 @@ export const nodeExecutionSchema = z
     logs: z.array(z.string()).optional(),
     /** The canonical LLM request; only in logs written before the wire log existed. */
     request: z.unknown().optional(),
-    /** What an LLM node actually sent and received. */
+    /** What an LLM node actually sent and received, one entry per HTTP call, in order. */
+    wires: z.array(wireExchangeSchema).optional(),
+    /** The single exchange that older logs wrote before `wires`; still read, no longer written. */
     wire: wireExchangeSchema.optional(),
   })
   .passthrough();

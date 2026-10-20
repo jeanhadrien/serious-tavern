@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
-import type { ChatRequest, StreamOptions } from '@st/engine';
+import type { ChatRequest, ChatResponse, StreamOptions } from '@st/engine';
 import {
   apiContract,
   turnEventSchema,
@@ -15,10 +15,10 @@ import {
 } from '@st/shared';
 import { createApp } from './app.js';
 import { historyMessages, settleTurn } from './services/settle-turn.js';
-import { restoreAdapter, useAdapter } from './test-support/adapter.js';
+import { chatResponse, restoreAdapter, useAdapter } from './test-support/adapter.js';
 import { parseEventStream } from './test-support/event-stream.js';
 
-type Script = (request: ChatRequest, options: StreamOptions) => Promise<{ text: string; raw: unknown }>;
+type Script = (request: ChatRequest, options: StreamOptions) => Promise<ChatResponse>;
 type Frame = ReturnType<typeof parseEventStream>[number];
 
 const directories: string[] = [];
@@ -154,7 +154,7 @@ describe('streamed turns', () => {
       await gate;
       onToken('lo');
       await finished;
-      return { text: 'Hello', raw: {} };
+      return chatResponse('Hello');
     });
     const { app, session } = await setup((presetId) => ({
       nodes: [node('input', 'chat-input'), llmNode('llm', presetId, provider), node('output', 'chat-output')],
@@ -215,7 +215,7 @@ describe('streamed turns', () => {
   });
 
   it('stores the reasoning of a non-streamed LLM call on its reply, like streamed reasoning', async () => {
-    useAdapter({ chat: async () => ({ text: 'Hello', reasoning: 'think', raw: {} }) });
+    useAdapter({ chat: async () => chatResponse('Hello', { reasoning: 'think' }) });
     const { app, session } = await setup((presetId) => ({
       nodes: [
         node('input', 'chat-input'),
@@ -248,7 +248,7 @@ describe('streamed turns', () => {
     const provider = useProvider(async (_request, { onToken }) => {
       onToken('Hi');
       await gate;
-      return { text: 'Hi', raw: {} };
+      return chatResponse('Hi');
     });
     const { app, session } = await setup((presetId) => ({
       nodes: [
@@ -284,11 +284,11 @@ describe('streamed turns', () => {
       if (request.model === 'fast') {
         onToken('first');
         await fastGate;
-        return { text: 'first', raw: {} };
+        return chatResponse('first');
       }
       await slowGate;
       onToken('second');
-      return { text: 'second', raw: {} };
+      return chatResponse('second');
     });
     const { app, session } = await setup((presetId) => ({
       nodes: [
@@ -454,7 +454,7 @@ describe('streamed turns', () => {
     const provider = useProvider(async (_request, { onToken, signal }) => {
       if (mode === 'done') {
         onToken('Done');
-        return { text: 'Done', raw: {} };
+        return chatResponse('Done');
       }
       onToken('PARTIAL-TOKENS');
       await new Promise<never>((_resolve, reject) =>

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { Character, ChatMessage, Preset, Workflow } from '@st/shared';
 import { executeWorkflow, ExecutionFailure, validateWorkflow } from './executor.js';
 import { registry } from './registry.js';
-import { providerRecord, providerResources, restoreAdapter, useAdapter } from './test-providers.js';
+import { chatResponse, providerRecord, providerResources, restoreAdapter, useAdapter } from './test-providers.js';
 import { memory } from './nodes/memory/index.js';
 import { renderPreset } from './preset.js';
 import type { ExecutionContext } from './types.js';
@@ -143,7 +143,7 @@ describe('multiple chat outputs', () => {
     expect(result.replies.map((reply) => reply.name)).toEqual(['slow', 'fast']);
   });
   it('orders by dependencies before configured order, and chains replies into a later LLM', async () => {
-    const chat = vi.fn(async (request) => ({ text: `bar(${request.messages[0].content})`, raw: {} }));
+    const chat = vi.fn(async (request) => chatResponse(`bar(${request.messages[0].content})`));
     useAdapter({ chat });
     const result = await executeWorkflow(
       graph(
@@ -166,7 +166,7 @@ describe('multiple chat outputs', () => {
     ]);
   });
   it('orders outputs fed by a shared upstream node by dependency, not by order config', async () => {
-    const chat = vi.fn(async (request) => ({ text: `second(${request.messages[0].content})`, raw: {} }));
+    const chat = vi.fn(async (request) => chatResponse(`second(${request.messages[0].content})`));
     useAdapter({ chat });
     const result = await executeWorkflow(
       graph(
@@ -362,7 +362,7 @@ describe('character nodes and history', () => {
     );
   });
   it.each([false, true])('renders all character macros from the LLM render context (override=%s)', async (override) => {
-    const chat = vi.fn(async (_request: ChatRequest) => ({ text: 'reply', raw: {} }));
+    const chat = vi.fn(async (_request: ChatRequest) => chatResponse('reply'));
     useAdapter({ chat });
     const definition: Preset = {
       ...preset,
@@ -424,6 +424,7 @@ describe('character nodes and history', () => {
       random: () => 0.5,
       emit: () => {},
       recordWire: () => {},
+      beginWire: () => {},
     } satisfies ExecutionContext;
     const fromMemory = (await memory.execute(context)).history;
     const fromInput = (await registry.get('chat-input')!.execute(context)).history;

@@ -13,6 +13,7 @@ A provider record lets you describe how *your* backend spells these things. The 
 - [Picking a model](#picking-a-model)
 - [Message names: from preset to wire](#message-names-from-preset-to-wire)
 - [Reasoning fields](#reasoning-fields)
+- [Tool calls and replayed messages](#tool-calls-and-replayed-messages)
 - [Per-model overrides](#per-model-overrides)
 - [Extra headers and body fields](#extra-headers-and-body-fields)
 - [Checking what was actually sent](#checking-what-was-actually-sent)
@@ -44,7 +45,7 @@ To use one, save a key under its secret name in **Settings** and pick it in the 
 | **Secret** | The name of an API key saved in **Settings**, sent as `Authorization: Bearer <key>`. Leave it empty for servers that need no key. The editor warns you if no secret by that name exists yet. |
 | **Message names** | **Send as a message field** writes each message's name into the field you choose (usually `name`). **Don't send names** never sends one. |
 | **Reasoning fields** | An ordered list of fields to read the reasoning trace from. The first non-empty one wins. |
-| **Headers, extra body and overrides (YAML)** | Advanced settings: extra request headers, raw fields added to every request, and per-model overrides. |
+| **Replay, headers, extra body and overrides (YAML)** | Advanced settings: `replayFields` and `reasoningReplayField` (see [Tool calls and replayed messages](#tool-calls-and-replayed-messages)), extra request headers, raw fields added to every request, and per-model overrides. |
 
 Sampling settings (temperature, max tokens, top-p, penalties, stop) always use their standard OpenAI names and are set on the LLM node, not on the provider.
 
@@ -93,6 +94,32 @@ While a reasoning model streams, the app looks for the reasoning trace on each c
 
 Reasoning appears in the chat above the reply, both for streamed calls and for calls with streaming turned off.
 
+## Tool calls and replayed messages
+
+The adapter speaks the OpenAI function-tool protocol. When a request carries tools, they go out as `tools` (plus `tool_choice` and `parallel_tool_calls` when set), before `extraBody`, which still wins. A reply that calls tools is read back with its calls kept exactly as the backend sent them, unknown fields included (a Gemini thought signature rides on the call), and an assistant message that only calls tools is sent back with `content: null`. A reply is an error ("returned no assistant text") only when it has neither text nor tool calls.
+
+There is no emulation. A backend or model that doesn't support tools answers an error, which is shown as the node's error like any other. The model list can hint at support (OpenRouter reports `supported_parameters`), but nothing is blocked.
+
+Some backends also need parts of a reply *back* on later requests. Two record fields say which, because the app never guesses:
+
+| Field | What it does |
+| --- | --- |
+| `replayFields` | Top-level fields of the response message that are kept with the message and sent back as they are. Default `[]`. The built-in OpenRouter record uses `[reasoning_details]`. While streaming, arrays from each chunk are concatenated and objects merged. |
+| `reasoningReplayField` | The wire field a message's reasoning is sent back under, or `null` (the default) to never send it. The built-in OpenRouter record uses `reasoning`. Whether a given message keeps its reasoning is decided by the LLM node, not here. |
+
+```yaml
+replayFields: [reasoning_details]
+reasoningReplayField: reasoning
+overrides:
+  - match: "deepseek/*"
+    reasoningReplayField: reasoning_content
+  - match: "mistralai/*"
+    replayFields: []
+    reasoningReplayField: null
+```
+
+Both can be set in an override (an explicit `reasoningReplayField: null` wins over the provider's). They live in the YAML box of the provider editor.
+
 ## Per-model overrides
 
 One provider can serve models with different habits, which is especially common through OpenRouter. Overrides change the provider's settings for the models whose id matches a pattern:
@@ -110,7 +137,7 @@ overrides:
 
 - `match` is checked against the model id on the LLM node. `*` matches anything, including `/`. Matching is case-sensitive and covers the whole id: `deepseek/*` matches `deepseek/deepseek-r1` but not `openrouter/deepseek-r1`.
 - The **first** override that matches is used, so put specific patterns before general ones.
-- An override can set `messageName` (including `null`), `reasoningFields`, `headers` and `extraBody`. Its `headers` and `extraBody` are merged over the provider's; the other two replace the provider's values.
+- An override can set `messageName` (including `null`), `reasoningFields`, `replayFields`, `reasoningReplayField` (including `null`), `headers` and `extraBody`. Its `headers` and `extraBody` are merged over the provider's; the others replace the provider's values.
 
 ## Extra headers and body fields
 
@@ -140,6 +167,8 @@ Every assistant message produced by a workflow has **Execution details**. For ea
 - **Headers (secrets redacted)**: what was sent, with keys shown as `Bearer [redacted]`;
 - **Request body**: the exact JSON sent, after your provider's mapping, overrides and `extraBody`;
 - **Response**: what came back. For a streamed reply, all chunks are folded into one object under the backend's own field names. This is where you can see whether reasoning arrived as `reasoning`, `reasoning_content` or something else.
+
+A node that makes several calls (a tool loop) shows one numbered **LLM call** entry per call, in order ("LLM call 2 of 3").
 
 Your API key never appears there, not even when a backend echoes it back in an error. If a call failed, the request is still shown, so you can compare it with the backend's documentation. Messages from before this feature show "LLM request (older log, before provider mapping)" instead.
 

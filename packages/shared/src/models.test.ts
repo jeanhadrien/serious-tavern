@@ -119,3 +119,17 @@ it('preserves unknown preset fields and defaults old placement/role', () => {
   expect(preset.entries[0]!.kind === 'message' && preset.entries[0]!.placement).toEqual({ mode: 'ordered' });
   expect(preset.entries[1]!.kind === 'slot' && preset.entries[1]!.role).toBe('user');
 });
+
+it('loads the wire log as a list of calls', () => {
+  const call = (url: string) => ({ url, method: 'POST', headers: {}, body: {}, status: 200 });
+  const execution = executionLogSchema.parse({
+    id: 'execution',
+    workflowId: 'workflow',
+    sessionId: 'session',
+    status: 'completed',
+    startedAt: '',
+    nodes: { llm: { status: 'completed', wires: [call('a'), call('b')] } },
+  });
+  expect(execution.nodes.llm?.wires).toEqual([call('a'), call('b')]);
+  expect(execution.nodes.llm).not.toHaveProperty('wire');
+});

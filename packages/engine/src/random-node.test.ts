@@ -28,6 +28,7 @@ const run = (config: Record<string, unknown>, inputs: Record<string, unknown> = 
       return queue.shift()!;
     },
     recordWire: () => {},
+    beginWire: () => {},
     emit: () => {},
   };
   return random.execute(ctx);

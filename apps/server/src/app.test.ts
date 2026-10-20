@@ -16,7 +16,7 @@ import {
 } from '@st/shared';
 import type { InjectOptions } from 'fastify';
 import { registry } from '@st/engine';
-import { restoreAdapter, useAdapter } from './test-support/adapter.js';
+import { chatResponse, restoreAdapter, useAdapter } from './test-support/adapter.js';
 import { parseEventStream } from './test-support/event-stream.js';
 
 const directories: string[] = [];
@@ -69,7 +69,7 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     });
     await request('getProvider', { method: 'GET', url: `/api/providers/${provider.id}` });
     useAdapter({
-      chat: async () => ({ text: '', raw: {} }),
+      chat: async () => chatResponse(''),
       listModels: async () => [{ id: 'model-a', contextLength: 8192 }],
     });
     const catalog = await request('listProviderModels', { method: 'GET', url: `/api/providers/${provider.id}/models` });

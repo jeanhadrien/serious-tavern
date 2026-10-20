@@ -92,8 +92,12 @@ export type ExecutionContext = {
   // stored writes are returned with its result (and with `ExecutionFailure`). `add` returns the item with
   // the id it will be stored under.
   writeState(request: StateWriteRequest): { item?: CollectionItem };
-  // Stores the node's HTTP exchange in the execution log (`wire`); each call replaces the previous one.
+  // Stores the node's HTTP exchange in the execution log (`wires`). Each call updates the current entry (a request
+  // is reported before it leaves and again with its response); `beginWire` starts the next entry.
   recordWire(exchange: WireExchange): void;
+  // Marks the start of another HTTP call: the next `recordWire` appends a new entry. Nodes making several calls
+  // (a tool loop) call it before each one; the first call needs no mark.
+  beginWire(): void;
   emit(event: EngineEvent): void;
 };
 export type NodeDefinition = {
