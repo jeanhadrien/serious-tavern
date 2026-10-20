@@ -66,6 +66,10 @@ export async function executeWorkflow(
     // The story state the turn starts from (`foldStoryState` + `stateSnapshot`): what `ctx.state` reads and
     // `trigger.turn` reports. Writes nodes ask for are returned as `writes`, never visible during the run.
     state?: StateSnapshot;
+    // Folds the story state again with extra writes of this run (the caller's own `state` arguments plus `pending`:
+    // `FoldInput.pending`). Lets a node read its own buffered writes (`ctx.pendingState`) without the engine knowing
+    // how the caller folds. Without it a node reads the same snapshot as `ctx.state`.
+    foldWith?: (pending: StateWrite[]) => StateSnapshot;
     // The replies the runs above this one saved in this turn, in chat order: Chat Input's `replies` (`[]` by default).
     replies?: ChatMessage[];
   },
@@ -113,7 +117,7 @@ export async function executeWorkflow(
       return next();
     };
   };
-  const stateRun = new StateRun(options.state, execution, workflow.id);
+  const stateRun = new StateRun(options.state, execution, workflow.id, options.foldWith);
   let wave = 0;
   const resolved = new Map<string, { output: Record<string, unknown>; skipped: boolean }>();
   const replies = new Map<string, ChatReply>();

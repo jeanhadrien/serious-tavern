@@ -47,6 +47,7 @@ export async function runNode(
   const queue = options.draws ? [...options.draws] : undefined;
   let drawn = 0;
   const writes = new StateWriteBuffer(options.state, 'run');
+  const state = createStateAccess(options.state, definition.type);
   const ctx: ExecutionContext = {
     nodeId: definition.type,
     inputs: options.inputs ?? {},
@@ -59,7 +60,8 @@ export async function runNode(
     resources: options.resources,
     signal: new AbortController().signal,
     log: (line) => logs.push(line),
-    state: createStateAccess(options.state, definition.type),
+    state,
+    pendingState: () => state,
     writeState: writes.writer(definition.type),
     random: () => {
       drawn++;

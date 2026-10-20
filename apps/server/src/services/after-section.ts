@@ -145,6 +145,7 @@ async function execute(
       persona: started.persona,
       settings: planned.settings,
       state: story.snapshot,
+      foldWith: story.foldWith,
       replies,
       executionId: planned.runId,
       signal: run.controller.signal,

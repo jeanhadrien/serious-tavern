@@ -88,6 +88,12 @@ export type ExecutionContext = {
   random(): number;
   // Story state as it was when the turn started: read-only, never shows this run's writes.
   state: StateAccess;
+  // The same read access with THIS node's own writes so far applied (read-your-own-writes), as the caller's fold reads
+  // them (`executeWorkflow`'s `foldWith`). Only the writing node sees them: `state`, templates and other nodes keep the
+  // turn-start snapshot. Equal to `state` until the node writes, and always when the caller gave no `foldWith`.
+  // Computed on demand and cached until the node's next write; every call after a write may cost a fold, so call it
+  // when a read needs it, not up front.
+  pendingState(): StateAccess;
   // Asks to store story state. Buffered: nothing is stored unless this node completes, and the run's
   // stored writes are returned with its result (and with `ExecutionFailure`). `add` returns the item with
   // the id it will be stored under.

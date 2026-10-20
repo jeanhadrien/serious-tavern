@@ -1,5 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import type { Character, ChatMessage, Persona, Session, StateDefinition, StateSnapshot, Workflow } from '@st/shared';
+import type {
+  Character,
+  ChatMessage,
+  Persona,
+  Session,
+  StateDefinition,
+  StateSnapshot,
+  StateWrite,
+  Workflow,
+} from '@st/shared';
 import {
   replyWorkflows,
   resolveChatSettings,
@@ -13,7 +22,7 @@ import { HttpError, notFound, requireEntity } from '../errors.js';
 import { nodeResources } from './node-resources.js';
 import { regenerateTarget } from './regenerate.js';
 import { historyMessages } from './settle-turn.js';
-import { foldSession, listDefinitions } from './story-state.js';
+import { foldSession, foldWithOf, listDefinitions } from './story-state.js';
 
 /** What starts a turn: a message (possibly empty), or a regenerate of the last turn, which stores no user message. */
 export type TurnRequest = { content: string; regenerate?: false } | { content?: undefined; regenerate: true };
@@ -59,6 +68,8 @@ export type StartedTurn = {
   // What the first run starts from.
   state: StateSnapshot;
   stateIssues: string[];
+  // The first run's `executeWorkflow` `foldWith`: the same fold that gave `state`, plus the run's pending writes.
+  foldWith: (pending: StateWrite[]) => StateSnapshot;
 };
 
 /**
@@ -116,9 +127,9 @@ export async function startTurn(context: AppContext, sessionId: string, request:
     // The state the turn starts from: the turns still present, folded against the definitions as they are now.
     // A regenerate runs as if the last turn's replies (whichever alternative is shown) were not there.
     const history = target?.history ?? historyMessages(current.messages);
-    const story = foldSession(definitions, target ? { ...current, messages: target.messages } : current, history, {
-      workflowId: first.workflow.id,
-    });
+    const foldedSession = target ? { ...current, messages: target.messages } : current;
+    const scope = { workflowId: first.workflow.id };
+    const story = foldSession(definitions, foldedSession, history, scope);
     started.value = {
       reply: runs.slice(0, lastReplying + 1),
       after: runs.slice(lastReplying + 1),
@@ -133,6 +144,7 @@ export async function startTurn(context: AppContext, sessionId: string, request:
       persona,
       state: story.snapshot,
       stateIssues: story.issues,
+      foldWith: foldWithOf(definitions, foldedSession, history, scope),
     };
     if (userMessage) current.messages.push(userMessage);
     current.updatedAt = now();
@@ -146,6 +158,7 @@ export async function startTurn(context: AppContext, sessionId: string, request:
  * What a run after the turn's first starts from: the state folded over the chat as it stands, with the turn counted as
  * present whatever its replies (so it sees the writes of the runs above it, and `trigger.turn` is the turn's number).
  * A regenerate folds over the chat without the last turn's replies, whichever alternative is shown, like its first run.
+ * `foldWith` is the run's closure for read-your-own-writes: the same fold again plus the run's pending writes.
  */
 export function foldRun(
   started: Pick<StartedTurn, 'definitions' | 'rootId' | 'turnId'>,
@@ -154,10 +167,12 @@ export function foldRun(
   history: ChatMessage[],
 ) {
   const messages = started.rootId ? (withoutLastTurnReplies(session.messages) ?? session.messages) : session.messages;
-  return foldSession(started.definitions, { messages, state: session.state }, history, {
-    workflowId: planned.workflow.id,
-    including: started.turnId,
-  });
+  const folded = { messages, state: session.state };
+  const scope = { workflowId: planned.workflow.id, including: started.turnId };
+  return {
+    ...foldSession(started.definitions, folded, history, scope),
+    foldWith: foldWithOf(started.definitions, folded, history, scope),
+  };
 }
 
 /** The after section's runs as the turn's entry announces them while they are still to run. */

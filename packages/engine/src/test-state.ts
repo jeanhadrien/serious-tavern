@@ -21,11 +21,12 @@ import type { ExecutionContext, NodeResources } from './types.js';
  * The members of a hand-built context that depend on the turn: a run that tracks no story state (reads find nothing,
  * writes vanish) and has no replies from workflows above it.
  */
-export const stateless = (nodeId: string): Pick<ExecutionContext, 'state' | 'writeState' | 'replies'> => ({
-  state: createStateAccess(undefined, nodeId),
-  writeState: () => ({}),
-  replies: [],
-});
+export const stateless = (
+  nodeId: string,
+): Pick<ExecutionContext, 'state' | 'pendingState' | 'writeState' | 'replies'> => {
+  const state = createStateAccess(undefined, nodeId);
+  return { state, pendingState: () => state, writeState: () => ({}), replies: [] };
+};
 
 type Override = Partial<Omit<StateKeyView, 'meta'>> & { meta?: Partial<StateKeyView['meta']> };
 

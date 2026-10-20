@@ -3,7 +3,13 @@ import { createStateAccess, frozenStateValues } from './state-access.js';
 import { resolveWrites, type BufferedRequest, type Committed } from './state-resolve.js';
 import type { ExecutionContext, StateAccess, StateWriteRequest } from './types.js';
 
-type NodeRequests = { requests: BufferedRequest[]; adds: number; wave?: number };
+type NodeRequests = {
+  requests: BufferedRequest[];
+  adds: number;
+  wave?: number;
+  // The pending view built for the requests so far (`StateRun.pendingView`); dropped by the node's next write.
+  view?: StateSnapshot;
+};
 
 /**
  * Collects the state writes nodes ask for during a run. Nothing is visible to reads (the run reads its
@@ -30,6 +36,7 @@ export class StateWriteBuffer {
     return (request) => {
       const node = this.node(nodeId);
       if (node.wave !== undefined) return {};
+      node.view = undefined;
       if (request.op !== 'add') {
         node.requests.push(structuredClone(request));
         return {};
@@ -60,6 +67,22 @@ export class StateWriteBuffer {
     return resolveWrites(committed, this.snapshot, this.workflowId);
   }
 
+  /**
+   * The state as the run's fold gives it with this node's buffered requests applied, committed or not: they are
+   * resolved on their own against the snapshot (other nodes' requests are not seen) and handed to `foldWith`. Cached
+   * until the node's next write; the snapshot itself when the requests resolve to no write.
+   */
+  pendingView(nodeId: string, foldWith: (pending: StateWrite[]) => StateSnapshot): StateSnapshot | undefined {
+    const node = this.node(nodeId);
+    if (!node.view) {
+      const requests = node.requests.map((request) => ({ nodeId, wave: 0, request }));
+      // Resolver warnings are not collected: `resolve` reports them when the node's requests count.
+      const { writes } = resolveWrites(requests, this.snapshot, this.workflowId);
+      node.view = writes.length ? foldWith(writes) : this.snapshot;
+    }
+    return node.view;
+  }
+
   private node(nodeId: string): NodeRequests {
     const found = this.nodes.get(nodeId) ?? { requests: [], adds: 0 };
     this.nodes.set(nodeId, found);
@@ -79,6 +102,8 @@ export class StateRun {
     private readonly snapshot: StateSnapshot | undefined,
     private readonly execution: Pick<ExecutionLog, 'id' | 'warnings'>,
     workflowId: string,
+    // Folds the run's story state with extra writes of the running turn (the caller's `foldWith`), if it gave one.
+    private readonly foldWith?: (pending: StateWrite[]) => StateSnapshot,
   ) {
     this.buffer = new StateWriteBuffer(snapshot, execution.id, workflowId);
     this.values = frozenStateValues(snapshot);
@@ -89,11 +114,26 @@ export class StateRun {
     return this.snapshot ? { turn: this.snapshot.turn } : {};
   }
 
-  /** `state` and `writeState` for one node. `isActive` tells whether it is still running: later calls are ignored. */
-  context(nodeId: string, isActive: () => boolean): Pick<ExecutionContext, 'state' | 'writeState'> {
+  /**
+   * The state with the writes `nodeId` has asked for so far folded in, as the caller's fold would read it: the run
+   * snapshot when the node has written nothing, or when the caller gave no `foldWith`. Only the writing node gets it.
+   */
+  pendingView(nodeId: string): StateSnapshot | undefined {
+    return this.foldWith ? this.buffer.pendingView(nodeId, this.foldWith) : this.snapshot;
+  }
+
+  /** `state`, `pendingState` and `writeState` for one node. `isActive` tells whether it is still running: later calls are ignored. */
+  context(nodeId: string, isActive: () => boolean): Pick<ExecutionContext, 'state' | 'pendingState' | 'writeState'> {
     const write = this.buffer.writer(nodeId);
+    let cached: { view: StateSnapshot | undefined; access: StateAccess } | undefined;
     return {
       state: createStateAccess(this.snapshot, nodeId, this.values),
+      pendingState: () => {
+        const view = this.pendingView(nodeId);
+        if (!cached || cached.view !== view)
+          cached = { view, access: createStateAccess(view, nodeId, view === this.snapshot ? this.values : undefined) };
+        return cached.access;
+      },
       writeState: (request) => (isActive() ? write(request) : {}),
     };
   }
