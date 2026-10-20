@@ -13,6 +13,7 @@ import {
   type TurnEntry,
 } from '@st/shared';
 import { formatValue, itemText, quote } from './format.js';
+import { threadNote, threadSummaryOf } from './threadItems.js';
 
 // What deleting a reply would undo, for the confirmation. The answer comes from the SHARED fold, run twice over the
 // chat's messages (with and without the reply) and the turn entries rebuilt from the state view; nothing here
@@ -27,7 +28,7 @@ const TEXT_MAX = 40;
 const ITEM_MAX = 30;
 const ITEMS_LISTED = 3;
 
-type Item = { id: string; text: string; linked?: number };
+type Item = { id: string; text: string; linked?: number; exchange?: string };
 type Turn = SessionStateView['turns'][number];
 
 // A node's own state belongs to its workflow (node ids repeat across the workflows of a chat); a target without a
@@ -79,20 +80,31 @@ function linkedCount(raw: Record<string, unknown>): { linked?: number } {
   return Array.isArray(ids) && ids.length > 0 ? { linked: ids.length } : {};
 }
 
+/** What a thread item (an exchange, as the view shows it) did, in a few words; nothing for any other item. */
+function exchangeNote(raw: Record<string, unknown>): { exchange?: string } {
+  const thread = threadSummaryOf(raw);
+  return thread ? { exchange: threadNote(thread) } : {};
+}
+
 const itemsOf = (value: unknown): Item[] =>
   Array.isArray(value)
     ? value.flatMap((raw): Item[] =>
         isPlainObject(raw) && typeof raw.id === 'string'
-          ? [{ id: raw.id, text: itemText(raw), ...linkedCount(raw) }]
+          ? [{ id: raw.id, text: itemText(raw), ...linkedCount(raw), ...exchangeNote(raw) }]
           : [],
       )
     : [];
 
-/** An item by its words and, when it links to chat messages, how many (a linked item's text is often markdown: its markers are dropped). */
-const describeItem = ({ text, linked }: Item) =>
+/**
+ * An item by its words and, when it links to chat messages, how many (a linked item's text is often markdown: its
+ * markers are dropped), or, for an exchange of a thread, what it did.
+ */
+const describeItem = ({ text, linked, exchange }: Item) =>
   linked
     ? `${quote(plainPreview(text), ITEM_MAX)} (linked to ${linked === 1 ? '1 message' : `${linked} messages`})`
-    : quote(text, ITEM_MAX);
+    : exchange
+      ? `${quote(text, ITEM_MAX)} (exchange: ${exchange})`
+      : quote(text, ITEM_MAX);
 
 /** What an item list change reads as: the items it forgets and the ones it brings back, at most three in all. */
 function itemChange(before: unknown, after: unknown): string {

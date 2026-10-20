@@ -50,10 +50,12 @@ function compileKey(key: KeyDraft): { def?: Record<string, unknown>; problems: s
       if (cap !== undefined && !(Number.isInteger(cap) && cap >= 1))
         problems.push('Cap must be a whole number, 1 or more');
       set('cap', cap);
-      if (key.type === 'thread') break;
-      const fields = parseFields(key.fields);
-      if (fields.ok) set('fields', fields.fields);
-      else problems.push(...fields.errors);
+      // A thread's items are exchanges, not declared records: it has a cap and no item fields.
+      if (key.type === 'collection') {
+        const fields = parseFields(key.fields);
+        if (fields.ok) set('fields', fields.fields);
+        else problems.push(...fields.errors);
+      }
       break;
     }
   }

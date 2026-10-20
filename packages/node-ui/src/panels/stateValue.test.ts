@@ -41,8 +41,9 @@ describe('valueKind', () => {
     'collection:add': 'item',
     'collection:remove': 'itemId',
     'collection:delete': 'none',
+    // A thread has no fixed value: the engine ignores one (an exchange comes from an LLM node's output).
     'thread:add': 'none',
-    'thread:remove': 'itemId',
+    'thread:remove': 'none',
     'thread:delete': 'none',
   };
 

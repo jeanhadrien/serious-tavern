@@ -105,6 +105,8 @@ export function retarget(
     return result;
   }
   if (config.definitionId !== next.definitionId || config.key !== next.key) delete result.value;
+  // The option belongs to thread keys; another key does not carry it along (a missing key keeps what it had).
+  if (def && def.type !== 'thread') delete result.keepReasoning;
   if (def) {
     const allowed = stateOpsFor(def.type);
     const op = text(config.op) || 'set';
@@ -133,3 +135,12 @@ export const pickKey = (
   catalog: readonly StateDefinition[],
   kind: PickerKind,
 ): Record<string, unknown> => retarget(config, { definitionId: text(config.definitionId), key }, catalog, kind);
+
+/**
+ * The config with State Write's `keepReasoning` option set. Off removes the setting: it is only ever stored as
+ * `true`, so a node that never used it keeps a config without it.
+ */
+export function withKeepReasoning(config: Record<string, unknown>, keep: boolean): Record<string, unknown> {
+  const { keepReasoning: _previous, ...rest } = config;
+  return keep ? { ...rest, keepReasoning: true } : rest;
+}

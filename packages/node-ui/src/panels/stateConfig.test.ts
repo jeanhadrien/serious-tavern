@@ -8,6 +8,7 @@ import {
   pickKey,
   readOptions,
   retarget,
+  withKeepReasoning,
 } from './stateConfig.js';
 
 const definition = (id: string, name: string, keys: StateDefinition['keys']): StateDefinition => ({
@@ -302,6 +303,61 @@ describe('the picker for nodes that work on a list (Next Chunk, Unlinked Message
     expect(pickerHint({ definitionId: 'd-other' }, catalog, 'collection')).toContain('no list (collection) key');
     expect(pickerHint({ definitionId: 'd-other' }, catalog, 'read')).toBe('Select a key.');
     expect(pickerHint({ definitionId: 'd-scene', key: 'injected' }, catalog, 'collection')).toBeUndefined();
+  });
+});
+
+describe('thread keys in the State Read and State Write pickers', () => {
+  const chat = definition('d-chat', 'chat', { log: { type: 'thread' }, note: { type: 'text' } });
+
+  it('are offered like any other key, labelled with their type', () => {
+    for (const kind of ['read', 'write'] as const)
+      expect(keyOptions(chat, '', kind)).toEqual([
+        { value: 'log', label: 'log (thread)' },
+        { value: 'note', label: 'note (text)' },
+      ]);
+  });
+
+  it('are not offered to the list nodes, which work on collections', () => {
+    expect(keyOptions(chat, 'log', 'collection')[0]).toEqual({ value: 'log', label: 'log (thread: not a list)' });
+  });
+
+  it('read like a list, without the linked read', () => {
+    expect(readOptions('thread', 'value')).toEqual(['value', 'meta']);
+    // Reading a key as linked after it became a thread falls back to its value.
+    const read = { definitionId: 'd-chat', key: 'note', read: 'linked' };
+    expect(retarget(read, { definitionId: 'd-chat', key: 'log' }, [chat], 'read').read).toBe('value');
+  });
+
+  it('fit the operation: add stays, set becomes add', () => {
+    const write = { definitionId: 'd-chat', key: 'note', op: 'set' };
+    expect(retarget(write, { definitionId: 'd-chat', key: 'log' }, [chat], 'write').op).toBe('add');
+    expect(retarget({ ...write, op: 'remove' }, { definitionId: 'd-chat', key: 'log' }, [chat], 'write').op).toBe(
+      'remove',
+    );
+  });
+
+  it('keep the reasoning option for the thread and drop it for any other key', () => {
+    const write = { definitionId: 'd-chat', key: 'log', op: 'add', keepReasoning: true };
+    expect(retarget(write, { definitionId: 'd-chat', key: 'log' }, [chat], 'write')).toEqual(write);
+    expect(retarget(write, { definitionId: 'd-chat', key: 'note' }, [chat], 'write')).not.toHaveProperty(
+      'keepReasoning',
+    );
+    // A target that cannot be resolved changes nothing but what retarget always does.
+    expect(retarget(write, { definitionId: 'gone', key: 'log' }, [chat], 'write')).toHaveProperty(
+      'keepReasoning',
+      true,
+    );
+  });
+});
+
+describe('withKeepReasoning', () => {
+  it('stores true only when on, and removes the setting when off', () => {
+    const config = { definitionId: 'd', key: 'log', op: 'add' };
+    expect(withKeepReasoning(config, true)).toEqual({ ...config, keepReasoning: true });
+    expect(withKeepReasoning({ ...config, keepReasoning: true }, false)).toEqual(config);
+    // Never writes false into a config that never had the option.
+    expect(withKeepReasoning(config, false)).toEqual(config);
+    expect(withKeepReasoning(config, false)).not.toHaveProperty('keepReasoning');
   });
 });
 

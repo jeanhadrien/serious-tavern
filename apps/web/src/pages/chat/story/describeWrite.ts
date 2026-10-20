@@ -1,5 +1,6 @@
 import { DRAW_STATE_KEY, type SessionStateView } from '@st/shared';
 import { formatValue, itemFields, quote } from './format.js';
+import { threadNote, threadSummaryOf } from './threadItems.js';
 
 export type TurnWrite = SessionStateView['turns'][number]['writes'][number];
 
@@ -19,6 +20,8 @@ function extras(item: Record<string, unknown>): string {
   const fields = itemFields(item).map(({ name, value }) => `${name} ${value}`);
   const linked = (item.messages as { ids?: unknown[] } | undefined)?.ids?.length;
   if (linked) fields.push(linked === 1 ? 'linked to 1 message' : `linked to ${linked} messages`);
+  const thread = threadSummaryOf(item);
+  if (thread) fields.push(threadNote(thread));
   return fields.length ? ` (${fields.join(', ')})` : '';
 }
 

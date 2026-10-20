@@ -120,6 +120,13 @@ describe('State Read panel', () => {
     expect(collection).toContain('<option value="value">Its value</option>');
   });
 
+  it('offers a thread key like a list, but with no linked read', () => {
+    const html = read({ definitionId: scene.id, key: 'log', read: 'value' });
+    expect(html).toContain('<option value="log" selected="">log (thread)</option>');
+    expect(html).toContain('<option value="meta">When it was written</option>');
+    expect(html).not.toContain('Linked items, in chat order');
+  });
+
   it('keeps a linked read on a key that cannot do it visible, instead of silently showing another', () => {
     expect(read({ definitionId: scene.id, key: 'tension', read: 'linked' })).toContain(
       '<option value="linked" selected="">Linked items, in chat order</option>',
@@ -150,7 +157,10 @@ describe('State Write panel', () => {
     [...(html.match(/<select[^>]*>(?:(?!<\/select>).)*<\/select>/g) ?? [])]
       .find(
         (select) =>
-          select.includes('Set to a value') || select.includes('Add an item') || select.includes('Not allowed'),
+          select.includes('Set to a value') ||
+          select.includes('Add an item') ||
+          select.includes('Add an exchange') ||
+          select.includes('Not allowed'),
       )
       ?.match(/<option value="([a-z]+)"/g)
       ?.map((option) => option.slice(15, -1));
@@ -263,6 +273,46 @@ describe('State Write panel', () => {
     expect(html).toContain('Run when (optional input)');
     expect(html).toContain('Condition branch');
     expect(html).toContain('Random chance');
+  });
+
+  describe('on a thread key', () => {
+    it('lists add, remove and empty, worded for exchanges', () => {
+      expect(ops(write('log', 'add'))).toEqual(['add', 'remove', 'delete']);
+      const html = write('log', 'add');
+      expect(html).toContain('<option value="add" selected="">Add an exchange</option>');
+      expect(html).toContain('<option value="remove">Remove an exchange by id</option>');
+      expect(html).toContain('<option value="delete">Empty the thread</option>');
+      expect(html).toContain('<option value="log" selected="">log (thread)</option>');
+    });
+
+    it('has no fixed value editor and no fixed value hint, and says what the inputs take', () => {
+      for (const op of ['add', 'remove', 'delete']) {
+        const html = write('log', op);
+        expect(html).not.toContain('state-value');
+        expect(html).not.toContain('Fixed value');
+      }
+      const add = write('log', 'add', 'stale');
+      expect(add).not.toContain('Item text');
+      expect(add).toContain('Exchange output to Exchange');
+      expect(add).toContain('Input is optional');
+      expect(add).toContain('Run when (optional input)');
+      expect(write('log', 'remove')).toContain('Connect the id of the exchange to remove to Item id');
+      expect(write('log', 'delete')).toContain('This operation needs no value.');
+    });
+
+    it('offers Keep reasoning for an add only, checked only when the option is on', () => {
+      expect(write('log', 'add')).toMatch(/<input type="checkbox"\/>Keep reasoning/);
+      expect(write('log', 'add', undefined, { keepReasoning: true })).toMatch(
+        /<input type="checkbox" checked=""\/>Keep reasoning/,
+      );
+      // An option stored as false reads as off.
+      expect(write('log', 'add', undefined, { keepReasoning: false })).toMatch(
+        /<input type="checkbox"\/>Keep reasoning/,
+      );
+      expect(write('log', 'remove')).not.toContain('Keep reasoning');
+      expect(write('log', 'delete')).not.toContain('Keep reasoning');
+      expect(write('injected', 'add')).not.toContain('Keep reasoning');
+    });
   });
 
   it('shares the picker with State Read, including the link to edit the definition', () => {

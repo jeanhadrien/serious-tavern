@@ -23,8 +23,9 @@ export function valueKind(def: StateKeyDef, op: StateNodeOp): ValueKind {
     case 'collection':
       return op === 'add' ? 'item' : op === 'remove' ? 'itemId' : 'none';
     case 'thread':
-      // An exchange comes from an LLM node's Exchange output, never from a fixed value.
-      return op === 'remove' ? 'itemId' : 'none';
+      // The node has no fixed value for a thread (an exchange comes from an LLM node's output, an item id to
+      // remove from a connected one): the engine ignores a stored `value`.
+      return 'none';
     default:
       return op === 'set' ? def.type : 'none';
   }

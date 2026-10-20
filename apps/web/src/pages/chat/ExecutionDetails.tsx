@@ -13,11 +13,14 @@ export function ExecutionDetails({
   cached,
   label = 'Execution details',
   optional = false,
+  defaultOpen = false,
 }: {
   id: string;
   cached?: ExecutionLog;
   label?: string;
   optional?: boolean;
+  /** Starts expanded, for a log the user just asked for. */
+  defaultOpen?: boolean;
 }) {
   const [execution, setExecution] = useState(cached);
   const [missing, setMissing] = useState(false);
@@ -29,7 +32,7 @@ export function ExecutionDetails({
         .catch(() => setMissing(optional));
   }, [id]);
   return (
-    <details className="execution">
+    <details className="execution" open={defaultOpen || undefined}>
       <summary>{label}</summary>
       {missing && <p className="hint">{POST_NO_LOG}</p>}
       {execution && (

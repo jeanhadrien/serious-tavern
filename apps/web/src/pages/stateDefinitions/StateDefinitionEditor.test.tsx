@@ -48,9 +48,10 @@ it('renders the name, the description and one row per key with the fields of its
   expect(html).toContain('value="scene"');
   expect(html).toContain('The scene so far');
   expect(html).toContain('Templates read it as <code>{{state.scene.&lt;key&gt;}}</code>');
-  for (let position = 1; position <= 7; position++) expect(html).toContain(`aria-label="Name of key ${position}"`);
-  expect(html.match(/class="state-key"/g)).toHaveLength(7);
+  for (let position = 1; position <= 8; position++) expect(html).toContain(`aria-label="Name of key ${position}"`);
+  expect(html.match(/class="state-key"/g)).toHaveLength(8);
   // Number: default, min, max. Boolean: select. Enum: options and a default over them. Collection: cap and fields.
+  // Thread: a cap and nothing else.
   expect(html).toContain('aria-label="Min of key 1"');
   expect(html).toContain('aria-label="Default of key 3"');
   expect(html).toContain('aria-label="Options of key 4"');
@@ -58,8 +59,24 @@ it('renders the name, the description and one row per key with the fields of its
   expect(html).toContain('aria-label="Default of key 6"');
   expect(html).toContain('aria-label="Cap of key 7"');
   expect(html).toContain('level:number');
+  expect(html).toContain('aria-label="Cap of key 8"');
+  expect(html).not.toContain('aria-label="Item fields of key 8"');
   // An object key's schema is kept but never shown.
   expect(html).not.toContain('x-note');
+});
+
+it('offers every key type in the type list, thread included', () => {
+  const options = render().match(/<select aria-label="Type of key 8"[^>]*>(.*?)<\/select>/)?.[1] ?? '';
+  expect(options).toContain('<option value="thread" selected="">thread</option>');
+  expect(options).toContain('<option value="collection">collection</option>');
+});
+
+it('says what a thread holds, without the linked-items warning of a capped collection', () => {
+  const onlyThread = { ...saved, keys: saved.keys.filter((key) => key.type === 'thread') };
+  const html = render({ draft: onlyThread });
+  expect(html).toContain('Each item is one LLM exchange');
+  expect(html).toContain('Only this many of the newest exchanges are kept when read.');
+  expect(html).not.toContain('link to messages');
 });
 
 it('notes what a cap does to linked items, neutrally, only while it has a value', () => {

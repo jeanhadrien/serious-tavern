@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { describeWrite, itemTexts, type TurnWrite } from './describeWrite.js';
-import { addWrite, buildView, drawWrite, entry, reply, setWrite } from './test-fixtures.js';
+import { addWrite, buildView, drawWrite, entry, reply, setWrite, threadWrite } from './test-fixtures.js';
 
 const named = (write: TurnWrite['write'], extra: Partial<TurnWrite> = {}): TurnWrite => ({
   write,
@@ -36,6 +36,19 @@ it.each([
   ],
 ])('words a definition write: %#', (write, expected) => {
   expect(describeWrite(named(write), texts)).toBe(expected);
+});
+
+it('words a thread write from the view: the text and what the exchange did, never its summary fields', () => {
+  const view = buildView({
+    messages: [reply('e1'), reply('e2')],
+    entries: [
+      entry('e1', [threadWrite('log', 'l1', 'The lamp is lit.', { calls: ['read_state', 'write_scene_mood'] })]),
+      entry('e2', [threadWrite('log', 'l2', 'Plain answer')]),
+    ],
+  });
+  const [first, second] = view.turns.flatMap((turn) => turn.writes);
+  expect(describeWrite(first as TurnWrite, texts)).toBe("scene.log + 'The lamp is lit.' (2 tool calls · 3 steps)");
+  expect(describeWrite(second as TurnWrite, texts)).toBe("scene.log + 'Plain answer' (no tool calls)");
 });
 
 it('cuts long text with an ellipsis', () => {
