@@ -1,3 +1,4 @@
+import { conversationMessageSchema, exchangeText, type ConversationMessage } from '../conversation/message.js';
 import type { CollectionKeyDef, StateKeyType } from './definition.js';
 import { isPlainObject } from './helpers.js';
 
@@ -83,4 +84,55 @@ export function collectionItem(def: CollectionKeyDef, value: unknown): ItemFit {
   }
   const ignored = Object.keys(value).filter((name) => name !== 'text' && !Object.hasOwn(declared, name));
   return { item, ignored };
+}
+
+/** What a thread item holds, before the engine stamps `id`, `turnId` and `runId` on it. */
+export type ThreadItemBody = { text: string; exchange: ConversationMessage[]; input?: ConversationMessage };
+
+export type ThreadFit = { problem: string } | { problem?: undefined; item: ThreadItemBody };
+
+/** A message without the fields only a backend replay needs (`reasoning`, `provider_data`). */
+function withoutReplayData(message: ConversationMessage): ConversationMessage {
+  const { reasoning: _reasoning, provider_data: _data, ...rest } = message;
+  return rest;
+}
+
+/**
+ * The user side of an exchange: text (a user message) or one message (only its role, content and name are kept, so a
+ * chat message does not bring its bookkeeping along); blank text means there is none.
+ */
+function threadInput(input: unknown): { input?: ConversationMessage; problem?: string } {
+  if (input === undefined || input === null) return {};
+  if (typeof input === 'string') return input.trim() ? { input: { role: 'user', content: input } } : {};
+  const parsed = conversationMessageSchema.safeParse(input);
+  if (!parsed.success) return { problem: 'the input to be text or one message' };
+  const { role, content, name } = parsed.data;
+  return { input: { role, content, ...(name !== undefined && { name }) } };
+}
+
+/**
+ * The item an `add` stores in a thread key: `value` must be a non-empty list of canonical messages (an LLM node's
+ * `exchange`), `input` an optional text (stored as a `user` message) or one message. `reasoning` and `provider_data` are
+ * left out unless `keepReasoning`; `provenance` always stays. `text` is the exchange's final answer. A problem is
+ * a plain-language phrase to follow the key's name ("<key> needs ...").
+ */
+export function threadItem(value: unknown, input?: unknown, options: { keepReasoning?: boolean } = {}): ThreadFit {
+  if (!Array.isArray(value)) return { problem: 'a list of messages (the exchange of an LLM node)' };
+  if (value.length === 0) return { problem: 'at least one message in the exchange' };
+  const exchange: ConversationMessage[] = [];
+  for (const [index, entry] of value.entries()) {
+    const parsed = conversationMessageSchema.safeParse(entry);
+    if (!parsed.success)
+      return { problem: `messages only, but message ${index + 1} is not valid: ${parsed.error.issues[0]?.message}` };
+    exchange.push(options.keepReasoning ? parsed.data : withoutReplayData(parsed.data));
+  }
+  const given = threadInput(input);
+  if (given.problem) return { problem: given.problem };
+  return {
+    item: {
+      text: exchangeText(exchange),
+      exchange: structuredClone(exchange),
+      ...(given.input && { input: given.input }),
+    },
+  };
 }

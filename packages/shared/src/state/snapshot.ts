@@ -127,6 +127,8 @@ function describeKey(def: StateKeyDef): string {
       return 'Object';
     case 'collection':
       return `List of items, newest first${def.cap === undefined ? '' : ` (up to ${def.cap})`}`;
+    case 'thread':
+      return `List of exchanges (their final text), newest first${def.cap === undefined ? '' : ` (up to ${def.cap})`}`;
   }
 }
 

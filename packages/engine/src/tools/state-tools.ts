@@ -1,10 +1,10 @@
 import { isPlainObject, keyDefault, type ToolDefinition } from '@st/shared';
-import { locateConfigured, type LocatedKey } from '../nodes/state-key.js';
+import { locateConfigured } from '../nodes/state-key.js';
 import { planWrite } from '../nodes/state-write/plan.js';
 import type { ExecutionContext, StateAccess } from '../types.js';
 import { ItemHandles } from './handles.js';
 import { uniqueToolName } from './names.js';
-import { keySummary, stateOpOf, writeOps, writeParameters } from './state-schemas.js';
+import { keySummary, stateOpOf, type ToolKey, writeOps, writeParameters } from './state-schemas.js';
 import type { EngineTool } from './types.js';
 
 /** A state key the node's settings let the model read or write. */
@@ -18,7 +18,7 @@ const tool = (name: string, description: string, parameters: Record<string, unkn
 });
 
 /** A key's value as the model sees it: collection items become `{ handle, text, ...declared fields }`. */
-function present({ definition, key, def }: LocatedKey, state: StateAccess, handles: ItemHandles): unknown {
+function present({ definition, key, def }: ToolKey, state: StateAccess, handles: ItemHandles): unknown {
   const value = state.read(definition.id, key)?.value ?? keyDefault(def);
   if (def.type !== 'collection') return value;
   const fields = Object.keys(def.fields ?? {});
@@ -29,7 +29,7 @@ function present({ definition, key, def }: LocatedKey, state: StateAccess, handl
   }));
 }
 
-function readTool(keys: LocatedKey[], handles: ItemHandles): EngineTool {
+function readTool(keys: ToolKey[], handles: ItemHandles): EngineTool {
   const byName = new Map(keys.map((found) => [found.label, found]));
   const names = [...byName.keys()];
   return {
@@ -61,7 +61,7 @@ function readTool(keys: LocatedKey[], handles: ItemHandles): EngineTool {
 }
 
 /** The tool's `op`, checked against what the key type offers; scalars default to `set`. */
-function operation(found: LocatedKey, given: unknown) {
+function operation(found: ToolKey, given: unknown) {
   const allowed = writeOps(found.def);
   if (given === undefined && !['number', 'collection'].includes(found.def.type)) return stateOpOf('set');
   if (typeof given !== 'string' || !allowed.includes(given))
@@ -84,7 +84,7 @@ function writeValue(args: Record<string, unknown>, op: string, handles: ItemHand
 }
 
 /** One write tool. It plans the write with State Write's own rules (`planWrite`), so the two never disagree. */
-function writeTool(found: LocatedKey, name: string, handles: ItemHandles): EngineTool {
+function writeTool(found: ToolKey, name: string, handles: ItemHandles): EngineTool {
   const description = `Changes ${keySummary(found)}`;
   return {
     definition: tool(name, description, writeParameters(found)),
@@ -105,13 +105,20 @@ function writeTool(found: LocatedKey, name: string, handles: ItemHandles): Engin
   };
 }
 
-/** Finds the configured keys. One that no longer exists is left out with a node log line, not an error. */
+/**
+ * Finds the configured keys. One that no longer exists, or a thread (never offered to a model), is left out with a node
+ * log line, not an error.
+ */
 async function locateAll(ctx: ExecutionContext, targets: readonly StateTarget[], what: string) {
-  const located: LocatedKey[] = [];
+  const located: ToolKey[] = [];
   for (const target of targets) {
     try {
       const found = await locateConfigured(target, (id) => ctx.state.definition(id));
-      if (!located.some((other) => other.label === found.label)) located.push(found);
+      if (found.def.type === 'thread') {
+        ctx.log(`Left out a ${what} tool: ${found.label} is a thread; threads are not offered to the model`);
+        continue;
+      }
+      if (!located.some((other) => other.label === found.label)) located.push({ ...found, def: found.def });
     } catch (error) {
       ctx.log(`Left out a ${what} tool: ${error instanceof Error ? error.message : String(error)}`);
     }

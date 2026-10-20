@@ -54,6 +54,19 @@ describe('which tools exist', () => {
     expect(logs[2]).toContain('Select a state definition');
   });
 
+  it('never offers a thread key, and says so in the node log', async () => {
+    const withThread: StateDefinition = { ...scene, keys: { ...scene.keys, log: { type: 'thread' } } };
+    const context = toolContext();
+    const run = { ...context.ctx, state: { ...context.ctx.state, definition: () => withThread } };
+    const tools = await buildStateTools(run, { read: [target('log'), target('tension')], write: [target('log')] });
+    expect(tools.map((tool) => tool.definition.function.name)).toEqual(['read_state']);
+    expect(tools[0]?.definition.function.description).not.toContain('scene.log');
+    expect(context.logs).toEqual([
+      'Left out a read tool: scene.log is a thread; threads are not offered to the model',
+      'Left out a write tool: scene.log is a thread; threads are not offered to the model',
+    ]);
+  });
+
   it('cuts long names and numbers repeated ones', () => {
     expect(uniqueToolName('write_a_b', new Set())).toBe('write_a_b');
     const long = `write_scene_${'k'.repeat(80)}`;

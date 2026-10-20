@@ -20,6 +20,7 @@ const defs: Record<StateKeyType, StateKeyDef> = {
   text: { type: 'text' },
   object: { type: 'object' },
   collection: { type: 'collection', fields: { level: 'number', note: 'text', hot: 'boolean' } },
+  thread: { type: 'thread' },
 };
 const injected = defs.collection as CollectionKeyDef;
 
@@ -40,6 +41,9 @@ describe('valueKind', () => {
     'collection:add': 'item',
     'collection:remove': 'itemId',
     'collection:delete': 'none',
+    'thread:add': 'none',
+    'thread:remove': 'itemId',
+    'thread:delete': 'none',
   };
 
   it.each(Object.keys(defs) as StateKeyType[])('has a kind for each operation a %s key allows', (type) => {

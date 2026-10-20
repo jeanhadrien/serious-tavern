@@ -1,5 +1,6 @@
 import {
   foldStoryState,
+  isListKeyType,
   isPlainObject,
   oldestFirst,
   plainPreview,
@@ -145,7 +146,7 @@ function definitionLine(
   if (!def || !was || !wasKey || !nowKey) return undefined;
   const name = `${was.name}.${target.key}`;
   if (sameValue(wasKey.value, nowKey.value)) return mayHide ? `${name} (may change)` : undefined;
-  return def.type === 'collection'
+  return isListKeyType(def.type)
     ? `${name} (${itemChange(wasKey.value, nowKey.value)})`
     : `${name} (${scalarChange(def, nowKey)})`;
 }

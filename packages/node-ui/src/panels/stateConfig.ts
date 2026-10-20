@@ -21,6 +21,13 @@ export type PickerKind = 'read' | 'write' | 'collection' | 'target';
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
 /**
+ * Whether the picker offers a key of this type: a list picker only collections; the tools picker (`target`) everything
+ * but threads (an exchange is not something a model reads or writes by hand).
+ */
+const offers = (kind: PickerKind | undefined, type: StateKeyType): boolean =>
+  kind === 'collection' ? type === 'collection' : kind !== 'target' || type !== 'thread';
+
+/**
  * What the picker tells the user to do next: create a definition when there is none, else pick the definition,
  * then the key. Nothing when both are chosen. (The node's ports cannot resolve until then, which is not reported
  * as an error: this is where it is said.)
@@ -50,7 +57,7 @@ export function definitionOptions(current: unknown, catalog: readonly StateDefin
 /** The keys of a definition (`name (type)`); a configured key it does not have comes first as an unknown entry. */
 export function keyOptions(definition: StateDefinition | undefined, current: unknown, kind?: PickerKind): Option[] {
   const options = Object.entries(definition?.keys ?? {})
-    .filter(([, def]) => kind !== 'collection' || def.type === 'collection')
+    .filter(([, def]) => offers(kind, def.type))
     .map(([name, def]) => ({
       value: name,
       label: `${name} (${def.type})`,
@@ -58,8 +65,10 @@ export function keyOptions(definition: StateDefinition | undefined, current: unk
   const key = text(current);
   if (!key || options.some((option) => option.value === key)) return options;
   const other = definition && Object.hasOwn(definition.keys, key) ? definition.keys[key] : undefined;
-  // A key that exists but is not a list (the picker is for lists): said as what it is, not as unknown.
-  const label = other ? `${key} (${other.type}: not a list)` : `Unknown key (${key})`;
+  // A key that exists but is not offered (not a list for a list picker; a thread for tools): said as what it is, not as unknown.
+  const label = other
+    ? `${key} (${other.type}: ${kind === 'target' ? 'not available to tools' : 'not a list'})`
+    : `Unknown key (${key})`;
   return [{ value: key, label }, ...options];
 }
 
@@ -113,10 +122,8 @@ export function pickDefinition(
 ): Record<string, unknown> {
   const definition = catalog.find((item) => item.id === definitionId);
   const key = text(config.key);
-  const fits =
-    definition &&
-    Object.hasOwn(definition.keys, key) &&
-    (kind !== 'collection' || definition.keys[key]?.type === 'collection');
+  const type = definition && Object.hasOwn(definition.keys, key) ? definition.keys[key]?.type : undefined;
+  const fits = type !== undefined && offers(kind, type);
   return retarget(config, { definitionId, key: fits ? key : '' }, catalog, kind);
 }
 

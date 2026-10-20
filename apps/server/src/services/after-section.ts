@@ -148,6 +148,7 @@ async function execute(
       foldWith: story.foldWith,
       replies,
       executionId: planned.runId,
+      turnId: started.turnId,
       signal: run.controller.signal,
     });
     execution = done.execution;

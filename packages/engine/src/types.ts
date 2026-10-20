@@ -47,6 +47,7 @@ export type StateWriteTarget =
 // `increment` becomes a `set` with the post-value, and `add` gets the item id the buffer mints for it.
 export type StateWriteRequest =
   | { target: StateWriteTarget; op: 'set'; value: unknown }
+  // A thread key's item is `text`, `exchange` and maybe `input` (`ThreadItemBody`); the buffer adds `turnId` and `runId`.
   | { target: StateWriteTarget; op: 'add'; item: { text: string } & Record<string, unknown> }
   | { target: StateWriteTarget; op: 'remove'; itemId: string }
   | { target: StateWriteTarget; op: 'delete' }
@@ -71,8 +72,9 @@ export type ExecutionContext = {
   nodeId: string;
   inputs: Record<string, unknown>;
   config: Record<string, unknown>;
-  // `turn` is the turn being run; present only when the run was given a state snapshot.
-  trigger: { message: string; sessionId: string; turn?: number };
+  // `turn` is the turn being run; present only when the run was given a state snapshot. `turnId` is the turn's id (the
+  // first run's execution id), when the caller gave one.
+  trigger: { message: string; sessionId: string; turn?: number; turnId?: string };
   history: ChatMessage[];
   character?: Character;
   persona?: Persona;

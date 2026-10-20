@@ -1,6 +1,9 @@
 import { keyDefault, stateOpsFor, type StateKeyDef, type StateNodeOp } from '@st/shared';
 import type { LocatedKey } from '../nodes/state-key.js';
 
+/** A key a model can be given: every type but a thread (an exchange is not something a model reads or writes by hand). */
+export type ToolKey = LocatedKey & { def: Exclude<StateKeyDef, { type: 'thread' }> };
+
 /** The operations a write tool offers for a key type: State Write's, with `delete` called `reset` for the model. */
 export const writeOps = (def: StateKeyDef): string[] =>
   stateOpsFor(def.type).map((op) => (op === 'delete' ? 'reset' : op));
@@ -9,7 +12,7 @@ export const writeOps = (def: StateKeyDef): string[] =>
 export const stateOpOf = (op: string): StateNodeOp => (op === 'reset' ? 'delete' : (op as StateNodeOp));
 
 /** What a key holds, in words: type, bounds, options and default. */
-function typeText(def: StateKeyDef): string {
+function typeText(def: ToolKey['def']): string {
   switch (def.type) {
     case 'number': {
       const bounds =
@@ -38,14 +41,14 @@ function typeText(def: StateKeyDef): string {
 }
 
 /** One key for a tool description: its name, what it holds, and what the definition and the key say about it. */
-export function keySummary({ label, definition, def }: LocatedKey): string {
+export function keySummary({ label, definition, def }: ToolKey): string {
   return [`${label}: ${typeText(def)}.`, definition.description, def.description].filter(Boolean).join(' ');
 }
 
 const RESET = 'reset puts the key back to its default.';
 
 /** The JSON Schema of a write tool's arguments, flat on purpose: backends handle it better than `oneOf`. */
-export function writeParameters({ def }: LocatedKey): Record<string, unknown> {
+export function writeParameters({ def }: ToolKey): Record<string, unknown> {
   const op = (description: string) => ({ type: 'string', enum: writeOps(def), description });
   switch (def.type) {
     case 'number':

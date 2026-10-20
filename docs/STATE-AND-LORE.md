@@ -17,7 +17,7 @@ You don't need to read it in order. If you want to see it work first, start with
 - [Try the examples](#try-the-examples)
 - [Chat settings](#chat-settings)
 - [Collections: Recall and Draw](#collections-recall-and-draw)
-- [Story state](#story-state)
+- [Story state](#story-state) (including [thread keys](#thread-keys))
 - [Workflows after the reply](#workflows-after-the-reply)
 - [Message links and summaries](#message-links-and-summaries)
 - [The Trigger](#the-trigger)
@@ -139,7 +139,8 @@ Providers and Settings in the left column header; on a phone **Open menu**, **Se
 - **Name:** letters, digits and `_`, not starting with a digit. Templates read it as `{{state.<name>.<key>}}`.
 - **Keys:** **+ Add key**, then a name and a type: **number** (Default, Min, Max), **boolean**, **enum** (options one
   per line), **text**, **object** (a JSON object) or **collection** (a list; an optional **Cap** keeps only the newest
-  items, and **Item fields** declares extra fields per item as `name:type`; `id` and `text` always exist).
+  items, and **Item fields** declares extra fields per item as `name:type`; `id` and `text` always exist) or
+  **thread** (a list of whole LLM exchanges; an optional **Cap**, see [Thread keys](#thread-keys)).
 - Problems show as you type and **Save** stays disabled until the form is valid.
 
 On a fresh data directory (or through the examples) you get `scene`: `tension` (0 to 10, default 3), `mood` (calm,
@@ -165,6 +166,7 @@ operation the key allows:
 | number | set to a value, add to the number (the **Amount**, blank adds 1; the result stays between min and max), reset to the default |
 | boolean, enum, text, object | set to a value, reset |
 | collection | add an item (text, or an object with a `text` field and the declared item fields), remove an item by id, empty the list |
+| thread | add an exchange (from an LLM node's **Exchange** output), remove one by id, empty the thread |
 
 The panel shows one control that fits the key and operation, and what you type keeps its real type. A value connected
 to the node's input always wins over the typed one. State Write runs every turn, even when no reply depends on it,
@@ -180,6 +182,33 @@ See [docs/TEMPLATING.md](TEMPLATING.md).
 
 **A turn reads the state as it started.** What a turn writes is visible from the next turn on, never inside the same
 turn. To use a value in the same turn, connect the State Write node's output where you need it.
+
+### Thread keys
+
+A **thread** key remembers what an LLM node did, tool calls included. Its items are **exchanges**: everything one LLM
+node run produced (each step's assistant message, the results of its tool calls, and the final answer). Connect the
+LLM node's **Exchange** output to the **Exchange** input of a State Write on a thread key and pick **Add**. Optional:
+
+- **Input** (State Write): what the exchange answers, stored with it. Text is kept as a user message; a message is
+  kept with its role, content and name.
+- **Keep reasoning** (State Write setting, off by default): by default the stored exchange leaves out the model's
+  reasoning and the provider data a backend needs to continue a reasoning chain. Prior-turn reasoning is rarely needed
+  and can be large. The run's execution log keeps everything either way. The tool calls and results always stay.
+
+An item has `text` (the exchange's final answer), the `exchange`, the optional `input`, and the `turnId` and `runId` of
+the turn and run that wrote it (the app stamps them). `{{#each state.<definition>.<key>}}{{text}}{{/each}}` lists the
+answers, newest first, like any list; State Read reads the items and their count.
+
+A thread follows the same rules as all story state: delete the reply of the turn that wrote an exchange and it goes;
+regenerate and swipes, forks and workflows after the reply behave like for any item. **Cap** keeps the newest
+exchanges when read.
+
+Not everything fits a thread, on purpose: the LLM node's state tools never offer thread keys (a model does not write
+exchanges by hand), and the Story state section and the state view show an exchange only as its answer with a count of
+steps and tool calls. The whole exchange is in the run's execution log.
+
+Exchanges are stored inline in the chat for now, so a long chat with many tool calls makes a large chat file. Keeping
+only a reference is planned.
 
 ### The rewind rule
 

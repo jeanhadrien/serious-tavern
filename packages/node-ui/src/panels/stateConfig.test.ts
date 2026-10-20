@@ -205,7 +205,7 @@ describe('retarget (write)', () => {
   });
 
   it('only ever leaves an operation the key type allows, for every type and operation', () => {
-    const types: StateKeyType[] = ['number', 'boolean', 'enum', 'text', 'object', 'collection'];
+    const types: StateKeyType[] = ['number', 'boolean', 'enum', 'text', 'object', 'collection', 'thread'];
     const keyOfType: Record<StateKeyType, string> = {
       number: 'tension',
       boolean: 'quiet',
@@ -213,10 +213,17 @@ describe('retarget (write)', () => {
       text: 'place',
       object: 'flags',
       collection: 'injected',
+      thread: 'log',
     };
+    const withThread = [definition('d-scene', 'scene', { ...scene.keys, log: { type: 'thread' } }), other];
     for (const type of types)
       for (const op of ['set', 'increment', 'add', 'remove', 'delete']) {
-        const result = retarget({ ...write, op }, { definitionId: 'd-scene', key: keyOfType[type] }, catalog, 'write');
+        const result = retarget(
+          { ...write, op },
+          { definitionId: 'd-scene', key: keyOfType[type] },
+          withThread,
+          'write',
+        );
         expect(stateOpsFor(type)).toContain(result.op);
         // An allowed operation is never changed.
         if (stateOpsFor(type).includes(op as never)) expect(result.op).toBe(op);
@@ -295,5 +302,24 @@ describe('the picker for nodes that work on a list (Next Chunk, Unlinked Message
     expect(pickerHint({ definitionId: 'd-other' }, catalog, 'collection')).toContain('no list (collection) key');
     expect(pickerHint({ definitionId: 'd-other' }, catalog, 'read')).toBe('Select a key.');
     expect(pickerHint({ definitionId: 'd-scene', key: 'injected' }, catalog, 'collection')).toBeUndefined();
+  });
+});
+
+describe('the picker for the LLM node tools (target)', () => {
+  const chat = definition('d-chat', 'chat', { log: { type: 'thread' }, note: { type: 'text' } });
+
+  it('offers every key but the threads', () => {
+    expect(keyOptions(chat, 'note', 'target').map((option) => option.value)).toEqual(['note']);
+    expect(keyOptions(chat, '', 'read').map((option) => option.value)).toEqual(['log', 'note']);
+  });
+
+  it('shows a configured thread as not available, and drops it when the definition changes', () => {
+    expect(keyOptions(chat, 'log', 'target')[0]).toEqual({
+      value: 'log',
+      label: 'log (thread: not available to tools)',
+    });
+    const twin = definition('d-twin', 'twin', { log: { type: 'thread' } });
+    expect(pickDefinition({ definitionId: 'd-chat', key: 'log' }, 'd-twin', [chat, twin], 'target').key).toBe('');
+    expect(pickDefinition({ definitionId: 'd-chat', key: 'log' }, 'd-twin', [chat, twin], 'read').key).toBe('log');
   });
 });

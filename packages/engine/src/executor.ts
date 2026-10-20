@@ -72,6 +72,9 @@ export async function executeWorkflow(
     foldWith?: (pending: StateWrite[]) => StateSnapshot;
     // The replies the runs above this one saved in this turn, in chat order: Chat Input's `replies` (`[]` by default).
     replies?: ChatMessage[];
+    // The id of the turn this run belongs to (the first run's execution id): `ctx.trigger.turnId`, stamped on the
+    // items State Write adds to a thread key. A run outside a turn is its own turn.
+    turnId?: string;
   },
 ): Promise<{ replies: ChatReply[]; execution: ExecutionLog; writes: StateWrite[] }> {
   // NB: Workflow is a passthrough (loose) object for forward compatibility, so `in`
@@ -117,7 +120,7 @@ export async function executeWorkflow(
       return next();
     };
   };
-  const stateRun = new StateRun(options.state, execution, workflow.id, options.foldWith);
+  const stateRun = new StateRun(options.state, execution, workflow.id, options.foldWith, options.turnId);
   let wave = 0;
   const resolved = new Map<string, { output: Record<string, unknown>; skipped: boolean }>();
   const replies = new Map<string, ChatReply>();

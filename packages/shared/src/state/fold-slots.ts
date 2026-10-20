@@ -1,5 +1,5 @@
 import { describeSettingValue } from '../chat-settings.js';
-import { keyDefault, keyValueProblem, type StateKeyDef } from './definition.js';
+import { isListKeyType, keyDefault, keyValueProblem, type StateKeyDef } from './definition.js';
 import type { FoldedKey, HistoryPoint, KeyMeta } from './fold-types.js';
 import type { CollectionItem, StateWrite } from './writes.js';
 
@@ -85,7 +85,7 @@ function foldCollection(writes: readonly SlotWrite[], cap: number | undefined, t
 }
 
 const suits = (def: StateKeyDef, write: StateWrite) =>
-  def.type === 'collection' ? write.op !== 'set' : write.op === 'set' || write.op === 'delete';
+  isListKeyType(def.type) ? write.op !== 'set' : write.op === 'set' || write.op === 'delete';
 
 /**
  * One key of a definition, folded against the CURRENT definition. Writes that don't suit the key's type
@@ -105,7 +105,9 @@ export function foldDefinitionKey(
           `${ignored} stored ${plural(ignored, 'write was', 'writes were')} made for another key type and ${plural(ignored, 'is', 'are')} ignored`,
         ]
       : [];
-  if (def.type === 'collection') return { key: foldCollection(accepted, def.cap, turn), problems };
+  // A thread folds like a collection (its items are exchanges; the fold does not look inside either kind).
+  if (def.type === 'collection' || def.type === 'thread')
+    return { key: foldCollection(accepted, def.cap, turn), problems };
   const fallback = keyDefault(def);
   const { key, warning } = foldScalar(
     accepted,

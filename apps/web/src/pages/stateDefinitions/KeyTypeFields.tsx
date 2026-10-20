@@ -147,5 +147,21 @@ export function KeyTypeFields({ keyDraft: key, position, onChange }: KeyTypeFiel
           </label>
         </>
       );
+    case 'thread':
+      // Minimal until the thread editor lands: a thread has only a cap.
+      return (
+        <label>
+          Cap
+          <input
+            aria-label={of('Cap')}
+            inputMode="numeric"
+            spellCheck={false}
+            value={key.cap}
+            placeholder="no limit"
+            onChange={(event) => onChange({ cap: event.target.value })}
+          />
+          <small>Only this many of the newest exchanges are kept when read.</small>
+        </label>
+      );
   }
 }

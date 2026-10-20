@@ -25,12 +25,23 @@ export class StateWriteBuffer {
     private readonly executionId: string,
     // The run's workflow: a node's own keys are stored under it (see `resolveWrites`).
     private readonly workflowId?: string,
+    // The turn's id; a thread item without one is stamped with the run's own id (a run outside a turn is its own turn).
+    private readonly turnId?: string,
   ) {}
+
+  // What the engine stamps on an item added to a thread key, so the Thread node can place the exchange in the chat.
+  private stamps(target: StateWriteRequest['target']): Record<string, string> {
+    if (target.kind !== 'definition') return {};
+    const definition = this.snapshot?.definitions.find((candidate) => candidate.id === target.definitionId);
+    const def = definition && Object.hasOwn(definition.keys, target.key) ? definition.keys[target.key] : undefined;
+    return def?.type === 'thread' ? { turnId: this.turnId ?? this.executionId, runId: this.executionId } : {};
+  }
 
   /**
    * The `writeState` function of one node. `add` mints the item id (`<execution>:<node>:<n>`, n counting the
    * node's adds from 1), so ids are unique across nodes and runs and never depend on call timing, and
-   * returns the item as it will be stored. Calls after the node committed are ignored.
+   * returns the item as it will be stored; an item of a thread key also gets its `turnId` and `runId`. Calls after the
+   * node committed are ignored.
    */
   writer(nodeId: string): (request: StateWriteRequest) => { item?: CollectionItem } {
     return (request) => {
@@ -41,7 +52,11 @@ export class StateWriteBuffer {
         node.requests.push(structuredClone(request));
         return {};
       }
-      const item = { ...structuredClone(request.item), id: `${this.executionId}:${nodeId}:${++node.adds}` };
+      const item = {
+        ...structuredClone(request.item),
+        ...this.stamps(request.target),
+        id: `${this.executionId}:${nodeId}:${++node.adds}`,
+      };
       node.requests.push({ ...request, item });
       return { item: structuredClone(item) };
     };
@@ -104,14 +119,19 @@ export class StateRun {
     workflowId: string,
     // Folds the run's story state with extra writes of the running turn (the caller's `foldWith`), if it gave one.
     private readonly foldWith?: (pending: StateWrite[]) => StateSnapshot,
+    // The turn's id, stamped on thread items (see `StateWriteBuffer.writer`).
+    private readonly turnId?: string,
   ) {
-    this.buffer = new StateWriteBuffer(snapshot, execution.id, workflowId);
+    this.buffer = new StateWriteBuffer(snapshot, execution.id, workflowId, turnId);
     this.values = frozenStateValues(snapshot);
   }
 
-  /** What `trigger.turn` adds to the context's trigger: only when the caller tracks story state. */
-  get trigger(): { turn?: number } {
-    return this.snapshot ? { turn: this.snapshot.turn } : {};
+  /** What `trigger.turn` and `trigger.turnId` add to the context's trigger: the turn only when the caller tracks story state. */
+  get trigger(): { turn?: number; turnId?: string } {
+    return {
+      ...(this.snapshot && { turn: this.snapshot.turn }),
+      ...(this.turnId !== undefined && { turnId: this.turnId }),
+    };
   }
 
   /**

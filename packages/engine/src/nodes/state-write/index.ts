@@ -28,11 +28,21 @@ export const stateWrite: NodeDefinition = {
       .describe(
         'A fixed value to store when nothing is connected to Value (a connected one wins). It has to fit the key, like a connected one.',
       ),
+    keepReasoning: z
+      .boolean()
+      .optional()
+      .describe(
+        "Thread keys only: also store the exchange's reasoning and the data a backend needs to continue it. Off by default: it is rarely needed and can be large; the run's log keeps it either way.",
+      ),
   }),
   defaultConfig: { definitionId: '', key: '', op: 'set' },
   async resolvePorts(config, resources) {
     const found = await locateConfigured(config, (id) => resources.stateDefinitions?.get(id));
-    return writePorts(found.def, checkOp(found.def, String(config.op ?? 'set')), fixedValue(config) !== undefined);
+    return writePorts(
+      found.def,
+      checkOp(found.def, String(config.op ?? 'set')),
+      fixedValue(config, found.def) !== undefined,
+    );
   },
   async execute(ctx) {
     const found = await locateConfigured(ctx.config, (id) => ctx.state.definition(id));
@@ -41,7 +51,7 @@ export const stateWrite: NodeDefinition = {
     const current = ctx.state.read(found.definition.id, found.key)?.value;
     // A connected value wins; otherwise the node's fixed one stands in for it, checked the same way.
     const connected = Object.hasOwn(ctx.inputs, 'value');
-    const fixed = fixedValue(ctx.config);
+    const fixed = fixedValue(ctx.config, found.def);
     // Only an `add` has the input (`resolvePorts`); a value's own `messages` property never links anything.
     const linked = op === 'add' && Object.hasOwn(ctx.inputs, 'messages');
     const plan = planWrite(found, op, {
@@ -49,6 +59,8 @@ export const stateWrite: NodeDefinition = {
       value: connected ? ctx.inputs.value : fixed,
       current,
       ...(linked && { link: messageLink(found.label, ctx.inputs.messages) }),
+      // A thread `add` also has `input` (`resolvePorts`) and the option to keep the exchange's reasoning.
+      ...(found.def.type === 'thread' && { input: ctx.inputs.input, keepReasoning: ctx.config.keepReasoning === true }),
     });
     for (const line of plan.logs) ctx.log(line);
     if (!plan.request) return {};

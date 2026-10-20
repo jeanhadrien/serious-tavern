@@ -46,6 +46,7 @@ const KNOWN: Record<StateKeyType, readonly string[]> = {
   text: ['type', 'description', 'default'],
   object: ['type', 'description', 'default'],
   collection: ['type', 'description', 'cap', 'fields'],
+  thread: ['type', 'description', 'cap'],
 };
 
 const withoutKnown = (type: StateKeyType, properties: Record<string, unknown>) =>
@@ -84,6 +85,8 @@ function keyDraft(uid: string, name: string, def: StateKeyDef): KeyDraft {
       return { ...key, default: objectText(def.default) };
     case 'collection':
       return { ...key, cap: numberText(def.cap), fields: fieldsText(def.fields) };
+    case 'thread':
+      return { ...key, cap: numberText(def.cap) };
   }
 }
 

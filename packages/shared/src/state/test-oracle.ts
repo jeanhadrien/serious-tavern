@@ -61,7 +61,7 @@ function expectCollection(writes: Accepted[], cap: number | undefined, turn: num
 }
 
 function expectScalar(def: StateKeyDef, writes: Accepted[], turn: number): Expected {
-  if (def.type === 'collection') throw new Error('scalar only');
+  if (def.type === 'collection' || def.type === 'thread') throw new Error('scalar only');
   const effective = (write: StateWrite) => {
     if (write.op !== 'set') return { value: keyDefault(def), bad: false };
     const bad = keyValueProblem(def, write.value) !== undefined;
@@ -110,11 +110,13 @@ export function oracleFold(
       const mine = forTarget(
         (w) => w.target.kind === 'definition' && w.target.definitionId === definition.id && w.target.key === key,
       );
-      const suits = (w: StateWrite) =>
-        def.type === 'collection' ? w.op !== 'set' : w.op === 'set' || w.op === 'delete';
+      const isList = def.type === 'collection' || def.type === 'thread';
+      const suits = (w: StateWrite) => (isList ? w.op !== 'set' : w.op === 'set' || w.op === 'delete');
       const accepted = mine.filter(({ write }) => suits(write));
       const expected =
-        def.type === 'collection' ? expectCollection(accepted, def.cap, turn) : expectScalar(def, accepted, turn);
+        def.type === 'collection' || def.type === 'thread'
+          ? expectCollection(accepted, def.cap, turn)
+          : expectScalar(def, accepted, turn);
       expected.warnings += accepted.length < mine.length ? 1 : 0;
       keys[definition.id]![key] = expected;
       warnings[definition.id]! += expected.warnings;

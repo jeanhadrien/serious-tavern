@@ -9,7 +9,7 @@ import { RESERVED_ITEM_FIELDS } from './node-values.js';
  * Records keep unknown fields (record and key), and they are read through the YAML codec, which parses every
  * file on read, so `.default()` is safe here (consumers always see concrete values).
  */
-export const stateKeyTypes = ['number', 'boolean', 'enum', 'text', 'object', 'collection'] as const;
+export const stateKeyTypes = ['number', 'boolean', 'enum', 'text', 'object', 'collection', 'thread'] as const;
 
 /** Why a name is refused: definition, key and item field names are template path segments (`{{state.scene.tension}}`). */
 export const TEMPLATE_NAME_RULE =
@@ -60,12 +60,26 @@ export const stateKeyDefSchema = z.discriminatedUnion('type', [
       fields: z.record(templateName, z.enum(['text', 'number', 'boolean'])).optional(),
     })
     .passthrough(),
+  // One exchange (the messages of an LLM node run, tool calls included) per item: see `threadItem`.
+  z
+    .object({
+      type: z.literal('thread'),
+      description: keyDescription,
+      // Keeps the `cap` newest exchanges when read.
+      cap: z.number().int().min(1).optional(),
+    })
+    .passthrough(),
 ]);
 export type StateKeyDef = z.infer<typeof stateKeyDefSchema>;
 export type StateKeyType = StateKeyDef['type'];
 export type NumberKeyDef = Extract<StateKeyDef, { type: 'number' }>;
-export type ScalarKeyDef = Exclude<StateKeyDef, { type: 'collection' }>;
+export type ScalarKeyDef = Exclude<StateKeyDef, { type: 'collection' | 'thread' }>;
 export type CollectionKeyDef = Extract<StateKeyDef, { type: 'collection' }>;
+export type ThreadKeyDef = Extract<StateKeyDef, { type: 'thread' }>;
+
+/** Whether a key type holds a list of items (`add`, `remove`, `delete`; the fold's collection rules, `cap` included). */
+export const isListKeyType = (type: StateKeyType): type is 'collection' | 'thread' =>
+  type === 'collection' || type === 'thread';
 
 // Plain-language problems the shapes above cannot express. Paths point at the field so that a YAML file's
 // invalid reason reads `invalid state definition: keys.tension.max: ...`.
@@ -146,6 +160,7 @@ export function keyDefault(def: StateKeyDef): unknown {
     case 'object':
       return structuredClone(def.default ?? {});
     case 'collection':
+    case 'thread':
       return [];
   }
 }
@@ -194,6 +209,7 @@ export function stateOpsFor(type: StateKeyType): StateNodeOp[] {
     case 'number':
       return ['set', 'increment', 'delete'];
     case 'collection':
+    case 'thread':
       return ['add', 'remove', 'delete'];
     default:
       return ['set', 'delete'];
@@ -208,6 +224,7 @@ export function stateKeyPortType(type: StateKeyType): PortDataType {
     case 'object':
       return type;
     case 'collection':
+    case 'thread':
       return 'array';
     default:
       return 'text';

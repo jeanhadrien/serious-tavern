@@ -98,6 +98,7 @@ export async function runReplyRun(
       replies: above,
       signal: turn.controller.signal,
       executionId: runId,
+      turnId,
       onEvent: stream?.onEvent,
     });
   } catch (error) {

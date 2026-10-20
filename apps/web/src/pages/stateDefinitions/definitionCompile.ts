@@ -44,11 +44,13 @@ function compileKey(key: KeyDraft): { def?: Record<string, unknown>; problems: s
       else problems.push(`Default: ${parsed.error}`);
       break;
     }
-    case 'collection': {
+    case 'collection':
+    case 'thread': {
       const cap = number('Cap', key.cap);
       if (cap !== undefined && !(Number.isInteger(cap) && cap >= 1))
         problems.push('Cap must be a whole number, 1 or more');
       set('cap', cap);
+      if (key.type === 'thread') break;
       const fields = parseFields(key.fields);
       if (fields.ok) set('fields', fields.fields);
       else problems.push(...fields.errors);
