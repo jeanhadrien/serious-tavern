@@ -321,6 +321,24 @@ describe('thread keys in the State Read and State Write pickers', () => {
     expect(keyOptions(chat, 'log', 'collection')[0]).toEqual({ value: 'log', label: 'log (thread: not a list)' });
   });
 
+  it('are the only keys the Thread node picker offers, and it sets nothing but the target', () => {
+    expect(keyOptions(chat, '', 'thread')).toEqual([{ value: 'log', label: 'log (thread)' }]);
+    expect(keyOptions(chat, 'note', 'thread')[0]).toEqual({ value: 'note', label: 'note (text: not a thread)' });
+    expect(pickDefinition({ definitionId: 'd-chat', key: 'note' }, 'd-chat', [chat], 'thread').key).toBe('');
+    const config = { definitionId: '', key: '', lastN: 3, withInputs: false };
+    expect(pickKey({ ...config, definitionId: 'd-chat' }, 'log', [chat], 'thread')).toEqual({
+      ...config,
+      definitionId: 'd-chat',
+      key: 'log',
+    });
+  });
+
+  it('tell the Thread picker what is missing when a definition has none', () => {
+    expect(pickerHint({ definitionId: 'd-chat' }, [chat], 'thread')).toBe('Select a key.');
+    const flat = definition('d-flat', 'flat', { note: { type: 'text' } });
+    expect(pickerHint({ definitionId: 'd-flat' }, [flat], 'thread')).toContain('no thread key');
+  });
+
   it('read like a list, without the linked read', () => {
     expect(readOptions('thread', 'value')).toEqual(['value', 'meta']);
     // Reading a key as linked after it became a thread falls back to its value.

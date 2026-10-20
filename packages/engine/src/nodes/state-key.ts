@@ -45,6 +45,17 @@ export async function locateCollection(
   return { ...found, def: found.def };
 }
 
+/** `locateConfigured` for the Thread node: a key of another type is an error that says so. */
+export async function locateThread(
+  config: Record<string, unknown>,
+  lookup: (id: string) => StateDefinition | undefined | Promise<StateDefinition | undefined>,
+): Promise<LocatedKey> {
+  const found = await locateConfigured(config, lookup);
+  if (found.def.type !== 'thread')
+    throw new Error(`${found.label} is a ${found.def.type} key; this node needs a thread key`);
+  return found;
+}
+
 /** The items a collection key held when the turn started (a copy); an unknown key reads as no items. */
 export function itemsOf(
   found: LocatedKey,

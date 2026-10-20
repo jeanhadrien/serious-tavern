@@ -375,6 +375,32 @@ describe('Next Chunk and Unlinked Messages panels', () => {
   });
 });
 
+describe('Thread panel', () => {
+  const threadNode = listNode(
+    'thread',
+    { definitionId: '', key: '', withInputs: true },
+    { definitionId: { type: 'string' }, key: { type: 'string' }, withInputs: { type: 'boolean', default: true } },
+  );
+
+  it('picks a thread key only, with the definition link, and keeps the other settings', () => {
+    const html = panel(threadNode, { definitionId: scene.id, key: 'log', withInputs: false }, [scene]);
+    expect(html).toContain('<option value="log" selected="">log (thread)</option>');
+    expect(html).not.toContain('injected (collection)');
+    expect(html).not.toContain('tension (number)');
+    expect(html).toContain(`href="/state-definitions?id=${scene.id}"`);
+    expect(html).not.toContain('definitionId');
+  });
+
+  it('tells what to pick next, and shows a key that is no thread as such', () => {
+    expect(panel(threadNode, { definitionId: '', key: '' }, [scene])).toContain('Select a state definition.');
+    const flat = definition({ keys: { place: { type: 'text' } } });
+    expect(panel(threadNode, { definitionId: flat.id, key: '' }, [flat])).toContain('no thread key');
+    expect(panel(threadNode, { definitionId: scene.id, key: 'injected' }, [scene])).toContain(
+      '<option value="injected" selected="">injected (collection: not a thread)</option>',
+    );
+  });
+});
+
 describe('the generic form', () => {
   it('shows the description of a checkbox, such as what All does to Last N in Memory', () => {
     const memory = listNode(

@@ -233,6 +233,16 @@ function CollectionKeyPanel(props: Props) {
     />
   );
 }
+/** Thread: a thread key of a state definition (the State Read picker), then the generic form. */
+function ThreadPanel(props: Props) {
+  return (
+    <GenericPanel
+      {...props}
+      hidden={['definitionId', 'key']}
+      lead={<StateKeyPicker kind="thread" config={props.config} onChange={props.onChange} context={props.context} />}
+    />
+  );
+}
 // Optional overrides are registered only here; all other node types use the schema-driven form.
 export const customPanels: Record<string, (props: Props) => React.JSX.Element> = {
   condition: ConditionPanel,
@@ -245,6 +255,7 @@ export const customPanels: Record<string, (props: Props) => React.JSX.Element> =
   'state-write': StateWritePanel,
   'next-chunk': CollectionKeyPanel,
   'unlinked-messages': CollectionKeyPanel,
+  thread: ThreadPanel,
 };
 export function NodeConfigPanel(props: Props) {
   const Panel = customPanels[props.descriptor.type] ?? GenericPanel;

@@ -57,6 +57,8 @@ export type StateWriteRequest =
 export type StateAccess = {
   // The turn being run (1-based; 1 when the run has no state snapshot).
   readonly turn: number;
+  // The ids of the present turns, oldest first (`StateSnapshot.turnIds`); the order a thread is woven into the chat by.
+  readonly turnIds: readonly string[];
   // The `state` namespace of templates: `{ <definition name>: { <key>: value } }`. Frozen. It is a plain
   // property (no methods) because nodes pass the whole context to `renderTemplate`.
   readonly values: Readonly<Record<string, Readonly<Record<string, unknown>>>>;

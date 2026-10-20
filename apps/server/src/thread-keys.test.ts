@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'vitest';
-import { apiContract, type ToolCall } from '@st/shared';
+import { apiContract, errorEnvelopeSchema, stateDefinitionInUseDetailsSchema, type ToolCall } from '@st/shared';
 import { chatResponse, restoreAdapter, useAdapter } from './test-support/adapter.js';
 import {
   assistantRows,
@@ -110,6 +110,124 @@ it('stores the exchange on the turn, keeps the state view small, and undoes it w
     const after = await stateView(app, session.id);
     expect(after.view.definitions[0]?.values.thread).toEqual([]);
     expect(after.view.turns[0]).toMatchObject({ turnNumber: null });
+  } finally {
+    await app.close();
+  }
+});
+
+// The Thread node feeds the stored exchanges back into the next turn's prompt, woven into the chat.
+
+const stamp = { providerId: 'openrouter', model: 'm', nodeId: 'llm' };
+
+it('weaves a stored exchange into the next turn: tool blocks before the reply, no duplicated answer', async () => {
+  const tool_calls: ToolCall[] = [
+    { id: 'call_1', type: 'function', function: { name: 'read_state', arguments: '{"keys":["story.mood"]}' } },
+  ];
+  // The fake adapter stamps the replies like the real one does: the Thread node places by the producing node.
+  const replies = [
+    chatResponse('', { message: { role: 'assistant', content: '', tool_calls, provenance: stamp } }),
+    chatResponse('It is calm.', { message: { role: 'assistant', content: 'It is calm.', provenance: stamp } }),
+    chatResponse('Still calm.', { message: { role: 'assistant', content: 'Still calm.', provenance: stamp } }),
+  ];
+  const prompts: { role: string; content: string; tool_calls?: unknown[] }[][] = [];
+  let calls = 0;
+  useAdapter({
+    chat: async (request) => {
+      prompts.push(request.messages as (typeof prompts)[number]);
+      return replies[calls++]!;
+    },
+  });
+  const { app } = await apps.open();
+  try {
+    await app.inject({ method: 'PUT', url: '/api/secrets/openrouter', payload: { value: 'test-key' } });
+    const definition = await define(app, {
+      name: 'story',
+      keys: { mood: { type: 'text', default: 'calm' }, thread: { type: 'thread' } },
+    });
+    const preset = (
+      await app.inject({
+        method: 'POST',
+        url: '/api/presets',
+        payload: {
+          name: 'P',
+          inputs: [
+            { id: 'history-input', key: 'history', label: 'History', dataType: 'messages' },
+            { id: 'message-input', key: 'message', label: 'Message', dataType: 'text' },
+          ],
+          entries: [
+            { id: 'history', kind: 'slot', displayName: 'History', enabled: true, inputKey: 'history' },
+            { id: 'message', kind: 'slot', displayName: 'Message', enabled: true, inputKey: 'message' },
+          ],
+        },
+      })
+    ).json();
+    const workflow = await makeWorkflow(
+      app,
+      [
+        node('input', 'chat-input'),
+        node('thread', 'thread', { definitionId: definition.id, key: 'thread' }),
+        node('llm', 'llm', {
+          presetId: preset.id,
+          provider: 'openrouter',
+          model: 'm',
+          tools: { read: [{ definitionId: definition.id, key: 'mood' }] },
+        }),
+        node('keep', 'state-write', { definitionId: definition.id, key: 'thread', op: 'add' }),
+        node('output', 'chat-output'),
+      ],
+      [
+        edge('input', 'history', 'thread', 'history'),
+        edge('thread', 'messages', 'llm', 'history'),
+        edge('input', 'message', 'llm', 'message'),
+        edge('llm', 'text', 'output', 'value'),
+        edge('llm', 'exchange', 'keep', 'value'),
+      ],
+    );
+    const session = await makeSession(app, workflow.id);
+
+    expect(await turn(app, session.id, 'How is it?')).toEqual(['It is calm.']);
+    // Turn 1 had nothing to weave: the preset's slots only (the new message).
+    expect(prompts[0]?.map((message) => message.content)).toEqual(['How is it?']);
+
+    expect(await turn(app, session.id, 'And now?')).toEqual(['Still calm.']);
+    expect(calls).toBe(3);
+    const second = prompts[2]!;
+    // The chat as the history, with turn 1's tool call and its result right before turn 1's reply; the stored
+    // exchange's final answer is not repeated (the chat already holds it), then the new message.
+    expect(second.map((message) => message.role)).toEqual(['user', 'assistant', 'tool', 'assistant', 'user']);
+    expect(second.map((message) => message.content)).toEqual([
+      'How is it?',
+      '',
+      expect.stringContaining('calm'),
+      'It is calm.',
+      'And now?',
+    ]);
+    expect(second[1]?.tool_calls).toHaveLength(1);
+    expect(second.filter((message) => message.content === 'It is calm.')).toHaveLength(1);
+  } finally {
+    await app.close();
+  }
+});
+
+it('keeps a definition from being deleted while a Thread node uses it', async () => {
+  const { app } = await apps.open();
+  try {
+    const definition = await define(app, { name: 'story', keys: { thread: { type: 'thread' } } });
+    await makeWorkflow(
+      app,
+      [
+        node('input', 'chat-input'),
+        node('thread', 'thread', { definitionId: definition.id, key: 'thread' }),
+        node('output', 'chat-output'),
+      ],
+      [edge('thread', 'messages', 'output', 'value')],
+      'Reads a thread',
+    );
+    const response = await app.inject({ method: 'DELETE', url: `/api/state-definitions/${definition.id}` });
+    expect(response.statusCode).toBe(409);
+    const { error } = errorEnvelopeSchema.parse(response.json());
+    expect(error.code).toBe('STATE_DEFINITION_IN_USE');
+    expect(stateDefinitionInUseDetailsSchema.parse(error.details).workflows).toEqual(['Reads a thread']);
   } finally {
     await app.close();
   }

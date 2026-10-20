@@ -13,19 +13,25 @@ export type Option = { value: string; label: string };
 
 /**
  * What the picker is for: a State Read or State Write (any key), or a node that works on a list (`collection`:
- * Next Chunk, Unlinked Messages), which only offers collection keys and leaves `read`/`op` alone. `target` picks
- * any key and nothing else (the LLM node's tool lists).
+ * Next Chunk, Unlinked Messages), which only offers collection keys and leaves `read`/`op` alone. `thread` is the same
+ * for the Thread node and thread keys. `target` picks any key and nothing else (the LLM node's tool lists).
  */
-export type PickerKind = 'read' | 'write' | 'collection' | 'target';
+export type PickerKind = 'read' | 'write' | 'collection' | 'thread' | 'target';
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
+/** The key type a list or thread picker is for. */
+const onlyType = (kind: PickerKind | undefined): StateKeyType | undefined =>
+  kind === 'collection' || kind === 'thread' ? kind : undefined;
+
 /**
- * Whether the picker offers a key of this type: a list picker only collections; the tools picker (`target`) everything
- * but threads (an exchange is not something a model reads or writes by hand).
+ * Whether the picker offers a key of this type: a list picker only collections, the Thread picker only threads; the
+ * tools picker (`target`) everything but threads (an exchange is not something a model reads or writes by hand).
  */
-const offers = (kind: PickerKind | undefined, type: StateKeyType): boolean =>
-  kind === 'collection' ? type === 'collection' : kind !== 'target' || type !== 'thread';
+const offers = (kind: PickerKind | undefined, type: StateKeyType): boolean => {
+  const only = onlyType(kind);
+  return only ? type === only : kind !== 'target' || type !== 'thread';
+};
 
 /**
  * What the picker tells the user to do next: create a definition when there is none, else pick the definition,
@@ -40,8 +46,11 @@ export function pickerHint(
   if (!catalog.length) return 'Create a state definition in the State definitions list first.';
   if (!text(config.definitionId)) return 'Select a state definition.';
   const definition = catalog.find((item) => item.id === text(config.definitionId));
-  if (kind === 'collection' && definition && !Object.values(definition.keys).some((key) => key.type === 'collection'))
-    return 'This definition has no list (collection) key. Add one in the definitions editor.';
+  const only = onlyType(kind);
+  if (only && definition && !Object.values(definition.keys).some((key) => key.type === only))
+    return only === 'thread'
+      ? 'This definition has no thread key. Add one in the definitions editor.'
+      : 'This definition has no list (collection) key. Add one in the definitions editor.';
   if (!text(config.key)) return 'Select a key.';
   return undefined;
 }
@@ -65,10 +74,10 @@ export function keyOptions(definition: StateDefinition | undefined, current: unk
   const key = text(current);
   if (!key || options.some((option) => option.value === key)) return options;
   const other = definition && Object.hasOwn(definition.keys, key) ? definition.keys[key] : undefined;
-  // A key that exists but is not offered (not a list for a list picker; a thread for tools): said as what it is, not as unknown.
-  const label = other
-    ? `${key} (${other.type}: ${kind === 'target' ? 'not available to tools' : 'not a list'})`
-    : `Unknown key (${key})`;
+  // A key that exists but is not offered (not a list for a list picker, not a thread for the Thread picker; a thread
+  // for tools): said as what it is, not as unknown.
+  const why = kind === 'target' ? 'not available to tools' : kind === 'thread' ? 'not a thread' : 'not a list';
+  const label = other ? `${key} (${other.type}: ${why})` : `Unknown key (${key})`;
   return [{ value: key, label }, ...options];
 }
 
@@ -85,7 +94,7 @@ export function readOptions(type: StateKeyType | undefined, current: string): St
 
 /**
  * The config after the user picks a definition and key. A State Read (`read`) goes back to `value` when its read
- * does not fit the new key's type (`linked` is for collections). `collection` and `target` only set the target. A
+ * does not fit the new key's type (`linked` is for collections). `collection`, `thread` and `target` only set the target. A
  * State Write (`write`) also fits `op` to the
  * key's type (the first operation it allows when the current one is not allowed) and drops its fixed `value` when
  * the definition or key changed, because that value was typed for another key.
@@ -97,7 +106,7 @@ export function retarget(
   kind: PickerKind,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...config, definitionId: next.definitionId, key: next.key };
-  if (kind === 'collection' || kind === 'target') return result;
+  if (kind === 'collection' || kind === 'thread' || kind === 'target') return result;
   const def = catalog.find((definition) => definition.id === next.definitionId)?.keys[next.key];
   if (kind === 'read') {
     const read = text(config.read) || 'value';

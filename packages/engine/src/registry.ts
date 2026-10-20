@@ -18,6 +18,7 @@ import { stateRead } from './nodes/state-read/index.js';
 import { stateWrite } from './nodes/state-write/index.js';
 import { nextChunk } from './nodes/next-chunk/index.js';
 import { unlinkedMessages } from './nodes/unlinked-messages/index.js';
+import { thread } from './nodes/thread/index.js';
 import { trigger } from './nodes/trigger/index.js';
 import { pickFields } from './nodes/pick-fields/index.js';
 
@@ -41,6 +42,7 @@ export const registry = new Map<string, NodeDefinition>(
     stateWrite,
     nextChunk,
     unlinkedMessages,
+    thread,
     trigger,
     pickFields,
   ].map((node) => [node.type, node]),

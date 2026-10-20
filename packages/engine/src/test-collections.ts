@@ -41,6 +41,8 @@ export async function runNode(
     draws?: number[];
     // The story state the node runs against; its writes come back resolved, as the executor would store them.
     state?: StateSnapshot;
+    // The running turn's id (`ctx.trigger.turnId`).
+    turnId?: string;
   },
 ) {
   const logs: string[] = [];
@@ -52,7 +54,7 @@ export async function runNode(
     nodeId: definition.type,
     inputs: options.inputs ?? {},
     config: definition.configSchema.parse(config),
-    trigger: { message: options.message ?? '', sessionId: 's' },
+    trigger: { message: options.message ?? '', sessionId: 's', ...(options.turnId && { turnId: options.turnId }) },
     settings: {},
     history: options.history ?? [],
     replies: [],

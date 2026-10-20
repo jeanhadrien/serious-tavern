@@ -33,6 +33,7 @@ export function createStateAccess(
 ): StateAccess {
   return {
     turn: snapshot?.turn ?? 1,
+    turnIds: snapshot?.turnIds ?? [],
     values,
     definition: (id) => {
       const found = snapshot?.definitions.find((definition) => definition.id === id);

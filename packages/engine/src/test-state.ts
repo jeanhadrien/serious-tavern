@@ -39,6 +39,8 @@ export function snapshotOf(
   definitions: StateDefinition[],
   options: {
     turn?: number;
+    // The present turns' ids, oldest first (`StateSnapshot.turnIds`).
+    turnIds?: string[];
     keys?: Record<string, Override>;
     nodes?: Record<string, Record<string, Override>>;
   } = {},
@@ -46,6 +48,7 @@ export function snapshotOf(
   const snapshot = emptyStateSnapshot(definitions);
   const turn = options.turn ?? 1;
   snapshot.turn = turn;
+  if (options.turnIds) snapshot.turnIds = options.turnIds;
   const merge = (base: StateKeyView | undefined, override: Override): StateKeyView =>
     ({
       ...base,

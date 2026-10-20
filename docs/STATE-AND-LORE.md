@@ -199,6 +199,16 @@ An item has `text` (the exchange's final answer), the `exchange`, the optional `
 the turn and run that wrote it (the app stamps them). `{{#each state.<definition>.<key>}}{{text}}{{/each}}` lists the
 answers, newest first, like any list; State Read reads the items and their count.
 
+**Reading a thread back.** Use a **Thread** node (category History) to hand the stored exchanges to a model: pick the
+definition and the thread key, and connect its **Messages** output to a messages input of an LLM node's preset (a
+history slot). Without a history connected it gives the thread on its own, oldest first, each exchange after its
+question (**With inputs**, on by default). Connect the chat's **History** (Chat Input's) to weave the exchanges into the
+chat instead: each exchange's tool calls and results land right before the reply they led to, and the final answer is
+not repeated, since the chat already shows it (an edited reply stays as edited). Exchanges whose answer is not in the
+chat (a templated reply, a run that did not reply) come after the last message of their turn. **Last N** keeps only the
+newest N exchanges. The model should have the same tools declared in the LLM node, or the preset turns tool calls it
+cannot call into plain text.
+
 A thread follows the same rules as all story state: delete the reply of the turn that wrote an exchange and it goes;
 regenerate and swipes, forks and workflows after the reply behave like for any item. **Cap** keeps the newest
 exchanges when read.
