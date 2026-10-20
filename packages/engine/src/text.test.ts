@@ -37,6 +37,44 @@ it('uses the same role/content transcript for messages and ignores speaker names
   expect(coerceValue({ not: 'messages' }, 'messages-to-text')).toBe('{"not":"messages"}');
 });
 
+it('writes tool calls and tool results in the messages transcript', () => {
+  const call = (id: string, name: string, args: string) => ({
+    id,
+    type: 'function' as const,
+    function: { name, arguments: args },
+  });
+  const longArguments = `{"text":"${'a'.repeat(300)}"}`;
+  expect(
+    coerceValue(
+      [
+        { role: 'user', content: 'Go' },
+        {
+          role: 'assistant',
+          content: 'Looking',
+          tool_calls: [call('c1', 'read_state', '{"key":"a"}'), call('c2', 'x', '')],
+        },
+        { role: 'tool', content: 'value', tool_call_id: 'c1' },
+        { role: 'tool', content: 'unknown call', tool_call_id: 'zzz' },
+        { role: 'assistant', content: '', tool_calls: [call('c3', 'long', longArguments)] },
+        { role: 'assistant', content: 'Done' },
+      ],
+      'messages-to-text',
+    ),
+  ).toBe(
+    [
+      'user: Go',
+      'assistant: Looking',
+      'assistant -> read_state({"key":"a"})',
+      'assistant -> x()',
+      'tool read_state: value',
+      'tool: unknown call',
+      'assistant: ',
+      `assistant -> long(${longArguments})`,
+      'assistant: Done',
+    ].join('\n'),
+  );
+});
+
 it.each([
   ['hi', 'text'],
   ['', 'text'],
