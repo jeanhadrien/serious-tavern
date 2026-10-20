@@ -97,9 +97,9 @@ Presets come before the Thread node: until slots accept tool messages, a thread 
 | 2. Adapter | done (`58625d3`) |
 | 3. Tool loop and state tools | done: fold with pending writes (`3b26d93`), loop and state tools (`3dd6d15`), panel, step resets, sink rule (`c568047`) |
 | 4. Thread keys | done: shared, engine, server (`67503a1`), web (`cb8298a`) |
-| 5. Presets | to do |
-| 6. Thread node | to do |
-| 7. Example pack | to do |
+| 5. Presets | done: slots, depth by block, flattening, `mergeAssistantMessages` (`04c986e`), preview (`93df381`) |
+| 6. Thread node | done: `weaveThread`, `turnIds`, `sourceNodeId` (`df22930`), the node and its panel (`8b91468`) |
+| 7. Example pack | done (`cd6c339`) |
 
 Process: one fresh Sonnet agent per step (or part of a step), the orchestrator reviews the diff, runs `npm run check`
 and commits. Agents edit files only with the Edit/Write tools: a PowerShell edit once corrupted every line of a
@@ -133,6 +133,31 @@ These are in the code; the remaining steps build on them.
   inline exchanges (part of the by-reference TODO) (step 4a).
 - **Thread keys are never tool targets**, and State Write's `remove` on a thread takes its id only from the input
   (no fixed value) (steps 4a, 4b).
+- **Slots keep app-only fields, templates don't.** `renderMessagesSlot` validates with the canonical schema and keeps
+  only the canonical keys (stored bookkeeping such as `id`, `executionId`, `status` never reaches a prompt), rendering
+  from the raw inputs; `forTemplates` strips `reasoning`, `provider_data` and `provenance` from what templates see
+  (step 5).
+- **Flattening lives in shared** (`flattenUndeclaredToolBlocks`, next to `messageBlocks`); the transcript format moved
+  to `conversation/transcript.ts` so flattening and `messages-to-text` share it. The LLM node builds its tools once,
+  before flattening (step 5).
+- **`mergeAssistantMessages` is applied in the adapter's request body** (resolved by `resolveWireSettings`), so it holds
+  for every loop step and shows in the wire log. Messages with tool calls, `provider_data` or different names never
+  merge; reasoning is joined like content. It lives in the provider editor's YAML box (step 5).
+- **The preview shows the rendered prompt as is:** tool calls, tool results and a reasoning view, no flattening or
+  merging (there is no LLM node there) (step 5).
+- **The running turn is woven like any other turn.** `StateSnapshot.turnIds` holds the running turn only for the later
+  runs of a turn, so `weaveThread` takes `runningTurnId` separately; when an earlier run of the turn already replied,
+  the tool blocks go before that reply. Only a running turn with no message in the history goes after the last
+  message. This refines the plan's "running-turn items go after the history's last message", which would put tool
+  calls after their own answer (step 6a).
+- **`sourceNodeId` is set at settle and on streaming rows** from `passthroughSources`, non-streamed passthrough replies
+  and partial rows included (step 6a).
+- **The Thread node** reads `ctx.state` (`StateAccess.turnIds` added), reverses the items to oldest first, keeps the
+  last `lastN` and only calls `threadAlone`/`weaveThread`. A plain item without `turnId` gets the turn its fold number
+  stands for (`turnIds[turn - 1]`), else the running turn's. Its picker is `PickerKind 'thread'` (step 6b).
+- **The example pack** is `scenarist`: `plot` (`tension`, `beat`, `threads`, thread key `notes`), "Narrator with a
+  scenarist (example)" and "Scenarist (example)" (Thread → LLM with tools → State Write into `notes`, no Chat Output).
+  `toolChoice` stays `auto`; the preset asks the model to read the state first (step 7).
 
 Docs updated along the way: `README.md` (node types, tools, threads), `docs/PROVIDERS.md` (tool support, replay
 fields), `docs/STATE-AND-LORE.md` (thread keys), `AGENTS.md` (contracts listed in each step).
