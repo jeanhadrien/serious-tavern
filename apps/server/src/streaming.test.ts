@@ -166,7 +166,7 @@ describe('streamed turns', () => {
         const current = await readSession(app, session.id);
         return assistantRows(current).find((message) => message.content === 'Hel');
       });
-      expect(row).toMatchObject({ status: 'streaming', nodeId: 'output', reasoning: 'think' });
+      expect(row).toMatchObject({ status: 'streaming', nodeId: 'output', sourceNodeId: 'llm', reasoning: 'think' });
       const updatedAt = (await readSession(app, session.id)).updatedAt;
       // Flushes write message text only; the session's updatedAt keeps the send time.
       vi.setSystemTime(new Date('2030-01-01T00:05:00.000Z'));
@@ -198,6 +198,7 @@ describe('streamed turns', () => {
             content: 'Hello',
             status: 'final',
             nodeId: 'output',
+            sourceNodeId: 'llm',
             reasoning: 'think',
             executionId: (start as unknown as { executionId: string }).executionId,
           },
@@ -209,6 +210,43 @@ describe('streamed turns', () => {
         ['assistant', row!.id],
       ]);
       expect(saved.messages[1]).toMatchObject({ content: 'Hello', status: 'final' });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('stores the LLM node on the replies of passthrough outputs, streamed or not, and on no other reply', async () => {
+    useAdapter({
+      chat: async () => chatResponse('B'),
+      stream: async (_request, { onToken }) => {
+        onToken('A');
+        return chatResponse('A');
+      },
+    });
+    const { app, session } = await setup((presetId) => ({
+      nodes: [
+        node('input', 'chat-input'),
+        llmNode('llmA', presetId, 'openrouter'),
+        node('outA', 'chat-output'),
+        node('llmB', 'llm', { presetId, provider: 'openrouter', model: 'm', streaming: false }),
+        node('outB', 'chat-output'),
+        llmNode('llmC', presetId, 'openrouter'),
+        node('outC', 'chat-output', { template: '[{{input.value}}]' }),
+      ],
+      edges: [
+        edge('llmA', 'text', 'outA', 'value'),
+        edge('llmB', 'text', 'outB', 'value'),
+        edge('llmC', 'text', 'outC', 'value'),
+      ],
+    }));
+    try {
+      expect((await app.inject(streamRequest(session.id, 'hi'))).statusCode).toBe(200);
+      const replies = assistantRows(await readSession(app, session.id));
+      const sourceOf = (content: string) => replies.find((message) => message.content === content)?.sourceNodeId;
+      expect(replies.map((message) => message.content).sort()).toEqual(['A', 'B', '[A]']);
+      expect(sourceOf('A')).toBe('llmA');
+      expect(sourceOf('B')).toBe('llmB');
+      expect(replies.find((message) => message.content === '[A]')).not.toHaveProperty('sourceNodeId');
     } finally {
       await app.close();
     }
@@ -614,6 +652,32 @@ describe('finalizing a turn', () => {
     expect(settled.assistantMessages.map(({ id, content, status }) => [id, content, status])).toEqual([
       ['row-1', 'Hello', 'final'],
       ['row-2', 'Still going', 'partial'],
+    ]);
+  });
+
+  it('stores the source LLM node on promoted and partial rows of passthrough outputs only', () => {
+    const current = session([structuredClone(user)]);
+    const other = { ...streamed, id: 'row-2', outputId: 'other', content: 'Still going', reasoning: '' };
+    const settled = settleTurn(current, {
+      executionId: 'execution',
+      userMessage: structuredClone(user),
+      replies: [
+        { nodeId: 'output', content: 'Hello' },
+        { nodeId: 'templated', content: 'Templated' },
+      ],
+      streamed: [streamed, other],
+      sources: new Map([
+        ['output', 'llm-1'],
+        ['other', 'llm-2'],
+      ]),
+      run: { executionId: 'execution', workflowId: 'workflow', status: 'stopped' },
+    });
+    expect(
+      settled.assistantMessages.map(({ content, status, sourceNodeId }) => [content, status, sourceNodeId]),
+    ).toEqual([
+      ['Hello', 'final', 'llm-1'],
+      ['Templated', undefined, undefined],
+      ['Still going', 'partial', 'llm-2'],
     ]);
   });
 

@@ -4,6 +4,7 @@ import type { AppContext } from '../context.js';
 import { errorMessage, notFound } from '../errors.js';
 import { failureMessage, stopWarning } from './failure.js';
 import { settleTurn, type RunEnd } from './settle-turn.js';
+import { passthroughSources } from './stream-bindings.js';
 import { announcedRuns, type PlannedRun, type StartedTurn } from './turn-start.js';
 import { TurnStream, type TurnFrame } from './turn-stream.js';
 import type { RunningTurn } from './turns.js';
@@ -138,6 +139,7 @@ export async function runReplyRun(
       writes,
       definitions: started.definitions,
       postRuns: announced ? announcedRuns(started) : [],
+      sources: passthroughSources(prepared),
       ...(started.rootId ? { regenerate: { rootId: started.rootId } } : {}),
     });
     return current;

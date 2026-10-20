@@ -58,6 +58,10 @@ export const messageSchema = z
     // Stored for display only; reasoning never enters prompt content.
     reasoning: z.string().optional(),
     nodeId: z.string().optional(),
+    // An assistant message only: the LLM node whose text this reply is, set for the replies of passthrough Chat Outputs
+    // (no template, fed by exactly one LLM's text). Absent on every other reply and in older messages. `weaveThread`
+    // uses it with `runId` to find the reply that carries a thread exchange's answer.
+    sourceNodeId: z.string().optional(),
     // Set when the content was edited after it was stored (display only: stored state is never recomputed).
     editedAt: z.string().optional(),
     // Regenerate and swipes (alternatives.ts): on the replies of a regenerated alternative, the `executionId` of the

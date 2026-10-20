@@ -45,6 +45,9 @@ export type Settlement = {
   // Set when the turn is a regenerate of the last turn (`rootId`: the `executionId` of its first alternative). Its
   // replies join that turn's alternatives and, if there are any, replace the shown ones in this same write.
   regenerate?: { rootId: string };
+  // The run's passthrough Chat Outputs (`passthroughSources`): output node id to the LLM node whose text it replies. Their
+  // replies (partial ones too) are stored with `sourceNodeId`; every other reply has none.
+  sources?: ReadonlyMap<string, string>;
 };
 
 /**
@@ -64,10 +67,15 @@ export function settleTurn(
     definitions = [],
     postRuns = [],
     regenerate,
+    sources = new Map(),
   }: Settlement,
 ) {
   const interrupted = run !== undefined && run.status !== 'completed';
   const alternativeOf = regenerate ? { alternativeOf: regenerate.rootId } : {};
+  const sourceOf = (outputId: string) => {
+    const sourceNodeId = sources.get(outputId);
+    return sourceNodeId === undefined ? {} : { sourceNodeId };
+  };
   const runId = run ? { runId: run.executionId } : {};
   const streamedIds = new Set(streamed.map((row) => row.id));
   const streamedByOutput = new Map(streamed.map((row) => [row.outputId, row]));
@@ -85,6 +93,7 @@ export function settleTurn(
       ...runId,
       ...alternativeOf,
       ...(live ? { nodeId: live.outputId, status: 'final' as const } : {}),
+      ...sourceOf(reply.nodeId),
       ...(live?.reasoning ? { reasoning: live.reasoning } : {}),
     };
   });
@@ -103,6 +112,7 @@ export function settleTurn(
             ...runId,
             ...alternativeOf,
             nodeId: row.outputId,
+            ...sourceOf(row.outputId),
             status: 'partial',
             ...(row.reasoning ? { reasoning: row.reasoning } : {}),
           }),

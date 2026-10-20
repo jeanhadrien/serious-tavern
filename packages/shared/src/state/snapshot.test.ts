@@ -57,6 +57,24 @@ describe('stateSnapshot', () => {
     });
   });
 
+  it('lists the ids of the present turns, oldest first', () => {
+    const entries = [turnEntry('a', []), turnEntry('b', []), turnEntry('c', [])];
+    // 'b' lost its replies; 'c' is the turn being run, counted only when the fold is given it.
+    const turnIds = (including?: string) =>
+      stateSnapshot(
+        foldStoryState({
+          definitions: [scene],
+          messages: [reply('a'), reply('c')],
+          state: { turns: entries },
+          including,
+        }),
+        [scene],
+      ).turnIds;
+    expect(turnIds()).toEqual(['a', 'c']);
+    expect(turnIds('b')).toEqual(['a', 'b', 'c']);
+    expect(emptyStateSnapshot([scene]).turnIds).toEqual([]);
+  });
+
   it('has no history and no warnings', () => {
     const { snapshot } = snapshotAfter();
     expect(JSON.stringify(snapshot)).not.toContain('history');
@@ -178,7 +196,7 @@ describe('emptyStateSnapshot', () => {
   it('equals the snapshot of a fold over nothing, and works without definitions', () => {
     const fromFold = stateSnapshot(foldStoryState({ definitions: [scene], messages: [], state: undefined }), [scene]);
     expect(emptyStateSnapshot([scene])).toEqual(fromFold);
-    expect(emptyStateSnapshot()).toEqual({ turn: 1, definitions: [], keys: {}, nodes: {} });
+    expect(emptyStateSnapshot()).toEqual({ turn: 1, turnIds: [], definitions: [], keys: {}, nodes: {} });
   });
 });
 

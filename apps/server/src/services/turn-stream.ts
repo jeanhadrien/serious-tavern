@@ -224,6 +224,7 @@ export class TurnStream {
         content: stream.content,
         status: 'streaming',
         nodeId: stream.outputId,
+        sourceNodeId: stream.llmId,
         executionId: this.options.executionId,
         runId: this.options.runId,
         ...(this.options.alternativeOf ? { alternativeOf: this.options.alternativeOf } : {}),
