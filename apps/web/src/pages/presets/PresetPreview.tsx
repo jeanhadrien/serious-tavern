@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   presetInputLabel,
@@ -11,6 +11,8 @@ import {
 import { presetsApi } from '../../api.js';
 import { layoutHref } from '../../layout/url.js';
 import { sessionsStore, useList } from '../../stores/index.js';
+import { PreviewMessage } from './PreviewMessage.js';
+import { previewToolNames } from './previewToolNames.js';
 
 export function PresetPreview(props: { preset: Preset }) {
   const sessions = useList(sessionsStore);
@@ -21,6 +23,7 @@ export function PresetPreview(props: { preset: Preset }) {
   const [previewed, setPreviewed] = useState(false);
   const parsed = presetSchema.safeParse(props.preset);
   const warnings = parsed.success ? presetWarnings(parsed.data) : [];
+  const toolNames = useMemo(() => previewToolNames(messages), [messages]);
 
   useEffect(() => {
     setPreviewed(false);
@@ -84,15 +87,7 @@ export function PresetPreview(props: { preset: Preset }) {
       )}
       {previewed && !messages.length && <p className="hint">No messages rendered.</p>}
       {previewed &&
-        messages.map((message, index) => (
-          <div className="preview-message" key={index}>
-            <strong>
-              {message.role}
-              {message.name && <span> · {message.name}</span>}
-            </strong>
-            <p>{message.content}</p>
-          </div>
-        ))}
+        messages.map((message, index) => <PreviewMessage key={index} message={message} toolName={toolNames[index]} />)}
       <p className="hint">
         Connect inputs to an LLM node in <Link to={layoutHref({ left: 'workflows' })}>Workflows</Link>.
       </p>

@@ -100,3 +100,37 @@
     border-top: 1px solid #343844;
   }
 }
+
+.preview-message .preview-tool-ref {
+  font-weight: normal;
+  text-transform: none;
+  color: #9aa3bd;
+}
+.preview-tool-call {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #242a40;
+  font-size: 0.82rem;
+}
+.preview-tool-call > span {
+  font-family: ui-monospace, monospace;
+  color: #c5cdff;
+}
+.preview-tool-call pre {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, monospace;
+}
+.preview-reasoning {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: #9aa3bd;
+}
+.preview-reasoning summary {
+  cursor: pointer;
+}
+.preview-reasoning p {
+  margin: 4px 0 0;
+}
