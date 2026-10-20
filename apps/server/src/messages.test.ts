@@ -71,7 +71,7 @@ it('edits either role without changing metadata or executing, then deletes only 
     const remaining = (await app.inject({ method: 'GET', url: `/api/sessions/${session.id}` })).json();
     expect(remaining.messages).toEqual([edited.messages[1]]);
     expect(remaining.updatedAt).toBe(edited.updatedAt);
-    const execution = await app.inject({ method: 'GET', url: `/api/executions/${result.execution.id}` });
+    const execution = await app.inject({ method: 'GET', url: `/api/executions/${result.execution!.id}` });
     expect(execution.json()).toEqual(result.execution);
     // The engine seeds every run and the stored log keeps the seed.
     expect(execution.json().seed).toEqual(expect.any(String));
@@ -205,7 +205,7 @@ it('runs an empty send on the history as it is, without storing a user message',
       expect(response.statusCode).toBe(200);
       const body = apiContract.sendMessage.response.parse(response.json());
       expect(body.userMessage).toBeUndefined();
-      expect(body.execution.status).toBe('completed');
+      expect(body.execution!.status).toBe('completed');
     }
     expect(await count()).toBe(1);
   } finally {

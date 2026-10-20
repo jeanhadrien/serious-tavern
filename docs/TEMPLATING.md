@@ -173,9 +173,9 @@ State Write node's `value` output where you need it. Because state belongs to th
 deleting a reply rewinds what its turn wrote (the next turn starts from the previous values), while editing a
 message changes nothing.
 
-In the **after-reply run** (work behind an After Reply node, which runs once the reply is saved; see the README's
-"After Reply and post-turn runs"), `{{trigger.turn}}` is the turn that just finished and `{{state.*}}` already
-includes what that turn's reply part wrote.
+In a workflow listed **below** another in the chat's On reply list (including the workflows that run after the
+reply; see the README's "Workflows after the reply"), `{{trigger.turn}}` is the same turn number as in the workflows
+above it, and `{{state.*}}` already includes what the workflows above it wrote in this turn.
 
 A State Write node runs every turn unless you gate it: connect a Condition branch (or a Random chance output) to
 its **Run when** input and it only writes when that branch is taken, whatever the operation is. A State Write can

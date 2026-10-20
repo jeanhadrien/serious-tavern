@@ -29,6 +29,13 @@ describe('turnPresence', () => {
     expect(turnPresence(messages, [turnEntry('t1', [], over)]).map(({ turn }) => turn)).toEqual([expected]);
   });
 
+  it('counts the turn being run as present when it is the `including` one, and no other', () => {
+    const entries = [turnEntry('a', [], { replies: 1 }), turnEntry('b', [], { replies: 0, completed: false })];
+    expect(turnPresence([], entries, 'b').map(({ turn }) => turn)).toEqual([null, 1]);
+    expect(turnPresence([], entries).map(({ turn }) => turn)).toEqual([null, null]);
+    expect(turnPresence([reply('a', 'final')], entries, 'b').map(({ turn }) => turn)).toEqual([1, 2]);
+  });
+
   it('numbers the present turns 1..n in stored order and leaves gaps as null', () => {
     const entries = [
       turnEntry('a'),

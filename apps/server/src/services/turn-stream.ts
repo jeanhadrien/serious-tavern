@@ -56,7 +56,10 @@ export class TurnStream {
     private readonly options: {
       sessions: Repository<Session>;
       sessionId: string;
+      // The turn (the first run's execution id): the rows' `executionId`.
       executionId: string;
+      // The run these rows and frames belong to: the rows' `runId`, and the `runId` of every node frame.
+      runId: string;
       // A regenerate's rows are alternatives of the turn this root started (see alternatives.ts).
       alternativeOf?: string;
       prepared: PreparedWorkflow;
@@ -94,11 +97,11 @@ export class TurnStream {
     const nodeId = event.nodeId ?? '';
     switch (event.type) {
       case 'node:start':
-        this.enqueue(() => this.options.emit({ type: 'node.start', nodeId }));
+        this.enqueue(() => this.options.emit({ type: 'node.start', nodeId, runId: this.options.runId }));
         break;
       case 'node:complete':
         this.settled.set(nodeId, { output: event.detail as Record<string, unknown> });
-        this.enqueue(() => this.options.emit({ type: 'node.complete', nodeId }));
+        this.enqueue(() => this.options.emit({ type: 'node.complete', nodeId, runId: this.options.runId }));
         this.enqueue(() => this.pump(false));
         break;
       case 'node:skipped':
@@ -161,6 +164,7 @@ export class TurnStream {
       const frame = {
         type: 'node.delta' as const,
         nodeId: stream.outputId,
+        runId: this.options.runId,
         ...(stream.unsentText ? { textDelta: stream.unsentText } : {}),
         ...(stream.unsentReasoning ? { reasoningDelta: stream.unsentReasoning } : {}),
       };
@@ -194,6 +198,7 @@ export class TurnStream {
         status: 'streaming',
         nodeId: stream.outputId,
         executionId: this.options.executionId,
+        runId: this.options.runId,
         ...(this.options.alternativeOf ? { alternativeOf: this.options.alternativeOf } : {}),
         createdAt: stream.createdAt,
         ...stamp,

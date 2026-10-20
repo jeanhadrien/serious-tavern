@@ -19,7 +19,7 @@ export type StateKeyView = {
  * what nodes and templates may read. `keys` is by definition id, `nodes` by node id (implicit keys).
  */
 export type StateSnapshot = {
-  /** The turn being run (in an after-reply run: the turn that just finished). */
+  /** The turn being run. */
   turn: number;
   definitions: StateDefinition[];
   keys: Record<string, Record<string, StateKeyView>>;
@@ -52,7 +52,13 @@ export function stateSnapshot(
     turn: story.turn,
     definitions: structuredClone([...definitions]),
     keys: Object.fromEntries(story.definitions.map((folded) => [folded.definitionId, views(folded.keys, history)])),
-    nodes: Object.fromEntries(story.nodes.map((folded) => [folded.nodeId, views(folded.keys, history)])),
+    // Only the entries a run of one workflow reads: a fold scoped to it (`FoldInput.workflowId`) has no workflow ids; an
+    // unscoped one lists other workflows' nodes apart, and they are not this run's.
+    nodes: Object.fromEntries(
+      story.nodes
+        .filter((folded) => folded.workflowId === undefined)
+        .map((folded) => [folded.nodeId, views(folded.keys, history)]),
+    ),
   };
 }
 

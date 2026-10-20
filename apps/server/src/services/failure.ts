@@ -7,8 +7,8 @@ const reasons: Record<TurnStop, string> = {
   shutdown: 'ended because the server shut down before it finished.',
 };
 
-/** The execution warning for a run that was stopped: `subject` is the turn's reply run or its after-reply run. */
-export function stopWarning(subject: 'turn' | 'after-reply run', by: TurnStop): string {
+/** The execution warning for a run that was stopped: `subject` is the turn's reply section or one of its runs after the reply. */
+export function stopWarning(subject: 'turn' | 'run after the reply', by: TurnStop): string {
   return `The ${subject} ${reasons[by]}`;
 }
 

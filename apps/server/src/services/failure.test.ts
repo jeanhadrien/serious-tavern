@@ -8,8 +8,12 @@ describe('stopWarning', () => {
     ['turn', 'user', 'The turn was stopped by the user before it finished.'],
     ['turn', 'disconnect', 'The turn ended because the client disconnected before it finished.'],
     ['turn', 'shutdown', 'The turn ended because the server shut down before it finished.'],
-    ['after-reply run', 'user', 'The after-reply run was stopped by the user before it finished.'],
-    ['after-reply run', 'shutdown', 'The after-reply run ended because the server shut down before it finished.'],
+    ['run after the reply', 'user', 'The run after the reply was stopped by the user before it finished.'],
+    [
+      'run after the reply',
+      'shutdown',
+      'The run after the reply ended because the server shut down before it finished.',
+    ],
   ] as const)('says how the %s ended when stopped by %s', (subject, by, expected) => {
     expect(stopWarning(subject, by)).toBe(expected);
   });

@@ -73,7 +73,7 @@ Below 700px the two-column layout is shown **one column at a time**:
 
 ## Unchanged behaviour
 
-- The session's character and persona are still picked with the `ChatHeader` dropdowns. The R character and persona lists only browse and edit; clicking one does **not** assign it to the chat. To be revisited later.
+- The session's character and persona are still picked with the `ChatHeader` dropdowns. Its workflows are not: they are the chat panel's On reply list (see `FRONTEND-UX.md`). The R character and persona lists only browse and edit; clicking one does **not** assign it to the chat. To be revisited later.
 - Cross-page links (e.g. "Edit preset ↗" in the LLM node panel, via node-ui's `renderLink`) keep working, but open the target editor in its slot instead of navigating to a page.
 
 ## Implementation notes

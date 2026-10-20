@@ -339,7 +339,7 @@ data: [DONE]
       await use(provider.id);
       const result = apiContract.sendMessage.response.parse((await send()).json());
       const stored = apiContract.getExecution.response.parse(
-        (await app.inject({ method: 'GET', url: `/api/executions/${result.execution.id}` })).json(),
+        (await app.inject({ method: 'GET', url: `/api/executions/${result.execution!.id}` })).json(),
       );
       const sent = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.body));
       expect(stored.nodes.llm?.wire).toMatchObject({

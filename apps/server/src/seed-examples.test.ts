@@ -11,8 +11,8 @@ import {
   ROLLING_SUMMARIES_WORKFLOW_ID,
   SUMMARIES_NARRATOR_PRESET_ID,
   SUMMARIZE_PRESET_ID,
+  SUMMARIZE_WORKFLOW_ID,
 } from './examples/rolling-summaries.js';
-import { defaultPreset } from './seed.js';
 import { LEDGER_FILE } from './seed-ledger.js';
 import { SCENE_DEFINITION_ID } from './seed-state.js';
 import { nodeResources } from './services/node-resources.js';
@@ -50,6 +50,7 @@ describe('a fresh data directory', () => {
       'Fresh texture (example)',
       'Parallel demo',
       'Rolling summaries (example)',
+      'Summarize history (example)',
     ]);
     expect((await context.collections.list()).map((item) => item.name)).toEqual(['Forest textures (example)']);
     expect((await context.presets.list()).map((item) => item.name).sort()).toEqual([
@@ -73,6 +74,7 @@ describe('a fresh data directory', () => {
         `rolling-summaries/preset:${SUMMARIZE_PRESET_ID}`,
         `rolling-summaries/stateDefinition:${MEMORY_DEFINITION_ID}`,
         `rolling-summaries/workflow:${ROLLING_SUMMARIES_WORKFLOW_ID}`,
+        `rolling-summaries/workflow:${SUMMARIZE_WORKFLOW_ID}`,
       ].sort(),
     );
     expect(info).toHaveBeenCalledWith('Added the example "Fresh texture (example)".');
@@ -95,7 +97,7 @@ describe('a fresh data directory', () => {
     const again = await open();
     expect(JSON.stringify(await again.workflows.get(FRESH_TEXTURE_WORKFLOW_ID))).toBe(before.workflow);
     expect(await readFile(join(directory, LEDGER_FILE), 'utf8')).toBe(before.ledger);
-    expect(await again.workflows.list()).toHaveLength(4);
+    expect(await again.workflows.list()).toHaveLength(5);
     expect(await again.collections.list()).toHaveLength(1);
     expect(info).not.toHaveBeenCalled();
   });
@@ -116,7 +118,12 @@ describe('a fresh data directory', () => {
     await first.workflows.delete(FRESH_TEXTURE_WORKFLOW_ID);
     await first.collections.delete(FOREST_COLLECTION_ID);
     const again = await open();
-    expect(await names(again)).toEqual(['Default Assistant', 'Parallel demo', 'Rolling summaries (example)']);
+    expect(await names(again)).toEqual([
+      'Default Assistant',
+      'Parallel demo',
+      'Rolling summaries (example)',
+      'Summarize history (example)',
+    ]);
     expect(await again.collections.list()).toEqual([]);
     expect(await again.presets.get(NARRATOR_PRESET_ID)).toBeDefined();
     expect(warn).not.toHaveBeenCalled();
@@ -141,7 +148,12 @@ describe('a user who already has data', () => {
   it('gets the example and the scene definition it needs, next to what they have', async () => {
     await existingUser();
     const context = await open();
-    expect(await names(context)).toEqual(['Fresh texture (example)', 'Mine', 'Rolling summaries (example)']);
+    expect(await names(context)).toEqual([
+      'Fresh texture (example)',
+      'Mine',
+      'Rolling summaries (example)',
+      'Summarize history (example)',
+    ]);
     expect((await context.stateDefinitions.list()).map((item) => item.name).sort()).toEqual([
       'inventory',
       'memory',
@@ -149,6 +161,7 @@ describe('a user who already has data', () => {
     ]);
     expect(await issues(context)).toEqual([]);
     expect(await issues(context, ROLLING_SUMMARIES_WORKFLOW_ID)).toEqual([]);
+    expect(await issues(context, SUMMARIZE_WORKFLOW_ID)).toEqual([]);
   });
 
   it('uses their own scene definition when it has the keys the workflow needs', async () => {
@@ -198,7 +211,7 @@ describe('a user who already has data', () => {
     await context.stateDefinitions.save(userDefinition('scene', keys as unknown as StateDefinition['keys']));
     const again = await open();
     // The other example does not need `scene` and is added.
-    expect(await names(again)).toEqual(['Mine', 'Rolling summaries (example)']);
+    expect(await names(again)).toEqual(['Mine', 'Rolling summaries (example)', 'Summarize history (example)']);
     expect(await again.collections.list()).toEqual([]);
     expect((await again.presets.list()).map((item) => item.id)).not.toContain(NARRATOR_PRESET_ID);
     expect(warn).toHaveBeenCalledWith(
@@ -211,7 +224,12 @@ describe('a user who already has data', () => {
     await again.stateDefinitions.delete(
       (await again.stateDefinitions.list()).find((item) => item.name === 'scene')!.id,
     );
-    expect(await names(await open())).toEqual(['Fresh texture (example)', 'Mine', 'Rolling summaries (example)']);
+    expect(await names(await open())).toEqual([
+      'Fresh texture (example)',
+      'Mine',
+      'Rolling summaries (example)',
+      'Summarize history (example)',
+    ]);
   });
 
   it('records the scene definition they got from the old seed, so deleting it later is final', async () => {
@@ -251,7 +269,12 @@ describe('the ledger', () => {
       JSON.stringify({ version: 1, seeded: [`collection:${FOREST_COLLECTION_ID}`] }),
     );
     const context = await open();
-    expect(await names(context)).toEqual(['Default Assistant', 'Parallel demo', 'Rolling summaries (example)']);
+    expect(await names(context)).toEqual([
+      'Default Assistant',
+      'Parallel demo',
+      'Rolling summaries (example)',
+      'Summarize history (example)',
+    ]);
     expect(await context.collections.list()).toEqual([]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('a record it uses was deleted'));
   });
@@ -263,6 +286,6 @@ describe('the ledger', () => {
     await first.workflows.delete(FRESH_TEXTURE_WORKFLOW_ID);
     const again = await open();
     expect(await names(again)).toContain('Fresh texture (example)');
-    expect((await ledger()).seeded).toHaveLength(8);
+    expect((await ledger()).seeded).toHaveLength(9);
   });
 });

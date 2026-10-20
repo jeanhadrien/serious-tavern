@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
-import type { ApiBody, Character, Persona, Session, Workflow } from '@st/shared';
+import type { ApiBody, Character, Persona, Session } from '@st/shared';
 import { charactersApi, personasApi } from '../../api.js';
 import { IconButton } from '../../components/IconButton.js';
 
@@ -38,10 +38,8 @@ function ContextSelector({ label, value, items, avatarUrl, disabled, onChange }:
 
 interface ChatHeaderProps {
   title: string;
-  workflowId: string;
   characterId?: Session['characterId'];
   personaId?: Session['personaId'];
-  workflows: Workflow[];
   characters: Character[];
   personas: Persona[];
   disabled: boolean;
@@ -53,10 +51,8 @@ interface ChatHeaderProps {
 
 export function ChatHeader({
   title,
-  workflowId,
   characterId,
   personaId,
-  workflows,
   characters,
   personas,
   disabled,
@@ -80,18 +76,6 @@ export function ChatHeader({
             if (draft.trim() !== title) void onUpdate({ title: draft.trim() || 'New chat' });
           }}
         />
-        <select
-          aria-label="Workflow"
-          value={workflowId}
-          disabled={disabled}
-          onChange={(event) => void onUpdate({ workflowId: event.target.value })}
-        >
-          {workflows.map((workflow) => (
-            <option key={workflow.id} value={workflow.id}>
-              {workflow.name}
-            </option>
-          ))}
-        </select>
         <IconButton
           icon={SlidersHorizontal}
           label="Chat panel"

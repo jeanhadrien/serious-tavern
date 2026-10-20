@@ -10,6 +10,7 @@ import { MessageEditor } from './MessageEditor.js';
 import { useLinkMarker } from './story/LinkMarker.js';
 import { changeNote, type MessageLinkNote } from './story/linkMarkers.js';
 import { TurnChip } from './story/TurnChip.js';
+import { messageLogId } from './turnMessages.js';
 import type { StoryChip } from './story/turnChips.js';
 
 interface ChatMessageViewProps {
@@ -67,6 +68,9 @@ export function ChatMessageView({
   }, [editing, disabled]);
   const user = message.role === 'user';
   const streaming = message.status === 'streaming';
+  // The log of the run that wrote the message (older messages: the turn's). A row still streaming has none saved yet,
+  // though it already carries its run id.
+  const logId = streaming ? undefined : messageLogId(message);
   // Copy takes the stored text (Markdown), never the reasoning; a streaming row is not stored yet.
   const copyable = !streaming && message.content.length > 0;
   const name = user ? persona?.name || 'You' : message.name || 'Assistant';
@@ -140,7 +144,7 @@ export function ChatMessageView({
       )}
       {alternatives && !editing && <AlternativeControls {...alternatives} />}
       {storyChip && !editing && <TurnChip chip={storyChip} />}
-      {message.executionId && <ExecutionDetails id={message.executionId} cached={execution} />}
+      {logId && <ExecutionDetails id={logId} cached={execution} />}
     </article>
   );
 }

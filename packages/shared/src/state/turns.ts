@@ -18,15 +18,23 @@ export type TurnPresence = {
  * reply (an alternative that isn't shown, see alternatives.ts) is not there at all, so a turn whose replies are all
  * inactive is not present and its writes do not apply.
  * Present turns are numbered 1..n in stored order; the turn being run is n + 1.
+ *
+ * `including` is the turn being run, once its first run has settled: its entry counts as present whatever its replies
+ * are, so the later runs of the turn see what the earlier ones wrote even when none of them replied (yet).
  */
-export function turnPresence(messages: readonly PresenceMessage[], entries: readonly TurnEntry[]): TurnPresence[] {
+export function turnPresence(
+  messages: readonly PresenceMessage[],
+  entries: readonly TurnEntry[],
+  including?: string,
+): TurnPresence[] {
   const replied = new Set<string>();
   for (const message of activeMessages(messages))
     if (message.role === 'assistant' && message.status !== 'streaming' && message.executionId)
       replied.add(message.executionId);
   let number = 0;
   return entries.map((entry) => {
-    const present = entry.replies > 0 ? replied.has(entry.executionId) : entry.completed;
+    const present =
+      entry.executionId === including || (entry.replies > 0 ? replied.has(entry.executionId) : entry.completed);
     return { entry, turn: present ? ++number : null };
   });
 }

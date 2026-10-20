@@ -211,7 +211,7 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     const story = await request('getSessionState', { method: 'GET', url: `/api/sessions/${session.id}/state` });
     expect(story.turn).toBe(2);
     expect(story.turns.map((entry) => entry.turnNumber)).toEqual([1]);
-    await request('getExecution', { method: 'GET', url: `/api/executions/${message.execution.id}` });
+    await request('getExecution', { method: 'GET', url: `/api/executions/${message.execution!.id}` });
     const streamed = await app.inject({
       method: 'POST',
       url: `/api/sessions/${session.id}/messages/stream`,
@@ -241,7 +241,7 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     const swiped = await request('setAlternative', {
       method: 'PATCH',
       url: `/api/sessions/${session.id}/alternative`,
-      payload: { executionId: regenerated.execution.id },
+      payload: { executionId: regenerated.execution!.id },
     });
     expect(swiped.messages.filter((item) => item.inactive).length).toBe(2);
     await request('stopTurn', { method: 'POST', url: `/api/sessions/${session.id}/stop` });
@@ -405,7 +405,9 @@ it('supports workflow CRUD, secrets masking, and a chat execution through inject
       details: {
         workflowId: workflow.id,
         workflowName: 'Empty',
-        issues: expect.arrayContaining([expect.objectContaining({ message: expect.stringContaining('chat-output') })]),
+        issues: expect.arrayContaining([
+          expect.objectContaining({ message: expect.stringContaining('at least one node that writes') }),
+        ]),
       },
     });
     const invalidGraph = await app.inject({

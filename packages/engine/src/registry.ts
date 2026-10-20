@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import type { NodeTypeDescriptor } from '@st/shared';
 import type { NodeDefinition } from './types.js';
-import { afterReply } from './nodes/after-reply/index.js';
 import { chatInput } from './nodes/chat-input/index.js';
 import { chatOutput } from './nodes/chat-output/index.js';
 import { llm } from './nodes/llm/index.js';
@@ -29,7 +28,6 @@ export const registry = new Map<string, NodeDefinition>(
     chatOutput,
     character,
     chatSettings,
-    afterReply,
     llm,
     httpRequest,
     condition,

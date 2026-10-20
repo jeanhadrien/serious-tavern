@@ -7,7 +7,7 @@ parts of the app that help with that, and how they fit together:
 - **Collections:** lists of short texts you write: lore a character must know, or a deck of small details a scene could use.
 - **Story state:** what a chat remembers between turns (a tension number, a mood, a list of notes, what a deck just drew).
   It lives exactly as long as the replies that stored it.
-- **After-reply work:** steps that run once the reply is on screen, such as writing a summary.
+- **Workflows after the reply:** workflows listed below the one that replies, which run once the reply is on screen, such as writing a summary.
 - **Message links and summaries:** a summary is a remembered text that knows which messages it stands for.
 - **The Trigger:** decides *whether* to inject something this turn and *how strongly*.
 - **Two ready-made examples** that put all of it together: "Fresh texture (example)" and "Rolling summaries (example)".
@@ -18,7 +18,7 @@ You don't need to read it in order. If you want to see it work first, start with
 - [Chat settings](#chat-settings)
 - [Collections: Recall and Draw](#collections-recall-and-draw)
 - [Story state](#story-state)
-- [After-reply work](#after-reply-work)
+- [Workflows after the reply](#workflows-after-the-reply)
 - [Message links and summaries](#message-links-and-summaries)
 - [The Trigger](#the-trigger)
 - [Example 1: Fresh texture](#example-1-fresh-texture)
@@ -200,31 +200,36 @@ When deleting a reply would change the state, the app asks first and lists what 
 
 Chats from before this feature keep working: state starts from their first new turn.
 
-## After-reply work
+## Workflows after the reply
 
-Some work should not delay the answer or put it at risk: writing a summary, noting what just happened. Put an **After
-Reply** node (category Chat) in the workflow. Everything wired behind it runs as a **second run after the reply is
-saved**:
+Some work should not delay the answer or put it at risk: writing a summary, noting what just happened. Make it its own
+workflow, with **no Chat Output** (a **State Write** is enough: a workflow needs at least one node that writes
+something), and list it **below** the workflow that replies in the chat panel's **On reply** section. It then runs as
+soon as the reply is saved:
 
 - the reply reaches the screen first, complete, exactly as before;
-- the second run then does its work and stores its results in the same turn's story state, so deleting the reply
+- the workflow then does its work and stores its results in the same turn's story state, so deleting the reply
   undoes them too;
-- if it fails, the reply and the turn are untouched. You get a message that the after-reply steps failed.
+- if it fails, the reply and the turn are untouched. You get a message that the workflow failed after the reply;
+- you can switch it off for a chat without touching the others.
 
-After Reply has no inputs and three outputs that only hold values in the second run: `Replies` (the turn's saved
-assistant messages), `Text` (their contents joined by a blank line) and `Turn` (the turn's number). A sink such as
-State Write with After Reply upstream of it belongs to the second run; everything else, every Chat Output included, is
-the reply. A Chat Output cannot depend on After Reply (**Validate** says so and highlights the connection).
+The list is split at the **last workflow that has a Chat Output**: it and everything above it run while the reply is
+written, in order; the enabled workflows below it run after the reply. A workflow without a Chat Output that sits
+*above* the replying one just runs first, and the reply sees what it wrote. If no workflow in the list has a Chat
+Output, the message completes at once with no reply and every workflow runs afterwards.
 
-What you see: a quiet row above the composer, **Running after-reply steps... (turn N)**, with a stop button (the
-composer stays usable); a failure toast once; and on the turn's chip the run's own log. Sending a message while the
-run works is allowed, the message waits behind it ("Waiting for the after-reply steps to finish") and the composer's
-button becomes **Cancel queued message**. Stopping the run keeps what finished nodes wrote.
+**Chat Input** has two outputs for this: `Replies` (the replies the workflows above saved in this turn, in chat order;
+empty for the first workflow) and `Turn` (the turn's number). Its `History` is the chat as it stands, so for a workflow
+that runs after the reply it ends with the turn's own user message and replies.
 
-Wire after-reply work from After Reply's outputs, not from the reply's own nodes: a node needed by both parts runs
-twice (an LLM feeding both would be called twice). State writes are the exception that makes this safe: only nodes
-exclusive to the after-reply run write state there. In the second run `{{trigger.turn}}` is the turn that just
-finished and `{{state.*}}` already includes what the reply part wrote.
+What you see: a quiet row above the composer, **Running Memory after the reply... (turn N)** (the workflow's name),
+with a stop button (the composer stays usable); a failure toast once; and on the turn's chip each run's own log.
+Sending a message while a workflow runs is allowed, the message waits behind it ("Waiting for the workflows after the
+reply to finish") and the composer's button becomes **Cancel queued message**. Stopping keeps what finished nodes
+wrote, and the workflows below the stopped one do not run.
+
+Every workflow, in the reply or after it, sees what the ones above it wrote in this turn (`{{state.*}}`), and
+`{{trigger.turn}}` is the turn's number in all of them.
 
 ## Message links and summaries
 
@@ -385,21 +390,21 @@ so a long chat keeps its memory with a short prompt.
   `{{#each (linked state.memory.summaries)}}...{{/each}}` that renders nothing until a summary exists, then a slot for
   `recent`) and "Summarize (example)" (one text input; an instruction to condense the excerpt into notes under 150
   words, keeping names, events, decisions, promises and open threads).
-- The reply part: **Memory** (format messages, **All** checked) goes to **Unlinked Messages** (`memory`, `summaries`),
+- The narrator workflow: **Memory** (format messages, **All** checked) goes to **Unlinked Messages** (`memory`, `summaries`),
   which goes to the LLM's `recent` input. So `recent` is the whole history minus the messages intact summaries stand
   for, and the summaries themselves come from the preset.
-- The after-reply part: **After Reply** goes to **Next Chunk** (`memory.summaries`, chunk 20, raw window 16) ->
-  a second **LLM** with "Summarize" -> **State Write** (`memory.summaries`, add). Next Chunk's `Text` is the LLM's
-  input and its `Link` goes to the State Write's **Link to messages** input, so the stored summary knows its messages.
+- The second workflow, **Summarize history (example)**, with no Chat Output, listed below the narrator: **Next Chunk**
+  (`memory.summaries`, chunk 20, raw window 16) -> an **LLM** with "Summarize" -> **State Write** (`memory.summaries`,
+  add). Next Chunk's `Text` is the LLM's input and its `Link` goes to the State Write's **Link to messages** input, so
+  the stored summary knows its messages. Add both workflows to the chat's **On reply** list, narrator first.
 
-**When the first summary appears.** The after-reply run sees the history as the reply run had it, before the turn's own
-messages. A chunk needs 20 messages older than the newest 16, so 36 messages must already exist before the turn: the
-first summary is written by the after-reply run of **turn 19** (messages 1 to 20), and it is in the prompt from turn
-20. After that, a new one follows each time 20 more messages have moved out of the raw window. Before the first
+**When the first summary appears.** A workflow running after the reply sees the chat as it stands, the turn's own
+messages included. A chunk needs 20 messages older than the newest 16, so 36 messages must exist: the first summary is
+written after the reply of **turn 18** (messages 1 to 20), and it is in the prompt from turn 19. After that, a new one follows each time 20 more messages have moved out of the raw window. Before the first
 summary the example behaves like a plain assistant.
 
 **Try it quickly.** Open **Next Chunk** in the editor and set **Chunk Size** `4` and **Raw Window** `2` (a short
-chat then summarizes messages 1 to 4 after turn 4 and the next four after turn 6, and so on). Save. Use real values
+chat then summarizes messages 1 to 4 after turn 3 and the next four after turn 5, and so on). Save. Use real values
 (20 and 16) for real chats, and keep the raw window at least as large as what you want sent raw.
 
 1. Chat for a few turns. After the first summary the chat panel's **Story state** shows `memory.summaries` with a card
@@ -419,9 +424,9 @@ messages appear after later summaries until the next turn redoes it.
 | Where | What it shows |
 | --- | --- |
 | **Chat panel > Settings** (sliders icon, **Chat panel**) | The current value of each chat setting, and issues such as a stored value that no longer fits. |
-| **Chat panel > Story state** | Per definition: every key with its current value ("never written" when nobody wrote it), a sparkline for numbers, "written at turn k" links that scroll to that turn's reply, list items (linked ones as cards), warnings, **Node memory** (Draw's `draws`, the Trigger's `fires`) and, at the bottom, failed after-reply runs. It reloads when a turn settles or you delete or edit a message, never per streamed token. |
-| **The chip under a reply** (database icon, **What this turn stored**) | The writes of that turn, including the after-reply run's: `scene.tension → 6`, `scene.injected + 'text'`, `Draw #1 (draw): drew 'text'`, `Trigger #1 (trigger): remembered 'fired at level 2' (fires)`. A turn with several replies has it on its last reply. A warning icon means an after-reply run failed or an item was dropped. |
-| **Execution details** (under a message) | The run's log: every node with its status, timing, outputs, logs and errors (State Write's `scene.tension: 3 -> 4`, the Trigger's `Reason`, Draw's reason), the settings the turn used and the seed. For an LLM node, the exact request that went over the wire. A turn that left an after-reply run has a second log, **After-reply run details**, behind its chip. |
+| **Chat panel > Story state** | Per definition: every key with its current value ("never written" when nobody wrote it), a sparkline for numbers, "written at turn k" links that scroll to that turn's reply, list items (linked ones as cards), warnings, **Node memory** (Draw's `draws`, the Trigger's `fires`) and, at the bottom, failed runs after the reply. It reloads when a turn settles or you delete or edit a message, never per streamed token. |
+| **The chip under a reply** (database icon, **What this turn stored**) | The writes of that turn, including those of the workflows after the reply: `scene.tension → 6`, `scene.injected + 'text'`, `Draw #1 (draw): drew 'text'`, `Trigger #1 (trigger): remembered 'fired at level 2' (fires)`. A turn with several replies has it on its last reply. A warning icon means a workflow after the reply failed or an item was dropped. |
+| **Execution details** (under a message) | The run's log: every node with its status, timing, outputs, logs and errors (State Write's `scene.tension: 3 -> 4`, the Trigger's `Reason`, Draw's reason), the settings the turn used and the seed. For an LLM node, the exact request that went over the wire. A turn with workflows after the reply has a log for each of them (**Run details**) behind its chip. |
 | **Delete dialog** | What deleting a reply would undo, before you confirm. |
 
 The pencil next to a definition's name in the Story state section opens that definition in the left column.
@@ -433,12 +438,11 @@ The pencil next to a definition's name in the Story state section opens that def
 - **The state definition name lock shows up when you save**, not before. Renaming a key does not move stored data.
 - **There is no YAML view** in the definition editor. The files (`data/state/definitions/<name>.yaml`) can be edited by
   hand while the app runs.
-- **The next message waits for the after-reply run.** A summary that takes a minute delays the next reply by a minute.
+- **The next message waits for the workflows after the reply.** A summary that takes a minute delays the next reply by a minute.
   A queued message gets no response until the run ends, so a proxy in front of the server with a short idle timeout
   could drop it.
-- **After-reply runs are not retried.** A failed or interrupted run (a server restart) leaves that turn without its
+- **Workflows after the reply are not retried.** A failed or interrupted run (a server restart) leaves that turn without its
   memory update; it is listed in the panel. For Rolling summaries the next turn plans the missing chunk again.
-- **Nodes needed by both parts cost twice.** Feed after-reply work from After Reply's outputs.
 - **Summaries: the quality is the model's.** The example's "Summarize" preset is a starting point; edit its
   instruction to change what a summary keeps. Every chunk costs one extra LLM call, and so does redoing a broken one.
 - **The Trigger has no built-in signals.** A signal is any number from 0 to 1 that you wire in; nothing in the app

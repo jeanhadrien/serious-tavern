@@ -6,13 +6,22 @@ import {
   resolveChatSettings,
   settingsCatalog,
   stateTemplateValues,
-  workflowSettings,
+  listedSettings,
+  replyWorkflows,
+  type Session,
+  type Workflow,
 } from '@st/shared';
 import { renderPreset } from '@st/engine';
 import type { AppContext } from '../context.js';
 import { errorMessage, HttpError, notFound } from '../errors.js';
 import { historyMessages } from './settle-turn.js';
 import { foldSession, listDefinitions } from './story-state.js';
+
+// The workflows of the chat's reply list, in order (one that no longer exists declares nothing).
+async function listedWorkflows(workflows: AppContext['workflows'], session: Session): Promise<Workflow[]> {
+  const found = await Promise.all(replyWorkflows(session).map((entry) => workflows.get(entry.workflowId)));
+  return found.flatMap((workflow) => (workflow ? [workflow] : []));
+}
 
 export async function previewPreset(
   { sessions, workflows, characters, personas, stateDefinitions }: AppContext,
@@ -25,14 +34,14 @@ export async function previewPreset(
   // With a session, what its next turn would see; without one, what a new chat would see: the default of
   // every key any workflow declares (its first declaration, as in the preset editor's hints).
   const declarations = session
-    ? workflowSettings((await workflows.get(session.workflowId)) ?? {})
+    ? listedSettings(await listedWorkflows(workflows, session))
     : settingsCatalog(await workflows.list());
   const settings = resolveChatSettings(declarations, session?.settings).values;
   // The story state the session's next turn would see; a new chat sees every key at its default, turn 1. The history
   // the next turn would get gives linked items their `link` (what `linked` and `{{link.status}}` read).
   const definitions = await listDefinitions(stateDefinitions);
   const state = session
-    ? foldSession(definitions, session, undefined, historyMessages(session.messages)).snapshot
+    ? foldSession(definitions, session, historyMessages(session.messages)).snapshot
     : emptyStateSnapshot(definitions);
   const values: Record<string, unknown> = { ...inputs };
   const sample = [

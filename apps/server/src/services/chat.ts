@@ -1,27 +1,12 @@
-import { randomUUID } from 'node:crypto';
-import type {
-  ApiResponse,
-  Character,
-  ChatMessage,
-  ExecutionLog,
-  Persona,
-  StateSnapshot,
-  StateWrite,
-  WorkflowInvalidDetails,
-} from '@st/shared';
-import { resolveChatSettings, workflowSettings } from '@st/shared';
-import type { StateDefinition } from '@st/shared';
-import { executeWorkflow, ExecutionFailure, postRunSeed, prepareWorkflow } from '@st/engine';
-import type { ChatReply, PreparedWorkflow } from '@st/engine';
-import { now, type AppContext } from '../context.js';
-import { HttpError, notFound, requireEntity } from '../errors.js';
-import { failureMessage, stopWarning } from './failure.js';
-import { nodeResources } from './node-resources.js';
-import { runPostTurn } from './post-turn.js';
-import { regenerateTarget } from './regenerate.js';
-import { historyMessages, settleTurn } from './settle-turn.js';
-import { foldSession, listDefinitions } from './story-state.js';
-import { TurnStream, type TurnFrame } from './turn-stream.js';
+import type { ApiResponse, ExecutionLog } from '@st/shared';
+import { ExecutionFailure } from '@st/engine';
+import type { AppContext } from '../context.js';
+import { HttpError } from '../errors.js';
+import { failureMessage } from './failure.js';
+import { runAfterSection } from './after-section.js';
+import { runReplySection } from './reply-section.js';
+import { startTurn, type TurnRequest } from './turn-start.js';
+import type { TurnFrame } from './turn-stream.js';
 import type { RunningTurn } from './turns.js';
 
 export type TurnOptions = {
@@ -32,9 +17,6 @@ export type TurnOptions = {
   // Only a turn that has not started is cancelled by `signal`: one that runs finishes (the plain endpoint).
   keepRunning?: boolean;
 };
-
-/** What starts a turn: a message (possibly empty), or a regenerate of the last turn, which stores no user message. */
-type TurnRequest = { content: string; regenerate?: false } | { content?: undefined; regenerate: true };
 
 export function sendMessage(
   context: AppContext,
@@ -90,82 +72,6 @@ function runRequest(
   });
 }
 
-async function startTurn(context: AppContext, sessionId: string, request: TurnRequest) {
-  const { workflows, sessions, personas, stateDefinitions } = context;
-  const started: {
-    value?: {
-      prepared: PreparedWorkflow;
-      // `trigger.message`: the sent text, or a regenerate's user message (`''` when there is none).
-      content: string;
-      // A regenerate only: the root of the alternatives its replies join.
-      rootId?: string;
-      // The listing the ports were resolved with: the after-reply run folds its state against the same one.
-      definitions: StateDefinition[];
-      userMessage?: ChatMessage;
-      history: ChatMessage[];
-      character?: Character;
-      persona?: Persona;
-      settings: Record<string, unknown>;
-      settingIssues: string[];
-      state: StateSnapshot;
-      stateIssues: string[];
-    };
-  } = {};
-  const session = await sessions.silent.update(sessionId, async (current) => {
-    // Checked inside the queue slot, so it is judged on the chat as the regenerate finds it.
-    const target = request.regenerate ? regenerateTarget(current.messages) : undefined;
-    const content = target?.content ?? request.content ?? '';
-    const workflow = await requireEntity(workflows, current.workflowId, 'Workflow');
-    // One listing serves the node ports and the fold, so a definition edited mid-turn cannot split them.
-    const definitions = await listDefinitions(stateDefinitions);
-    const { errors, prepared } = await prepareWorkflow(workflow, {
-      ...nodeResources(context),
-      stateDefinitions: { get: async (id) => definitions.find((definition) => definition.id === id) },
-    });
-    if (!prepared)
-      throw new HttpError(400, 'WORKFLOW_INVALID', `Workflow "${workflow.name}" is invalid`, {
-        workflowId: workflow.id,
-        workflowName: workflow.name,
-        issues: errors,
-      } satisfies WorkflowInvalidDetails);
-    const character = current.characterId ? await prepared.resources.characters?.get(current.characterId) : undefined;
-    const persona = current.personaId ? await personas.get(current.personaId) : undefined;
-    // An empty send adds no user message: the turn runs on the history as it is.
-    const userMessage: ChatMessage | undefined =
-      !target && content.trim() ? { id: randomUUID(), role: 'user', content, createdAt: now() } : undefined;
-    // The values are snapshotted here: a settings change during the run applies from the next turn.
-    const settings = resolveChatSettings(workflowSettings(workflow), current.settings);
-    // The state the turn starts from: the turns still present, folded against the definitions as they are now.
-    // A regenerate runs as if the last turn's replies (whichever alternative is shown) were not there.
-    const history = target?.history ?? historyMessages(current.messages);
-    const story = foldSession(
-      definitions,
-      target ? { ...current, messages: target.messages } : current,
-      undefined,
-      history,
-    );
-    started.value = {
-      prepared,
-      content,
-      rootId: target?.rootId,
-      definitions,
-      userMessage,
-      history,
-      character,
-      persona,
-      settings: settings.values,
-      settingIssues: settings.issues.map(({ key, message }) => `Chat setting "${key}": ${message}.`),
-      state: story.snapshot,
-      stateIssues: story.issues,
-    };
-    if (userMessage) current.messages.push(userMessage);
-    current.updatedAt = now();
-    return current;
-  });
-  if (!session) throw notFound('Session');
-  return started.value!;
-}
-
 async function executeTurn(
   context: AppContext,
   sessionId: string,
@@ -173,124 +79,48 @@ async function executeTurn(
   turn: RunningTurn,
   options: TurnOptions,
 ): Promise<ApiResponse<'sendMessage'>> {
-  const { sessions, executions, secrets } = context;
-  const {
-    prepared,
-    content,
-    rootId,
-    definitions,
-    userMessage,
-    history,
-    character,
-    persona,
-    settings,
-    settingIssues,
-    state,
-    stateIssues,
-  } = await startTurn(context, sessionId, request);
-  const executionId = randomUUID();
-  const stream = options.emit
-    ? new TurnStream({
-        sessions: sessions.silent,
-        sessionId,
-        executionId,
-        alternativeOf: rootId,
-        prepared,
-        emit: options.emit,
-      })
-    : undefined;
-  options.emit?.({ type: 'turn.start', executionId });
-  let outcome: { replies: ChatReply[]; execution: ExecutionLog; writes: StateWrite[] } | undefined;
-  let failure: unknown;
-  try {
-    outcome = await executeWorkflow(prepared, {
-      message: content,
-      sessionId,
-      history,
-      secrets,
-      character,
-      persona,
-      settings,
-      state,
-      signal: turn.controller.signal,
-      executionId,
-      onEvent: stream?.onEvent,
-    });
-  } catch (error) {
-    failure = error;
-  }
-  const streamed = (await stream?.finish()) ?? [];
-  const execution = outcome?.execution ?? (failure instanceof ExecutionFailure ? failure.execution : undefined);
-  const replies = outcome?.replies ?? (failure instanceof ExecutionFailure ? failure.replies : []);
-  // The writes of every node that completed, even when the turn failed or was stopped.
-  const writes = outcome?.writes ?? (failure instanceof ExecutionFailure ? failure.writes : []);
-  // A stored value that no longer fits its declaration is ignored (the default runs); say so in the log.
-  execution?.warnings.push(...settingIssues, ...stateIssues);
-  if (!outcome && turn.stoppedBy && execution) execution.warnings.push(stopWarning('turn', turn.stoppedBy));
-  if (execution) await executions.save(execution);
-  // A turn that ran to the end leaves an after-reply run when the workflow has one. It is announced in the entry
-  // (`running`) by the settle below, and its id is on the RunningTurn first, so a state read can tell it is live.
-  // A regenerate that left no reply changes nothing in the chat: its turn is not present, so there is nothing to follow.
-  const postExecutionId =
-    outcome && prepared.parts.postSinks.length && !(rootId && !outcome.replies.length) ? randomUUID() : undefined;
-  if (postExecutionId) turn.postExecutionId = postExecutionId;
-  const settled: {
-    value?: { userMessage?: ChatMessage; assistantMessages: ChatMessage[]; linkWarnings: string[] };
-  } = {};
-  // Everything a turn writes is silent; the settled turn announces itself once (success, failure or stop).
-  const session = await sessions.silent.update(sessionId, (current) => {
-    settled.value = settleTurn(current, {
-      executionId,
-      userMessage,
-      replies,
-      streamed,
-      interrupted: !outcome,
-      writes,
-      definitions,
-      postExecutionId,
-      ...(rootId ? { regenerate: { rootId } } : {}),
-    });
-    return current;
-  });
-  if (!session) throw notFound('Session');
+  const started = await startTurn(context, sessionId, request);
+  options.emit?.({ type: 'turn.start', executionId: started.turnId });
+  // The reply section: each enabled workflow down to the last that replies, one after another, each settled in its own write.
+  const { results, userMessage, stopped, announced } = await runReplySection(
+    context,
+    sessionId,
+    turn,
+    started,
+    options.emit,
+  );
+  // One announcement for the whole section, whatever happened in it (success, failure or stop).
   context.changes.publish({ type: 'sessions.changed', id: sessionId });
-  const { userMessage: saved, assistantMessages, linkWarnings } = settled.value!;
-  // A write dropped at commit time (the messages it links to changed during the run) is said in the log, which was saved
-  // before the commit: save it again with the warning.
-  if (execution && linkWarnings.length) {
-    execution.warnings.push(...linkWarnings);
-    await executions.save(execution);
-  }
-  // The reply is complete for the client. The after-reply run follows in this turn's queue slot, after the
-  // caller has its result.
-  if (postExecutionId && outcome)
-    turn.after = (run) =>
-      runPostTurn(
-        context,
-        sessionId,
-        {
-          prepared,
-          definitions,
-          turnExecutionId: executionId,
-          executionId: postExecutionId,
-          seed: postRunSeed(outcome.execution.seed ?? executionId),
-          message: content,
-          history,
-          settings,
-          character,
-          persona,
-          replies: assistantMessages,
-        },
-        run,
-      );
-  if (outcome) return { userMessage: saved, assistantMessages, execution: outcome.execution };
-  if (!(failure instanceof ExecutionFailure)) throw failure;
-  const details = { execution: failure.execution, userMessage: saved, assistantMessages };
-  if (turn.stoppedBy)
+  // The reply is complete for the client. The workflows below it follow in this turn's queue slot, after the caller has its
+  // result; their ids are on the RunningTurn already, so a state read can tell they are live.
+  if (announced) turn.after = (run) => runAfterSection(context, sessionId, started, run);
+  const assistantMessages = results.flatMap((result) => result.replies);
+  const executions = results.flatMap((result) => (result.execution ? [result.execution] : []));
+  const failed = results.find((result) => result.failure !== undefined);
+  // The first run's log; absent when no workflow of the list replies (the after section ran them all).
+  const [execution] = executions;
+  if (!failed && !stopped) return { userMessage, assistantMessages, ...(execution && { execution }), executions };
+  const details = (execution: ExecutionLog) => ({ execution, executions, userMessage, assistantMessages });
+  // A stop ends the turn as stopped, with the log of the run it ended (or of the last one run, when it fell between two
+  // runs); otherwise the first failure does, after the runs below it ran.
+  if (stopped) {
+    const last = results.at(-1)!;
+    if (!last.execution) throw last.failure;
     throw new HttpError(409, 'TURN_STOPPED', 'The turn was stopped before it finished', {
-      ...details,
+      ...details(last.execution),
       aborted: turn.stoppedBy,
     });
+  }
+  const { failure, planned } = failed!;
+  if (!(failure instanceof ExecutionFailure)) throw failure;
   const message = failureMessage(failure);
-  throw new HttpError(500, 'WORKFLOW_EXECUTION_FAILED', message, details);
+  // Said with the workflow's name only when the chat lists several, so a chat of one workflow reads exactly as it always did.
+  throw new HttpError(
+    500,
+    'WORKFLOW_EXECUTION_FAILED',
+    started.reply.length + started.after.length > 1
+      ? `Workflow "${planned.workflow.name}" failed: ${message}`
+      : message,
+    details(failure.execution),
+  );
 }

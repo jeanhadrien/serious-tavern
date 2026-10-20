@@ -12,6 +12,8 @@ export type RegenerateTarget = {
   messages: ChatMessage[];
   /** What the nodes see as history: the same as `messages` without the turn's own user message, as in the original run. */
   history: ChatMessage[];
+  /** The last turn's user message, absent for an empty send. */
+  user?: ChatMessage;
 };
 
 /**
@@ -30,5 +32,6 @@ export function regenerateTarget(messages: ChatMessage[]): RegenerateTarget {
     content: user?.content ?? '',
     messages: rest,
     history: historyMessages(rest.filter((message) => message !== user)),
+    ...(user ? { user } : {}),
   };
 }

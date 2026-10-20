@@ -7,7 +7,7 @@ export interface AlternativeControlsProps {
   count: number;
   /** Regenerate and swipe are locked while a message change is saved. */
   disabled: boolean;
-  /** Swiping also waits for an after-reply run (the server refuses it while one works). */
+  /** Swiping also waits for a run after the reply (the server refuses it while one works). */
   swipeDisabled: boolean;
   onRegenerate: () => void;
   /** -1 for the previous alternative, 1 for the next. */

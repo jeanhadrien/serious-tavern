@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { portDataTypes } from './ports.js';
 import { workflowSettingSchema } from './chat-settings.js';
 import { sessionStateSchema } from './state/writes.js';
+import { sessionTriggersSchema } from './triggers.js';
 export const validationIssueSchema = z.object({
   message: z.string(),
   edgeId: z.string().optional(),
@@ -45,7 +46,11 @@ export const messageSchema = z
     role: z.enum(['user', 'assistant']),
     content: z.string(),
     createdAt: z.string(),
+    // The turn: the execution id of its first run (and of the turn's entry). Every message of the turn carries it.
     executionId: z.string().optional(),
+    // An assistant message only: the execution log of the run that wrote it (a turn has one run per listed workflow).
+    // Absent in older messages, whose log is the `executionId` one: read it as `runId ?? executionId`.
+    runId: z.string().optional(),
     name: z.string().optional(),
     characterId: z.string().optional(),
     // `streaming` while a turn runs; `partial` when stopped early; `final` once complete.
@@ -67,7 +72,12 @@ export const sessionSchema = z
   .object({
     id: z.string(),
     title: z.string(),
+    // Mirrors the first entry of the reply list (every write of the list writes it too), so older readers keep
+    // working. New code reads the list through `replyWorkflows`, never this, to decide what runs.
     workflowId: z.string(),
+    // The workflows a reply runs, in order (see triggers.ts). Absent in older files, and stored records are not
+    // parsed on read: read it through `replyWorkflows`.
+    triggers: sessionTriggersSchema.optional(),
     messages: z.array(messageSchema),
     characterId: z.string().optional(),
     personaId: z.string().optional(),
@@ -128,9 +138,9 @@ export const executionLogSchema = z
     seed: z.string().optional(),
     /** The resolved chat settings the run used; absent in older logs. */
     settings: z.record(z.string(), z.unknown()).optional(),
-    /** `post` for the after-reply run of a turn (only its nodes are listed); absent for the reply run and in older logs. */
+    /** `post` for a run of a turn's after section (the workflows below the last one that replies); absent for a reply-section run. */
     part: z.enum(['reply', 'post']).optional(),
-    /** On a post run's log: the execution id of the turn it follows. */
+    /** On a post run's log: the execution id of the turn it belongs to. */
     turnExecutionId: z.string().optional(),
     nodes: z.record(z.string(), nodeExecutionSchema),
     warnings: z.array(z.string()).default([]),

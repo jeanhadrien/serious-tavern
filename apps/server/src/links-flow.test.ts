@@ -4,7 +4,7 @@ import { deleteMessage, makeWorkflow, node } from './test-support/story.js';
 import { linkHarness, patchMessage, say, storedItems } from './test-support/links.js';
 
 // Summaries, wired the way the README does: the reply shows the intact summaries and the messages no summary stands
-// for; the after-reply run summarizes the next chunk.
+// for; the workflow below it, which runs after the reply, summarizes the next chunk.
 
 const harness = linkHarness('links-flow');
 afterEach(() => harness.cleanup());
@@ -49,7 +49,7 @@ describe('summaries as linked story state', () => {
     for (const message of writing.filter((m) => m.role === 'assistant'))
       await deleteMessage(app, session.id, message.id);
     expect((await storedItems(app, session.id)).items).toEqual([]);
-    // The reply of the next turn has no summary, the messages are raw again, and its post run redoes the chunk.
+    // The reply of the next turn has no summary, the messages are raw again, and its run after the reply redoes the chunk.
     const reply = await say(app, session, 'u4');
     expect(reply).toMatch(/^S\[\] H\[user: u1/);
     const after = await storedItems(app, session.id);
@@ -67,7 +67,7 @@ describe('an edit inside a summarized chunk', () => {
     return context;
   }
 
-  it('stops the summary being used, and the next post run redoes it without a remove', async () => {
+  it('stops the summary being used, and the next run after the reply redoes it without a remove', async () => {
     const { app, session } = await editedChat();
     const shown = (await storedItems(app, session.id)).view.definitions[0]!.values.summaries as { link?: unknown }[];
     expect(shown).toHaveLength(1);

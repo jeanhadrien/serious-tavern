@@ -34,7 +34,17 @@ export type CollectionItem = z.infer<typeof collectionItemSchema>;
 /** A definition's key, or the writing node's own implicit key (Draw's `draws`): see the fold. */
 export const stateTargetSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('definition'), definitionId: z.string(), key: z.string() }).passthrough(),
-  z.object({ kind: z.literal('node'), nodeId: z.string(), key: z.string() }).passthrough(),
+  z
+    .object({
+      kind: z.literal('node'),
+      nodeId: z.string(),
+      key: z.string(),
+      // The workflow of the writing run. Node ids are only unique within a workflow, so a node's own state is its
+      // workflow's: a node reads the writes with its workflow id AND those without one (made when a chat ran a single
+      // workflow). Absent on every write made before chats ran several; `.catch` so a bad value reads as absent.
+      workflowId: z.string().min(1).optional().catch(undefined),
+    })
+    .passthrough(),
 ]);
 export type StateTarget = z.infer<typeof stateTargetSchema>;
 
@@ -49,9 +59,25 @@ export const stateWriteSchema = z.discriminatedUnion('op', [
 ]);
 export type StateWrite = z.infer<typeof stateWriteSchema>;
 
-/** How a turn's post-turn run (After Reply) stands. `running` is only believed while the server holds the run: see `effectivePostRun`. */
-export const postStatusSchema = z.enum(['running', 'completed', 'error', 'stopped']);
-export type PostStatus = z.infer<typeof postStatusSchema>;
+/** How a run stands. `running` is only believed while the server holds the run: see `effectiveRuns`. */
+export const runStatusSchema = z.enum(['running', 'completed', 'error', 'stopped']);
+export type RunStatus = z.infer<typeof runStatusSchema>;
+
+/**
+ * One run of a turn: one workflow of the chat's reply list, in the reply section (`reply`) or the after section
+ * (`post`), with its own execution log. `running` is only believed while the server holds the run (see `effectiveRuns`).
+ */
+export const turnRunSchema = z
+  .object({
+    executionId: z.string().min(1),
+    workflowId: z.string(),
+    part: z.enum(['reply', 'post']),
+    status: runStatusSchema,
+    // Cut to `POST_ERROR_LIMIT`; the full text is in the run's execution log.
+    error: z.string().optional().catch(undefined),
+  })
+  .passthrough();
+export type TurnRun = z.infer<typeof turnRunSchema>;
 
 /**
  * One settled turn. An entry exists for EVERY settled turn, with or without writes, so turn counting is
@@ -66,12 +92,9 @@ export const turnEntrySchema = z
     /** Assistant messages saved for the turn when it settled (partial rows included). */
     replies: z.number().int().nonnegative(),
     writes: z.array(stateWriteSchema).default([]),
-    // The post-turn run this turn left behind. Tolerant on purpose (`.catch`): a hand-edited bad value drops
-    // the field, never the turn.
-    /** Execution id of the post-turn run (After Reply); absent when the workflow has none. */
-    postExecutionId: z.string().min(1).optional().catch(undefined),
-    postStatus: postStatusSchema.optional().catch(undefined),
-    postError: z.string().optional().catch(undefined),
+    // The runs of the turn, in the order they ran: the workflows of the reply section, then those of the after section.
+    // Tolerant on purpose (`.catch`): a run that cannot be read is skipped on read, never the turn.
+    runs: z.array(turnRunSchema).optional().catch(undefined),
     // Items this turn's runs asked to store with a message link but were dropped at commit time, in plain words and cut
     // (`LINK_WARNING_LIMITS`): the chat shows them on the turn's chip.
     linkWarnings: z.array(z.string()).optional().catch(undefined),
@@ -83,7 +106,10 @@ export const sessionStateSchema = z.object({ turns: z.array(turnEntrySchema) }).
 export type SessionState = z.infer<typeof sessionStateSchema>;
 
 // The shell of an entry, without its writes: a write that cannot be read must not take its turn with it.
-const turnShellSchema = turnEntrySchema.extend({ writes: z.array(z.unknown()).default([]) });
+const turnShellSchema = turnEntrySchema.extend({
+  writes: z.array(z.unknown()).default([]),
+  runs: z.array(z.unknown()).optional().catch(undefined),
+});
 
 const rawTurns = (state: unknown): unknown[] =>
   typeof state === 'object' && state !== null && Array.isArray((state as { turns?: unknown }).turns)
@@ -102,7 +128,13 @@ export function readTurnEntries(state: unknown): TurnEntry[] {
       const parsed = stateWriteSchema.safeParse(write);
       return parsed.success ? [parsed.data] : [];
     });
-    return [{ ...shell.data, writes }];
+    // A run that cannot be read is skipped.
+    const runs = shell.data.runs?.flatMap((run) => {
+      const parsed = turnRunSchema.safeParse(run);
+      return parsed.success ? [parsed.data] : [];
+    });
+    const { runs: _raw, ...rest } = shell.data;
+    return [{ ...rest, writes, ...(runs?.length ? { runs } : {}) }];
   });
 }
 

@@ -1,5 +1,5 @@
 import { plainPreview, type LinkStatus, type SessionStateView } from '@st/shared';
-import { linkLabel } from './linkedItems.js';
+import { linkLabel } from './linkedGroups.js';
 import { shortText } from './format.js';
 import { definitionBlocks } from './storyModel.js';
 

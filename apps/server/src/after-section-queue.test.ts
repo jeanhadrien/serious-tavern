@@ -3,11 +3,11 @@ import { turnEventSchema } from '@st/shared';
 import type { ChatRequest, StreamOptions } from '@st/engine';
 import { restoreAdapter, useAdapter } from './test-support/adapter.js';
 import {
-  afterReplyWorkflow,
   gateNode,
   postHarness,
   postRunOf,
   stateView,
+  trailingWorkflow,
   waitFor,
   waitForPostRun,
   watchQueue,
@@ -25,10 +25,11 @@ import {
   turn,
 } from './test-support/story.js';
 import { parseEventStream } from './test-support/event-stream.js';
+import { makeListSession } from './test-support/triggers.js';
 
-// Ordering, Stop and failure of the post run: it holds the chat's queue slot and never touches the reply.
+// Ordering, Stop and failure of the runs after the reply: they hold the chat's queue slot and never touch the reply.
 
-const harness = postHarness('post-turn-queue');
+const harness = postHarness('after-section-queue');
 const { setup } = harness;
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -41,14 +42,14 @@ const stop = (app: Awaited<ReturnType<typeof setup>>['app'], sessionId: string) 
   app.inject({ method: 'POST', url: `/api/sessions/${sessionId}/stop` });
 
 describe('the next message', () => {
-  it('waits for the post run of the previous turn and then sees its writes', async () => {
+  it('waits for the run after the reply of the previous turn and then sees its writes', async () => {
     const { app, session, gate } = await setup();
     const queue = watchQueue();
     await send(app, session.id, 'one');
     await gate.started;
     const second = send(app, session.id, 'two');
     await queue.reached(2);
-    // Give a message that wrongly started time to show: it has not, nothing of it is stored, and the post run is
+    // Give a message that wrongly started time to show: it has not, nothing of it is stored, and the run after the reply is
     // still the only run.
     await pause();
     expect((await readSession(app, session.id)).messages.map((message) => message.content)).toEqual([
@@ -90,7 +91,7 @@ describe('the next message', () => {
     ]);
   });
 
-  it('is not delayed by the post run of another chat', async () => {
+  it('is not delayed by the run after the reply of another chat', async () => {
     const { app, session, gate, workflow } = await setup();
     await send(app, session.id);
     await gate.started;
@@ -101,7 +102,7 @@ describe('the next message', () => {
 });
 
 describe('Stop', () => {
-  it('stops the post run, keeps the writes of the nodes that finished, and leaves the reply alone', async () => {
+  it('stops the run after the reply, keeps the writes of the nodes that finished, and leaves the reply alone', async () => {
     const { app, session, gate } = await setup();
     await send(app, session.id);
     await gate.started;
@@ -111,7 +112,7 @@ describe('Stop', () => {
     expect(stopped.postError).toBeUndefined();
     const post = await readExecution(app, stopped.postExecutionId!);
     expect(post).toMatchObject({ part: 'post', status: 'error', turnExecutionId: before[0]!.executionId });
-    expect(post.warnings).toContain('The after-reply run was stopped by the user before it finished.');
+    expect(post.warnings).toContain('The run after the reply was stopped by the user before it finished.');
     expect(post.nodes.gate?.status).toBe('cancelled');
     const saved = await readSession(app, session.id);
     expect(entriesOf(saved)[0]).toMatchObject({ completed: true, replies: 1 });
@@ -123,7 +124,7 @@ describe('Stop', () => {
   });
 });
 
-describe('a failing post run', () => {
+describe('a failing run after the reply', () => {
   it('is an error on the entry and nothing else: the reply, the turn and the queue are fine', async () => {
     const { app, session, gate } = await setup();
     await send(app, session.id);
@@ -134,7 +135,8 @@ describe('a failing post run', () => {
     expect(failed.postError).toBe('Post Gate (gate): boom');
     const saved = await readSession(app, session.id);
     expect(saved.messages).toEqual(before.messages);
-    expect(entriesOf(saved)[0]).toMatchObject({ completed: true, replies: 1, postStatus: 'error' });
+    expect(entriesOf(saved)[0]).toMatchObject({ completed: true, replies: 1 });
+    expect(entriesOf(saved)[0]!.runs!.find((run) => run.part === 'post')).toMatchObject({ status: 'error' });
     expect(entriesOf(saved)[0]!.writes.map((write) => write.nodeId)).toEqual(['bump', 'postBump']);
     const post = await readExecution(app, failed.postExecutionId!);
     expect(post).toMatchObject({ status: 'error', part: 'post' });
@@ -154,38 +156,38 @@ describe('a failing post run', () => {
 });
 
 describe('a reply that did not finish', () => {
-  // The same after-reply work behind a different reply: a plain Chat Output (so it streams) fed by `reply`.
-  const withReply = (definitionId: string, reply: object[], replyEdges: object[]) => {
-    const { nodes, edges } = afterReplyWorkflow(definitionId, true);
-    return {
-      nodes: [...nodes.filter((item) => item.id !== 'output'), node('output', 'chat-output'), ...reply],
-      edges: [...edges.filter((item) => item.source !== 'input'), ...replyEdges],
-    };
-  };
-
-  it('leaves no post run when the reply failed', async () => {
+  it('still runs the workflows after the reply when a reply run failed, each workflow being independent', async () => {
     const { app, definition } = await harness.bare();
     const gate = gateNode();
     try {
-      const { nodes, edges } = withReply(
-        definition.id,
-        [node('parse', 'parse-json')],
+      const replying = await makeWorkflow(
+        app,
+        [node('input', 'chat-input'), node('parse', 'parse-json'), node('output', 'chat-output')],
         [edge('input', 'message', 'parse', 'text'), edge('parse', 'value', 'output', 'value')],
+        'Fails',
       );
-      const session = await makeSession(app, (await makeWorkflow(app, nodes, edges)).id);
+      const trailing = trailingWorkflow(definition.id, true);
+      const after = await makeWorkflow(app, trailing.nodes, trailing.edges, 'After');
+      const session = await makeListSession(app, [{ workflowId: replying.id }, { workflowId: after.id }]);
       expect((await send(app, session.id, 'not json')).statusCode).toBe(500);
+      await gate.started;
       const [entry] = entriesOf(await readSession(app, session.id));
       expect(entry).toMatchObject({ completed: false });
-      expect(entry!.postExecutionId).toBeUndefined();
-      expect(entry!.postStatus).toBeUndefined();
-      expect(gate.runs).toBe(0);
-      expect((await stateView(app, session.id)).turns[0]!.postStatus).toBeUndefined();
+      expect(entry!.runs!.map((run) => [run.part, run.status])).toEqual([
+        ['reply', 'error'],
+        ['post', 'running'],
+      ]);
+      gate.release();
+      const done = await waitForPostRun(app, session.id, 'completed');
+      // The failure is the turn's, and the run after it is its own: it ran, and its failure would not be the turn's.
+      expect((await readExecution(app, done.postExecutionId!)).status).toBe('completed');
+      expect(entriesOf(await readSession(app, session.id))[0]).toMatchObject({ completed: false });
     } finally {
       gate.dispose();
     }
   });
 
-  it('leaves no post run when the reply was stopped', async () => {
+  it('leaves no run after the reply when the reply was stopped', async () => {
     useAdapter({
       chat: async () => {
         throw new Error('These tests stream');
@@ -198,19 +200,26 @@ describe('a reply that did not finish', () => {
         throw new Error('unreachable');
       },
     });
-    const { app, definition } = await harness.bare();
     const gate = gateNode();
     try {
+      const { app, definition } = await harness.bare();
       await app.inject({ method: 'PUT', url: '/api/secrets/openrouter', payload: { value: 'test-key' } });
       const preset = (
         await app.inject({ method: 'POST', url: '/api/presets', payload: { name: 'Stop', inputs: [], entries: [] } })
       ).json();
-      const { nodes, edges } = withReply(
-        definition.id,
-        [node('llm', 'llm', { presetId: preset.id, provider: 'openrouter', model: 'stop-model' })],
+      const replying = await makeWorkflow(
+        app,
+        [
+          node('input', 'chat-input'),
+          node('llm', 'llm', { presetId: preset.id, provider: 'openrouter', model: 'stop-model' }),
+          node('output', 'chat-output'),
+        ],
         [edge('llm', 'text', 'output', 'value')],
+        'Streams',
       );
-      const session = await makeSession(app, (await makeWorkflow(app, nodes, edges)).id);
+      const trailing = trailingWorkflow(definition.id, true);
+      const after = await makeWorkflow(app, trailing.nodes, trailing.edges, 'After');
+      const session = await makeListSession(app, [{ workflowId: replying.id }, { workflowId: after.id }]);
       const running = app.inject({
         method: 'POST',
         url: `/api/sessions/${session.id}/messages/stream`,
@@ -224,7 +233,7 @@ describe('a reply that did not finish', () => {
       expect(frames.at(-1)).toMatchObject({ type: 'turn.error', error: { code: 'TURN_STOPPED' } });
       const [entry] = entriesOf(await readSession(app, session.id));
       expect(entry).toMatchObject({ completed: false, replies: 1 });
-      expect(entry!.postStatus).toBeUndefined();
+      expect(entry!.runs!.map((run) => run.part)).toEqual(['reply']);
       expect(gate.runs).toBe(0);
     } finally {
       gate.dispose();

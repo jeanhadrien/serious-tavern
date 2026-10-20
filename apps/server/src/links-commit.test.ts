@@ -29,7 +29,7 @@ describe('a linked item whose messages changed while it was being written', () =
       const { app, session } = await harness.chat({ via: { type: 'post-gate-test', id: 'gate' } });
       await say(app, session, 'u1');
       await say(app, session, 'u2');
-      // Turn 3's after-reply run plans the chunk m1 m2 and waits at the gate.
+      // Turn 3's run after the reply plans the chunk m1 m2 and waits at the gate.
       expect((await send(app, session.id, 'u3')).statusCode).toBe(200);
       await gate.started;
       const first = (await storedItems(app, session.id)).session.messages[0]!.id;
@@ -85,7 +85,7 @@ describe('a linked item whose messages changed while it was being written', () =
 });
 
 describe('linking to the messages of the turn itself', () => {
-  it('takes the fingerprint at commit time: the post run links to its own reply by id alone', async () => {
+  it('takes the fingerprint at commit time: the run after the reply links to its own reply by id alone', async () => {
     const { app, session } = await harness.chat({ linkToReplies: true });
     for (const text of ['u1', 'u2', 'u3']) await say(app, session, text);
     const { session: stored, items } = await storedItems(app, session.id);
@@ -161,10 +161,20 @@ describe('a failed or stopped run', () => {
     await held;
     expect((await app.inject({ method: 'POST', url: `/api/sessions/${session.id}/stop` })).statusCode).toBe(204);
     expect((await turn).body).toContain('TURN_STOPPED');
-    expect((await storedItems(app, session.id)).items.map((item) => item.text)).toEqual(['S[user: u1]']);
+    // The summarizing workflow is above the narrator, which never ran: the turn has no reply and did not complete, so it
+    // does not count and the folded view holds nothing. What the completed State Write asked for was still checked
+    // and stored with the turn's entry.
+    const { session: stored, items } = await storedItems(app, session.id);
+    expect(items).toEqual([]);
+    expect(readTurnEntries(stored.state).at(-1)!.writes).toMatchObject([
+      {
+        op: 'add',
+        item: { text: 'S[user: u1]', messages: { ids: expect.any(Array), fingerprint: expect.any(String) } },
+      },
+    ]);
   });
 
-  it('keeps it when the after-reply run fails after State Write completed', async () => {
+  it('keeps it when the run after the reply fails after State Write completed', async () => {
     const { app, session } = await harness.chat({ failAfterSave: true });
     for (const text of ['u1', 'u2']) await say(app, session, text);
     await send(app, session.id, 'u3');

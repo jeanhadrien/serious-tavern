@@ -7,7 +7,7 @@ import { composerShouldSend } from './keyboard.js';
 interface ComposerProps {
   content: string;
   busy: boolean;
-  /** The message waits behind an after-reply run: the button cancels it instead of stopping a generation. */
+  /** The message waits behind a run after the reply: the button cancels it instead of stopping a generation. */
   queued?: boolean;
   locked: boolean;
   onChange: (content: string) => void;
@@ -57,7 +57,7 @@ export function Composer({ content, busy, queued = false, locked, onChange, onSe
         placeholder={
           busy
             ? queued
-              ? 'Waiting for the after-reply steps… Esc to cancel'
+              ? 'Waiting for the workflows after the reply… Esc to cancel'
               : 'Generating… Esc to stop'
             : 'Write a message… (empty to generate a reply)'
         }

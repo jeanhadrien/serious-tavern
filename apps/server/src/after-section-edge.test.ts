@@ -7,16 +7,16 @@ import { JsonRepository } from './storage/repository.js';
 import { isRepository, postHarness, stateView, waitFor, waitForPostRun } from './test-support/post.js';
 import { assistantRows, entriesOf, readSession, send, turn } from './test-support/story.js';
 
-// What happens to a post run when the chat changes under it, and when the server shuts down.
+// What happens to a run after the reply when the chat changes under it, and when the server shuts down.
 
-const harness = postHarness('post-turn-edge');
+const harness = postHarness('after-section-edge');
 const { setup } = harness;
 afterEach(async () => {
   vi.restoreAllMocks();
   await harness.cleanup();
 });
 
-describe('a chat changed during its post run', () => {
+describe('a chat changed during a run after the reply', () => {
   it('is not resurrected when it was deleted: the run is stopped and its settle is a no-op', async () => {
     const { app, directory, session, gate } = await setup();
     await send(app, session.id);
@@ -51,26 +51,22 @@ describe('a chat changed during its post run', () => {
 });
 
 describe('closing the app', () => {
-  it('stops a running post run and records it, as an interrupted run, before returning', async () => {
+  it('stops a running run after the reply and records it, as an interrupted run, before returning', async () => {
     const { app, directory, session, gate } = await setup();
     await send(app, session.id);
     await gate.started;
     await app.close();
     const stored = JSON.parse(await readFile(join(directory, 'sessions', `${session.id}.json`), 'utf8'));
-    // Like a restart that cut it short, not like a Stop: nothing says the steps should be run again otherwise.
-    expect(stored.state.turns[0]).toMatchObject({
-      completed: true,
-      postStatus: 'error',
-      postError: 'The run was interrupted by a server restart.',
-    });
-    const log = JSON.parse(
-      await readFile(join(directory, 'executions', `${stored.state.turns[0].postExecutionId}.json`), 'utf8'),
-    );
-    expect(log.warnings).toContain('The after-reply run ended because the server shut down before it finished.');
+    // Like a restart that cut it short, not like a Stop: nothing says the run should be run again otherwise.
+    const post = stored.state.turns[0].runs.find((run: { part: string }) => run.part === 'post');
+    expect(stored.state.turns[0]).toMatchObject({ completed: true });
+    expect(post).toMatchObject({ status: 'error', error: 'The run was interrupted by a server restart.' });
+    const log = JSON.parse(await readFile(join(directory, 'executions', `${post.executionId}.json`), 'utf8'));
+    expect(log.warnings).toContain('The run after the reply ended because the server shut down before it finished.');
   });
 });
 
-describe('the state view while a post run settles', () => {
+describe('the state view while a run after the reply settles', () => {
   it('never reports a run that finished just after the view read the chat as interrupted', async () => {
     const { app, directory, session, gate } = await setup();
     await send(app, session.id);
@@ -98,7 +94,9 @@ describe('the state view while a post run settles', () => {
     const { app, session, gate } = await setup();
     await send(app, session.id);
     await gate.started;
-    const postExecutionId = entriesOf(await readSession(app, session.id))[0]!.postExecutionId!;
+    const postExecutionId = entriesOf(await readSession(app, session.id))[0]!.runs!.find(
+      (run) => run.part === 'post',
+    )!.executionId;
     // The registry that holds the run, picked up from the view's own question to it.
     let registry: TurnRegistry | undefined;
     const held = TurnRegistry.prototype.hasPostRun;

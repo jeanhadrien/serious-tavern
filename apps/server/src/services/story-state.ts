@@ -29,17 +29,24 @@ export async function listDefinitions(repository: Pick<StateDefinitionRepository
 /**
  * Folds a session's stored turns against `definitions`: what its state is right now, and the snapshot its
  * next turn runs on. Never throws and writes nothing; a stored value that doesn't fit its definition reads as
- * the default and shows up in `issues`. `atTurn` reads the state as of that turn instead of the next one (an
- * after-reply run reads at the turn it follows). `history` is the history messages the run's nodes see: with it, items
+ * the default and shows up in `issues`. `history` is the history messages the run's nodes see: with it, items
  * that link to messages carry their computed `link` in the snapshot (the SAME history the nodes judge links by).
+ * `scope` is for the run of one workflow: its `workflowId` scopes the nodes' own state (`FoldInput.workflowId`; a caller
+ * that runs a workflow always gives it) and `including` is the turn being run (`FoldInput.including`), for the later
+ * runs of a turn whose first run has settled.
  */
 export function foldSession(
   definitions: StateDefinition[],
   session: Pick<Session, 'messages' | 'state'>,
-  atTurn?: number,
   history?: readonly ChatMessage[],
+  scope: { workflowId?: string; including?: string } = {},
 ): SessionStory {
-  const story = foldStoryState({ definitions, messages: session.messages, state: session.state, turn: atTurn });
+  const story = foldStoryState({
+    definitions,
+    messages: session.messages,
+    state: session.state,
+    ...scope,
+  });
   return {
     definitions,
     story,

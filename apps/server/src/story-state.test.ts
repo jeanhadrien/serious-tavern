@@ -216,7 +216,7 @@ describe('definition edits', () => {
       const response = await send(app, session.id);
       const result = apiContract.sendMessage.response.parse(response.json());
       expect(result.assistantMessages[0]!.content).toBe('n=1 turn=3');
-      expect((await readExecution(app, result.execution.id)).warnings).toEqual([
+      expect((await readExecution(app, result.execution!.id)).warnings).toEqual([
         'State "counter.n": Stored value 2 is above max 1; using default 1.',
       ]);
       // Another type altogether: the number key is now an enum.

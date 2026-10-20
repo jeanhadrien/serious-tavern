@@ -5,7 +5,7 @@ import { POST_NO_LOG } from './story/postRunText.js';
 import { LegacyRequestDetails, WireDetails } from './WireDetails.js';
 
 /**
- * A run's log in a disclosure. `optional` is for a run that may have no log (an after-reply run cut short by a
+ * A run's log in a disclosure. `optional` is for a run that may have no log (a run after the reply cut short by a
  * restart): the fetch is silent, and a missing log is said in words instead of toasted.
  */
 export function ExecutionDetails({

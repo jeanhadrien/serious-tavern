@@ -8,7 +8,7 @@ const isId = (value: unknown): value is string => typeof value === 'string' && v
 
 /**
  * The link a State Write `messages` input stands for: a link (`{ ids, fingerprint? }`, Next Chunk's `link`), a message,
- * or a non-empty list of messages (their ids in order, repeats dropped; After Reply's `replies`). Anything else is an
+ * or a non-empty list of messages (their ids in order, repeats dropped; Chat Input's `replies`). Anything else is an
  * error naming what arrived. Whether the ids are really messages of the chat is checked when the run settles.
  */
 export function messageLink(label: string, value: unknown): ItemLink {

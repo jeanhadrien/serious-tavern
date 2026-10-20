@@ -29,11 +29,16 @@ const ITEMS_LISTED = 3;
 type Item = { id: string; text: string; linked?: number };
 type Turn = SessionStateView['turns'][number];
 
+// A node's own state belongs to its workflow (node ids repeat across the workflows of a chat); a target without a
+// `workflowId` is a legacy write, made when a chat ran one workflow, which every workflow's node reads. As targets they
+// are different things: the same node id of another workflow is another node.
 const sameTarget = (a: StateTarget, b: StateTarget) =>
   a.key === b.key &&
   (a.kind === 'definition'
     ? b.kind === 'definition' && a.definitionId === b.definitionId
-    : b.kind === 'node' && a.nodeId === b.nodeId);
+    : b.kind === 'node' && a.nodeId === b.nodeId && a.workflowId === b.workflowId);
+
+const nodeKey = (nodeId: string, workflowId?: string) => `${workflowId ?? ''}\u0000${nodeId}`;
 
 const sameValue = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -145,14 +150,22 @@ function definitionLine(
     : `${name} (${scalarChange(def, nowKey)})`;
 }
 
+/**
+ * What a node's key reads as in a fold the way the server's rule reads it: with a `workflowId` the fold is scoped to the
+ * workflow (its own writes plus the legacy ones, merged per node id); a legacy target is found in the unscoped fold
+ * among the nodes that have no workflow id.
+ */
+const nodeKeyIn = (fold: StoryState, target: Extract<StateTarget, { kind: 'node' }>) =>
+  fold.nodes.find((node) => node.nodeId === target.nodeId && node.workflowId === undefined)?.keys[target.key];
+
 function nodeLine(
   target: Extract<StateTarget, { kind: 'node' }>,
   before: StoryState,
   after: StoryState,
   label: string | undefined,
 ): string | undefined {
-  const wasKey = before.nodes.find((node) => node.nodeId === target.nodeId)?.keys[target.key];
-  const nowKey = after.nodes.find((node) => node.nodeId === target.nodeId)?.keys[target.key];
+  const wasKey = nodeKeyIn(before, target);
+  const nowKey = nodeKeyIn(after, target);
   const who = label ?? "A node's memory";
   if (!wasKey || sameValue(wasKey.value, nowKey?.value ?? [])) return undefined;
   if (Array.isArray(wasKey.value)) return `${who} ${itemChange(wasKey.value, nowKey?.value ?? [])}`;
@@ -187,19 +200,35 @@ export function undoneByDelete({
 
   const ordered = oldestFirst(definitions);
   const state = { turns: view.turns.map(entryOf) };
-  const before = foldStoryState({ definitions: ordered, messages, state });
-  const after = foldStoryState({ definitions: ordered, messages: messages.filter((item) => item !== message), state });
+  const without = messages.filter((item) => item !== message);
+  // Definition keys are shared by every workflow; a node's own keys are read the way its workflow reads them (scoped
+  // to it), so each workflow that wrote gets its own pair of folds, made only when a line needs it.
+  const folds = new Map<string, { before: StoryState; after: StoryState }>();
+  const foldsFor = (workflowId?: string) => {
+    const known = folds.get(workflowId ?? '');
+    if (known) return known;
+    const made = {
+      before: foldStoryState({ definitions: ordered, messages, state, workflowId }),
+      after: foldStoryState({ definitions: ordered, messages: without, state, workflowId }),
+    };
+    folds.set(workflowId ?? '', made);
+    return made;
+  };
+  // A node's name in ITS workflow: node ids repeat across the workflows of a chat.
   const labels = new Map<string, string>();
-  for (const node of view.nodes) if (node.label) labels.set(node.nodeId, node.label);
-  for (const { write, nodeLabel } of turn.writes)
-    if (write.target.kind === 'node' && nodeLabel && !labels.has(write.target.nodeId))
-      labels.set(write.target.nodeId, nodeLabel);
+  for (const node of view.nodes) if (node.label) labels.set(nodeKey(node.nodeId, node.workflowId), node.label);
+  for (const { write, nodeLabel } of turn.writes) {
+    const { target } = write;
+    if (target.kind === 'node' && nodeLabel && !labels.has(nodeKey(target.nodeId, target.workflowId)))
+      labels.set(nodeKey(target.nodeId, target.workflowId), nodeLabel);
+  }
 
   const lines = distinctTargets(turn).flatMap((target) => {
+    const { before, after } = foldsFor(target.kind === 'node' ? target.workflowId : undefined);
     const line =
       target.kind === 'definition'
         ? definitionLine(target, before, after, definitions, cutMayHide(view.turns, turn, target))
-        : nodeLine(target, before, after, labels.get(target.nodeId));
+        : nodeLine(target, before, after, labels.get(nodeKey(target.nodeId, target.workflowId)));
     return line ? [line] : [];
   });
   return lines.length ? lines : undefined;

@@ -2,14 +2,17 @@ import { join } from 'node:path';
 import { vi } from 'vitest';
 import { z } from 'zod';
 import { registry } from '@st/engine';
-import { apiContract, type PostStatus } from '@st/shared';
+import { apiContract, type RunStatus } from '@st/shared';
 import { ChangeHub } from '../services/change-events.js';
 import { TurnRegistry } from '../services/turns.js';
-import { define, edge, makeSession, makeWorkflow, node, tempApps, type App } from './story.js';
+import { define, edge, makeWorkflow, node, tempApps, type App } from './story.js';
+import { makeListSession } from './triggers.js';
 
-// Helpers of the after-reply (post-turn run) tests: a node that holds the run, the workflow it sits in, and waiting.
+// Helpers of the tests of the workflows that run after the reply: a node that holds the run, the workflows around it,
+// and waiting.
 
 const GATE_TYPE = 'post-gate-test';
+const REPLIES_TEXT_TYPE = 'replies-text-test';
 
 /**
  * A normal node (`value` in, `value` out) that holds whatever run executes it until `release` or `fail`, and stops
@@ -67,28 +70,62 @@ export function gateNode() {
 }
 
 /**
- * input -> output ("n=<n> turn=<turn>"), a reply-part increment `bump` of `counter.n`, After Reply, an increment
- * `postBump` of `counter.n` (it completes at once) and `postAdd`, which adds After Reply's text to `counter.log`.
- * With `gated`, a Post Gate node sits between After Reply's text and `postAdd`, so `postAdd` waits for the gate.
+ * Registers a node that turns Chat Input's `replies` (or `history`) into the text of the messages, so a workflow after
+ * the reply can store what was said. Removed by the harness's `cleanup`.
  */
-export function afterReplyWorkflow(definitionId: string, gated = false) {
-  const write = (id: string, key: string, op: string) => node(id, 'state-write', { definitionId, key, op });
+function registerRepliesText() {
+  registry.set(REPLIES_TEXT_TYPE, {
+    type: REPLIES_TEXT_TYPE,
+    label: 'Replies Text',
+    description: '',
+    category: 'Tests',
+    inputs: [{ name: 'value', label: 'Value', dataType: 'messages' }],
+    outputs: [{ name: 'value', label: 'Value', dataType: 'text' }],
+    configSchema: z.object({}),
+    defaultConfig: {},
+    async execute(ctx) {
+      const replies = ctx.inputs.value as { content: string }[];
+      return { value: replies.map((reply) => reply.content).join('\n\n') };
+    },
+  });
+}
+
+/**
+ * The workflow that replies: input -> output ("n=<n> turn=<turn>") and a State Write `bump` that adds 1 to `counter.n`.
+ */
+export function replyWorkflow(definitionId: string) {
   return {
     nodes: [
       node('input', 'chat-input'),
       node('output', 'chat-output', { template: 'n={{state.counter.n}} turn={{trigger.turn}}' }),
-      write('bump', 'n', 'increment'),
-      node('after', 'after-reply'),
+      node('bump', 'state-write', { definitionId, key: 'n', op: 'increment' }),
+    ],
+    edges: [edge('input', 'message', 'output', 'value')],
+  };
+}
+
+/**
+ * A workflow with no Chat Output, listed below the one that replies, so it runs after the reply: an increment
+ * `postBump` of `counter.n` (it completes at once, gated by Chat Input's `turn`) and `postAdd`, which adds the text of
+ * the turn's replies (Chat Input's `replies`) to `counter.log`. With `gated`, a Post Gate node sits between the text and
+ * `postAdd`, so `postAdd` waits for the gate.
+ */
+export function trailingWorkflow(definitionId: string, gated = false) {
+  const write = (id: string, key: string, op: string) => node(id, 'state-write', { definitionId, key, op });
+  return {
+    nodes: [
+      node('input', 'chat-input'),
+      node('text', REPLIES_TEXT_TYPE),
       write('postBump', 'n', 'increment'),
       write('postAdd', 'log', 'add'),
       ...(gated ? [node('gate', GATE_TYPE)] : []),
     ],
     edges: [
-      edge('input', 'message', 'output', 'value'),
-      edge('after', 'turn', 'postBump', 'when'),
+      edge('input', 'replies', 'text', 'value'),
+      edge('input', 'turn', 'postBump', 'when'),
       ...(gated
-        ? [edge('after', 'text', 'gate', 'value'), edge('gate', 'value', 'postAdd', 'value')]
-        : [edge('after', 'text', 'postAdd', 'value')]),
+        ? [edge('text', 'value', 'gate', 'value'), edge('gate', 'value', 'postAdd', 'value')]
+        : [edge('text', 'value', 'postAdd', 'value')]),
     ],
   };
 }
@@ -153,22 +190,22 @@ export async function stateView(app: App, sessionId: string) {
   return apiContract.getSessionState.response.parse(response.json());
 }
 
-/** The post-run fields the state view reports for the chat's newest turn. */
+/** The after-section fields the state view reports for the chat's newest turn. */
 export async function postRunOf(app: App, sessionId: string) {
   const turn = (await stateView(app, sessionId)).turns.at(-1);
   return { postStatus: turn?.postStatus, postExecutionId: turn?.postExecutionId, postError: turn?.postError };
 }
 
-/** Waits until the newest turn's post run has this status (the state view is what the web sees). */
-export const waitForPostRun = (app: App, sessionId: string, status: PostStatus) =>
+/** Waits until the newest turn's runs after the reply stand at this status (the state view is what the web sees). */
+export const waitForPostRun = (app: App, sessionId: string, status: RunStatus) =>
   waitFor(async () => {
     const run = await postRunOf(app, sessionId);
     return run.postStatus === status ? run : undefined;
   });
 
 /**
- * The setup every after-reply test file needs: temp apps that are closed (draining any post run) before their
- * directories are removed, and the gate that holds the post run. Call `cleanup` from `afterEach`.
+ * The setup every test file of the after section needs: temp apps that are closed (draining any run after the reply)
+ * before their directories are removed, and the gate that holds the run. Call `cleanup` from `afterEach`.
  */
 export function postHarness(prefix: string) {
   const apps = tempApps(prefix);
@@ -176,11 +213,12 @@ export function postHarness(prefix: string) {
   const held: { gate?: Gate } = {};
   /** An app with the `counter` definition. */
   async function bare() {
+    registerRepliesText();
     const { app, directory } = await apps.open();
     opened.push(app);
     return { app, directory, definition: await define(app) };
   }
-  /** The gate node, registered for the test (disposed by `cleanup`); `setup` wires one into the after-reply work. */
+  /** The gate node, registered for the test (disposed by `cleanup`); `setup` wires one into the work after the reply. */
   function gate() {
     held.gate?.dispose();
     held.gate = gateNode();
@@ -189,15 +227,23 @@ export function postHarness(prefix: string) {
   return {
     bare,
     gate,
-    /** A chat on the After Reply workflow; its post run is held at the gate until `gate.release()`. */
+    /**
+     * A chat that lists the replying workflow and, below it, the trailing one (`replyWorkflow`, `trailingWorkflow`): the
+     * run after the reply is held at the gate until `gate.release()`. `workflow` is the replying one.
+     */
     async setup() {
       const context = await bare();
       const hold = gate();
-      const { nodes, edges } = afterReplyWorkflow(context.definition.id, true);
-      const workflow = await makeWorkflow(context.app, nodes, edges);
-      return { ...context, gate: hold, workflow, session: await makeSession(context.app, workflow.id) };
+      const { definition } = context;
+      const reply = replyWorkflow(definition.id);
+      const workflow = await makeWorkflow(context.app, reply.nodes, reply.edges, 'Reply');
+      const trailing = trailingWorkflow(definition.id, true);
+      const after = await makeWorkflow(context.app, trailing.nodes, trailing.edges, 'After');
+      const session = await makeListSession(context.app, [{ workflowId: workflow.id }, { workflowId: after.id }]);
+      return { ...context, gate: hold, workflow, after, session };
     },
     async cleanup() {
+      registry.delete(REPLIES_TEXT_TYPE);
       held.gate?.dispose();
       held.gate = undefined;
       await Promise.all(opened.splice(0).map((app) => app.close()));

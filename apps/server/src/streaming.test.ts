@@ -183,9 +183,11 @@ describe('streamed turns', () => {
       const start = frames.find((frame) => frame.data.type === 'turn.start')!.data;
       expect(frames[0]!.event).toBe('turn.start');
       const deltas = frames.filter((frame) => frame.data.type === 'node.delta').map((frame) => frame.data);
+      // A chat of one workflow has one run, whose id is the turn's.
+      const runId = (start as unknown as { executionId: string }).executionId;
       expect(deltas).toEqual([
-        { type: 'node.delta', nodeId: 'output', reasoningDelta: 'think', textDelta: 'Hel' },
-        { type: 'node.delta', nodeId: 'output', textDelta: 'lo' },
+        { type: 'node.delta', nodeId: 'output', runId, reasoningDelta: 'think', textDelta: 'Hel' },
+        { type: 'node.delta', nodeId: 'output', runId, textDelta: 'lo' },
       ]);
       expect(frames.at(-1)!.data).toMatchObject({
         type: 'turn.complete',
@@ -224,8 +226,9 @@ describe('streamed turns', () => {
     }));
     try {
       const frames = framesOf((await app.inject(streamRequest(session.id, 'hi'))).body);
+      const turnId = (frames[0]!.data as unknown as { executionId: string }).executionId;
       expect(frames.filter((frame) => frame.data.type === 'node.delta').map((frame) => frame.data)).toEqual([
-        { type: 'node.delta', nodeId: 'output', reasoningDelta: 'think' },
+        { type: 'node.delta', nodeId: 'output', runId: turnId, reasoningDelta: 'think' },
       ]);
       expect(frames.at(-1)!.data).toMatchObject({
         type: 'turn.complete',
@@ -539,7 +542,7 @@ describe('finalizing a turn', () => {
       userMessage,
       replies: [{ nodeId: 'output', content: 'Hello', name: 'Ann' }],
       streamed: [streamed],
-      interrupted: false,
+      run: { executionId: 'execution', workflowId: 'workflow', status: 'completed' },
     });
     expect(settled.assistantMessages).toEqual([
       {
@@ -549,6 +552,7 @@ describe('finalizing a turn', () => {
         name: 'Ann',
         createdAt: '2024-01-01T00:00:01.000Z',
         executionId: 'execution',
+        runId: 'execution',
         nodeId: 'output',
         status: 'final',
         reasoning: 'think',
@@ -565,7 +569,7 @@ describe('finalizing a turn', () => {
       userMessage: structuredClone(user),
       replies: [],
       streamed: [streamed],
-      interrupted: false,
+      run: { executionId: 'execution', workflowId: 'workflow', status: 'completed' },
     });
     expect(settled.assistantMessages).toEqual([]);
     expect(current.messages.map((message) => message.id)).toEqual(['user-1']);
@@ -578,7 +582,7 @@ describe('finalizing a turn', () => {
       userMessage: structuredClone(user),
       replies: [],
       streamed: [streamed],
-      interrupted: true,
+      run: { executionId: 'execution', workflowId: 'workflow', status: 'stopped' },
     });
     expect(settled.assistantMessages).toEqual([
       {
@@ -588,6 +592,7 @@ describe('finalizing a turn', () => {
         name: 'Ann',
         createdAt: '2024-01-01T00:00:01.000Z',
         executionId: 'execution',
+        runId: 'execution',
         nodeId: 'output',
         status: 'partial',
         reasoning: 'think',
@@ -604,7 +609,7 @@ describe('finalizing a turn', () => {
       userMessage: structuredClone(user),
       replies: [{ nodeId: 'output', content: 'Hello' }],
       streamed: [streamed, other],
-      interrupted: true,
+      run: { executionId: 'execution', workflowId: 'workflow', status: 'stopped' },
     });
     expect(settled.assistantMessages.map(({ id, content, status }) => [id, content, status])).toEqual([
       ['row-1', 'Hello', 'final'],
@@ -619,7 +624,7 @@ describe('finalizing a turn', () => {
       userMessage: structuredClone(user),
       replies: [{ nodeId: 'plain', content: 'Plain reply' }],
       streamed: [],
-      interrupted: false,
+      run: { executionId: 'execution', workflowId: 'workflow', status: 'completed' },
     });
     expect(settled.assistantMessages).toHaveLength(1);
     expect(settled.assistantMessages[0]).toMatchObject({ role: 'assistant', content: 'Plain reply' });

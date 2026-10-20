@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ChatMessage } from '@st/shared';
-import { addWrite, buildView, drawWrite, entry, reply, setWrite, userMessage } from './test-fixtures.js';
+import type { ChatMessage, RunStatus } from '@st/shared';
+import { addWrite, afterRun, buildView, drawWrite, entry, reply, setWrite, userMessage } from './test-fixtures.js';
 import { chipsFor, describeTurns } from './turnChips.js';
 
 const chips = (view: ReturnType<typeof buildView> | undefined, messages: ChatMessage[]) =>
@@ -97,7 +97,7 @@ describe('items a turn lost at commit time', () => {
   const lost =
     'An item for memory.summaries ("The party met Borin") was not saved: a message it links to was edited while it was being written.';
 
-  it('gives a turn with no writes and no after-reply run a chip carrying the warnings', () => {
+  it('gives a turn with no writes and no run after the reply a chip carrying the warnings', () => {
     const view = buildView({ messages, entries: [{ ...entry('e1'), linkWarnings: [lost] }, entry('e2')] });
     expect(chips(view, messages).get('m-e1')).toEqual({
       turnNumber: 1,
@@ -109,16 +109,12 @@ describe('items a turn lost at commit time', () => {
   });
 });
 
-describe('the after-reply run of a turn', () => {
-  const post = (status: string, extra: Record<string, unknown> = {}) => ({
-    postStatus: status as 'error',
-    postExecutionId: 'p1',
-    ...extra,
-  });
+describe('the run after the reply of a turn', () => {
+  const post = (status: RunStatus, error?: string) => afterRun(status, { error });
   const messages = [reply('e1')];
 
   it('gives a failed run a chip even when the turn stored nothing', () => {
-    const view = buildView({ messages, entries: [{ ...entry('e1'), ...post('error', { postError: 'HTTP 500' }) }] });
+    const view = buildView({ messages, entries: [{ ...entry('e1'), ...post('error', 'HTTP 500') }] });
     expect(chips(view, messages).get('m-e1')).toEqual({
       turnNumber: 1,
       lines: [],
@@ -164,7 +160,56 @@ describe('the after-reply run of a turn', () => {
   });
 
   it('gives no chip to a turn that no longer counts', () => {
-    const view = buildView({ messages: [], entries: [{ ...entry('e1'), ...post('error', { postError: 'x' }) }] });
+    const view = buildView({ messages: [], entries: [{ ...entry('e1'), ...post('error', 'x') }] });
     expect(chips(view, messages).size).toBe(0);
+  });
+});
+
+describe('a turn of several runs', () => {
+  const run = (executionId: string, workflowId: string, part: 'reply' | 'post', status: 'completed' | 'error') => ({
+    executionId,
+    workflowId,
+    part,
+    status,
+    ...(status === 'error' && { error: 'boom' }),
+  });
+  const twoReplies = [run('e1', 'a', 'reply', 'completed'), run('r2', 'b', 'reply', 'completed')];
+  const view = (runs: ReturnType<typeof run>[], writes = [] as ReturnType<typeof setWrite>[]) => {
+    const messages = [userMessage(), reply('e1')];
+    return {
+      messages,
+      view: buildView({
+        messages,
+        entries: [{ ...entry('e1', writes), runs }],
+        workflowNames: { a: 'Narrator' },
+      }),
+    };
+  };
+
+  it('has a chip that lists the runs in order, even when the turn stored nothing', () => {
+    const { messages, view: built } = view(twoReplies);
+    expect(chips(built, messages).get('m-e1')?.runs).toEqual([
+      { executionId: 'e1', part: 'reply', status: 'completed', workflowName: 'Narrator' },
+      { executionId: 'r2', part: 'reply', status: 'completed' },
+    ]);
+  });
+
+  it('keeps the stored lines next to the runs', () => {
+    const { messages, view: built } = view(twoReplies, [setWrite('tension', 6)]);
+    const chip = chips(built, messages).get('m-e1');
+    expect(chip?.lines).toEqual(['scene.tension → 6']);
+    expect(chip?.runs).toHaveLength(2);
+  });
+
+  it('has no chip for a turn of one reply run that stored nothing', () => {
+    const { messages, view: built } = view([run('e1', 'a', 'reply', 'completed')]);
+    expect(chips(built, messages).size).toBe(0);
+  });
+
+  it('lists a workflow below the reply workflow as a second run and keeps the failure', () => {
+    const { messages, view: built } = view([run('e1', 'a', 'reply', 'completed'), run('p1', 'a', 'post', 'error')]);
+    const chip = chips(built, messages).get('m-e1');
+    expect(chip?.runs?.map((item) => item.part)).toEqual(['reply', 'post']);
+    expect(chip?.post).toEqual({ status: 'error', message: 'boom', executionId: 'p1' });
   });
 });

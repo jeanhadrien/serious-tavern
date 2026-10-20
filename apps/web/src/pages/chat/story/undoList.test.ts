@@ -274,3 +274,31 @@ describe('node memory', () => {
     expect(chat([[set(1)]]).undo('m-e1')).toEqual(['Draw #1 (draw): draws cleared']);
   });
 });
+
+describe('node memory of several workflows', () => {
+  // The same node id in two workflows is two nodes; a write without `workflowId` is legacy, read by every workflow.
+  const draw = (workflowId: string | undefined, id: string, text: string): StateWrite => {
+    const { target, ...rest } = drawWrite(id, text);
+    return { ...rest, target: { ...target, ...(workflowId && { workflowId }) } } as StateWrite;
+  };
+
+  it('keeps a node of another workflow apart even though the node id is the same', () => {
+    const { undo } = chat([
+      [draw('a', 'a1', 'resin smell')],
+      [draw('a', 'a2', 'wet stone'), draw('b', 'b1', 'cold iron')],
+    ]);
+    expect(undo('m-e2')).toEqual(["Draw #1 (draw) forgets 'wet stone'", "Draw #1 (draw) forgets 'cold iron'"]);
+  });
+
+  it("lists only what the workflow's own node loses, and never the other workflow's draws", () => {
+    // Turn 2 of workflow b has nothing of workflow a to forget: a's draw of turn 1 stays.
+    const { undo } = chat([[draw('a', 'a1', 'resin smell')], [draw('b', 'b1', 'cold iron')]]);
+    expect(undo('m-e2')).toEqual(["Draw #1 (draw) forgets 'cold iron'"]);
+  });
+
+  it('reads the legacy writes together with the workflow own, as its nodes do', () => {
+    const { undo } = chat([[draw(undefined, 'old', 'resin smell')], [draw('a', 'a1', 'wet stone')]]);
+    expect(undo('m-e2')).toEqual(["Draw #1 (draw) forgets 'wet stone'"]);
+    expect(undo('m-e1')).toEqual(["Draw #1 (draw) forgets 'resin smell'"]);
+  });
+});

@@ -88,7 +88,8 @@ describe('the size of the state view', () => {
       const bumped = state.turns[2]!.writes.find((item) => item.write.nodeId === 'bump')!;
       expect(bumped.truncated).toBeUndefined();
       expect(bumped.write).toMatchObject({ op: 'set', value: 3 });
-      expect(JSON.stringify(state).length).toBeLessThan(BIG + 3000);
+      // Each turn lists its run (ids and the workflow's name), which is a few hundred characters over three turns.
+      expect(JSON.stringify(state).length).toBeLessThan(BIG + 4000);
 
       // The stored data is whole.
       const [first] = entriesOf(await readSession(app, session.id));

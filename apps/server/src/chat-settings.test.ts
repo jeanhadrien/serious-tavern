@@ -81,8 +81,8 @@ describe('chat settings on sessions', () => {
     expect(workflow.settings?.[1]).toEqual({ key: 'flag', type: 'boolean', default: false });
     const result = await send(app, session.id);
     expect(result.assistantMessages[0]?.content).toBe('v=0.3 f=false m=calm n=');
-    expect(result.execution.settings).toEqual({ volatility: 0.3, flag: false, mood: 'calm', note: '' });
-    expect(result.execution.warnings).not.toContainEqual(expect.stringContaining('Chat setting'));
+    expect(result.execution!.settings).toEqual({ volatility: 0.3, flag: false, mood: 'calm', note: '' });
+    expect(result.execution!.warnings).not.toContainEqual(expect.stringContaining('Chat setting'));
   });
 
   it('merges patches, resets keys with null and never advances updatedAt', async () => {
@@ -133,7 +133,7 @@ describe('chat settings on sessions', () => {
     expect(switched.json()).toMatchObject({ workflowId: other.id, settings: { volatility: 0.9, level: 4 } });
     const onOther = await send(app, session.id);
     expect(onOther.assistantMessages[0]?.content).toBe('l=4 v=');
-    expect(onOther.execution.settings).toEqual({ level: 4 });
+    expect(onOther.execution!.settings).toEqual({ level: 4 });
     await patch(app, session.id, { workflowId: workflow.id });
     expect((await send(app, session.id)).assistantMessages[0]?.content).toMatch(/^v=0\.9 /);
   });
@@ -145,7 +145,7 @@ describe('chat settings on sessions', () => {
     await createWorkflowUpdate(app, workflow.id, narrowed);
     const result = await send(app, session.id);
     expect(result.assistantMessages[0]?.content).toMatch(/^v=0\.3 /);
-    expect(result.execution.warnings).toContain(
+    expect(result.execution!.warnings).toContain(
       'Chat setting "volatility": Stored value 0.8 is above max 0.5; using default 0.3.',
     );
     expect((await read(app, session.id)).settings).toEqual({ volatility: 0.8 });
@@ -313,9 +313,9 @@ describe('mergeSettings', () => {
   const workflow = { id: 'w', name: 'W', nodes: [], edges: [], createdAt: '', updatedAt: '', settings: [] };
   it('returns a new object and leaves the stored one alone', () => {
     const stored = Object.freeze({ ghost: 1 });
-    expect(mergeSettings(stored, { ghost: null }, workflow)).toEqual({});
+    expect(mergeSettings(stored, { ghost: null }, [workflow])).toEqual({});
     expect(stored).toEqual({ ghost: 1 });
-    expect(mergeSettings(undefined, {}, workflow)).toEqual({});
+    expect(mergeSettings(undefined, {}, [workflow])).toEqual({});
   });
 });
 

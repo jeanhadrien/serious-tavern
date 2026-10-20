@@ -72,9 +72,9 @@ afterEach(() => {
 });
 
 describe('multiple chat outputs', () => {
-  it('requires one input and at least one output, but allows multiple outputs', async () => {
+  it('requires one input and at least one sink, but allows multiple outputs', async () => {
     expect(await validateWorkflow(graph([node('input', 'chat-input')], []))).toContainEqual(
-      expect.objectContaining({ message: expect.stringContaining('chat-output node') }),
+      expect.objectContaining({ message: expect.stringContaining('at least one node that writes something') }),
     );
     expect(
       await validateWorkflow(

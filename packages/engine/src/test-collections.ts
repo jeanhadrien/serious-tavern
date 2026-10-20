@@ -54,6 +54,7 @@ export async function runNode(
     trigger: { message: options.message ?? '', sessionId: 's' },
     settings: {},
     history: options.history ?? [],
+    replies: [],
     secrets: { get: async () => undefined },
     resources: options.resources,
     signal: new AbortController().signal,

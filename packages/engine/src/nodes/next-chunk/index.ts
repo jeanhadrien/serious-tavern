@@ -4,16 +4,6 @@ import type { NodeDefinition } from '../../types.js';
 import { coerceValue } from '../../text.js';
 import { itemsOf, locateCollection } from '../state-key.js';
 
-const inputs: PortDef[] = [
-  {
-    name: 'after',
-    label: 'After',
-    dataType: 'any',
-    description:
-      'Nothing is read from it. Connect After Reply here to look for a chunk after the reply, so the work never delays it',
-  },
-];
-
 const outputs: PortDef[] = [
   { name: 'messages', label: 'Messages', dataType: 'messages', optional: true, description: 'The chunk as messages' },
   {
@@ -53,7 +43,7 @@ export const nextChunk: NodeDefinition = {
   description:
     'Finds the next chunk of older chat messages that no intact item of a state collection key links to (or a broken item to redo). Outputs nothing when every message outside the raw window is covered.',
   category: 'History',
-  inputs,
+  inputs: [],
   outputs,
   configSchema: z.object({
     definitionId: z.string().min(1, 'Select a state definition'),
@@ -72,7 +62,7 @@ export const nextChunk: NodeDefinition = {
   // The ports never change; resolving them checks the target, so an unset or mistaken key shows as "not set up".
   async resolvePorts(config, resources) {
     await locateCollection(config, (id) => resources.stateDefinitions?.get(id));
-    return { inputs, outputs };
+    return { inputs: [], outputs };
   },
   async execute(ctx) {
     const found = await locateCollection(ctx.config, (id) => ctx.state.definition(id));

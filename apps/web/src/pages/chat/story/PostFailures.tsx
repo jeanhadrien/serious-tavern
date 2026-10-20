@@ -3,7 +3,7 @@ import type { PostFailure } from './postRuns.js';
 import { POST_DETAILS_LABEL, POST_FAILURES_HEADING, postFailureNote, postFailureSubject } from './postRunText.js';
 
 /**
- * The chat panel's list of after-reply runs that failed or were cut short, with each run's log: the toast is gone
+ * The chat panel's list of runs after the reply that failed or were cut short, with each run's log: the toast is gone
  * after a moment and the chip needs a reply to hang on, so this is where a failure stays visible.
  */
 export function PostFailures({ failures }: { failures: readonly PostFailure[] }) {
@@ -15,7 +15,7 @@ export function PostFailures({ failures }: { failures: readonly PostFailure[] })
         {failures.map((failure, index) => (
           <li key={failure.executionId ?? index}>
             <p className="error">
-              <strong>{postFailureSubject(failure)}</strong> · {postFailureNote(failure.error)}
+              <strong>{postFailureSubject(failure)}</strong> · {postFailureNote(failure.error, failure.workflowName)}
             </p>
             {failure.executionId && <ExecutionDetails id={failure.executionId} label={POST_DETAILS_LABEL} optional />}
           </li>

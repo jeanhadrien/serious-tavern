@@ -4,26 +4,37 @@ import { PostRunStatus } from './PostRunStatus.js';
 
 const noop = () => {};
 
-it('renders nothing without a running after-reply run', () => {
+it('renders nothing without a running run after the reply', () => {
   expect(renderToStaticMarkup(<PostRunStatus sessionId="s" onStopped={noop} />)).toBe('');
 });
 
 it('is a polite status with the label and a stop button', () => {
   const html = renderToStaticMarkup(
-    <PostRunStatus sessionId="s" run={{ status: 'running', turnNumber: 3 }} onStopped={noop} />,
+    <PostRunStatus sessionId="s" run={{ executionId: 'p1', status: 'running', turnNumber: 3 }} onStopped={noop} />,
   );
   expect(html).toContain('role="status"');
   expect(html).toContain('aria-live="polite"');
-  expect(html).toContain('Running after-reply steps… (turn 3)');
+  expect(html).toContain('Running after the reply… (turn 3)');
   const button = html.match(/<button[^>]*>/)?.[0] ?? '';
-  expect(button).toContain('aria-label="Stop after-reply steps"');
-  expect(button).toContain('title="Stop after-reply steps"');
+  expect(button).toContain('aria-label="Stop the workflows running after the reply"');
+  expect(button).toContain('title="Stop the workflows running after the reply"');
 });
 
 it('leaves out the turn when the run does not know it', () => {
   const html = renderToStaticMarkup(
-    <PostRunStatus sessionId="s" run={{ status: 'running', turnNumber: null }} onStopped={noop} />,
+    <PostRunStatus sessionId="s" run={{ executionId: 'p1', status: 'running', turnNumber: null }} onStopped={noop} />,
   );
-  expect(html).toContain('Running after-reply steps…<');
+  expect(html).toContain('Running after the reply…<');
   expect(html).not.toContain('(turn');
+});
+
+it('says which workflow runs when the view knows it', () => {
+  const html = renderToStaticMarkup(
+    <PostRunStatus
+      sessionId="s"
+      run={{ executionId: 'p1', status: 'running', turnNumber: 3, workflowName: 'Memory' }}
+      onStopped={noop}
+    />,
+  );
+  expect(html).toContain('Running Memory after the reply… (turn 3)');
 });

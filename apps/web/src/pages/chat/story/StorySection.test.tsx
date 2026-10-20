@@ -1,7 +1,17 @@
 import { expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { StorySection } from './StorySection.js';
-import { addWrite, buildView, drawWrite, entry, reply, scene, setWrite, userMessage } from './test-fixtures.js';
+import {
+  addWrite,
+  afterRun,
+  buildView,
+  drawWrite,
+  entry,
+  reply,
+  scene,
+  setWrite,
+  userMessage,
+} from './test-fixtures.js';
 import type { StoryPanelData } from './useStoryState.js';
 
 const render = (story: StoryPanelData) =>
@@ -229,26 +239,26 @@ it('gives an object value its full pretty-printed JSON as the tooltip', () => {
   expect(title.replaceAll('&quot;', '"').replaceAll('&#10;', '\n')).toBe(JSON.stringify(flags, null, 2));
 });
 
-it('lists failed after-reply runs, also when nothing is stored and for a turn without a reply', () => {
-  const failed = { ...entry('e1', [], 0), postStatus: 'error' as const, postExecutionId: 'p1', postError: 'HTTP 500' };
+it('lists failed runs after the reply, also when nothing is stored and for a turn without a reply', () => {
+  const failed = { ...entry('e1', [], 0), ...afterRun('error', { error: 'HTTP 500' }) };
   const html = render({ failed: false, view: buildView({ messages: [], entries: [failed] }) });
-  expect(html).toContain('After-reply steps that failed');
+  expect(html).toContain('Runs after the reply that failed');
   expect(html).toContain('Turn 1 (no reply)');
-  expect(html).toContain('After-reply steps failed: HTTP 500');
-  expect(html).toContain('<summary>After-reply run details</summary>');
+  expect(html).toContain('A workflow failed after the reply: HTTP 500');
+  expect(html).toContain('<summary>Run details</summary>');
   // The explanation of an empty story is still there.
   expect(html).toContain('Nothing has been stored in this chat yet.');
 });
 
 it('lists them above the stored keys, and not at all when none failed or one was only stopped', () => {
   const messages = [reply('e1'), reply('e2')];
-  const failed = { ...entry('e1', [setWrite('tension', 5)]), postStatus: 'error' as const, postError: 'boom' };
-  const stopped = { ...entry('e2', [setWrite('tension', 7)]), postStatus: 'stopped' as const, postExecutionId: 'p2' };
+  const failed = { ...entry('e1', [setWrite('tension', 5)]), ...afterRun('error', { error: 'boom' }) };
+  const stopped = { ...entry('e2', [setWrite('tension', 7)]), ...afterRun('stopped', { executionId: 'p2' }) };
   const html = render({ failed: false, view: buildView({ messages, entries: [failed, stopped] }) });
-  expect(html.indexOf('After-reply steps that failed')).toBeLessThan(html.indexOf('story-definition'));
-  expect(html).toContain('After-reply steps failed: boom');
-  // The failed run has no execution id here: no log disclosure; the stopped one is not a failure.
-  expect(html).not.toContain('After-reply run details');
+  expect(html.indexOf('Runs after the reply that failed')).toBeLessThan(html.indexOf('story-definition'));
+  expect(html).toContain('A workflow failed after the reply: boom');
+  // The failed run has a log; the stopped one is not a failure.
+  expect(html).toContain('<summary>Run details</summary>');
   expect(html).not.toContain('Turn 2');
-  expect(render({ failed: false, view: played() })).not.toContain('After-reply steps that failed');
+  expect(render({ failed: false, view: played() })).not.toContain('Runs after the reply that failed');
 });

@@ -19,12 +19,14 @@ const render = (target: Workflow | undefined, stored?: Record<string, unknown>) 
   renderToStaticMarkup(
     <MemoryRouter>
       <ChatPanel
-        workflow={target}
+        workflows={target ? [target] : []}
+        replyList={[{ workflowId: 'w1', enabled: true }]}
         stored={stored}
         sessionId="s1"
         story={{ failed: false }}
         onRevealed={() => {}}
         onSave={async () => {}}
+        onSaveReply={async () => true}
         onClose={() => {}}
       />
     </MemoryRouter>,
@@ -38,6 +40,28 @@ it('says when the workflow declares no settings and links to its editor', () => 
   expect(html).toContain(`href="${layoutHref({ wide: 'workflows', wideId: 'w1' })}"`);
   expect(html).toContain('aria-label="Close chat panel"');
   expect(render(undefined)).not.toContain('<a ');
+});
+
+it('has the On reply list first, then Settings, then Story state', () => {
+  const html = render(workflow());
+  expect(html.indexOf('>On reply</h3>')).toBeLessThan(html.indexOf('>Settings</h3>'));
+  expect(html).toContain('aria-labelledby="chat-reply-s1"');
+});
+
+it('no longer has a workflow select in the header', () => {
+  const html = renderToStaticMarkup(
+    <ChatHeader
+      title="Chat"
+      characters={[]}
+      personas={[]}
+      disabled={false}
+      onUpdate={async () => {}}
+      panelOpen={false}
+      onTogglePanel={() => {}}
+    />,
+  );
+  expect(html).not.toContain('aria-label="Workflow"');
+  expect(html).toContain('aria-label="Chat title"');
 });
 
 it('has a Story state section under Settings, loading until the state arrives', () => {
@@ -81,8 +105,6 @@ it('shows the panel toggle in the chat header, usable while the chat is busy', (
   const html = renderToStaticMarkup(
     <ChatHeader
       title="Chat"
-      workflowId="w1"
-      workflows={[workflow()]}
       characters={[]}
       personas={[]}
       disabled
@@ -108,7 +130,7 @@ it('renders a key declared twice once, with its first declaration, as the resolv
   );
   expect(html.match(/class="chat-setting /g)).toHaveLength(1);
   expect(html).toContain('value="calm"');
-  expect(html).not.toContain('type="checkbox"');
+  expect(html).not.toContain('chat-setting-toggle');
 });
 
 it('points to the workflow editor when declarations exist but none is usable', () => {

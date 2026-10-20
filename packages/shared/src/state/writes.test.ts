@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { sessionSchema } from '../models.js';
 import { item, nodeAddWrite, setWrite, turnEntry } from './test-fixtures.js';
 import {
-  postStatusSchema,
   readTurnEntries,
+  runStatusSchema,
   stateWriteSchema,
   turnEntrySchema,
   withTurnEntry,
@@ -22,6 +22,15 @@ describe('stateWriteSchema', () => {
     [
       'a node target',
       { op: 'add', target: { kind: 'node', nodeId: 'n', key: 'draws' }, nodeId: 'n', item: { id: 'i', text: '' } },
+    ],
+    [
+      'a node target of a workflow',
+      {
+        op: 'add',
+        target: { kind: 'node', nodeId: 'n', key: 'draws', workflowId: 'w1' },
+        nodeId: 'n',
+        item: { id: 'i', text: '' },
+      },
     ],
     ['unknown fields', { op: 'delete', target: { ...target, extra: 1 }, nodeId: 'n', note: 'x' }],
     [
@@ -115,37 +124,34 @@ describe('turnEntrySchema', () => {
   });
 });
 
-describe('the post-turn run fields of an entry', () => {
+describe('the runs of an entry', () => {
   const base = { executionId: 'e', at: 't', completed: true, replies: 1 };
+  const run = { executionId: 'r', workflowId: 'w', part: 'post', status: 'running' };
 
-  it.each(postStatusSchema.options)('keeps the fields of a run that is %s', (postStatus) => {
-    const entry = { ...base, writes: [], postExecutionId: 'p', postStatus, postError: 'boom' };
+  it.each(runStatusSchema.options)('keeps a run that is %s', (status) => {
+    const entry = { ...base, writes: [], runs: [{ ...run, status, error: 'boom' }] };
     expect(turnEntrySchema.parse(entry)).toStrictEqual(entry);
   });
 
-  it('parses an entry without them to an object without those keys', () => {
+  it('parses an entry without runs to an object without that key', () => {
     expect(turnEntrySchema.parse({ ...base, writes: [] })).toStrictEqual({ ...base, writes: [] });
     expect(readTurnEntries({ turns: [{ ...base, writes: [] }] })).toStrictEqual([{ ...base, writes: [] }]);
   });
 
-  it.each([
-    ['a status that is not one', { postStatus: 'paused' }],
-    ['a status that is a number', { postStatus: 7 }],
-    ['an error that is an object', { postError: {} }],
-    ['an error that is a number', { postError: 3 }],
-    ['an empty execution id', { postExecutionId: '' }],
-    ['an execution id that is a list', { postExecutionId: ['p'] }],
-  ])('drops %s and still reads the turn', (_, over) => {
-    const [name] = Object.keys(over);
-    const [entry] = readTurnEntries({ turns: [{ ...base, writes: [setWrite('n', 1)], ...over }] });
-    expect(entry).toMatchObject({ executionId: 'e', completed: true, replies: 1, writes: [setWrite('n', 1)] });
-    expect(entry?.[name as 'postStatus']).toBeUndefined();
+  it('skips a run it cannot read and keeps the turn, its writes and the other runs', () => {
+    const good = { ...run, executionId: 'ok' };
+    const [entry] = readTurnEntries({
+      turns: [{ ...base, writes: [setWrite('n', 1)], runs: [{ ...run, status: 'paused' }, good] }],
+    });
+    expect(entry).toMatchObject({ executionId: 'e', writes: [setWrite('n', 1)], runs: [good] });
   });
 
-  it('keeps the good fields next to a bad one', () => {
-    const [entry] = readTurnEntries({ turns: [{ ...base, postExecutionId: 'p', postStatus: 'bogus' }] });
-    expect(entry?.postExecutionId).toBe('p');
-    expect(entry?.postStatus).toBeUndefined();
+  it('reads an entry whose runs are all unreadable, or not a list, as one without runs', () => {
+    for (const runs of [[{ nope: 1 }], 'oops']) {
+      const [entry] = readTurnEntries({ turns: [{ ...base, writes: [], runs }] });
+      expect(entry).toMatchObject({ executionId: 'e' });
+      expect(entry?.runs).toBeUndefined();
+    }
   });
 
   it('keeps the dropped-link warnings of a turn, and drops a bad value without losing the turn', () => {
@@ -157,7 +163,7 @@ describe('the post-turn run fields of an entry', () => {
   });
 
   it('accepts a session that stores them', () => {
-    const state = { turns: [{ ...base, writes: [], postExecutionId: 'p', postStatus: 'running' }] };
+    const state = { turns: [{ ...base, writes: [], runs: [run] }] };
     const session = { id: 's', title: 'T', workflowId: 'w', messages: [], createdAt: '', updatedAt: '', state };
     expect(sessionSchema.parse(session)).toEqual(session);
   });
@@ -270,6 +276,46 @@ describe('withUpdatedTurnEntry', () => {
   });
 });
 
+describe('the runs of an entry', () => {
+  const good = turnEntry('a', [setWrite('n', 1)]);
+  const reply = { executionId: 'r1', workflowId: 'w1', part: 'reply', status: 'completed' };
+  const post = { executionId: 'r2', workflowId: 'w1', part: 'post', status: 'running', note: 'kept' };
+
+  it('reads an entry without runs as it always was: no runs key', () => {
+    expect(readTurnEntries({ turns: [good] })[0]).not.toHaveProperty('runs');
+  });
+
+  it('reads the runs in order, keeping unknown fields', () => {
+    expect(readTurnEntries({ turns: [{ ...good, runs: [reply, post] }] })[0]!.runs).toEqual([reply, post]);
+  });
+
+  it('skips a run it cannot read without dropping the others or the turn', () => {
+    const bad = [{ ...reply, status: 'weird' }, { ...reply, part: 'middle' }, 'x', null, { part: 'post' }];
+    expect(readTurnEntries({ turns: [{ ...good, runs: [...bad, post] }] })[0]!.runs).toEqual([post]);
+  });
+
+  it('reads an entry whose runs are all unreadable, or not a list, as a legacy one', () => {
+    for (const runs of [[{ junk: 1 }], [], 'x', 5, {}]) {
+      const [entry] = readTurnEntries({ turns: [{ ...good, runs, postExecutionId: 'p', postStatus: 'running' }] });
+      expect(entry).not.toHaveProperty('runs');
+      expect(entry).toMatchObject({ executionId: 'a', postStatus: 'running' });
+    }
+  });
+
+  it('drops a bad error text of a run, not the run', () => {
+    expect(readTurnEntries({ turns: [{ ...good, runs: [{ ...reply, status: 'error', error: 5 }] }] })[0]!.runs).toEqual(
+      [{ ...reply, status: 'error' }],
+    );
+  });
+
+  it('keeps legacy post fields and runs side by side', () => {
+    const [entry] = readTurnEntries({
+      turns: [{ ...good, runs: [reply], postExecutionId: 'p', postStatus: 'completed' }],
+    });
+    expect(entry).toMatchObject({ runs: [reply], postExecutionId: 'p', postStatus: 'completed' });
+  });
+});
+
 describe('session and message schemas', () => {
   const session = { id: 's', title: 'T', workflowId: 'w', messages: [], createdAt: '', updatedAt: '' };
 
@@ -278,6 +324,14 @@ describe('session and message schemas', () => {
     const withState = { ...session, state: { turns: [turnEntry('a', [setWrite('n', 1)])] } };
     expect(sessionSchema.parse(withState)).toEqual(withState);
     expect(sessionSchema.parse({ ...session, state: { turns: [], extra: 1 } }).state).toEqual({ turns: [], extra: 1 });
+  });
+
+  it('keeps the reply list and a message’s run id, and does not require them', () => {
+    const triggers = { reply: [{ workflowId: 'w', enabled: false }], other: 1 };
+    const message = { id: 'm', role: 'assistant', content: 'hi', createdAt: '', runId: 'r1' };
+    const withBoth = { ...session, triggers, messages: [message] };
+    expect(sessionSchema.parse(withBoth)).toEqual(withBoth);
+    expect(sessionSchema.parse(session)).not.toHaveProperty('triggers');
   });
 
   it('keeps editedAt on messages and does not require it', () => {
