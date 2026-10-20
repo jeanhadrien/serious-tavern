@@ -21,6 +21,7 @@ function compileKey(key: KeyDraft): { def?: Record<string, unknown>; problems: s
   const set = (name: string, value: unknown) => {
     if (value !== undefined) typed[name] = value;
   };
+  set('description', key.description.trim() || undefined);
   switch (key.type) {
     case 'number':
       set('default', number('Default', key.default));

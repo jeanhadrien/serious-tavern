@@ -38,6 +38,25 @@ describe('toDraft and compile', () => {
     expect(bodyOf(draft)?.keys.flags).toMatchObject({ schema: { a: 'number' }, 'x-note': 'keep me' });
   });
 
+  it('keeps a key description out of the unknown properties, trims it, and drops a blank one', () => {
+    const stored = definition({ keys: { tension: { type: 'number', description: 'How tense it is', max: 10 } } });
+    const draft = toDraft(stored);
+    expect(draft.keys[0]).toMatchObject({ description: 'How tense it is', rest: {} });
+    expect(bodyOf(draft)?.keys.tension).toEqual({ type: 'number', description: 'How tense it is', max: 10 });
+    const edited = { ...draft, keys: [{ ...draft.keys[0]!, description: '  Tension  ' }] };
+    expect(bodyOf(edited)?.keys.tension).toMatchObject({ description: 'Tension' });
+    expect(draftChanged(edited, stored)).toBe(true);
+    expect(bodyOf({ ...draft, keys: [{ ...draft.keys[0]!, description: ' ' }] })?.keys.tension).toEqual({
+      type: 'number',
+      max: 10,
+    });
+  });
+
+  it('keeps the description when the key type changes', () => {
+    const key = { ...newKeyDraft(), name: 'k', description: 'About k', min: '1' };
+    expect(changeKeyType(key, 'text')).toMatchObject({ description: 'About k', min: '' });
+  });
+
   it('numbers the rows k0..kn in key order', () => {
     expect(toDraft(definition()).keys.map((key) => key.uid)).toEqual(['k0', 'k1', 'k2', 'k3', 'k4', 'k5', 'k6']);
   });

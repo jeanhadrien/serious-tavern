@@ -105,7 +105,7 @@ describe('integration nodes', () => {
     expect(result.body).toEqual({ ok: true });
   });
   it('uses a fake provider, rendered preset, secretName and wire recorder', async () => {
-    const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
+    const chat = vi.fn().mockResolvedValue(chatResponse('reply'));
     useAdapter({ chat });
     const get = vi.fn().mockResolvedValue('test-key');
     const recordWire = vi.fn();
@@ -127,7 +127,7 @@ describe('integration nodes', () => {
     );
   });
   it('hands the resolved provider record to the adapter', async () => {
-    const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
+    const chat = vi.fn().mockResolvedValue(chatResponse('reply'));
     useAdapter({ chat });
     await llm.execute(ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake' }));
     expect(chat.mock.calls[0]?.[1]).toMatchObject({ provider: providerRecord('fake') });
@@ -138,7 +138,7 @@ describe('integration nodes', () => {
     );
   });
   it('calls a provider without a secret without asking for credentials', async () => {
-    const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
+    const chat = vi.fn().mockResolvedValue(chatResponse('reply'));
     useAdapter({ chat });
     const get = vi.fn();
     const local = { ...providerRecord('local'), secret: undefined };
@@ -246,7 +246,7 @@ describe('integration nodes', () => {
   });
 
   it.each([undefined, false, true])('records and sends the final prompt with mergeSystemMessages=%s', async (merge) => {
-    const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
+    const chat = vi.fn().mockResolvedValue(chatResponse('reply'));
     useAdapter({ chat });
     const definition: Preset = {
       ...preset,
@@ -306,7 +306,11 @@ describe('integration nodes', () => {
       nodeId: 'llm-node',
       emit: (event) => events.push(event),
     });
-    expect(result).toEqual({ text: 'Hello', raw: { streamed: true } });
+    expect(result).toEqual({
+      text: 'Hello',
+      raw: { streamed: true },
+      exchange: [{ role: 'assistant', content: 'Hello' }],
+    });
     expect(chat).not.toHaveBeenCalled();
     expect(events).toEqual([
       { type: 'node:delta', nodeId: 'llm-node', detail: { reasoningDelta: 'Plan.' } },
@@ -316,20 +320,24 @@ describe('integration nodes', () => {
   });
 
   it('falls back to chat without deltas when the provider cannot stream', async () => {
-    const chat = vi.fn().mockResolvedValue({ text: 'whole', raw: { whole: true } });
+    const chat = vi.fn().mockResolvedValue(chatResponse('whole', { raw: { whole: true } }));
     useAdapter({ chat });
     const emit = vi.fn();
     const result = await llm.execute({
       ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake' }),
       emit,
     });
-    expect(result).toEqual({ text: 'whole', raw: { whole: true } });
+    expect(result).toEqual({
+      text: 'whole',
+      raw: { whole: true },
+      exchange: [{ role: 'assistant', content: 'whole' }],
+    });
     expect(chat).toHaveBeenCalledTimes(1);
     expect(emit).not.toHaveBeenCalled();
   });
 
   it('uses chat without deltas when streaming is disabled, even if the provider supports it', async () => {
-    const chat = vi.fn().mockResolvedValue({ text: 'whole', raw: { whole: true } });
+    const chat = vi.fn().mockResolvedValue(chatResponse('whole', { raw: { whole: true } }));
     const stream = vi.fn();
     useAdapter({ chat, stream });
     const emit = vi.fn();
@@ -337,28 +345,32 @@ describe('integration nodes', () => {
       ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', streaming: false }),
       emit,
     });
-    expect(result).toEqual({ text: 'whole', raw: { whole: true } });
+    expect(result).toEqual({
+      text: 'whole',
+      raw: { whole: true },
+      exchange: [{ role: 'assistant', content: 'whole' }],
+    });
     expect(chat).toHaveBeenCalledTimes(1);
     expect(stream).not.toHaveBeenCalled();
     expect(emit).not.toHaveBeenCalled();
   });
 
   it('surfaces a non-streamed reasoning trace as one reasoning delta', async () => {
-    useAdapter({ chat: vi.fn().mockResolvedValue({ text: 'whole', reasoning: 'Plan.', raw: {} }) });
+    useAdapter({ chat: vi.fn().mockResolvedValue(chatResponse('whole', { reasoning: 'Plan.' })) });
     const events: EngineEvent[] = [];
     const result = await llm.execute({
       ...ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', streaming: false }),
       nodeId: 'llm-node',
       emit: (event) => events.push(event),
     });
-    expect(result).toEqual({ text: 'whole', raw: {} });
+    expect(result).toEqual({ text: 'whole', raw: {}, exchange: [{ role: 'assistant', content: 'whole' }] });
     expect(events).toEqual([{ type: 'node:delta', nodeId: 'llm-node', detail: { reasoningDelta: 'Plan.' } }]);
   });
 
   it.each(['off', 'low', 'medium', 'high'] as const)(
     'passes reasoningEffort %s to the provider request',
     async (reasoningEffort) => {
-      const chat = vi.fn().mockResolvedValue({ text: 'reply', raw: {} });
+      const chat = vi.fn().mockResolvedValue(chatResponse('reply'));
       useAdapter({ chat });
       await llm.execute(ctx({ ...llm.defaultConfig, presetId: preset.id, provider: 'fake', reasoningEffort }));
       expect(chat.mock.calls[0]?.[0]).toMatchObject({ reasoningEffort });

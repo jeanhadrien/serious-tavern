@@ -1,9 +1,20 @@
 import { z } from 'zod';
-import { characterSchema, presetInputLabel, reasoningEfforts, type PromptMessage } from '@st/shared';
+import {
+  characterSchema,
+  presetInputLabel,
+  reasoningEfforts,
+  repairToolSequence,
+  type PromptMessage,
+} from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { renderPreset } from '../../preset.js';
-import { adapters, missingSecretMessage, type ChatResponse } from '../../providers/index.js';
+import { adapters, missingSecretMessage } from '../../providers/index.js';
 import '../../providers/openai-compatible.js';
+import { runToolLoop } from '../../tools/loop.js';
+import { buildStateTools } from '../../tools/state-tools.js';
+import { modelCaller } from './call.js';
+import { applyReplayPolicy } from './replay.js';
+import { toolSettingsSchema } from './tool-settings.js';
 
 export function mergeSystemMessages(messages: readonly PromptMessage[]): PromptMessage[] {
   const result: PromptMessage[] = [];
@@ -32,6 +43,13 @@ export const llm: NodeDefinition = {
   outputs: [
     { name: 'text', label: 'Text', dataType: 'text' },
     { name: 'raw', label: 'Raw', dataType: 'object' },
+    {
+      name: 'exchange',
+      label: 'Exchange',
+      dataType: 'messages',
+      description:
+        "The messages this run produced: each step's assistant message and its tool results, ending with the answer",
+    },
   ],
   configSchema: z.object({
     provider: z.string().min(1).default('openrouter'),
@@ -65,6 +83,7 @@ export const llm: NodeDefinition = {
       .boolean()
       .default(true)
       .describe('Stream tokens and reasoning as they are generated; disable to wait for the full response'),
+    ...toolSettingsSchema.shape,
   }),
   defaultConfig: {
     provider: 'openrouter',
@@ -76,6 +95,10 @@ export const llm: NodeDefinition = {
     reasoningExclude: false,
     mergeSystemMessages: false,
     streaming: true,
+    tools: { read: [], write: [] },
+    maxSteps: 5,
+    toolChoice: 'auto',
+    replayReasoning: 'never',
   },
   async resolvePorts(config, resources) {
     const preset = await resources.presets.get(String(config.presetId ?? ''));
@@ -115,9 +138,14 @@ export const llm: NodeDefinition = {
         state: ctx.state,
       },
     });
-    const messages = ctx.config.mergeSystemMessages === true ? mergeSystemMessages(rendered) : rendered;
+    const settings = toolSettingsSchema.parse(ctx.config);
+    const model = String(ctx.config.model);
+    const merged = ctx.config.mergeSystemMessages === true ? mergeSystemMessages(rendered) : rendered;
+    const replayed = applyReplayPolicy(merged, settings.replayReasoning, { providerId: provider.id, model });
+    const { messages, dropped } = repairToolSequence(replayed);
+    if (dropped > 0) ctx.log(`Left out ${dropped} tool message(s) or call(s) that had no counterpart in the prompt`);
     const request = {
-      model: String(ctx.config.model),
+      model,
       messages,
       temperature: Number(ctx.config.temperature),
       maxTokens: Number(ctx.config.maxTokens),
@@ -136,24 +164,15 @@ export const llm: NodeDefinition = {
       ),
     };
     const options = { provider, apiKey, nodeId: ctx.nodeId, signal: ctx.signal, onWire: ctx.recordWire };
-    const delta = (detail: { textDelta?: string; reasoningDelta?: string }) =>
-      ctx.emit({ type: 'node:delta', nodeId: ctx.nodeId, detail });
-    // One HTTP call, one wire log entry.
-    ctx.beginWire();
-    // Deltas are notifications only; the outcome is the accumulated response returned below.
-    const stream = adapter.stream;
-    let response: ChatResponse;
-    if (ctx.config.streaming !== false && stream != null) {
-      response = await stream(request, {
-        ...options,
-        onToken: (textDelta) => delta({ textDelta }),
-        onReasoning: (reasoningDelta) => delta({ reasoningDelta }),
-      });
-    } else {
-      response = await adapter.chat(request, options);
-      // A whole reasoning trace reaches the chat like a streamed one: as a single delta.
-      if (response.reasoning) delta({ reasoningDelta: response.reasoning });
-    }
-    return { text: response.text, raw: response.raw };
+    const { exchange, response } = await runToolLoop({
+      request,
+      call: modelCaller(ctx, adapter, options),
+      tools: await buildStateTools(ctx, settings.tools),
+      maxSteps: settings.maxSteps,
+      toolChoice: settings.toolChoice,
+      parallelToolCalls: settings.parallelToolCalls,
+      ctx,
+    });
+    return { text: response.text, raw: response.raw, exchange };
   },
 };

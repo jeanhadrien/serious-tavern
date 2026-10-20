@@ -16,29 +16,35 @@ export const TEMPLATE_NAME_RULE =
   'Use letters, digits and _, not starting with a digit; words such as this, true or toString are reserved';
 const templateName = z.string().refine(isSettingKey, TEMPLATE_NAME_RULE);
 
+// What the key is for. Not used by the fold; the LLM node's state tools show it to the model.
+const keyDescription = z.string().optional();
+
 export const stateKeyDefSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('number'),
+      description: keyDescription,
       // Absent means 0, kept inside min..max.
       default: z.number().optional(),
       min: z.number().optional(),
       max: z.number().optional(),
     })
     .passthrough(),
-  z.object({ type: z.literal('boolean'), default: z.boolean().optional() }).passthrough(),
+  z.object({ type: z.literal('boolean'), description: keyDescription, default: z.boolean().optional() }).passthrough(),
   z
     .object({
       type: z.literal('enum'),
+      description: keyDescription,
       options: z.array(z.string()).min(1, 'An enum needs at least one option'),
       // Absent means the first option.
       default: z.string().optional(),
     })
     .passthrough(),
-  z.object({ type: z.literal('text'), default: z.string().optional() }).passthrough(),
+  z.object({ type: z.literal('text'), description: keyDescription, default: z.string().optional() }).passthrough(),
   z
     .object({
       type: z.literal('object'),
+      description: keyDescription,
       default: z.record(z.string(), z.unknown()).optional(),
       // Kept for later; nothing is checked against it yet.
       schema: z.unknown().optional(),
@@ -47,6 +53,7 @@ export const stateKeyDefSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('collection'),
+      description: keyDescription,
       // Keeps the `cap` newest items when read.
       cap: z.number().int().min(1).optional(),
       // Declared extra fields of an item (`id` and `text` always exist).
