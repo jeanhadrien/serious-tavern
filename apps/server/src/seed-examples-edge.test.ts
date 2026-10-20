@@ -10,6 +10,7 @@ import {
   SUMMARIES_NARRATOR_PRESET_ID,
   SUMMARIZE_WORKFLOW_ID,
 } from './examples/rolling-summaries.js';
+import { SCENARIST_NARRATOR_PRESET_ID } from './examples/scenarist.js';
 import { seedExamples } from './seed-examples.js';
 import { LEDGER_FILE } from './seed-ledger.js';
 import { defaultPreset } from './seed.js';
@@ -46,8 +47,10 @@ describe("a definition with the example's own id", () => {
     const again = await open();
     expect(await names(again)).toEqual([
       'Default Assistant',
+      'Narrator with a scenarist (example)',
       'Parallel demo',
       'Rolling summaries (example)',
+      'Scenarist (example)',
       'Summarize history (example)',
     ]);
     expect(await again.collections.list()).toEqual([]);
@@ -105,7 +108,12 @@ describe('seeding never stops the server from starting', () => {
       seedExamples(stores, directory, { info: () => {}, warn: (message) => console.warn(message) }),
     ).resolves.toBeUndefined();
     expect(warn).toHaveBeenCalledWith('Example "Fresh texture (example)" not added: disk is full');
-    expect(await names(context)).toEqual(['Rolling summaries (example)', 'Summarize history (example)']);
+    expect(await names(context)).toEqual([
+      'Narrator with a scenarist (example)',
+      'Rolling summaries (example)',
+      'Scenarist (example)',
+      'Summarize history (example)',
+    ]);
     // The records the failed pack did create are recorded, the workflow is not; the next start finishes it.
     const recorded = (await ledger()).seeded;
     expect(recorded).toContain(`fresh-texture/preset:${NARRATOR_PRESET_ID}`);
@@ -113,7 +121,9 @@ describe('seeding never stops the server from starting', () => {
     expect(recorded).toContain(`rolling-summaries/workflow:${ROLLING_SUMMARIES_WORKFLOW_ID}`);
     expect(await names(await open())).toEqual([
       'Fresh texture (example)',
+      'Narrator with a scenarist (example)',
       'Rolling summaries (example)',
+      'Scenarist (example)',
       'Summarize history (example)',
     ]);
   });
@@ -129,7 +139,7 @@ describe('the ledger file', () => {
     const again = await open();
     expect(await names(again)).not.toContain('Rolling summaries (example)');
     const upgraded = (await ledger()).seeded;
-    expect(upgraded.every((entry) => /^(fresh-texture|rolling-summaries)\//.test(entry))).toBe(true);
+    expect(upgraded.every((entry) => /^(fresh-texture|rolling-summaries|scenarist)\//.test(entry))).toBe(true);
     expect(upgraded).toHaveLength(bare.length);
   });
 
@@ -143,8 +153,10 @@ describe('the ledger file', () => {
     expect(await names(again)).toEqual([
       'Default Assistant',
       'Mine',
+      'Narrator with a scenarist (example)',
       'Parallel demo',
       'Rolling summaries (example)',
+      'Scenarist (example)',
       'Summarize history (example)',
     ]);
     expect(await again.presets.get(SUMMARIES_NARRATOR_PRESET_ID)).toBeDefined();
@@ -169,7 +181,7 @@ describe('the example presets', () => {
     const contents = (entries: { kind: string; content?: string }[]) =>
       entries.filter((entry) => entry.kind === 'message').map((entry) => entry.content);
     const wanted = contents(defaultPreset().entries);
-    for (const id of [NARRATOR_PRESET_ID, SUMMARIES_NARRATOR_PRESET_ID]) {
+    for (const id of [NARRATOR_PRESET_ID, SUMMARIES_NARRATOR_PRESET_ID, SCENARIST_NARRATOR_PRESET_ID]) {
       const preset = (await context.presets.get(id))!;
       expect(contents(preset.entries)).toEqual(expect.arrayContaining(wanted));
     }
