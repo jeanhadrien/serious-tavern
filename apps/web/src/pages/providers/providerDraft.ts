@@ -5,7 +5,7 @@ import type { DiskChange } from '../fileLiveSync.js';
 
 /**
  * What the provider editor edits: the common fields as form values, and the structured fields (`headers`,
- * `extraBody`, `overrides`, `replayFields`, `reasoningReplayField`) as one raw YAML document. Bookkeeping and
+ * `extraBody`, `overrides`, `replayFields`, `reasoningReplayField`, `mergeAssistantMessages`) as one raw YAML document. Bookkeeping and
  * unknown fields are not part of it; the server keeps unknown fields on update.
  */
 export interface ProviderDraft {
@@ -21,8 +21,15 @@ export interface ProviderDraft {
   advanced: string;
 }
 
-const ADVANCED_KEYS = ['replayFields', 'reasoningReplayField', 'headers', 'extraBody', 'overrides'] as const;
-const KEY_LIST = 'replayFields, reasoningReplayField, headers, extraBody and overrides';
+const ADVANCED_KEYS = [
+  'replayFields',
+  'reasoningReplayField',
+  'mergeAssistantMessages',
+  'headers',
+  'extraBody',
+  'overrides',
+] as const;
+const KEY_LIST = 'replayFields, reasoningReplayField, mergeAssistantMessages, headers, extraBody and overrides';
 
 export function toDraft(provider: ProviderView): ProviderDraft {
   return {
@@ -35,6 +42,7 @@ export function toDraft(provider: ProviderView): ProviderDraft {
       {
         replayFields: provider.replayFields ?? [],
         reasoningReplayField: provider.reasoningReplayField ?? null,
+        mergeAssistantMessages: provider.mergeAssistantMessages ?? false,
         headers: provider.headers ?? {},
         extraBody: provider.extraBody ?? {},
         overrides: provider.overrides ?? [],

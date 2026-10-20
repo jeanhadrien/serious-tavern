@@ -134,11 +134,20 @@ describe('renderPreset', () => {
       'Input history requires messages',
     );
     expect(() => renderPreset(definition, options({ history: [{ role: 'tool', content: 'bad' }] }))).toThrow(
-      'Input history requires messages with role and content',
+      /Input history requires valid messages \(message 1, tool_call_id: A tool message needs the tool_call_id/,
     );
     expect(() => renderPreset(definition, options({ history: [{ role: 'user', content: 'bad', name: 3 }] }))).toThrow(
-      'Input history requires message names to be strings',
+      /Input history requires valid messages \(message 1, name: /,
     );
+    expect(() => renderPreset(definition, options({ history: [{ role: 'robot', content: 'bad' }] }))).toThrow(
+      /Input history requires valid messages \(message 1, role: /,
+    );
+    expect(() => renderPreset(definition, options({ history: [{ role: 'user', content: 'ok' }, null] }))).toThrow(
+      /Input history requires valid messages \(message 2, /,
+    );
+    expect(() =>
+      renderPreset(definition, options({ history: [{ role: 'user', content: 'x', tool_calls: [] }] })),
+    ).toThrow(/message 1, tool_calls: Only an assistant message can have tool_calls/);
   });
 
   it('passes optional speaker names through repeated history slots and depth insertion without mutating input', () => {
@@ -227,10 +236,18 @@ describe('renderPreset', () => {
     expect(renderPreset(definition, options({})).map((item) => item.content)).toEqual([' |  |  |  |  | User | ']);
   });
 
-  it('keeps assistant reasoning out of every prompt path while the stored history keeps it', () => {
+  it('keeps app-only fields out of every template path, but slots keep them for the node to decide', () => {
     const reasoningHistory = [
       { id: '1', role: 'user', content: 'Question', createdAt: '' },
-      { id: '2', role: 'assistant', content: 'Answer', createdAt: '', reasoning: 'SECRET THOUGHT' },
+      {
+        id: '2',
+        role: 'assistant',
+        content: 'Answer',
+        createdAt: '',
+        reasoning: 'SECRET THOUGHT',
+        provider_data: { reasoning_details: ['SECRET DATA'] },
+        provenance: { providerId: 'SECRET PROVIDER', model: 'm', nodeId: 'n' },
+      },
     ];
     const definition = preset(
       [input('history', 'messages'), input('extra', 'messages')],
@@ -247,14 +264,100 @@ describe('renderPreset', () => {
       inputs: { history: reasoningHistory, extra: reasoningHistory },
       templateContext: { trigger: { message: 'Hi', sessionId: 'session-1' }, history: reasoningHistory },
     });
-    expect(JSON.stringify(rendered)).not.toContain('SECRET THOUGHT');
+    // Templates: the dump message sees none of it.
+    expect(rendered[0]?.content).not.toMatch(/SECRET/);
+    expect(rendered[0]?.content).toContain('[Answer:]');
+    // Slots: reasoning, provider data and provenance ride along (bookkeeping like id and createdAt does not).
+    const answer = {
+      role: 'assistant',
+      content: 'Answer',
+      reasoning: 'SECRET THOUGHT',
+      provider_data: { reasoning_details: ['SECRET DATA'] },
+      provenance: { providerId: 'SECRET PROVIDER', model: 'm', nodeId: 'n' },
+    };
     expect(rendered.slice(1)).toEqual([
       { role: 'user', content: 'Question' },
-      { role: 'assistant', content: 'Answer' },
+      answer,
       { role: 'user', content: 'Question' },
-      { role: 'assistant', content: 'Answer' },
+      answer,
     ]);
     expect(reasoningHistory[1]?.reasoning).toBe('SECRET THOUGHT');
+    expect(reasoningHistory[1]?.id).toBe('2');
+  });
+
+  it('sends only canonical keys from slot messages, tool calls verbatim', () => {
+    const call = {
+      id: 'c1',
+      type: 'function' as const,
+      function: { name: 'read_state', arguments: '{ "keys":["a"] }', extra: 1 },
+      thought_signature: 'sig',
+    };
+    const definition = preset([input('history', 'messages')], [slot('history-slot', 'history')]);
+    const stored = [
+      { id: 'm1', role: 'user', content: 'Hi', executionId: 'e', status: 'done', characterId: 'c', createdAt: '' },
+      { id: 'm2', role: 'assistant', content: '', runId: 'r', tool_calls: [call], name: 'Mira' },
+      { id: 'm3', role: 'tool', content: '{"a":1}', tool_call_id: 'c1', status: 'done' },
+    ];
+    const rendered = renderPreset(definition, options({ history: stored }));
+    expect(rendered).toEqual([
+      { role: 'user', content: 'Hi' },
+      { role: 'assistant', content: '', name: 'Mira', tool_calls: [call] },
+      { role: 'tool', content: '{"a":1}', tool_call_id: 'c1' },
+    ]);
+    expect(rendered[1]?.tool_calls?.[0]?.function.arguments).toBe('{ "keys":["a"] }');
+  });
+
+  it('shows tool calls and tool messages to templates as a transcript, without app-only fields', () => {
+    const definition = preset(
+      [input('history', 'messages')],
+      [
+        message(
+          'dump',
+          '{{history}}|{{input.history}}|{{#each history}}{{this.role}}{{#if this.tool_calls}}+calls{{/if}} {{/each}}',
+        ),
+      ],
+    );
+    const history = [
+      {
+        role: 'assistant',
+        content: 'Looking',
+        reasoning: 'SECRET',
+        tool_calls: [{ id: 'c1', type: 'function', function: { name: 'read_state', arguments: '{}' } }],
+      },
+      { role: 'tool', content: 'value', tool_call_id: 'c1' },
+    ];
+    const transcript = 'assistant: Looking\nassistant -> read_state({})\ntool read_state: value';
+    expect(
+      renderPreset(definition, {
+        inputs: { history },
+        templateContext: { trigger: { message: '', sessionId: 's' }, history },
+      })[0]?.content,
+    ).toBe(`${transcript}|${transcript}|assistant+calls tool `);
+  });
+
+  it('puts a depth entry before the n-th last block, never between a tool call and its result', () => {
+    const call = (id: string) => ({ id, type: 'function' as const, function: { name: 't', arguments: '{}' } });
+    const history = [
+      { role: 'user', content: 'u1' },
+      { role: 'assistant', content: '', tool_calls: [call('a'), call('b')] },
+      { role: 'tool', content: 'ra', tool_call_id: 'a' },
+      { role: 'tool', content: 'rb', tool_call_id: 'b' },
+      { role: 'assistant', content: 'a2' },
+    ];
+    const at = (depth: number) =>
+      renderPreset(
+        preset(
+          [input('history', 'messages')],
+          [slot('history-slot', 'history'), message('note', 'NOTE', { mode: 'depth', entryId: 'history-slot', depth })],
+        ),
+        options({ history }),
+      ).map((item) => item.content || item.role);
+    // Blocks: [u1] [assistant+tool results] [a2].
+    expect(at(0)).toEqual(['u1', 'assistant', 'ra', 'rb', 'a2', 'NOTE']);
+    expect(at(1)).toEqual(['u1', 'assistant', 'ra', 'rb', 'NOTE', 'a2']);
+    expect(at(2)).toEqual(['u1', 'NOTE', 'assistant', 'ra', 'rb', 'a2']);
+    expect(at(3)).toEqual(['NOTE', 'u1', 'assistant', 'ra', 'rb', 'a2']);
+    expect(at(99)).toEqual(['NOTE', 'u1', 'assistant', 'ra', 'rb', 'a2']);
   });
 
   it('renders a message name like its content, trims it and leaves it out when empty', () => {

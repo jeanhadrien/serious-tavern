@@ -53,7 +53,15 @@ directly when you need full control of the format:
 {{/each}}
 ```
 
-`this.role`, `this.content` and `this.name` are the raw message fields;
+`this.role`, `this.content` and `this.name` are the raw message fields. Messages that
+carry tool calls also show `this.tool_calls` (each with `function.name` and
+`function.arguments`), and a `tool` message has `this.tool_call_id`; `{{history}}` as
+text writes them as `assistant -> name(arguments)` and `tool name: result` lines.
+Templates never see a message's `reasoning`, `provider_data` or `provenance`: they
+stay out of every template, while a `messages` slot passes them on to the prompt
+(the LLM node's replay setting decides whether they are sent). A slot also accepts
+tool messages, and a depth entry counts a tool call and its results as one message,
+so it never lands between them.
 `@index` starts at 0, `@first`/`@last` mark the ends. An `{{else}}` branch
 covers empty history:
 

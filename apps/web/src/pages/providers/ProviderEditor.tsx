@@ -65,10 +65,11 @@ export function ProviderEditor(props: ProviderEditorProps) {
             <code>headers</code>: extra request headers. <code>extraBody</code>: merged into the request body last.{' '}
             <code>replayFields</code>: response message fields sent back with that message later (e.g.{' '}
             <code>reasoning_details</code>). <code>reasoningReplayField</code>: the field a replayed reasoning is sent
-            under, or null for never. <code>overrides</code>: per-model changes, e.g. <code>- match: "deepseek/*"</code>{' '}
-            with <code>messageName</code>, <code>reasoningFields</code>, <code>replayFields</code>,{' '}
-            <code>reasoningReplayField</code>, <code>headers</code> or <code>extraBody</code>; the first matching glob
-            wins.
+            under, or null for never. <code>mergeAssistantMessages</code>: join consecutive assistant messages without
+            tool calls before sending. <code>overrides</code>: per-model changes, e.g.{' '}
+            <code>- match: "deepseek/*"</code> with <code>messageName</code>, <code>reasoningFields</code>,{' '}
+            <code>replayFields</code>, <code>reasoningReplayField</code>, <code>mergeAssistantMessages</code>,{' '}
+            <code>headers</code> or <code>extraBody</code>; the first matching glob wins.
           </small>
         </label>
       </fieldset>

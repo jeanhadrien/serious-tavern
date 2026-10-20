@@ -23,6 +23,32 @@ export function wireMessage(message: PromptMessage, { messageName, reasoningRepl
   };
 }
 
+/**
+ * Joins consecutive assistant messages into one, with a blank line between their texts. Only plain neighbours merge:
+ * never a message with tool calls (a block stays whole), never two with different `name`s, and never a message with
+ * `provider_data` (merging would lose data the backend needs back). Reasoning is joined the same way, so two thoughts
+ * become one; the first message's other fields (`provenance`) are kept. Applied to the request only, so the wire log
+ * shows what was sent and stored data is untouched.
+ */
+export function mergeAssistantMessages(messages: readonly PromptMessage[]): PromptMessage[] {
+  const mergeable = (message: PromptMessage) =>
+    message.role === 'assistant' && !message.tool_calls?.length && message.provider_data === undefined;
+  const join = (first: string | undefined, second: string | undefined) => [first, second].filter(Boolean).join('\n\n');
+  const result: PromptMessage[] = [];
+  for (const message of messages) {
+    const previous = result.at(-1);
+    if (previous && mergeable(previous) && mergeable(message) && previous.name === message.name) {
+      const reasoning = join(previous.reasoning, message.reasoning);
+      result[result.length - 1] = {
+        ...previous,
+        content: join(previous.content, message.content),
+        ...(reasoning ? { reasoning } : {}),
+      };
+    } else result.push(message);
+  }
+  return result;
+}
+
 /** The request's tool fields (`tools`, `tool_choice`, `parallel_tool_calls`), each only when set. */
 export function toolParams(request: ChatRequest) {
   return {

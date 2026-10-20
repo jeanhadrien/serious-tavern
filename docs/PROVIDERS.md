@@ -45,7 +45,7 @@ To use one, save a key under its secret name in **Settings** and pick it in the 
 | **Secret** | The name of an API key saved in **Settings**, sent as `Authorization: Bearer <key>`. Leave it empty for servers that need no key. The editor warns you if no secret by that name exists yet. |
 | **Message names** | **Send as a message field** writes each message's name into the field you choose (usually `name`). **Don't send names** never sends one. |
 | **Reasoning fields** | An ordered list of fields to read the reasoning trace from. The first non-empty one wins. |
-| **Replay, headers, extra body and overrides (YAML)** | Advanced settings: `replayFields` and `reasoningReplayField` (see [Tool calls and replayed messages](#tool-calls-and-replayed-messages)), extra request headers, raw fields added to every request, and per-model overrides. |
+| **Replay, headers, extra body and overrides (YAML)** | Advanced settings: `replayFields`, `reasoningReplayField` and `mergeAssistantMessages` (see [Tool calls and replayed messages](#tool-calls-and-replayed-messages)), extra request headers, raw fields added to every request, and per-model overrides. |
 
 Sampling settings (temperature, max tokens, top-p, penalties, stop) always use their standard OpenAI names and are set on the LLM node, not on the provider.
 
@@ -120,6 +120,22 @@ overrides:
 
 Both can be set in an override (an explicit `reasoningReplayField: null` wins over the provider's). They live in the YAML box of the provider editor.
 
+### Consecutive assistant messages
+
+Some backends refuse two assistant messages in a row (a history woven from several replies can have them). `mergeAssistantMessages` (default `false`, also settable per model in an override) joins them just before each request:
+
+```yaml
+mergeAssistantMessages: true
+overrides:
+  - match: "mistralai/*"
+    mergeAssistantMessages: false
+```
+
+- Consecutive assistant messages are joined with a blank line.
+- Never across a message with tool calls (a call and its results stay whole), never two messages with different `name`s (a message without a name and one with a name differ), and never a message that carries `provider_data` (the fields from `replayFields`), because merging would lose data the backend needs back.
+- Two messages with reasoning are merged too, their reasoning joined with a blank line the same way (it is only sent at all when `reasoningReplayField` is set and the LLM node's replay policy kept it).
+- It applies to every call of a tool loop, and the [wire log](#checking-what-was-actually-sent) shows the merged messages, since it records what was sent. The chat itself is unchanged. The setting is read through the same per-model resolution as the other wire fields.
+
 ## Per-model overrides
 
 One provider can serve models with different habits, which is especially common through OpenRouter. Overrides change the provider's settings for the models whose id matches a pattern:
@@ -137,7 +153,7 @@ overrides:
 
 - `match` is checked against the model id on the LLM node. `*` matches anything, including `/`. Matching is case-sensitive and covers the whole id: `deepseek/*` matches `deepseek/deepseek-r1` but not `openrouter/deepseek-r1`.
 - The **first** override that matches is used, so put specific patterns before general ones.
-- An override can set `messageName` (including `null`), `reasoningFields`, `replayFields`, `reasoningReplayField` (including `null`), `headers` and `extraBody`. Its `headers` and `extraBody` are merged over the provider's; the others replace the provider's values.
+- An override can set `messageName` (including `null`), `reasoningFields`, `replayFields`, `reasoningReplayField` (including `null`), `mergeAssistantMessages`, `headers` and `extraBody`. Its `headers` and `extraBody` are merged over the provider's; the others replace the provider's values.
 
 ## Extra headers and body fields
 

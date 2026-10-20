@@ -15,6 +15,7 @@ const FIRST = [
   'reasoningFields',
   'replayFields',
   'reasoningReplayField',
+  'mergeAssistantMessages',
   'extraBody',
   'overrides',
 ];

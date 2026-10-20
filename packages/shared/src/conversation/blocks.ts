@@ -1,4 +1,5 @@
 import type { ConversationMessage } from './message.js';
+import { callsOf, toolCallLine, toolResultLine } from './transcript.js';
 
 /**
  * Splits a list into blocks, the units a prompt must never split: an assistant message with `tool_calls`
@@ -21,6 +22,39 @@ export function messageBlocks(messages: readonly ConversationMessage[]): Convers
     blocks.push(block);
   }
   return blocks;
+}
+
+/**
+ * Turns the tool blocks that name a tool outside `declared` into plain text, for a backend that refuses a history
+ * whose calls match no declared tool. A block can't be split, so one undeclared call flattens the whole block: the
+ * assistant message keeps its content followed by the transcript lines of its calls (`messagesToText`'s format), and
+ * the `tool` messages become one `user` message holding their transcript lines. Blocks whose calls are all declared are
+ * untouched. `flattened` counts the calls turned into text, for a node log line. A flattened assistant message drops
+ * its `provider_data` (it describes the calls that are gone) and keeps its reasoning. Meant for the final prompt,
+ * never for stored data; run it before `repairToolSequence`.
+ */
+export function flattenUndeclaredToolBlocks(
+  messages: readonly ConversationMessage[],
+  declared: Iterable<string>,
+): { messages: ConversationMessage[]; flattened: number } {
+  const known = new Set(declared);
+  const result: ConversationMessage[] = [];
+  let flattened = 0;
+  for (const block of messageBlocks(messages)) {
+    const [first, ...answers] = block as [ConversationMessage, ...ConversationMessage[]];
+    const calls = callsOf(first);
+    if (calls.every((call) => known.has(call.function.name))) {
+      result.push(...block);
+      continue;
+    }
+    flattened += calls.length;
+    const { tool_calls: _calls, provider_data: _providerData, ...assistant } = first;
+    const toolNames = new Map(calls.map((call) => [call.id, call.function.name]));
+    result.push({ ...assistant, content: [first.content, ...calls.map(toolCallLine)].filter(Boolean).join('\n') });
+    if (answers.length > 0)
+      result.push({ role: 'user', content: answers.map((answer) => toolResultLine(answer, toolNames)).join('\n') });
+  }
+  return { messages: result, flattened };
 }
 
 /** A copy of an assistant message without its tool calls. */

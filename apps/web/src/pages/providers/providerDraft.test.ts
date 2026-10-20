@@ -12,6 +12,7 @@ const provider = (extra: Partial<ProviderView> = {}): ProviderView => ({
   reasoningFields: ['reasoning', 'reasoning_content'],
   replayFields: [],
   reasoningReplayField: null,
+  mergeAssistantMessages: false,
   extraBody: {},
   overrides: [{ match: 'deepseek/*', messageName: null }],
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -35,6 +36,7 @@ it('round-trips a provider through the draft', () => {
       reasoningFields: ['reasoning', 'reasoning_content'],
       replayFields: [],
       reasoningReplayField: null,
+      mergeAssistantMessages: false,
       headers: { 'X-One': '1' },
       extraBody: {},
       overrides: [{ match: 'deepseek/*', messageName: null }],
@@ -59,6 +61,15 @@ it('sends empty values for YAML keys that are missing or empty, so saving clears
   }
 });
 
+it('edits mergeAssistantMessages in the YAML box, and a record without it reads as off', () => {
+  const draft = toDraft(provider({ mergeAssistantMessages: undefined }));
+  expect(draft.advanced).toContain('mergeAssistantMessages: false');
+  const on = draftToBody({ ...draft, advanced: 'mergeAssistantMessages: true' }, 'openai-compatible');
+  expect(on.ok && on.body.mergeAssistantMessages).toBe(true);
+  const cleared = draftToBody({ ...draft, advanced: '' }, 'openai-compatible');
+  expect(cleared.ok && cleared.body.mergeAssistantMessages).toBe(false);
+});
+
 it('reports YAML and validation problems in plain language', () => {
   const errors = (changes: object) => {
     const result = draftToBody({ ...toDraft(provider()), ...changes }, 'openai-compatible');
@@ -66,7 +77,7 @@ it('reports YAML and validation problems in plain language', () => {
   };
   expect(errors({ advanced: 'headers: [unclosed' })[0]).toMatch(/^YAML: /);
   expect(errors({ advanced: '- just a list' })).toEqual([
-    'YAML: must be a mapping with replayFields, reasoningReplayField, headers, extraBody and overrides',
+    'YAML: must be a mapping with replayFields, reasoningReplayField, mergeAssistantMessages, headers, extraBody and overrides',
   ]);
   expect(errors({ advanced: 'headers: {}\nbaseUrl: x' })[0]).toContain('unknown key "baseUrl"');
   expect(errors({ advanced: 'overrides:\n  - messageName: null' })[0]).toMatch(/^YAML overrides\.0\.match: /);

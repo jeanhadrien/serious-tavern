@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   characterSchema,
+  flattenUndeclaredToolBlocks,
   presetInputLabel,
   reasoningEfforts,
   repairToolSequence,
@@ -144,7 +145,14 @@ export const llm: NodeDefinition = {
     const model = String(ctx.config.model);
     const merged = ctx.config.mergeSystemMessages === true ? mergeSystemMessages(rendered) : rendered;
     const replayed = applyReplayPolicy(merged, settings.replayReasoning, { providerId: provider.id, model });
-    const { messages, dropped } = repairToolSequence(replayed);
+    // Built once: the same tools declare what stays native in the prompt and run in the loop.
+    const tools = await buildStateTools(ctx, settings.tools);
+    const { messages: flat, flattened } = flattenUndeclaredToolBlocks(
+      replayed,
+      tools.map((tool) => tool.definition.function.name),
+    );
+    if (flattened > 0) ctx.log(`${flattened} tool call(s) of undeclared tools sent as text`);
+    const { messages, dropped } = repairToolSequence(flat);
     if (dropped > 0) ctx.log(`Left out ${dropped} tool message(s) or call(s) that had no counterpart in the prompt`);
     const request = {
       model,
@@ -169,7 +177,7 @@ export const llm: NodeDefinition = {
     const { exchange, response } = await runToolLoop({
       request,
       call: modelCaller(ctx, adapter, options),
-      tools: await buildStateTools(ctx, settings.tools),
+      tools,
       maxSteps: settings.maxSteps,
       toolChoice: settings.toolChoice,
       parallelToolCalls: settings.parallelToolCalls,

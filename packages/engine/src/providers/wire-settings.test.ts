@@ -41,6 +41,7 @@ describe('resolveWireSettings', () => {
         reasoningFields: ['reasoning_content'],
         replayFields: ['signature'],
         reasoningReplayField: null,
+        mergeAssistantMessages: true,
         headers: { 'X-B': 'o1' },
       },
       { match: 'deepseek/deepseek-r1', messageName: 'speaker', extraBody: { b: 2 } },
@@ -55,6 +56,7 @@ describe('resolveWireSettings', () => {
       reasoningFields: ['reasoning_content'],
       replayFields: ['signature'],
       reasoningReplayField: null,
+      mergeAssistantMessages: true,
       extraBody: { a: 1, b: 1 },
     });
     expect(resolveWireSettings(provider, 'openai/gpt-chat')).toEqual({
@@ -63,8 +65,18 @@ describe('resolveWireSettings', () => {
       reasoningFields: ['reasoning', 'reasoning_content'],
       replayFields: ['reasoning_details'],
       reasoningReplayField: 'reasoning',
+      mergeAssistantMessages: false,
       extraBody: { a: 1, b: 3, c: 3 },
     });
+  });
+
+  it('lets an override turn mergeAssistantMessages off as well as on', () => {
+    const merging = providerRecord('m', {
+      mergeAssistantMessages: true,
+      overrides: [{ match: 'x/*', mergeAssistantMessages: false }],
+    });
+    expect(resolveWireSettings(merging, 'x/y').mergeAssistantMessages).toBe(false);
+    expect(resolveWireSettings(merging, 'z/y').mergeAssistantMessages).toBe(true);
   });
 
   it('uses the provider fields when no override matches', () => {
@@ -74,6 +86,7 @@ describe('resolveWireSettings', () => {
       reasoningFields: ['reasoning', 'reasoning_content'],
       replayFields: ['reasoning_details'],
       reasoningReplayField: 'reasoning',
+      mergeAssistantMessages: false,
       extraBody: provider.extraBody,
     });
   });
@@ -159,6 +172,102 @@ describe('openai-compatible wire format', () => {
       text: 'Done',
       reasoning: 'Think more',
       raw: { choices: [{ message: { role: 'assistant', content: 'Done', reasoning: 'Think more' } }] },
+    });
+  });
+
+  it('never puts the bookkeeping of a stored chat message on the wire', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(completion({}));
+    const stored = {
+      id: 'm1',
+      executionId: 'e1',
+      runId: 'r1',
+      status: 'done',
+      characterId: 'c1',
+      createdAt: 't',
+      role: 'user' as const,
+      content: 'Hi',
+    };
+    const onWire = vi.fn();
+    await openaiCompatible.chat(
+      { ...request, messages: [stored] },
+      { provider: providerRecord('p'), nodeId: 'llm-1', signal: signal(), onWire },
+    );
+    expect(sentBody(fetchMock).messages).toEqual([{ role: 'user', content: 'Hi' }]);
+    expect(onWire.mock.calls[0]?.[0].body.messages).toEqual([{ role: 'user', content: 'Hi' }]);
+  });
+
+  describe('mergeAssistantMessages', () => {
+    const call = { id: 'c1', type: 'function' as const, function: { name: 't', arguments: '{}' } };
+    const assistant = (content: string, extra: Record<string, unknown> = {}) => ({
+      role: 'assistant' as const,
+      content,
+      ...extra,
+    });
+    const sentMessages = async (messages: ChatRequest['messages'], merge = true) => {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(completion({}));
+      const onWire = vi.fn();
+      await openaiCompatible.chat(
+        { ...request, messages },
+        { provider: providerRecord('p', { mergeAssistantMessages: merge }), nodeId: 'llm-1', signal: signal(), onWire },
+      );
+      return { sent: sentBody(fetchMock).messages, logged: onWire.mock.calls[0]?.[0].body.messages };
+    };
+
+    it('joins consecutive plain assistant messages with a blank line, in the body and in the wire log', async () => {
+      const { sent, logged } = await sentMessages([
+        { role: 'user', content: 'Hi' },
+        assistant('One'),
+        assistant('Two'),
+        assistant('Three'),
+        { role: 'user', content: 'Go' },
+      ]);
+      expect(sent).toEqual([
+        { role: 'user', content: 'Hi' },
+        { role: 'assistant', content: 'One\n\nTwo\n\nThree' },
+        { role: 'user', content: 'Go' },
+      ]);
+      expect(logged).toEqual(sent);
+    });
+
+    it('does nothing unless the record asks for it', async () => {
+      const messages = [assistant('One'), assistant('Two')];
+      expect((await sentMessages(messages, false)).sent).toHaveLength(2);
+    });
+
+    it('never merges across tool calls, different names or provider_data', async () => {
+      const { sent } = await sentMessages([
+        assistant('Before'),
+        assistant('', { tool_calls: [call] }),
+        { role: 'tool', content: 'result', tool_call_id: 'c1' },
+        assistant('After one'),
+        assistant('Same name', { name: 'Mira' }),
+        assistant('Other name', { name: 'Alex' }),
+        assistant('Keeps data', { provider_data: { reasoning_details: [1] } }),
+        assistant('Plain'),
+        assistant('Calls again', { tool_calls: [{ ...call, id: 'c2' }] }),
+        assistant('Trailing'),
+      ]);
+      expect(sent.map((message: { content: string | null }) => message.content)).toEqual([
+        'Before',
+        null,
+        'result',
+        'After one',
+        'Same name',
+        'Other name',
+        'Keeps data',
+        'Plain',
+        'Calls again',
+        'Trailing',
+      ]);
+    });
+
+    it('joins reasoning like content and does not change the caller’s messages', async () => {
+      const provider = providerRecord('p', { mergeAssistantMessages: true, reasoningReplayField: 'reasoning' });
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(completion({}));
+      const messages = [assistant('One', { reasoning: 'a' }), assistant('Two', { reasoning: 'b' })];
+      await openaiCompatible.chat({ ...request, messages }, { provider, nodeId: 'llm-1', signal: signal() });
+      expect(sentBody(fetchMock).messages).toEqual([{ role: 'assistant', content: 'One\n\nTwo', reasoning: 'a\n\nb' }]);
+      expect(messages).toHaveLength(2);
     });
   });
 

@@ -10,6 +10,8 @@ export type WireSettings = {
   replayFields: string[];
   // Wire field a message's `reasoning` is sent back under; null never sends it.
   reasoningReplayField: string | null;
+  // Join consecutive assistant messages without tool calls before sending (`mergeAssistantMessages`).
+  mergeAssistantMessages: boolean;
   extraBody: Record<string, unknown>;
 };
 
@@ -24,7 +26,7 @@ function globMatches(pattern: string, model: string) {
 
 /**
  * Resolves the wire settings of `provider` for `model`. The first override whose `match` fits the model id
- * replaces `messageName`/`reasoningFields`/`replayFields`/`reasoningReplayField` and shallow-merges its `headers`/`extraBody` over the provider's.
+ * replaces `messageName`/`reasoningFields`/`replayFields`/`reasoningReplayField`/`mergeAssistantMessages` and shallow-merges its `headers`/`extraBody` over the provider's.
  */
 export function resolveWireSettings(provider: Provider, model: string): WireSettings {
   const override = provider.overrides.find((candidate) => globMatches(candidate.match, model));
@@ -37,6 +39,8 @@ export function resolveWireSettings(provider: Provider, model: string): WireSett
     // Like `messageName`, an explicit null ("never send reasoning back") must win.
     reasoningReplayField:
       override?.reasoningReplayField !== undefined ? override.reasoningReplayField : provider.reasoningReplayField,
+    // A plain boolean: an override's `false` is a value, and `??` only falls through on undefined.
+    mergeAssistantMessages: override?.mergeAssistantMessages ?? provider.mergeAssistantMessages,
     extraBody: { ...provider.extraBody, ...override?.extraBody },
   };
 }

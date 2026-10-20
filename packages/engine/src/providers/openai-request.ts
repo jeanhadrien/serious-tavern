@@ -1,6 +1,6 @@
 import type { ChatOptions, ChatRequest } from './index.js';
 import { failedResponse } from './http.js';
-import { toolParams, wireMessage } from './wire-messages.js';
+import { mergeAssistantMessages, toolParams, wireMessage } from './wire-messages.js';
 import type { WireSettings } from './wire-settings.js';
 import { wireRecorder } from './wire-log.js';
 
@@ -21,7 +21,9 @@ function reasoningParams(request: ChatRequest) {
 function requestBody(request: ChatRequest, stream: boolean, wire: WireSettings) {
   return {
     model: request.model,
-    messages: request.messages.map((message) => wireMessage(message, wire)),
+    messages: (wire.mergeAssistantMessages ? mergeAssistantMessages(request.messages) : request.messages).map(
+      (message) => wireMessage(message, wire),
+    ),
     temperature: request.temperature,
     max_tokens: request.maxTokens,
     ...(stream ? { stream: true } : {}),

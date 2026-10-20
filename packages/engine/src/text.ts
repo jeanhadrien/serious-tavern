@@ -1,24 +1,9 @@
 import { canConnect, type CoercionKind, type PortDataType } from '@st/shared/ports';
-import type { PromptMessage } from '@st/shared';
+import { messagesToText } from '@st/shared';
 
 // Node templates/replies use compact JSON; port and preset text coercion uses pretty JSON.
 export const stringify = (value: unknown): string =>
   typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value);
-
-// A transcript, one line per message. An assistant message lists its tool calls after its text, and a tool
-// message names the tool whose call it answers (looked up among the earlier messages).
-function messagesToText(messages: PromptMessage[]): string {
-  const toolNames = new Map<string, string>();
-  const lines: string[] = [];
-  for (const message of messages) {
-    const calls = message.role === 'assistant' && Array.isArray(message.tool_calls) ? message.tool_calls : [];
-    for (const call of calls) toolNames.set(call.id, call.function.name);
-    const toolName = message.role === 'tool' && message.tool_call_id ? toolNames.get(message.tool_call_id) : undefined;
-    lines.push(`${toolName ? `tool ${toolName}` : message.role}: ${message.content}`);
-    for (const call of calls) lines.push(`assistant -> ${call.function.name}(${call.function.arguments})`);
-  }
-  return lines.join('\n');
-}
 
 export function coerceValue(value: unknown, kind: CoercionKind): string {
   if (kind === 'messages-to-text') {
