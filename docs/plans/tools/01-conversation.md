@@ -16,7 +16,7 @@ yet except the existing `PromptMessage` users, which must keep working unchanged
 | `tool_call_id` | `string?` | `tool` only, required there. |
 | `reasoning` | `string?` | App-only. The reasoning text, as today on chat messages. |
 | `provider_data` | `Record<string, unknown>?` | App-only. Message-level fields the backend needs back, named by the provider record (step 2), copied verbatim from the response. |
-| `provenance` | `{ providerId, model }?` | App-only. On assistant messages the app produced. |
+| `provenance` | `{ providerId, model, nodeId }?` | App-only. On assistant messages the app produced: the provider record, the model and the LLM node that called it (the Thread node uses `nodeId`, step 6). |
 
 - Tool field names stay in the wire's snake_case on purpose: a stored thread is a readable OpenAI conversation.
 - `promptMessageSchema` becomes this schema (same export name, additive: `tool` role, optional fields). The existing

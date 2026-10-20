@@ -17,9 +17,19 @@ items are exchanges:
   existing item preview keep working.
 - `exchange` is never named `messages`: that name is the built-in link to chat messages on collection items.
 - `turnId` (the turn's id) and `runId` (the writing run's execution id) are stamped by the engine at write time; the
-  Thread node uses them to place the exchange in the chat (step 5). `ctx.trigger` gains `turnId` (additive; the server
+  Thread node uses them to place the exchange in the chat (step 6). `ctx.trigger` gains `turnId` (additive; the server
   passes the turn id to every run). Nothing parses item ids.
 - `input` is the optional user side of the exchange (see State Write below).
+- **Reasoning is left out by default.** `threadItem` strips `reasoning` and `provider_data` from the stored exchange
+  unless State Write's `keepReasoning` option (thread keys only, default off) is on. Prior-turn reasoning is rarely
+  needed by backends and the round-trip data can be large encrypted blobs; the run's execution log still holds the
+  whole exchange. `provenance` is always kept (small, and the Thread node needs `nodeId`).
+
+> **TODO (later): store exchanges by reference.** Every item stays in `session.state.turns` for good (turns are never
+> compacted), and the session file is rewritten whole on each streaming flush and settle. For now exchanges are stored
+> inline (decided with the user). Later candidates: a small item in state pointing to the run log's `exchange` output,
+> or a per-session sidecar file keyed by item id. Either needs a migration plan and a rule that logs or sidecars a
+> thread points to are never deleted (the Fork contract already asks this of logs).
 
 ## Ops and fold
 
@@ -28,6 +38,10 @@ items are exchanges:
   Items are not checked by the fold, like collection items today.
 - The commit-time link check (`commitItemLinks`) never applies (no `messages` field).
 - Turn rules come for free: deleting a reply, regenerate, swipes, fork, runs after the reply.
+- Every switch on the key type gets a `thread` case. Known places: `stateKeyTypes`, `stateKeyPortType`, `stateOpsFor`,
+  `keyDefault`, `suits` and `foldDefinitionKey` (fold-slots), `describeKey`, `smallValues` (the view's history),
+  `stateReadsFor` (State Read modes), `stateHints`, the definitions editor's type list and compile, and the web's
+  `storyModel`. The coding agent greps for the others (`'collection'`).
 
 ## Writing
 
@@ -38,14 +52,15 @@ plain-language problem.
 State Write on a thread key:
 
 - `add`: the `value` input takes the LLM's `exchange`; a new optional `input` input (`requiredIfConnected`, any of text
-  or a message) appears only for thread keys (`resolvePorts`). The fixed `value` literal is not offered for threads.
+  or a message) and the `keepReasoning` option appear only for thread keys (`resolvePorts`). The fixed `value` literal
+  is not offered for threads.
 - `remove` (by item id) and `delete` as for collections; `when` as for every op.
 - The State Write panel and the `StateKeyPicker` list thread keys; the op picker follows `stateOpsFor`.
 - The generated state tools of step 3 never offer thread keys.
 
 ## Reading and the view
 
-- State Read on a thread key reads the items (`value`, `count`), like a collection. The Thread node (step 5) is the way
+- State Read on a thread key reads the items (`value`, `count`), like a collection. The Thread node (step 6) is the way
   to get messages.
 - `{{state.<def>.<key>}}` exposes the items; `stateHints` hints the key like a collection.
 - **The state view stays small.** `previewWrite` shows a thread add as its `text` (cut at the usual limit) plus
@@ -69,4 +84,5 @@ thread key.
 ## Docs
 
 `docs/STATE-AND-LORE.md`: thread keys. `AGENTS.md` Story state: the item shape, `exchange` vs `messages`, the view never
-carries the exchange, `turnId`/`runId` stamped by the engine.
+carries the exchange, `turnId`/`runId` stamped by the engine, reasoning left out unless `keepReasoning`, and the
+by-reference TODO.
