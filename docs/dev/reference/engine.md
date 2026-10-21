@@ -206,3 +206,26 @@ Outputs (LLM `text` straight into `value`).
 
 **Names.** Chat Input, Memory (messages format), slots and depth insertion keep each message's `name`; the adapter
 sends it only when present, under the record's `messageName` field. No speaker prefix is ever added to content.
+
+## Text stats
+
+`src/text-stats/` computes uninterpreted statistics on assistant replies: nothing is stored, and the web never
+computes them. `chatStats(messages, history)` returns a `TextStats` per assistant message id; `textStats(text, window)`
+does one text against a list of window texts (what a workflow node will use).
+
+- **Tokenizer.** Text is NFKC-normalized and lowercased, curly apostrophes become `'`. A word is a run of letters and
+  digits with inner apostrophes. Everything else separates words: em-dashes, ellipses, hyphens (`well-known` is two
+  words), underscores, Markdown syntax. The words inside `*actions*` and quotes are kept. Fenced code blocks, link
+  targets (`[text](url)` keeps `text`) and bare URLs are dropped.
+- **Per message.** `words`; `mtld` (McCarthy & Jarvis: threshold 0.72, mean of the forward and backward passes, each
+  `tokens / factors`; `null` under 50 words, or when a pass completes no factor); `slopWords`, the number of tokens
+  found in the vendored slop list (a count, not a rate).
+- **Across messages**, against the window: `ngramOverlap`, the share of the reply's 4-gram instances (stopwords kept)
+  that occur in any window reply (`null` with no window or no 4-gram); `recycledSentences`, how many of the reply's
+  sentences (case and punctuation ignored, at least 4 words) equal a window sentence. Sentences end at `.`, `!`, `?`
+  or a line break.
+- **Window.** The 5 (`WINDOW_SIZE`) assistant replies of the chat history before the reply. `chatStats` walks the
+  chat once in order: a reply's window is the history replies seen so far, and a stopped reply (not in the history)
+  gets stats but never joins a window.
+- **Data.** `slop_list.json` is the word list of sam-paech/slop-score (MIT, see `NOTICE.md` beside it). Its bigram and
+  trigram lists and the "not X, but Y" detector are not used. Background: `explorations/07-message-text-stats.md`.

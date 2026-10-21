@@ -8,3 +8,11 @@ export { pruneInvalidEdges } from './prune.js';
 export * from './preset.js';
 export * from './providers/index.js';
 export * from './providers/openai-compatible.js';
+export {
+  chatStats,
+  replyWindow,
+  textStats,
+  WINDOW_SIZE,
+  type StatsMessage,
+  type TextStats,
+} from './text-stats/index.js';

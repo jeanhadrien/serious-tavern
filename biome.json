@@ -13,7 +13,8 @@
       "!**/*.tsbuildinfo",
       "!package-lock.json",
       "!**/AGENTS.md",
-      "!PLAN.md"
+      "!PLAN.md",
+      "!**/slop_list.json"
     ]
   },
   "formatter": {

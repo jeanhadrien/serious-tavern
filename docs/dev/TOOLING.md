@@ -18,8 +18,8 @@ Commands for working on the code. Run them from the repository root; they cover 
 
 The recommended lint preset, two-space indentation, single quotes, semicolons and a 120-column line. Import
 organizing and the other assists are **off**, to avoid noisy import-order changes. Excluded: generated output,
-`node_modules`, data directories, coverage, Playwright reports, TypeScript build metadata, the lockfile, `PLAN.md`
-and every `AGENTS.md`.
+`node_modules`, data directories, coverage, Playwright reports, TypeScript build metadata, the lockfile, `PLAN.md`,
+every `AGENTS.md` and the vendored `slop_list.json` (kept byte for byte as upstream).
 
 Rules turned off, and why (`biome.json`):
 

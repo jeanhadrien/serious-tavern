@@ -39,3 +39,11 @@ Graph validation, the wave-based parallel executor, templating and node types. N
 ## Tests
 - `vi.restoreAllMocks()` does not undo a `mockReturnValue` on a module mocked with `vi.mock(..., { spy: true })` (`renderPreset` in `llm-prompt.test.ts`). A test that needs the real behaviour sets a call-through implementation explicitly.
 - Fake LLMs replace the `openai-compatible` adapter (`useAdapter`/`restoreAdapter` in `test-providers.ts`) and answer with `chatResponse(text)`; never register fake provider ids.
+
+## Text stats (`src/text-stats/`)
+Raw per-reply metrics (words, MTLD, slop words, 4-gram overlap, recycled sentences), computed on demand and never stored. English only; the web never computes them, so nothing from here goes through `packages/shared`.
+- **One tokenizer** (`tokenize.ts`) feeds every metric. A new metric reads its tokens, never re-splits the text. Fenced code, link targets and URLs are not prose and are dropped before anything is counted.
+- **The minimum lengths are part of a metric's definition**, not a display choice: MTLD is `null` under `MIN_MTLD_TOKENS`, a sentence counts only from `MIN_SENTENCE_WORDS` words, overlap is `null` with no window or no 4-gram. An undefined metric is `null`, never `0`.
+- **The window rule has one home, `replyWindow`:** the last `WINDOW_SIZE` assistant replies of the chat history before the reply, the reply excluded. A stopped (`partial`) reply gets stats of its own but is never in a window; `chatStats` takes the history from the caller (the server's `historyMessages`) and does not re-derive it. The Text Stats node must use `replyWindow` too.
+- Each text is analyzed once per request (`chatStats`); no cache across requests.
+- `slop_list.json` is vendored from sam-paech/slop-score (MIT, notice in `NOTICE.md`), byte for byte: Biome skips it. Only the word list is used, no rates.
