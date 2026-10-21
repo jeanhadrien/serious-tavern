@@ -36,5 +36,5 @@ export const changeEventTypes: ChangeEvent['type'][] = changeEventSchema.options
 );
 
 export const eventEndpoints = {
-  streamChanges: endpoint(changeEventSchema),
+  streamChanges: endpoint({ method: 'GET', path: '/api/events' }, changeEventSchema),
 };

@@ -22,5 +22,10 @@ export const sessionStatsSchema = z.object({
 
 export const messageStatsEndpoints = {
   // Computed on read, never stored. A stopped reply gets stats of its own but is never part of another reply's comparison.
-  getSessionStats: endpoint(sessionStatsSchema, undefined, idParamsSchema),
+  getSessionStats: endpoint(
+    { method: 'GET', path: '/api/sessions/:id/stats' },
+    sessionStatsSchema,
+    undefined,
+    idParamsSchema,
+  ),
 };

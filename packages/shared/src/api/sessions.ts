@@ -86,23 +86,68 @@ export const turnEventSchema = z.discriminatedUnion('type', [
   errorEnvelopeSchema.extend({ type: z.literal('turn.error') }),
 ]);
 export const sessionEndpoints = {
-  listSessions: endpoint(z.array(sessionSummarySchema)),
-  createSession: endpoint(sessionSchema, createSessionSchema),
-  getSession: endpoint(sessionSchema, undefined, idParamsSchema),
-  updateSession: endpoint(sessionSchema, updateSessionSchema, idParamsSchema),
-  deleteSession: endpoint(noContentSchema, undefined, idParamsSchema),
-  sendMessage: endpoint(sendMessageResultSchema, sendMessageSchema, idParamsSchema),
-  streamTurn: endpoint(turnEventSchema, sendMessageSchema, idParamsSchema),
+  listSessions: endpoint({ method: 'GET', path: '/api/sessions' }, z.array(sessionSummarySchema)),
+  createSession: endpoint({ method: 'POST', path: '/api/sessions' }, sessionSchema, createSessionSchema),
+  getSession: endpoint({ method: 'GET', path: '/api/sessions/:id' }, sessionSchema, undefined, idParamsSchema),
+  updateSession: endpoint(
+    { method: 'PATCH', path: '/api/sessions/:id' },
+    sessionSchema,
+    updateSessionSchema,
+    idParamsSchema,
+  ),
+  deleteSession: endpoint({ method: 'DELETE', path: '/api/sessions/:id' }, noContentSchema, undefined, idParamsSchema),
+  sendMessage: endpoint(
+    { method: 'POST', path: '/api/sessions/:id/messages' },
+    sendMessageResultSchema,
+    sendMessageSchema,
+    idParamsSchema,
+  ),
+  streamTurn: endpoint(
+    { method: 'POST', path: '/api/sessions/:id/messages/stream' },
+    turnEventSchema,
+    sendMessageSchema,
+    idParamsSchema,
+  ),
   // Regenerate the last turn: a turn that stores no user message (same result and events as a send).
-  regenerate: endpoint(sendMessageResultSchema, undefined, idParamsSchema),
-  streamRegenerate: endpoint(turnEventSchema, undefined, idParamsSchema),
+  regenerate: endpoint(
+    { method: 'POST', path: '/api/sessions/:id/regenerate' },
+    sendMessageResultSchema,
+    undefined,
+    idParamsSchema,
+  ),
+  streamRegenerate: endpoint(
+    { method: 'POST', path: '/api/sessions/:id/regenerate/stream' },
+    turnEventSchema,
+    undefined,
+    idParamsSchema,
+  ),
   // Swipe: the whole session, as `updateSession` answers.
-  setAlternative: endpoint(sessionSchema, setAlternativeSchema, idParamsSchema),
+  setAlternative: endpoint(
+    { method: 'PATCH', path: '/api/sessions/:id/alternative' },
+    sessionSchema,
+    setAlternativeSchema,
+    idParamsSchema,
+  ),
   // Fork: the new session, with `forkedFrom` set. The source chat is not changed.
-  forkSession: endpoint(sessionSchema, forkSessionSchema, idParamsSchema),
-  stopTurn: endpoint(noContentSchema, undefined, idParamsSchema),
-  updateMessage: endpoint(messageSchema, editMessageSchema, messageParamsSchema),
-  deleteMessage: endpoint(noContentSchema, undefined, messageParamsSchema),
-  getExecution: endpoint(executionLogSchema, undefined, idParamsSchema),
+  forkSession: endpoint(
+    { method: 'POST', path: '/api/sessions/:id/fork' },
+    sessionSchema,
+    forkSessionSchema,
+    idParamsSchema,
+  ),
+  stopTurn: endpoint({ method: 'POST', path: '/api/sessions/:id/stop' }, noContentSchema, undefined, idParamsSchema),
+  updateMessage: endpoint(
+    { method: 'PATCH', path: '/api/sessions/:id/messages/:messageId' },
+    messageSchema,
+    editMessageSchema,
+    messageParamsSchema,
+  ),
+  deleteMessage: endpoint(
+    { method: 'DELETE', path: '/api/sessions/:id/messages/:messageId' },
+    noContentSchema,
+    undefined,
+    messageParamsSchema,
+  ),
+  getExecution: endpoint({ method: 'GET', path: '/api/executions/:id' }, executionLogSchema, undefined, idParamsSchema),
 };
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;

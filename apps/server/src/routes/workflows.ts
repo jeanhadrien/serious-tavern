@@ -5,12 +5,12 @@ import { pruneInvalidEdges, validateWorkflow } from '@st/engine';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
 import { nodeResources } from '../services/node-resources.js';
-import type { ApiRoute } from './types.js';
+import { route } from './route.js';
 
 export function registerWorkflows(app: FastifyInstance, context: AppContext) {
   const { workflows, sessions } = context;
-  app.get<ApiRoute<'listWorkflows'>>('/api/workflows', async () => workflows.list());
-  app.post<ApiRoute<'createWorkflow'>>('/api/workflows', async (request, reply) => {
+  route(app, 'listWorkflows', async () => workflows.list());
+  route(app, 'createWorkflow', async (request, reply) => {
     const body = apiContract.createWorkflow.body.parse(request.body);
     const date = now();
     const workflow: ApiResponse<'createWorkflow'> = {
@@ -25,10 +25,10 @@ export function registerWorkflows(app: FastifyInstance, context: AppContext) {
     await workflows.save(workflow);
     return reply.code(201).send(workflow);
   });
-  app.get<ApiRoute<'getWorkflow'>>('/api/workflows/:id', async (request) =>
+  route(app, 'getWorkflow', async (request) =>
     requireEntity(workflows, apiContract.getWorkflow.params.parse(request.params).id, 'Workflow'),
   );
-  app.put<ApiRoute<'updateWorkflow'>>('/api/workflows/:id', async (request) => {
+  route(app, 'updateWorkflow', async (request) => {
     const { id } = apiContract.updateWorkflow.params.parse(request.params);
     const body = apiContract.updateWorkflow.body.parse(request.body);
     const existing = await requireEntity(workflows, id, 'Workflow');
@@ -46,7 +46,7 @@ export function registerWorkflows(app: FastifyInstance, context: AppContext) {
     if (!workflow) throw notFound('Workflow');
     return workflow;
   });
-  app.delete<ApiRoute<'deleteWorkflow'>>('/api/workflows/:id', async (request, reply) => {
+  route(app, 'deleteWorkflow', async (request, reply) => {
     const { id } = apiContract.deleteWorkflow.params.parse(request.params);
     // Used by a chat when its reply list names it (`replyWorkflows`: the legacy `workflowId` for a chat without a list).
     if ((await sessions.list()).some((s) => replyWorkflows(s).some((entry) => entry.workflowId === id)))
@@ -54,7 +54,7 @@ export function registerWorkflows(app: FastifyInstance, context: AppContext) {
     await workflows.delete(id);
     return reply.code(204).send();
   });
-  app.post<ApiRoute<'validateWorkflow'>>('/api/workflows/:id/validate', async (request) => {
+  route(app, 'validateWorkflow', async (request) => {
     const { id } = apiContract.validateWorkflow.params.parse(request.params);
     const workflow = await requireEntity(workflows, id, 'Workflow');
     const errors = await validateWorkflow(workflow, nodeResources(context));
@@ -64,6 +64,6 @@ export function registerWorkflows(app: FastifyInstance, context: AppContext) {
         workflowName: workflow.name,
         issues: errors,
       } satisfies WorkflowInvalidDetails);
-    return { valid: true, errors: [] };
+    return { valid: true as const, errors: [] };
   });
 }

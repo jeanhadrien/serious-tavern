@@ -6,12 +6,12 @@ import { requireEntity } from '../errors.js';
 import { cardData, exportCharacterPng, importCharacters } from '../services/character-cards.js';
 import { deleteEntity, updateEntity, updateEntityAvatar } from '../services/entity-mutations.js';
 import { parseImageRequest, sendAvatar, uploadedFiles } from '../uploads.js';
-import type { ApiRoute } from './types.js';
+import { route } from './route.js';
 
 export function registerCharacters(app: FastifyInstance, context: AppContext) {
   const { characters, characterAvatars } = context;
-  app.get<ApiRoute<'listCharacters'>>('/api/characters', async () => characters.list());
-  app.post<ApiRoute<'createCharacter'>>('/api/characters', async (request, reply) => {
+  route(app, 'listCharacters', async () => characters.list());
+  route(app, 'createCharacter', async (request, reply) => {
     const body = apiContract.createCharacter.body.parse(request.body);
     const date = now();
     const character = characterSchema.parse({
@@ -24,34 +24,32 @@ export function registerCharacters(app: FastifyInstance, context: AppContext) {
     await characters.save(character);
     return reply.code(201).send(character);
   });
-  app.get<ApiRoute<'getCharacter'>>('/api/characters/:id', async (request) =>
+  route(app, 'getCharacter', async (request) =>
     requireEntity(characters, apiContract.getCharacter.params.parse(request.params).id, 'Character'),
   );
-  app.put<ApiRoute<'updateCharacter'>>('/api/characters/:id', async (request) => {
+  route(app, 'updateCharacter', async (request) => {
     const { id } = apiContract.updateCharacter.params.parse(request.params);
     const body = apiContract.updateCharacter.body.parse(request.body);
     return updateEntity(characters, id, body, characterSchema, 'Character');
   });
-  app.delete<ApiRoute<'deleteCharacter'>>('/api/characters/:id', async (request, reply) => {
+  route(app, 'deleteCharacter', async (request, reply) => {
     const { id } = apiContract.deleteCharacter.params.parse(request.params);
     await deleteEntity(characters, characterAvatars, id, 'Character');
     return reply.code(204).send();
   });
-  app.get<ApiRoute<'getCharacterAvatar'>>('/api/characters/:id/avatar', async (request, reply) => {
+  route(app, 'getCharacterAvatar', async (request, reply) => {
     const { id } = apiContract.getCharacterAvatar.params.parse(request.params);
     const character = await requireEntity(characters, id, 'Character');
     return sendAvatar(reply, characterAvatars, character.avatar);
   });
-  app.put<ApiRoute<'updateCharacterAvatar'>>('/api/characters/:id/avatar', async (request, reply) => {
+  route(app, 'updateCharacterAvatar', async (request, reply) => {
     const { id } = apiContract.updateCharacterAvatar.params.parse(request.params);
     const file = parseImageRequest(request);
     const character = await updateEntityAvatar(characters, characterAvatars, id, file, 'Character');
     return reply.send(character);
   });
-  app.post<ApiRoute<'importCharacters'>>('/api/characters/import', async (request) =>
-    importCharacters(context, uploadedFiles(request)),
-  );
-  app.get<ApiRoute<'exportCharacter'>>('/api/characters/:id/export', async (request, reply) => {
+  route(app, 'importCharacters', async (request) => importCharacters(context, uploadedFiles(request)));
+  route(app, 'exportCharacter', async (request, reply) => {
     const { id } = apiContract.exportCharacter.params.parse(request.params);
     const { format } = apiContract.exportCharacter.query.parse(request.query);
     const character = await requireEntity(characters, id, 'Character');

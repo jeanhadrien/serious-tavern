@@ -52,8 +52,8 @@ Note: run tests sparringly as they are slow and long.
 
 ## Contracts that hold everywhere
 - **A rule has one home.** When shared holds a rule (port compatibility, the story state fold, link status, the fork cut, `activeMessages`, settings resolution...), the engine, the server, node-ui and the web all call it. Never copy or re-implement it.
-- **API contract:** `packages/shared/src/api/` holds the zod schemas and types of every endpoint's request and response. It is the only definition of the API.
-  - To add or change an endpoint, update the contract first. The server parses its input with the contract and types its response from it; the web client uses the same types.
+- **API contract:** `packages/shared/src/api/` holds the method, path and zod schemas (request and response) of every endpoint. It is the only definition of the API.
+  - To add or change an endpoint, update the contract first. The server registers its route from the contract (`route(app, 'key', handler)`: a path is never written twice), parses its input with it and types its response from it; the web client uses the same types.
   - Don't declare request or response types locally, and don't put inline `z.object` schemas in routes.
   - Server tests check responses against the contract schemas, and `app.test.ts` requires every contract endpoint to be exercised: a new contract entry, its route and its test land in the same commit.
 - **API errors** are always `{ error: { code, message, details? } }`, through the global Fastify error handler. No stack traces in responses.

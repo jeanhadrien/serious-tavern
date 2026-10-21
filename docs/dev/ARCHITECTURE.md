@@ -36,7 +36,7 @@ flowchart LR
 
 | Package | Role |
 | --- | --- |
-| `packages/shared` | Zod schemas and types for every record, the **API contract** (`src/api/`: request and response of every endpoint), and the pure rules both sides must agree on: port compatibility (`canConnect`), the story state fold, message links, alternatives, the fork cut, chat settings resolution, the macro registry. |
+| `packages/shared` | Zod schemas and types for every record, the **API contract** (`src/api/`: method, path and request and response of every endpoint; the server's routes register from it), and the pure rules both sides must agree on: port compatibility (`canConnect`), the story state fold, message links, alternatives, the fork cut, chat settings resolution, the macro registry. |
 | `packages/engine` | Workflow preparation and validation, the wave-based parallel executor, Handlebars templating, preset rendering, the node types (`src/nodes/<type>/`), the LLM adapter and the tool loop. No I/O of its own besides the LLM and HTTP calls nodes make. |
 | `packages/node-ui` | Node configuration forms generated from each node's JSON Schema, and custom panels for the nodes that need more. Knows nothing of the web app's routing or API clients. |
 | `apps/server` | Fastify routes (thin) over services (logic): chat turns, story state, storage, secrets, imports, change events. Owns all data and secrets. |

@@ -133,18 +133,49 @@ export type SessionStateView = z.infer<typeof sessionStateViewSchema>;
 export const stateEndpoints = {
   // The chat's computed story state: what its next turn would start from. Read-only (the fold of its stored
   // turns against the current definitions).
-  getSessionState: endpoint(sessionStateViewSchema, undefined, idParamsSchema),
+  getSessionState: endpoint(
+    { method: 'GET', path: '/api/sessions/:id/state' },
+    sessionStateViewSchema,
+    undefined,
+    idParamsSchema,
+  ),
   // Definitions in file-name order; clients sort.
-  listStateDefinitions: endpoint(z.array(stateDefinitionSchema)),
-  getStateDefinition: endpoint(stateDefinitionSchema, undefined, idParamsSchema),
+  listStateDefinitions: endpoint(
+    {
+      method: 'GET',
+      path: '/api/state-definitions',
+      description: 'List the story state definitions (named groups of keys that workflows read and write per chat).',
+    },
+    z.array(stateDefinitionSchema),
+  ),
+  getStateDefinition: endpoint(
+    { method: 'GET', path: '/api/state-definitions/:id', description: 'Get one story state definition.' },
+    stateDefinitionSchema,
+    undefined,
+    idParamsSchema,
+  ),
   // 409 `STATE_DEFINITION_NAME_TAKEN` when another definition has the name (compared ignoring case).
-  createStateDefinition: endpoint(stateDefinitionSchema, stateDefinitionWriteSchema),
+  createStateDefinition: endpoint(
+    { method: 'POST', path: '/api/state-definitions' },
+    stateDefinitionSchema,
+    stateDefinitionWriteSchema,
+  ),
   // Replaces name, description and keys; unknown top-level fields of the stored record survive. Changing keys or
   // types is always allowed (stored data is never rewritten); workflows using the definition lose their
   // connections to ports that no longer exist, and a State node whose key or operation no longer fits is
   // reported by validation until it is reconfigured. 409 `STATE_DEFINITION_NAME_TAKEN`, and
   // 409 `STATE_DEFINITION_IN_USE` for a rename while a chat holds story state under the old name.
-  updateStateDefinition: endpoint(stateDefinitionSchema, stateDefinitionWriteSchema, idParamsSchema),
+  updateStateDefinition: endpoint(
+    { method: 'PUT', path: '/api/state-definitions/:id' },
+    stateDefinitionSchema,
+    stateDefinitionWriteSchema,
+    idParamsSchema,
+  ),
   // 409 `STATE_DEFINITION_IN_USE` while a chat holds story state for it or a workflow node uses it.
-  deleteStateDefinition: endpoint(noContentSchema, undefined, idParamsSchema),
+  deleteStateDefinition: endpoint(
+    { method: 'DELETE', path: '/api/state-definitions/:id' },
+    noContentSchema,
+    undefined,
+    idParamsSchema,
+  ),
 };

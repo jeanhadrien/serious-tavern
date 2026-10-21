@@ -4,6 +4,12 @@ Zod schemas, types and the pure rules that the engine, the server, node-ui and t
 
 Story state, message links and prompt messages have their own notes: `src/state/AGENTS.md`, `src/links/AGENTS.md`, `src/conversation/AGENTS.md`.
 
+## API contract (`src/api/`)
+- Every entry is `endpoint({ method, path, description? }, response, body?, params?, query?)`, collected in `apiContract`. The key is the endpoint's name.
+- `path` is the full Fastify template with the `/api` prefix (`/api/presets/:id`); the `:names` are exactly the keys of the `params` schema (a test checks it), and no two entries share a method and path.
+- `description` is optional, plain language for API consumers (an MCP agent reads it): what the call does and what to watch for, never how the server does it. Keep it true when behaviour changes.
+- Server routes register through `route()` from the contract, so nothing here is copied into a route; the web client still writes its own paths until it moves onto these.
+
 ## Templates and macros
 Preset content and template-taking node configs are rendered with the `handlebars` runtime (`noEscape: true`, no code eval) over a data object built from the turn context. The syntax and the helper list are documented in `docs/TEMPLATING.md`.
 - The macro registry (`macros.ts`) defines every available path, and the helper list lives next to it. Preset validation walks the parsed AST, so editor hints and warnings stay in step with what renders. **Never hand-write a hint or key list:** settings keys come from workflow declarations (`macroHints(inputs, settings)`, `settingsCatalog` unions them across workflows), state paths from `stateHints(definitions)`.

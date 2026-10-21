@@ -18,6 +18,7 @@ import { registerNodeTypes } from './routes/node-types.js';
 import { registerImports } from './routes/imports.js';
 import { registerAppSettings } from './routes/app-settings.js';
 import { registerEvents } from './routes/events.js';
+import { requireContractRoutes } from './routes/route.js';
 import { watchResourceFiles } from './services/change-events.js';
 
 export async function createApp(
@@ -36,6 +37,7 @@ export async function createApp(
     done(null, body),
   );
   const context = await createContext(dataDir, options);
+  requireContractRoutes(app);
   registerNodeTypes(app, context);
   registerCharacters(app, context);
   registerPersonas(app, context);

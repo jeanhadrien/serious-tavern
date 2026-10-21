@@ -31,6 +31,10 @@ it('returns payloads conforming to every shared endpoint response contract', asy
   const app = await createApp(directory, { seed: false });
   const covered = new Set<ApiEndpoint>();
   const request = async <K extends ApiEndpoint>(key: K, options: InjectOptions): Promise<ApiResponse<K>> => {
+    // The call must be the one the contract declares for this key.
+    const { method, path } = apiContract[key];
+    expect(options.method, key).toBe(method);
+    expect(options.url, key).toMatch(new RegExp(`^${path.replace(/:\w+/g, '[^/?]+')}(\\?.*)?$`));
     const response = await app.inject(options);
     expect(response.statusCode, `${key}: ${response.body}`).toBeGreaterThanOrEqual(200);
     expect(response.statusCode, `${key}: ${response.body}`).toBeLessThan(300);
@@ -570,11 +574,11 @@ it('hides unexpected error stacks and logs them server-side', async () => {
   directories.push(directory);
   const app = await createApp(directory, { seed: false });
   const log = vi.spyOn(console, 'error').mockImplementation(() => {});
-  app.get('/api/boom', async () => {
+  app.get('/boom', async () => {
     throw new Error('sensitive internal details');
   });
   try {
-    const response = await app.inject({ method: 'GET', url: '/api/boom' });
+    const response = await app.inject({ method: 'GET', url: '/boom' });
     expect(response.statusCode).toBe(500);
     expect(response.json()).toEqual({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
     expect(response.body).not.toContain('sensitive internal details');

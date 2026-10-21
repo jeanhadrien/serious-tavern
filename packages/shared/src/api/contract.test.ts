@@ -1,3 +1,4 @@
+import type { z } from 'zod';
 import { expect, it } from 'vitest';
 import { executionLogSchema, messageSchema } from '../models.js';
 import {
@@ -370,4 +371,16 @@ it('describes the reply list of a chat: both ways to create one, a whole-replace
   expect(view([], [{ ...node, workflowId: w1 }, node]).nodes.map((item) => item.workflowId)).toEqual([w1, undefined]);
   // Messages say which run wrote them, and a session keeps its reply list.
   expect(messageSchema.parse({ id: 'm', role: 'assistant', content: '', createdAt: '', runId: 'r1' }).runId).toBe('r1');
+});
+
+it('gives every endpoint its own method and path, whose :params are the keys of its params schema', () => {
+  const seen = new Set<string>();
+  for (const [key, contract] of Object.entries(apiContract)) {
+    const route = `${contract.method} ${contract.path}`;
+    expect(seen.has(route), `${key} repeats ${route}`).toBe(false);
+    seen.add(route);
+    const pathParams = [...contract.path.matchAll(/:(\w+)/g)].map((match) => match[1]);
+    const schemaParams = Object.keys((contract.params as z.ZodObject).shape);
+    expect(pathParams.sort(), key).toEqual(schemaParams.sort());
+  }
 });

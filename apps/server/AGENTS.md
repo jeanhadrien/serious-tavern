@@ -5,6 +5,7 @@ Fastify 5 on port 3001. Turns, runs, story state, alternatives and fork are in `
 ## Structure
 - `app.ts` only wires things together. `context.ts` sets up the repositories and secrets; `errors.ts` has `HttpError` and the error handler.
 - `routes/<resource>.ts` holds thin handlers; the logic lives in `services/`.
+- **Routes register only through `route(app, 'key', handler, options?)`** (`routes/route.ts`): method and path come from the contract entry, so add the endpoint to the contract first. `options` are Fastify route options (`bodyLimit`, ...). Never call `app.get`/`app.post`/... for an `/api` path: `createApp` makes that throw at startup, and `contract-routes.test.ts` checks every contract entry is served at its method and path. A test-only route lives outside `/api`.
 
 ## Writes and locks
 - **Session writes always go through the per-session lock and `update`**, never `load → await → save`. The same applies to every mutation of an existing record (characters, personas, avatars): use `update` or the entity lock. Plain `save` is only for creation. Secrets use one store-wide lock.
