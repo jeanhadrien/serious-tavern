@@ -135,6 +135,15 @@ included, for a [thread key](STATE-AND-LORE.md#thread-keys)).
 - An LLM node with writable keys counts as writing something: it runs even when no reply needs it.
 - Every round's text streams, but only the last round's text is the reply. The log shows every call.
 
+**Text Stats.** Measures a text, normally a reply before it is posted, with the same numbers as the optional
+[text statistics](GETTING-STARTED.md#chatting) under replies (whatever that setting says). Input `Text` (connect a
+single reply text, not a message list: messages become a `role: content` transcript and the role names get measured).
+The optional `History` input holds the messages to compare against; without it the node uses the chat's history minus
+this turn's own replies, so a node in a workflow after the reply doesn't compare the reply with itself. Only the last
+five assistant replies count. Outputs: `Words`, `MTLD`, `Slop words`, `4-gram overlap` (0 to 1), `Recycled sentences`
+and `Stats` (all of them as an object). A number that can't be measured (`MTLD` on a short text, the overlap with no
+earlier reply) is absent, so what it feeds is skipped, except as a Trigger signal, where an absent signal counts as 0.
+
 ### Logic
 
 **Condition.** Compares two texts and sends the `Value` input down `True` or `False` (the other branch is skipped).

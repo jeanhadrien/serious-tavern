@@ -38,6 +38,11 @@ The LLM node has its own notes in `llm/AGENTS.md`; its tool loop and adapter are
 - `add` on a collection key has the `messages` input (`requiredIfConnected`): `messageLink` accepts a link, a message or a non-empty list of messages, anything else is a node error. Only `add` reads it; a value's own `messages` is ignored.
 - On a thread key, `add` takes the `value` input as the LLM's `exchange` (a `messages` port) plus an optional `input`, and has no fixed value literal. `keepReasoning` is a thread-only option (default off).
 
+## Text Stats
+- The window rule is `replyWindow` (the chat view's), applied to the assistant messages of the `history` input or, unconnected, of `ctx.history` minus the messages of `ctx.replies`: without that, a node after the reply compares the reply with itself. A stopped or streaming message is never a window text.
+- Messages ports carry more than one shape: read `role`/`content`/`status` defensively. The `text` input coerces a connected `messages` value into a role-prefixed transcript (`canConnect`), which is why its description warns about it.
+- A `null` metric (`mtld`, `ngramOverlap`) leaves its `optional` port out of the result, as Chat Settings' `value` does, and logs why; `stats` keeps the `null`. It reads no app setting and keeps no cache.
+
 ## History nodes
 - **Thread** is the only caller of `weaveThread`/`threadAlone`. It locates its key with `locateThread` (a run-time error when the key isn't a thread), reads whole items from the run snapshot, reverses the fold's newest-first order (same-turn items keep write order), keeps the last `lastN`, and places nothing itself. Its `history` input is optional and `neverSkips`.
 - **Next Chunk** plans over a collection key's snapshot items with `ctx.history` (`planNextChunk`). Its `resolvePorts` only checks the target, so an unset key is the "not set up" state.

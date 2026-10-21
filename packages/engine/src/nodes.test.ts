@@ -2,6 +2,8 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import type { Preset, PromptMessage } from '@st/shared';
 import { httpRequest } from './nodes/http-request/index.js';
 import { character } from './nodes/character/index.js';
+import { WINDOW_SIZE } from './text-stats/index.js';
+import { textStatsNode } from './nodes/text-stats/index.js';
 import { llm, mergeSystemMessages } from './nodes/llm/index.js';
 import { openaiCompatible } from './providers/openai-compatible.js';
 import {
@@ -381,5 +383,74 @@ describe('integration nodes', () => {
     expect(llm.defaultConfig.reasoningEffort).toBe('off');
     expect(llm.configSchema.parse({ presetId: preset.id })).toMatchObject({ reasoningEffort: 'off' });
     expect(llm.configSchema.safeParse({ presetId: preset.id, reasoningEffort: 'max' }).success).toBe(false);
+  });
+});
+
+describe('text stats node', () => {
+  const sentence = 'The rain kept falling on the old stone bridge tonight.';
+  const message = (id: string, role: 'user' | 'assistant', content: string) => ({ id, role, content, createdAt: '' });
+  const run = (inputs: Record<string, unknown>, overrides: Partial<ExecutionContext> = {}) => {
+    const logs: string[] = [];
+    const result = textStatsNode.execute({ ...ctx({}), inputs, log: (line) => logs.push(line), ...overrides });
+    return result.then((outputs) => ({ outputs, logs }));
+  };
+
+  it('is registered with one number port per metric and a stats object', () => {
+    expect(textStatsNode.outputs.map((port) => [port.name, port.dataType])).toEqual([
+      ['words', 'number'],
+      ['mtld', 'number'],
+      ['slopWords', 'number'],
+      ['ngramOverlap', 'number'],
+      ['recycledSentences', 'number'],
+      ['stats', 'object'],
+    ]);
+    expect(textStatsNode.inputs.find((port) => port.name === 'history')).toMatchObject({ neverSkips: true });
+    expect(textStatsNode.inputs.find((port) => port.name === 'text')?.description).toContain('messages');
+  });
+
+  it('measures the text and leaves absent the metrics it cannot measure, saying why', async () => {
+    const { outputs, logs } = await run({ text: 'Just a few words here.' });
+    expect(outputs).toMatchObject({ words: 5, slopWords: 0, recycledSentences: 0 });
+    expect(outputs).not.toHaveProperty('mtld');
+    expect(outputs).not.toHaveProperty('ngramOverlap');
+    expect(outputs.stats).toMatchObject({ words: 5, mtld: null, ngramOverlap: null });
+    expect(logs).toHaveLength(2);
+  });
+
+  it('compares with the chat history without the replies of the running turn', async () => {
+    const earlier = message('a1', 'assistant', sentence);
+    const own = message('a2', 'assistant', sentence);
+    const history = [message('u1', 'user', 'Hi'), earlier, message('u2', 'user', 'Go on'), own];
+    const withEarlier = await run({ text: sentence }, { history, replies: [own as never] });
+    expect(withEarlier.outputs).toMatchObject({ recycledSentences: 1, ngramOverlap: 1 });
+    // The turn's own reply is not a comparison text: alone in the history, the text has nothing to compare with.
+    const alone = await run({ text: sentence }, { history: [own], replies: [own as never] });
+    expect(alone.outputs).toMatchObject({ recycledSentences: 0 });
+    expect(alone.outputs).not.toHaveProperty('ngramOverlap');
+  });
+
+  it('prefers a connected history, reading messages defensively and ignoring stopped replies', async () => {
+    const history = [
+      message('a1', 'assistant', sentence),
+      { id: 'a2', role: 'assistant', content: sentence, status: 'partial' },
+      { role: 'assistant', content: 42 },
+      'not a message',
+      null,
+    ];
+    const { outputs } = await run(
+      { text: sentence, history },
+      { history: [message('x', 'assistant', 'unrelated words')] },
+    );
+    expect(outputs).toMatchObject({ recycledSentences: 1, ngramOverlap: 1 });
+  });
+
+  it('compares only with the last WINDOW_SIZE assistant replies', async () => {
+    const replies = [
+      sentence,
+      ...Array.from({ length: WINDOW_SIZE }, (_, n) => `Filler number ${n} says something else entirely.`),
+    ];
+    const history = replies.map((content, n) => message(`a${n}`, 'assistant', content));
+    const { outputs } = await run({ text: sentence }, { history });
+    expect(outputs).toMatchObject({ recycledSentences: 0 });
   });
 });

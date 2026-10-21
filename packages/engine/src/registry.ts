@@ -21,6 +21,7 @@ import { unlinkedMessages } from './nodes/unlinked-messages/index.js';
 import { thread } from './nodes/thread/index.js';
 import { trigger } from './nodes/trigger/index.js';
 import { pickFields } from './nodes/pick-fields/index.js';
+import { textStatsNode } from './nodes/text-stats/index.js';
 
 // Register a new backend node here; the UI uses its descriptor and generic editor automatically.
 export const registry = new Map<string, NodeDefinition>(
@@ -45,6 +46,7 @@ export const registry = new Map<string, NodeDefinition>(
     thread,
     trigger,
     pickFields,
+    textStatsNode,
   ].map((node) => [node.type, node]),
 );
 export function descriptors(): NodeTypeDescriptor[] {

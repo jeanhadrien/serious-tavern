@@ -211,7 +211,7 @@ sends it only when present, under the record's `messageName` field. No speaker p
 
 `src/text-stats/` computes uninterpreted statistics on assistant replies: nothing is stored, and the web never
 computes them. `chatStats(messages, history)` returns a `TextStats` per assistant message id; `textStats(text, window)`
-does one text against a list of window texts (what a workflow node will use).
+does one text against a list of window texts (what the Text Stats node uses).
 
 - **Tokenizer.** Text is NFKC-normalized and lowercased, curly apostrophes become `'`. A word is a run of letters and
   digits with inner apostrophes. Everything else separates words: em-dashes, ellipses, hyphens (`well-known` is two
@@ -227,5 +227,11 @@ does one text against a list of window texts (what a workflow node will use).
 - **Window.** The 5 (`WINDOW_SIZE`) assistant replies of the chat history before the reply. `chatStats` walks the
   chat once in order: a reply's window is the history replies seen so far, and a stopped reply (not in the history)
   gets stats but never joins a window.
+- **The Text Stats node** (`nodes/text-stats/`) calls `textStats` on its `text` input, whatever the `showMessageStats`
+  setting says (the setting only gates the chat view). Its window is `replyWindow` over the assistant messages of the
+  `history` input or, unconnected, of `ctx.history` minus the messages whose id is in `ctx.replies` (this turn's own
+  replies, which an after-section run already sees in the history). One `number` output per metric plus a `stats`
+  object; `mtld` and `ngramOverlap` are `optional` ports, left out of the result when `null` (and logged), so an absent
+  signal counts as 0 in a Trigger. Nothing is cached.
 - **Data.** `slop_list.json` is the word list of sam-paech/slop-score (MIT, see `NOTICE.md` beside it). Its bigram and
   trigram lists and the "not X, but Y" detector are not used. Background: `explorations/07-message-text-stats.md`.
