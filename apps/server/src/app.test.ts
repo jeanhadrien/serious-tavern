@@ -61,6 +61,14 @@ it('returns payloads conforming to every shared endpoint response contract', asy
       const definition = registry.get(descriptor.type)!;
       expect(descriptor.sink).toBe(isSink(definition, definition.defaultConfig));
     }
+    // One type is the same descriptor as its entry in the catalog; an unknown one is the standard 404.
+    const llmType = await request('getNodeType', { method: 'GET', url: '/api/node-types/llm' });
+    expect(llmType).toEqual(nodeTypes.find((descriptor) => descriptor.type === 'llm'));
+    const unknownType = await app.inject({ method: 'GET', url: '/api/node-types/nope' });
+    expect(unknownType.statusCode).toBe(404);
+    expect(errorEnvelopeSchema.parse(unknownType.json())).toEqual({
+      error: { code: 'NOT_FOUND', message: 'Node type not found' },
+    });
     expect(nodeTypes.find((descriptor) => descriptor.type === 'llm')?.sink).toBe(false);
     expect(nodeTypes.find((descriptor) => descriptor.type === 'chat-output')?.sink).toBe(true);
     expect(nodeTypes.find((descriptor) => descriptor.type === 'state-write')?.sink).toBe(true);

@@ -9,9 +9,21 @@ export const catalogEndpoints = {
     {
       method: 'GET',
       path: '/api/node-types',
-      description: 'List every node type with its ports, config schema and defaults.',
+      description:
+        'List every node type with its ports, config schema and defaults. The answer is large (tens of kilobytes): to learn one type, call getNodeType.',
     },
     z.array(nodeTypeDescriptorSchema),
+  ),
+  getNodeType: endpoint(
+    {
+      method: 'GET',
+      path: '/api/node-types/:type',
+      description:
+        'Get one node type: what it does, its fixed input and output ports, the JSON Schema of its config, its default config and which config fields are templates. Types with dynamicPorts have ports that depend on the node config: resolvePorts answers for a given config. 404 for an unknown type.',
+    },
+    nodeTypeDescriptorSchema,
+    undefined,
+    z.object({ type: z.string() }),
   ),
   resolvePorts: endpoint(
     {

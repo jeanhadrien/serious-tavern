@@ -46,6 +46,7 @@ run's on success, the failing run's on failure, absent when no workflow of the c
 | `DELETE /api/workflows/:id` | | `204`; `409 WORKFLOW_IN_USE` while a chat's reply list names it. |
 | `POST /api/workflows/:id/validate` | | `200` when valid; `422 WORKFLOW_INVALID` with the issues. |
 | `GET /api/node-types` | | `200` every node type's descriptor (ports, config schema, defaults, `sink`, `dynamicPorts`). |
+| `GET /api/node-types/:type` | | `200` one node type's descriptor, the same as its entry in the list (the list is tens of kilobytes); `404` for an unknown type. |
 | `POST /api/node-types/:type/ports` | the node's config | `200` its resolved inputs and outputs (for `dynamicPorts` types). |
 
 **Positions.** A node in a create or update body may omit `position`; the stored workflow always has one. On update a node

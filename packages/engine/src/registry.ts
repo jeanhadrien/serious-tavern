@@ -49,19 +49,28 @@ export const registry = new Map<string, NodeDefinition>(
     textStatsNode,
   ].map((node) => [node.type, node]),
 );
+const describe = (definition: NodeDefinition): NodeTypeDescriptor => ({
+  type: definition.type,
+  label: definition.label,
+  description: definition.description,
+  category: definition.category,
+  dynamicPorts: !!definition.resolvePorts,
+  // Descriptors are static: a sink that depends on its config is described with the default config.
+  sink: isSink(definition, definition.defaultConfig),
+  inputs: definition.inputs,
+  outputs: definition.outputs,
+  templateFields: definition.templateFields,
+  configSchema: z.toJSONSchema(definition.configSchema) as Record<string, unknown>,
+  defaultConfig: definition.defaultConfig,
+});
+
+/** The descriptor of every node type, the node catalog. */
 export function descriptors(): NodeTypeDescriptor[] {
-  return [...registry.values()].map((definition) => ({
-    type: definition.type,
-    label: definition.label,
-    description: definition.description,
-    category: definition.category,
-    dynamicPorts: !!definition.resolvePorts,
-    // Descriptors are static: a sink that depends on its config is described with the default config.
-    sink: isSink(definition, definition.defaultConfig),
-    inputs: definition.inputs,
-    outputs: definition.outputs,
-    templateFields: definition.templateFields,
-    configSchema: z.toJSONSchema(definition.configSchema) as Record<string, unknown>,
-    defaultConfig: definition.defaultConfig,
-  }));
+  return [...registry.values()].map(describe);
+}
+
+/** The descriptor of one node type, or undefined when the type is unknown. */
+export function descriptor(type: string): NodeTypeDescriptor | undefined {
+  const definition = registry.get(type);
+  return definition && describe(definition);
 }
