@@ -44,6 +44,12 @@ with the chat moved to the right so you can test as you go.
   red. The toolbar's **Problems** button, with the count, lists them over the canvas: click one to select the node or
   wire and zoom to it. Problems about the whole workflow (a loop, no output) are listed but have nothing to click, and
   problems with the chat settings show in the **Chat settings** panel instead.
+- **Live run:** while a message is being answered in the open chat, the nodes of the workflow that is running light up in
+  the editor if that workflow is open: blue and pulsing while running, green when done, faded and dashed when skipped,
+  red on an error and amber when cancelled. The marks clear a few seconds after the reply ends. Three limits: only the
+  workflows that make the reply show it (the ones that run after the reply don't), only in the browser tab that sent the
+  message, and the marks follow the node ids of the saved workflow that ran, so a node you added or removed since shows
+  nothing.
 - **Save** when you're done. A workflow with a problem (a required input not connected, a setting missing, a node
   pointing at a deleted preset) can still be saved. **Validate** in the toolbar checks right away, without saving, and opens the list of problems, and a chat that
   runs it gets a message naming the node, with a link that opens the workflow and highlights the wire.

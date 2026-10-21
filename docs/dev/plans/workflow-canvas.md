@@ -36,8 +36,7 @@ The brief came from an earlier review. These points differ from it and shape the
 ## Overlays
 
 The rule is recorded in `pages/workflows/AGENTS.md` (overlays are never part of the draft). `CanvasOverlayContext`
-exists and holds the issues by node id. Live run status (8b) adds run status by node id to it, and node summaries (7)
-the catalogs they need.
+exists and holds the issues by node id and the live run status by node id. Node summaries (7) add the catalogs they need.
 
 ## Order
 
@@ -46,38 +45,15 @@ independent.
 
 | Phase | Commits |
 | --- | --- |
-| C. Runs | 8a stream contract · 8b live status · 9a move coercion to shared · 9b last run in the panel |
+| C. Runs | 9a move coercion to shared · 9b last run in the panel |
 | D. Larger additions | 7 node summaries · 13 sticky notes |
 
-Phase C builds the cross-view store in 8b, and 9b reuses it. 13 comes last because it touches every reader of the
+13 comes last because it touches every reader of the
 canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
 
 ---
 
 ## Phase C: runs
-
-### 8b. Live run status on the canvas
-
-- **Goal:** while the open chat streams a run of the workflow open in the editor, its nodes show running, done,
-  skipped, error or cancelled. The marks fade or clear at `turn.complete` or `turn.error`.
-- **Cross-view state:** a small module store, for example `stores/runActivity.ts`:
-  - `useChat` writes to it from `run.start` (`workflowId`, `runId`) and the node events;
-  - the editor reads it.
-  - This is the first time the chat publishes to another view, so keep the store tiny and free of session data.
-- **Touches:**
-  - `api/turnStream.ts`: handlers for the node events;
-  - `useChat.ts`;
-  - the new store;
-  - `WorkflowNode` through the overlay context;
-  - `workflows.css`.
-- **Limits, to state in the guide:**
-  - Only the **reply section** streams. Workflows that run after the reply don't light up (no `onEvent` in
-    `after-section.ts`, and the stream has ended).
-  - Only in the tab that sent the message.
-  - Node ids match the **saved** workflow that ran. A draft that deleted or re-added nodes simply shows nothing for
-    them.
-- **Docs:** `docs/WORKFLOWS.md`, `reference/web.md`, `pages/chat/AGENTS.md` (the chat publishes run activity, never per
-  token to the shell), `pages/workflows/AGENTS.md`.
 
 ### 9a. Move port coercion to shared
 
@@ -96,8 +72,8 @@ canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
     (9a).
   - Skipped nodes show the item 5 reason.
 - **Which run:** see the open questions. The default proposal is the open chat's most recent run of this workflow,
-  from the session's turn entries (`readTurnEntries`, `runs[]` holds `workflowId` and `executionId`), or the `runId`
-  item 8b stored. The log comes from `executionsApi.get`, which is already cached by id.
+  from the session's turn entries (`readTurnEntries`, `runs[]` holds `workflowId` and `executionId`). The live store
+  (`stores/runActivity.ts`) keeps no run id and clears after the turn, so it is no source. The log comes from `executionsApi.get`, which is already cached by id.
 - **Greyed out:** greying when the draft is dirty is not enough. A save made after the run also changes the edges the
   inputs are rebuilt from. Add `workflowUpdatedAt` to the execution log (additive, optional; the engine stamps it from
   the prepared workflow). Grey the panel when the log's stamp differs from the saved workflow's `updatedAt`, or when
@@ -182,8 +158,6 @@ canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
    per-workflow index of executions on the server, which does not exist.
 3. **Rebuild or record inputs (item 9).** Rebuilding (proposed) is approximate even with the version stamp. Recording
    each node's inputs in the log is exact, but it bloats every log: every LLM node's `history` would be stored again.
-4. **Live status after the reply (item 8).** Is reply-section-only acceptable, or should after-section runs publish
-   too? That would mean another channel, such as `/api/events` or a per-chat SSE.
-5. **Notes (item 13):** separate state (a, proposed) or a second node type (b)? Should Tidy (14) move notes, and
+4. **Notes (item 13):** separate state (a, proposed) or a second node type (b)? Should Tidy (14) move notes, and
    should copy and paste carry them? The proposal: Tidy leaves notes where they are, and copy and paste come later.
    Undo and the dirty check are required either way.

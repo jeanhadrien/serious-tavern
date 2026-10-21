@@ -3,6 +3,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { workflowSettingIssues, workflowSettings, type Workflow } from '@st/shared';
 import { useEscapeArea } from '../keyboard/escapeRegistry.js';
 import { useShortcutArea } from '../keyboard/shortcutAreas.js';
+import { useRunActivity } from '../stores/runActivity.js';
 import { Splitter } from '../components/splitter/Splitter.js';
 import { useStoredSize } from '../components/splitter/useStoredSize.js';
 import { useWorkflowEditor } from './workflows/useWorkflowEditor.js';
@@ -20,6 +21,7 @@ import './workflows/workflows.css';
 // The node config panel and the settings panel share one slot and one remembered width; until the user sets it,
 // each keeps its own default (300 and 340).
 const PANEL_WIDTH = { min: 240, max: 720 };
+const NO_RUN_STATUS = {};
 
 export function Workflows() {
   return (
@@ -55,6 +57,9 @@ function WorkflowEditor() {
   const settingsShown = settingsOpen && !canvas.current;
   const panelShown = canvas.current !== undefined || settingsOpen;
   const panelWidth = useStoredSize('workflow-panel', { ...PANEL_WIDTH, initial: canvas.current ? 300 : 340 });
+  // The open chat's streaming run, when it is a run of this workflow (reply section only, and only in this tab).
+  const activity = useRunActivity();
+  const runStatus = workflow && activity.workflowId === workflow.id ? activity.nodes : NO_RUN_STATUS;
   const problems = useMemo(() => listedIssues(issues ?? []), [issues]);
   // Validate asks the engine at once: all clear is a toast, otherwise the list opens (or the settings panel, when
   // the problems are only the chat settings').
@@ -111,6 +116,7 @@ function WorkflowEditor() {
               issues={issues ?? []}
               issuesOpen={issuesOpen}
               onCloseIssues={() => setIssuesOpen(false)}
+              runStatus={runStatus}
             />
             {panelShown && (
               <Splitter

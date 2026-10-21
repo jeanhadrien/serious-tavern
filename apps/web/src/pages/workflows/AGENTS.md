@@ -13,6 +13,7 @@
 
 ## Overlays
 - Issue badges, edge marks and anything else derived from a run or a check (live status, config summaries later) are **not part of the draft**. Never put them in node `data`: the history's `snapshotOf` copies `data`, so an undo would bring back stale marks. Derive them at render, as `styleEdges` does for edges, and hand them to `WorkflowNode` through `CanvasOverlayContext`.
+- The run streaming in the open chat (`runActivity`, only when it is a run of the open workflow) reaches `WorkflowNode` as `CanvasOverlayContext.runStatus`: marks, never draft data.
 - Selecting what an issue names is selection only (`focusIssue`): no `recordStep`.
 
 ## Validation

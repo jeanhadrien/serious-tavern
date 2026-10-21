@@ -5,7 +5,7 @@ import type { ValidationIssue } from '@st/shared';
 import { IconButton } from '../../components/IconButton.js';
 import { checkConnection } from '../../connection.js';
 import { useMediaQuery } from '../../useMediaQuery.js';
-import { CanvasOverlayContext } from './CanvasOverlayContext.js';
+import { CanvasOverlayContext, type CanvasOverlay } from './CanvasOverlayContext.js';
 import { ConnectPicker } from './ConnectPicker.js';
 import { styleEdges } from './edgeStyle.js';
 import { IssueList } from './IssueList.js';
@@ -49,16 +49,19 @@ export function WorkflowCanvas({
   issues,
   issuesOpen,
   onCloseIssues,
+  runStatus,
 }: {
   canvas: ReturnType<typeof useWorkflowCanvas>;
   /** The engine's problems with the draft; the canvas marks the nodes and connections they name. */
   issues: readonly ValidationIssue[];
   issuesOpen: boolean;
   onCloseIssues: () => void;
+  /** Where the nodes of the run streaming now stand, when it is a run of this workflow. */
+  runStatus: CanvasOverlay['runStatus'];
 }) {
   const touch = useMediaQuery('(pointer: coarse)');
   const { nodes, edges, highlightedEdge } = canvas;
-  const overlay = useMemo(() => ({ issuesByNode: issuesByNode(issues) }), [issues]);
+  const overlay = useMemo(() => ({ issuesByNode: issuesByNode(issues), runStatus }), [issues, runStatus]);
   const drawnEdges = useMemo(
     () => styleEdges(edges, nodes, { focused: highlightedEdge, issues: issueEdgeIds(issues) }),
     [edges, nodes, highlightedEdge, issues],

@@ -145,6 +145,11 @@ conversion model (unknown node types become read-only placeholders).
   one request in flight (a newer draft aborts the older request, so a stale answer never shows). The toolbar's Validate
   asks at once, toasts the count and reports failures, and no longer saves first.
 - **Template warnings in node panels** are node-ui's (`templateFieldWarnings` over shared's `templateWarnings`), shown under each template field of the generic form. They are panel-only: never validation issues, never badges.
+- **Live run status.** `stores/runActivity.ts` is the one cross-view store: `useChat` writes it (`run.start` starts a run,
+  each `node.*` frame sets a node's status through `TurnHandlers.onNode`, the end of the turn lets the marks linger 3 s),
+  and the editor reads it through `CanvasOverlayContext.runStatus` when `workflowId` is the open workflow. It holds no
+  session data and nothing per token. Limits: only the reply section streams (the after section runs without
+  `onEvent`), only in the tab that sent the message, and ids match the saved workflow that ran.
 - **Issues on the canvas.** The engine's issues (`useWorkflowEditor().issues`) are overlays derived at render, never part
   of the draft: `CanvasOverlayContext` gives `WorkflowNode` the messages per node (a red count badge, messages as its
   tooltip), `styleEdges` (`edgeStyle.ts`) reds every edge an issue names (the one-shot `edge=` link stays thick and

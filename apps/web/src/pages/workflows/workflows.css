@@ -128,6 +128,39 @@
   text-align: center;
   cursor: help;
 }
+/* The run streaming right now (the open chat's reply section): each node shows where it stands. The marks clear shortly
+   after the turn ends. */
+.flow-node.run-running {
+  border-color: #6f9bff;
+  box-shadow: 0 0 0 2px rgba(111, 155, 255, 0.45);
+  animation: run-pulse 1.1s ease-in-out infinite;
+}
+.flow-node.run-completed {
+  border-color: #5fbf7f;
+  box-shadow: 0 0 0 2px rgba(95, 191, 127, 0.35);
+}
+.flow-node.run-skipped {
+  opacity: 0.5;
+  border-style: dashed;
+}
+.flow-node.run-error {
+  border-color: #ef8186;
+  box-shadow: 0 0 0 2px rgba(239, 129, 134, 0.45);
+}
+.flow-node.run-cancelled {
+  border-color: #e6bb77;
+  border-style: dashed;
+}
+@keyframes run-pulse {
+  50% {
+    box-shadow: 0 0 0 5px rgba(111, 155, 255, 0.15);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flow-node.run-running {
+    animation: none;
+  }
+}
 /* Links in node config panels ("Edit preset", "Edit" a collection): readable on the dark panel. */
 .config-panel a {
   color: #9fb0ff;

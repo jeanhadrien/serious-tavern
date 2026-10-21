@@ -13,6 +13,7 @@ import { ApiError, notifyError } from '../../api/transport.js';
 import type { TurnHandlers, TurnResult } from '../../api/turnStream.js';
 import { alerts } from '../../alerts/index.js';
 import { charactersStore, personasStore, sessionsStore, useList, workflowsStore } from '../../stores/index.js';
+import { runActivity } from '../../stores/runActivity.js';
 import { createDraftSaver, loadDraft, pruneDrafts, saveDraft } from './composerDraft.js';
 import { withStoredMetadata, withStoredSettings, withStoredTriggers } from './openSession.js';
 import { copiedList } from './panel/replyList.js';
@@ -254,7 +255,11 @@ export function useChat() {
             // A regenerate shows only its own rows once the server runs it; until then (queued) the reply stays.
             if (replaced) patchMessages((messages) => replaceLastTurnReplies(messages, replaced));
           },
-          onRun: (run) => setRunningWorkflow(run.workflowName),
+          onRun: (run) => {
+            setRunningWorkflow(run.workflowName);
+            runActivity.startRun(run.workflowId);
+          },
+          onNode: (event) => runActivity.setNode(event.nodeId, event.status),
           onDelta: (delta) => patchMessages((messages) => applyDelta(messages, delta)),
           onComplete: settle,
         },
@@ -281,6 +286,7 @@ export function useChat() {
       setBusy(false);
       setWaiting(false);
       setRunningWorkflow(undefined);
+      runActivity.finish();
       refresh().catch(() => {});
     }
   };

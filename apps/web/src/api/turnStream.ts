@@ -1,4 +1,4 @@
-import { turnEventSchema, type ApiResponse } from '@st/shared';
+import { turnEventSchema, type ApiResponse, type ExecutionLog } from '@st/shared';
 import { ApiError, apiErrorFrom, networkError } from './transport.js';
 
 export type TurnResult = ApiResponse<'sendMessage'>;
@@ -8,12 +8,17 @@ type TurnDelta = { nodeId: string; runId?: string; reset?: boolean; textDelta?: 
 /** A run of the reply list is starting: its node events follow, tagged with its `runId`. */
 type RunStart = { runId: string; workflowId: string; workflowName: string };
 
+/** A node of the streaming run began, or ended in one of the ways that are not a completion. */
+type NodeEvent = { nodeId: string; runId?: string; status: ExecutionLog['nodes'][string]['status'] };
+
 export type TurnHandlers = {
   /** The turn began on the server. Until then the message may be waiting in its queue and can still be cancelled. */
   onStart?: () => void;
   /** One run per enabled workflow of the chat's reply list begins, one after another, before its node events. */
   onRun?: (run: RunStart) => void;
   onDelta?: (delta: TurnDelta) => void;
+  /** A node of the current run started, completed, was skipped, failed or was cancelled. */
+  onNode?: (event: NodeEvent) => void;
   onComplete?: (result: TurnResult) => void;
 };
 
@@ -121,6 +126,16 @@ function handleFrame(frame: string, handlers: TurnHandlers): boolean {
         ...(event.reasoningDelta !== undefined && { reasoningDelta: event.reasoningDelta }),
       });
       return false;
+    case 'node.start':
+      return node(handlers, event, 'running');
+    case 'node.complete':
+      return node(handlers, event, 'completed');
+    case 'node.skipped':
+      return node(handlers, event, 'skipped');
+    case 'node.error':
+      return node(handlers, event, 'error');
+    case 'node.cancelled':
+      return node(handlers, event, 'cancelled');
     case 'turn.complete':
       handlers.onComplete?.(event);
       return true;
@@ -129,4 +144,10 @@ function handleFrame(frame: string, handlers: TurnHandlers): boolean {
     default:
       return false;
   }
+}
+
+/** Reports a node outcome; never ends the turn. */
+function node(handlers: TurnHandlers, event: { nodeId: string; runId?: string }, status: NodeEvent['status']): false {
+  handlers.onNode?.({ nodeId: event.nodeId, ...(event.runId !== undefined && { runId: event.runId }), status });
+  return false;
 }

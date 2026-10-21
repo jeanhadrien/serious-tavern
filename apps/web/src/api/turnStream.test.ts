@@ -36,6 +36,32 @@ it('dispatches deltas and the completed turn, even when frames are split across 
   expect(completed).toHaveBeenCalledOnce();
 });
 
+it('reports where each node of a run stands, whatever way it ended, and keeps reading', async () => {
+  respondWith([
+    frame({ type: 'turn.start', executionId: 'e' }),
+    frame({ type: 'run.start', runId: 'r', workflowId: 'w', workflowName: 'W' }),
+    frame({ type: 'node.start', nodeId: 'a', runId: 'r' }),
+    frame({ type: 'node.complete', nodeId: 'a', runId: 'r' }),
+    frame({ type: 'node.skipped', nodeId: 'b', runId: 'r', skip: { reason: 'inactive-inputs' } }),
+    frame({ type: 'node.error', nodeId: 'c', runId: 'r' }),
+    frame({ type: 'node.cancelled', nodeId: 'd' }),
+    frame({ type: 'turn.complete', assistantMessages: [], execution }),
+  ]);
+  const nodes: unknown[] = [];
+  const run = vi.fn();
+  const completed = vi.fn();
+  await streamMessage('s', 'hi', { onRun: run, onNode: (event) => nodes.push(event), onComplete: completed });
+  expect(run).toHaveBeenCalledWith({ runId: 'r', workflowId: 'w', workflowName: 'W' });
+  expect(nodes).toEqual([
+    { nodeId: 'a', runId: 'r', status: 'running' },
+    { nodeId: 'a', runId: 'r', status: 'completed' },
+    { nodeId: 'b', runId: 'r', status: 'skipped' },
+    { nodeId: 'c', runId: 'r', status: 'error' },
+    { nodeId: 'd', status: 'cancelled' },
+  ]);
+  expect(completed).toHaveBeenCalledOnce();
+});
+
 it('throws the server error of a failed turn with its details', async () => {
   const details = { userMessage: user, assistantMessages: [], execution, aborted: 'user' };
   respondWith([frame({ type: 'turn.error', error: { code: 'TURN_STOPPED', message: 'Stopped', details } })]);

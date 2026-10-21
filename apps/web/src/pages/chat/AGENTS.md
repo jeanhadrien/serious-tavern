@@ -15,6 +15,7 @@ Story state in the chat (chips, delete check, linked items, after runs) is in `s
 - Copy copies the stored `content`, never `reasoning`.
 
 ## Streaming and messages
+- The chat publishes run activity to the editor through `stores/runActivity.ts` (workflow id and node statuses from `onRun`/`onNode`, `finish()` in the stream's `finally`). That is all it publishes: never session data, and never anything per token, to another view.
 - `streamMessage` never toasts; `useChat` decides, through `notifyError`.
 - Local row bookkeeping lives in the pure helpers of `turnMessages.ts`. Rows with `status: 'streaming'` are local until the turn settles. Streaming rows are keyed by `runId` + node id. A frame with `reset: true` clears the row's text before applying the delta.
 - A row still streaming has a `runId` but no saved log: never render `ExecutionDetails` for it. Open a message's log with `messageLogId(message)` (`runId ?? executionId`).

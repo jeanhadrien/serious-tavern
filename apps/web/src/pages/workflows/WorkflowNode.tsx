@@ -11,7 +11,9 @@ export function WorkflowNode({ id, data, selected }: NodeProps<CanvasNode>) {
   useEffect(() => {
     updateNodeInternals(id);
   }, [id, descriptor.inputs, descriptor.outputs, updateNodeInternals]);
-  const problems = useContext(CanvasOverlayContext).issuesByNode.get(id);
+  const overlay = useContext(CanvasOverlayContext);
+  const problems = overlay.issuesByNode.get(id);
+  const runStatus = overlay.runStatus[id];
   const connection = useConnection<CanvasNode>();
   const incompatible = (port: PortDef, type: 'source' | 'target') => {
     if (!connection.inProgress || !connection.fromHandle || connection.fromHandle.nodeId === id) return false;
@@ -28,7 +30,10 @@ export function WorkflowNode({ id, data, selected }: NodeProps<CanvasNode>) {
   const tooltip = (port: PortDef) =>
     `${port.label} (${port.dataType}${port.required ? ', required' : ''})${port.description ? ` — ${port.description}` : ''}`;
   return (
-    <div className={`flow-node ${selected ? 'selected' : ''} ${data.unknown ? 'unknown-node' : ''}`}>
+    <div
+      className={`flow-node ${selected ? 'selected' : ''} ${data.unknown ? 'unknown-node' : ''} ${runStatus ? `run-${runStatus}` : ''}`}
+      data-run-status={runStatus}
+    >
       {problems && (
         <span
           className="node-issue-badge"
