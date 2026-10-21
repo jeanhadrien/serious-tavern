@@ -176,11 +176,15 @@ generated from the definitions:
 | Key type | Write tool arguments |
 | --- | --- |
 | number | `{ op: set \| increment \| reset, value }`, bounds in the description, clamped |
-| boolean, text, object | `{ op?: set \| reset, value }` |
+| boolean, object | `{ op?: set \| reset, value }` |
 | enum | the same, options as a JSON Schema `enum` |
+| text | `{ op?: set \| reset \| replace \| append, value, old }` |
 | collection | `{ op: add \| remove \| reset, text, handle, ...declared fields }` |
 
-`reset` is State Write's `delete`. A write tool goes through State Write's own rules, so a refused value comes back in
+`reset` is State Write's `delete`. `replace` and `append` exist only as tools: `replace` changes `old` (it must appear
+exactly once, else the call fails and says how often it matched) into `value`, and `append` adds `value` on a new line.
+The tool computes the whole new text from the pending value and plans it as a `set`, so the stored write is an ordinary
+post-value. A write tool goes through State Write's own rules, so a refused value comes back in
 State Write's words; it is buffered like any write and answers with the key's value after it. Collection items are
 shown as `{ handle, text, ...fields }` with handles `#1`, `#2`... per loop; `remove` takes a handle. Thread keys are
 never offered.

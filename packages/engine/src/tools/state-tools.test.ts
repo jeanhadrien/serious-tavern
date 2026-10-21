@@ -126,12 +126,21 @@ describe('the schemas', () => {
 
   it.each([
     ['alarm', { type: 'boolean' }],
-    ['note', { type: 'string' }],
     ['data', { type: 'object' }],
   ])('writes %s as a flat value', async (key, value) => {
     const tool = (await toolsFor([], [target(key)])).byName.get(`write_scene_${key}`);
     expect(parametersOf(tool).properties.value).toMatchObject(value);
     expect(parametersOf(tool).properties.op.enum).toEqual(['set', 'reset']);
+  });
+
+  it('writes text with set and reset, plus the replace and append edits', async () => {
+    const tool = (await toolsFor([], [target('note')])).byName.get('write_scene_note');
+    expect(parametersOf(tool).properties).toMatchObject({
+      op: { enum: ['set', 'reset', 'replace', 'append'] },
+      value: { type: 'string' },
+      old: { type: 'string' },
+    });
+    expect(parametersOf(tool).required).toBeUndefined();
   });
 
   it('writes a collection with add, remove and reset, the declared fields flat', async () => {
@@ -191,6 +200,9 @@ describe('write tools follow State Write', () => {
     const { call } = await toolsFor([], everyKey);
     await expect(call('write_scene_tension', {})).rejects.toThrow('"op" must be one of: set, increment, reset');
     await expect(call('write_scene_note', { op: 'increment', value: 1 })).rejects.toThrow(
+      '"op" must be one of: set, reset, replace, append',
+    );
+    await expect(call('write_scene_data', { op: 'append', value: 'x' })).rejects.toThrow(
       '"op" must be one of: set, reset',
     );
     await expect(call('write_scene_log', { op: 'set', value: 'x' })).rejects.toThrow('add, remove, reset');
@@ -228,6 +240,54 @@ describe('write tools follow State Write', () => {
     ]);
     expect(writes[0]).toMatchObject({ value: 5, nodeId: 'llm' });
     expect(writes[2]).toMatchObject({ item: { text: 'A storm', level: 2 } });
+  });
+});
+
+describe('text edits', () => {
+  it('replaces the one place old appears, keeping the rest of the text', async () => {
+    const { call, logs } = await toolsFor([], [target('note')]);
+    await call('write_scene_note', { value: 'The door is shut. The lamp is lit.' });
+    expect(await call('write_scene_note', { op: 'replace', old: 'shut', value: 'open' })).toBe(
+      'The door is open. The lamp is lit.',
+    );
+    // Edits build on each other within the loop, and an empty value deletes the text.
+    expect(await call('write_scene_note', { op: 'replace', old: ' The lamp is lit.', value: '' })).toBe(
+      'The door is open.',
+    );
+    expect(logs.at(-1)).toContain('scene.note:');
+  });
+
+  it('refuses a replace that matches nowhere or more than once', async () => {
+    const { call } = await toolsFor([], [target('note')]);
+    await call('write_scene_note', { value: 'a cat and a cat' });
+    await expect(call('write_scene_note', { op: 'replace', old: 'dog', value: 'x' })).rejects.toThrow(
+      '"old" does not appear in the text',
+    );
+    await expect(call('write_scene_note', { op: 'replace', old: 'cat', value: 'x' })).rejects.toThrow(
+      '"old" appears 2 times',
+    );
+    await expect(call('write_scene_note', { op: 'replace', old: '', value: 'x' })).rejects.toThrow('"old" must be');
+    await expect(call('write_scene_note', { op: 'replace', old: 'and' })).rejects.toThrow('"value" must be');
+  });
+
+  it('takes a replacement literally', async () => {
+    const { call } = await toolsFor([], [target('note')]);
+    expect(await call('write_scene_note', { op: 'replace', old: 'none', value: '$& $1' })).toBe('$& $1');
+  });
+
+  it('appends on a new line, to the default text too', async () => {
+    const { call } = await toolsFor([], [target('note')]);
+    expect(await call('write_scene_note', { op: 'append', value: 'Day 1' })).toBe('none\nDay 1');
+    await call('write_scene_note', { value: '' });
+    expect(await call('write_scene_note', { op: 'append', value: 'Day 2' })).toBe('Day 2');
+    await expect(call('write_scene_note', { op: 'append' })).rejects.toThrow('"value" must be the text to append');
+  });
+
+  it('stores an edit as a set of the whole new text', async () => {
+    const { call, run } = await toolsFor([], [target('note')]);
+    await call('write_scene_note', { op: 'append', value: 'Day 1' });
+    run.commit('llm', 1);
+    expect(run.finish()).toMatchObject([{ op: 'set', value: 'none\nDay 1' }]);
   });
 });
 

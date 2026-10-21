@@ -4,7 +4,7 @@ import { planWrite } from '../nodes/state-write/plan.js';
 import type { ExecutionContext, StateAccess } from '../types.js';
 import { ItemHandles } from './handles.js';
 import { uniqueToolName } from './names.js';
-import { keySummary, stateOpOf, type ToolKey, writeOps, writeParameters } from './state-schemas.js';
+import { isTextEdit, keySummary, stateOpOf, type ToolKey, writeOps, writeParameters } from './state-schemas.js';
 import type { EngineTool } from './types.js';
 
 /** A state key the node's settings let the model read or write. */
@@ -60,17 +60,34 @@ function readTool(keys: ToolKey[], handles: ItemHandles): EngineTool {
   };
 }
 
-/** The tool's `op`, checked against what the key type offers; scalars default to `set`. */
-function operation(found: ToolKey, given: unknown) {
+/** The tool's `op` word, checked against what the key type offers; scalars default to `set`. */
+function operation(found: ToolKey, given: unknown): string {
   const allowed = writeOps(found.def);
-  if (given === undefined && !['number', 'collection'].includes(found.def.type)) return stateOpOf('set');
+  if (given === undefined && !['number', 'collection'].includes(found.def.type)) return 'set';
   if (typeof given !== 'string' || !allowed.includes(given))
     throw new Error(`"op" must be one of: ${allowed.join(', ')}`);
-  return stateOpOf(given);
+  return given;
+}
+
+/** The whole text a `replace` or `append` leaves in a text key, from the text it holds now. */
+function editedText(op: 'replace' | 'append', args: Record<string, unknown>, current: string): string {
+  const { old, value } = args;
+  if (typeof value !== 'string')
+    throw new Error(op === 'append' ? '"value" must be the text to append' : '"value" must be the replacement text');
+  if (op === 'append') return current === '' || current.endsWith('\n') ? `${current}${value}` : `${current}\n${value}`;
+  if (typeof old !== 'string' || old === '') throw new Error('"old" must be the exact text to change');
+  const matches = current.split(old).length - 1;
+  if (matches === 0) throw new Error('"old" does not appear in the text. Read the key to see its current text.');
+  if (matches > 1)
+    throw new Error(
+      `"old" appears ${matches} times in the text. Include more of the text around it so it matches once.`,
+    );
+  return current.replace(old, () => value);
 }
 
 /** What the write is about (the value, the new item or the item to remove), ready for `planWrite`. */
-function writeValue(args: Record<string, unknown>, op: string, handles: ItemHandles): unknown {
+function writeValue(args: Record<string, unknown>, op: string, handles: ItemHandles, current: unknown): unknown {
+  if (isTextEdit(op)) return editedText(op, args, typeof current === 'string' ? current : '');
   if (op === 'add') {
     const { op: _op, handle: _handle, ...item } = args;
     return item;
@@ -90,11 +107,12 @@ function writeTool(found: ToolKey, name: string, handles: ItemHandles): EngineTo
     definition: tool(name, description, writeParameters(found)),
     async run(args, ctx) {
       const op = operation(found, args.op);
-      const plan = planWrite(found, op, {
+      const current = ctx.pendingState().read(found.definition.id, found.key)?.value;
+      const plan = planWrite(found, stateOpOf(op), {
         // An increment without an amount adds 1, like State Write.
         connected: args.value !== undefined,
-        value: writeValue(args, op, handles),
-        current: ctx.pendingState().read(found.definition.id, found.key)?.value,
+        value: writeValue(args, op, handles, current ?? keyDefault(found.def)),
+        current,
       });
       for (const line of plan.logs) ctx.log(line);
       // Only a removal of an item that is already gone has no request.
