@@ -40,7 +40,7 @@ with the chat moved to the right so you can test as you go.
 - **Chat settings:** the toolbar's **Chat settings** button declares the knobs each chat can turn for this workflow.
   See [chat settings](STATE-AND-LORE.md#chat-settings).
 - **Save** when you're done. A workflow with a problem (a required input not connected, a setting missing, a node
-  pointing at a deleted preset) can still be saved. **Validate** in the toolbar lists the problems, and a chat that
+  pointing at a deleted preset) can still be saved. **Validate** in the toolbar checks the workflow as you have it on screen (it doesn't save) and lists the problems, and a chat that
   runs it gets a message naming the node, with a link that opens the workflow and highlights the wire.
 
 A node type the app doesn't know (from a newer or older version) is kept as a read-only placeholder and saved

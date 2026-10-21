@@ -5,8 +5,11 @@ import { upstreamOf } from './replies.js';
 import { registry } from './registry.js';
 import { isSink, type NodeDefinition, type NodeResources } from './types.js';
 
-export type PreparedWorkflow = {
-  workflow: Workflow;
+/** What validation reads of a workflow: a draft the editor holds has no id, name or timestamps. */
+type WorkflowGraph = Pick<Workflow, 'nodes' | 'edges' | 'settings'>;
+
+export type PreparedWorkflow<W extends WorkflowGraph = Workflow> = {
+  workflow: W;
   resources: NodeResources;
   definitions: Map<string, NodeDefinition>;
   ports: Map<string, { inputs: PortDef[]; outputs: PortDef[] }>;
@@ -36,10 +39,10 @@ function cachedGet<T>(get: (id: string) => Promise<T | undefined>) {
   };
 }
 
-export async function prepareWorkflow(
-  source: Workflow,
+export async function prepareWorkflow<W extends WorkflowGraph>(
+  source: W,
   sourceResources: NodeResources = { presets: { get: async () => undefined } },
-): Promise<{ errors: ValidationIssue[]; prepared?: undefined } | { errors: []; prepared: PreparedWorkflow }> {
+): Promise<{ errors: ValidationIssue[]; prepared?: undefined } | { errors: []; prepared: PreparedWorkflow<W> }> {
   const workflow = structuredClone(source);
   const resources: NodeResources = {
     presets: { get: cachedGet((id) => sourceResources.presets.get(id)) },
@@ -54,7 +57,7 @@ export async function prepareWorkflow(
   const nameOf = (id: string) => nodeDisplayName(workflow.nodes, labelOf, id);
   const ids = new Set<string>();
   const definitions = new Map<string, NodeDefinition>();
-  const ports: PreparedWorkflow['ports'] = new Map();
+  const ports: PreparedWorkflow<W>['ports'] = new Map();
   for (const node of workflow.nodes) {
     if (ids.has(node.id))
       errors.push({
@@ -201,7 +204,9 @@ export async function prepareWorkflow(
   }
   if (visited !== workflow.nodes.length)
     errors.push({ message: 'The connections form a loop; a workflow cannot contain a cycle.' });
-  errors.push(...workflowSettingIssues(workflow.settings).map(({ message }) => ({ message })));
+  errors.push(
+    ...workflowSettingIssues(workflow.settings).map(({ message }) => ({ message, source: 'settings' as const })),
+  );
   if (errors.length) {
     const seen = new Set<string>();
     return {
@@ -223,6 +228,6 @@ export async function prepareWorkflow(
   return { errors: [], prepared: { workflow, resources, definitions, ports, incoming, upstream, reachable } };
 }
 
-export async function validateWorkflow(workflow: Workflow, resources?: NodeResources): Promise<ValidationIssue[]> {
+export async function validateWorkflow(workflow: WorkflowGraph, resources?: NodeResources): Promise<ValidationIssue[]> {
   return (await prepareWorkflow(workflow, resources)).errors;
 }

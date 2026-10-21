@@ -10,6 +10,8 @@ export const workflowsApi = {
     api<ApiResponse<'updateWorkflow'>>(`/workflows/${id}`, { ...json('PUT', body), ...options }),
   delete: (id: string, options?: RequestOptions) =>
     api<ApiResponse<'deleteWorkflow'>>(`/workflows/${id}`, { ...json('DELETE'), ...options }),
+  validateDraft: (body: ApiBody<'validateWorkflowDraft'>, options?: RequestOptions) =>
+    api<ApiResponse<'validateWorkflowDraft'>>('/workflows/validate', { ...json('POST', body), ...options }),
   validate: (id: string, options?: RequestOptions) =>
     api<ApiResponse<'validateWorkflow'>>(`/workflows/${id}/validate`, { ...json('POST'), ...options }),
 };

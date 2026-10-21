@@ -11,6 +11,11 @@
 - The palette, the connect picker and quick add list node types in one order, `nodeTypeOrder.ts` (category, then label). Never sort types anywhere else.
 - The palette renders a category with exactly one type as a plain button (a count rule, never a per-category branch) and one with several as a `<details>`. Its open state is one `localStorage` key, `st.palette.open` (JSON map category → boolean, absent means open), read and written only through `paletteOpen.ts`, which guards both.
 
+## Validation
+- It runs on the draft, never on the saved workflow: debounced, silent, one request in flight (`useDraftValidation`). Never validate per keystroke: the server rescans the YAML repositories and resolves dynamic ports on every call.
+- The body leaves out chat settings declarations that don't parse (`canvasToDraftBody`); the settings panel and `unsavableSettings` already report those.
+- Issue messages name nodes with the same `nodeDisplayName` rule as the canvas, so a name in a message is the name on the node.
+
 ## Quick add
 - It is the connect picker with no origin, never a second picker. A double-click acts only when its target is the `.react-flow__pane` element itself (nodes live inside the pane, so `closest` would match them). `/` is the `quickAdd` area shortcut, kept out of fields by `areaShortcutAllowed`.
 

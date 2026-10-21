@@ -134,6 +134,11 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     await request('getWorkflow', { method: 'GET', url: `/api/workflows/${workflow.id}` });
     await request('listWorkflows', { method: 'GET', url: '/api/workflows' });
     await request('validateWorkflow', { method: 'POST', url: `/api/workflows/${workflow.id}/validate` });
+    await request('validateWorkflowDraft', {
+      method: 'POST',
+      url: '/api/workflows/validate',
+      payload: { nodes: [], edges: [] },
+    });
     const preset = await request('createPreset', {
       method: 'POST',
       url: '/api/presets',
@@ -365,6 +370,27 @@ it('supports workflow CRUD, secrets masking, and a chat execution through inject
     expect((await app.inject({ method: 'POST', url: `/api/workflows/${workflow.id}/validate` })).json().valid).toBe(
       true,
     );
+    // A draft is judged as sent and never saved. Its problems are the answer (200), and a settings problem says so.
+    const draft = await app.inject({
+      method: 'POST',
+      url: '/api/workflows/validate',
+      payload: {
+        nodes,
+        edges: [],
+        settings: [
+          { key: 'mood', type: 'text' },
+          { key: 'mood', type: 'text' },
+        ],
+      },
+    });
+    expect(draft.statusCode).toBe(200);
+    const { issues } = apiContract.validateWorkflowDraft.response.parse(draft.json());
+    expect(issues).toContainEqual(
+      expect.objectContaining({ nodeIds: ['output'], message: expect.stringContaining('required input') }),
+    );
+    expect(issues.filter((issue) => issue.source === 'settings')).toHaveLength(1);
+    expect(issues.filter((issue) => issue.source !== 'settings' && issue.nodeIds === undefined)).toEqual([]);
+    expect((await app.inject({ method: 'GET', url: `/api/workflows/${workflow.id}` })).json().edges).toHaveLength(4);
     const emptyValidation = await app.inject({
       method: 'POST',
       url: `/api/workflows/${workflow.id}/validate`,

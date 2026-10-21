@@ -31,4 +31,9 @@ export const workflowEndpoints = {
     undefined,
     idParamsSchema,
   ),
+  // Validates a draft the editor holds, without saving it. Problems are the expected answer (200), not a failure.
+  validateWorkflowDraft: endpoint(
+    z.object({ issues: z.array(validationIssueSchema) }),
+    workflowSchema.pick({ nodes: true, edges: true, settings: true }),
+  ),
 };

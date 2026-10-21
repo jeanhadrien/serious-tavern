@@ -1,5 +1,13 @@
 import type { Edge as FlowEdge, Node as FlowNode } from '@xyflow/react';
-import { nodeDisplayName, type Edge, type NodeInstance, type NodeTypeDescriptor, type Workflow } from '@st/shared';
+import {
+  nodeDisplayName,
+  workflowSettings,
+  type ApiBody,
+  type Edge,
+  type NodeInstance,
+  type NodeTypeDescriptor,
+  type Workflow,
+} from '@st/shared';
 
 export type CanvasNode = FlowNode<{
   descriptor: NodeTypeDescriptor;
@@ -93,4 +101,17 @@ export function canvasToWorkflow(workflow: Workflow, nodes: CanvasNode[], edges:
         }) as Edge,
     ),
   };
+}
+
+/**
+ * The draft as the validate endpoint takes it. The draft keeps chat settings declarations that don't parse (the
+ * settings panel shows them), and the endpoint would answer 400 to those, so only the ones that parse are sent.
+ */
+export function canvasToDraftBody(
+  workflow: Workflow,
+  nodes: CanvasNode[],
+  edges: FlowEdge[],
+): ApiBody<'validateWorkflowDraft'> {
+  const draft = canvasToWorkflow(workflow, nodes, edges);
+  return { nodes: draft.nodes, edges: draft.edges, settings: workflowSettings(draft) };
 }

@@ -186,7 +186,7 @@ describe('chat settings on sessions', () => {
     const validation = await app.inject({ method: 'POST', url: `/api/workflows/${workflow.id}/validate` });
     expect(validation.statusCode).toBe(422);
     const duplicate = 'More than one chat setting uses the key "flag"; keys must be unique.';
-    expect(validation.json().error.details.issues).toEqual([{ message: duplicate }]);
+    expect(validation.json().error.details.issues).toEqual([{ message: duplicate, source: 'settings' }]);
     const turn = await app.inject({
       method: 'POST',
       url: `/api/sessions/${session.id}/messages`,

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Edge } from '@xyflow/react';
-import { workflowInvalidDetailsSchema, type Workflow, type NodeTypeDescriptor } from '@st/shared';
-import { ApiError, workflowsApi, nodeTypesApi } from '../../api.js';
+import type { Workflow, NodeTypeDescriptor } from '@st/shared';
+import { workflowsApi, nodeTypesApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
 import {
   charactersStore,
@@ -15,8 +15,9 @@ import {
   workflowEditorStore,
   workflowsStore,
 } from '../../stores/index.js';
-import { canvasToWorkflow, workflowToCanvas, type CanvasNode } from './model.js';
+import { canvasToDraftBody, canvasToWorkflow, workflowToCanvas, type CanvasNode } from './model.js';
 import { unsavableSettings, withDraftSettings } from './settingsDraft.js';
+import { useDraftValidation } from './useDraftValidation.js';
 import { useWorkflowCanvas } from './useWorkflowCanvas.js';
 
 /** Serialization of a workflow as the canvas would save it; the dirty check compares these. */
@@ -92,7 +93,7 @@ export function useWorkflowEditor() {
     typesReady,
   );
 
-  const save = async (showToast = true): Promise<boolean> => {
+  const save = async (): Promise<boolean> => {
     if (!workflow) return false;
     // The API would refuse it (400); say which declaration and leave the decision to the user.
     const blocked = unsavableSettings(workflow.settings);
@@ -108,7 +109,7 @@ export function useWorkflowEditor() {
       setWorkflow((prev) => (prev?.id === updated.id ? { ...prev, updatedAt: updated.updatedAt } : prev));
       stored.current = { ...current, updatedAt: updated.updatedAt };
       setSaved(snapshot({ ...workflow, updatedAt: updated.updatedAt }, canvas.nodes, canvas.edges));
-      if (showToast) alerts.success('Workflow saved');
+      alerts.success('Workflow saved');
       await workflowsStore.refresh();
       return true;
     } catch {
@@ -120,21 +121,22 @@ export function useWorkflowEditor() {
     if (stored.current) load(stored.current);
   };
   useEditorSaver(workflowEditorStore, { label: () => workflow?.name ?? '', save: () => save() });
+  // The engine's verdict on the draft as it stands (nothing is saved), asked again shortly after each change.
+  const draftBody = useMemo(
+    () => workflow && canvasToDraftBody(workflow, canvas.nodes, canvas.edges),
+    [workflow, canvas.nodes, canvas.edges],
+  );
+  const validation = useDraftValidation(workflow?.id, draftBody);
   const validate = async () => {
-    if (!workflow) return;
-    try {
-      if (!(await save(false))) return;
-      await workflowsApi.validate(workflow.id);
-      canvas.setHighlightedEdge(undefined);
-      alerts.success('Workflow is valid');
-    } catch (error) {
-      const invalid = error instanceof ApiError ? workflowInvalidDetailsSchema.safeParse(error.details) : undefined;
-      if (invalid?.success) {
-        const edgeId = invalid.data.issues.find((issue) => issue.edgeId)?.edgeId;
-        canvas.setHighlightedEdge(edgeId);
-      }
-      /* API errors are toasted. */
-    }
+    const issues = await validation.validateNow();
+    if (!issues) return;
+    canvas.setHighlightedEdge(issues.find((issue) => issue.edgeId)?.edgeId);
+    if (!issues.length) alerts.success('Workflow is valid');
+    else
+      alerts.warning(`${issues.length} problem(s) found`, {
+        title: 'Workflow is invalid',
+        details: issues.map((issue) => issue.message).join('\n'),
+      });
   };
   return {
     types,
@@ -150,5 +152,6 @@ export function useWorkflowEditor() {
     save,
     revert,
     validate,
+    issues: validation.issues,
   };
 }

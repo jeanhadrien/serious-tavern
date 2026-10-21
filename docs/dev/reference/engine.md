@@ -13,7 +13,7 @@ dependencies, sink reachability, and execution-scoped resources.
 - Resource lookups (presets, characters, providers, collections, state definitions) cache their promises, missing
   results included, and clone what they fetch, so preparation and execution see the same snapshot. Loading a
   resource belongs in a node's port resolver, not in the executor.
-- `validateWorkflow` is a thin wrapper returning the errors. `executeWorkflow(workflowOrPrepared, options)` prepares a
+- `validateWorkflow` is a thin wrapper returning the errors. It takes only what preparation reads (`nodes`, `edges`, `settings`), so a draft with no id or name can be validated; `prepareWorkflow` is generic over that, keeping the caller's type in `prepared.workflow`. Issues about the chat settings declarations carry `source: 'settings'`. `executeWorkflow(workflowOrPrepared, options)` prepares a
   raw workflow itself; callers that must validate before side effects prepare once and pass the result. A prepared
   workflow is valid for one turn only.
 - Issues are `ValidationIssue { message, edgeId?, nodeIds? }`. Messages name nodes as `Label #k (type)`

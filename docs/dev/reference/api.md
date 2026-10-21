@@ -43,6 +43,7 @@ run's on success, the failing run's on failure, absent when no workflow of the c
 | `PUT /api/workflows/:id` | the workflow; a body without `settings` keeps the stored ones | `200`. Edges to ports that no longer exist are pruned. Not validated. |
 | `DELETE /api/workflows/:id` | | `204`; `409 WORKFLOW_IN_USE` while a chat's reply list names it. |
 | `POST /api/workflows/:id/validate` | | `200` when valid; `422 WORKFLOW_INVALID` with the issues. |
+| `POST /api/workflows/validate` | `{ nodes, edges, settings? }`, a draft the editor holds | `200 { issues }`, empty when valid. Problems are the answer, not an error (a `422` would be toasted by the client). Writes nothing and takes no lock. An issue carries `source: 'settings'` when it belongs to the chat settings declarations. |
 | `GET /api/node-types` | | `200` every node type's descriptor (ports, config schema, defaults, `sink`, `dynamicPorts`). |
 | `POST /api/node-types/:type/ports` | the node's config | `200` its resolved inputs and outputs (for `dynamicPorts` types). |
 

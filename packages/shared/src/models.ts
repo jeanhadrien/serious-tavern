@@ -7,6 +7,8 @@ export const validationIssueSchema = z.object({
   message: z.string(),
   edgeId: z.string().optional(),
   nodeIds: z.array(z.string()).optional(),
+  /** Where an issue that belongs to neither a node nor a connection is edited: `settings` is the chat settings panel. */
+  source: z.literal('settings').optional(),
 });
 // Stored records preserve unknown fields (passthrough) so forward-compatible reads
 // never drop data added by newer versions; writes migrate-on-write via these schemas.

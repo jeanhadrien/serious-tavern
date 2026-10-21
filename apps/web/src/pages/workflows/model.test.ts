@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Workflow, NodeTypeDescriptor } from '@st/shared';
-import { canvasToWorkflow, workflowToCanvas } from './model.js';
+import { canvasToDraftBody, canvasToWorkflow, workflowToCanvas } from './model.js';
 
 const workflow: Workflow = {
   id: 'workflow',
@@ -54,6 +54,22 @@ describe('workflow canvas model', () => {
     };
     const model = workflowToCanvas(withSettings, knownTypes);
     expect(canvasToWorkflow(withSettings, model.nodes, model.edges).settings).toEqual(withSettings.settings);
+  });
+
+  it('sends the draft to validation without its identity, and only the settings that parse', () => {
+    const draft = {
+      ...workflow,
+      settings: [
+        { key: 'mood', type: 'enum', options: ['calm'] },
+        { key: 'broken', type: 'color' },
+      ] as unknown as Workflow['settings'],
+    };
+    const model = workflowToCanvas(draft, knownTypes);
+    const body = canvasToDraftBody(draft, model.nodes, model.edges);
+    expect(Object.keys(body).sort()).toEqual(['edges', 'nodes', 'settings']);
+    expect(body.nodes).toEqual(workflow.nodes);
+    expect(body.edges).toEqual(workflow.edges);
+    expect(body.settings).toEqual([expect.objectContaining({ key: 'mood', type: 'enum', options: ['calm'] })]);
   });
 
   it('uses a late-loaded node type descriptor without changing its saved config or edges', () => {

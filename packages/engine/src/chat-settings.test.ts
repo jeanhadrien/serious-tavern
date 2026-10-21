@@ -228,6 +228,6 @@ describe('declaration validation', () => {
   ])('reports bad declarations in plain language: %j', async (settings: unknown, message) => {
     const result = await prepareWorkflow(workflow(base.nodes, base.edges, settings));
     expect(result.prepared).toBeUndefined();
-    expect(result.errors).toEqual([{ message }]);
+    expect(result.errors).toEqual([{ message, source: 'settings' }]);
   });
 });

@@ -45,6 +45,10 @@ export function registerWorkflows(app: FastifyInstance, context: AppContext) {
     await workflows.delete(id);
     return reply.code(204).send();
   });
+  app.post<ApiRoute<'validateWorkflowDraft'>>('/api/workflows/validate', async (request) => {
+    const draft = apiContract.validateWorkflowDraft.body.parse(request.body);
+    return { issues: await validateWorkflow(draft, nodeResources(context)) };
+  });
   app.post<ApiRoute<'validateWorkflow'>>('/api/workflows/:id/validate', async (request) => {
     const { id } = apiContract.validateWorkflow.params.parse(request.params);
     const workflow = await requireEntity(workflows, id, 'Workflow');

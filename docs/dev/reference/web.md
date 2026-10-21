@@ -136,6 +136,11 @@ conversion model (unknown node types become read-only placeholders).
   JSON `{ kind: 'serious-tavern/nodes', version: 1, nodes, edges }` (`canvasClipboard.ts`; only edges with both ends
   selected). A paste gives new ids, offsets positions by 40 px per consecutive paste of the same text, renumbers names,
   selects what it added, skips unknown types and a second Chat Input (with an info toast), and is one undo step.
+- **Draft validation.** `useDraftValidation` sends the canvas as it stands (`canvasToDraftBody`: nodes, edges and only the
+  chat settings that parse, since the endpoint would answer 400 to the rest, which the settings panel already shows) to
+  `POST /api/workflows/validate`: at once for a newly opened workflow, then 600 ms after the last change, silently, with
+  one request in flight (a newer draft aborts the older request, so a stale answer never shows). The toolbar's Validate
+  asks at once, toasts the count and reports failures, and no longer saves first.
 - **Chat settings panel** (`WorkflowSettingsPanel`, toggled from the toolbar, which counts problems): one row per
   declaration with type-specific fields, reorderable. Declarations are part of the draft; one that doesn't parse is a
   read-only row the user can only remove. Problems from `workflowSettingIssues` show next to their field.
