@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { validationIssueSchema, workflowSchema } from '../models.js';
+import { validationIssueSchema, workflowDraftSchema, workflowSchema } from '../models.js';
 import { endpoint, idParamsSchema, noContentSchema } from './common.js';
 
 export const workflowInvalidDetailsSchema = z.object({
@@ -33,13 +33,13 @@ export const workflowEndpoints = {
       method: 'POST',
       path: '/api/workflows',
       description:
-        'Create a workflow. Node and edge ids are chosen by the caller and must be unique within the workflow. Edges to ports that do not exist are not stored: their ids come back in droppedEdgeIds. The workflow is saved even when invalid (a draft may be incomplete); issues lists what still prevents it from running (each may name edgeId and nodeIds).',
+        'Create a workflow. Node and edge ids are chosen by the caller and must be unique within the workflow. A node may omit position: the server lays out the nodes that have none, left to right along the edges. Edges to ports that do not exist are not stored: their ids come back in droppedEdgeIds. The workflow is saved even when invalid (a draft may be incomplete); issues lists what still prevents it from running (each may name edgeId and nodeIds).',
     },
     savedWorkflowSchema,
     // `nodes`/`edges`/`settings` let a client create a copy of an existing workflow in one write.
     z
       .object({ name: z.string().trim().min(1) })
-      .and(workflowSchema.pick({ nodes: true, edges: true, settings: true }).partial()),
+      .and(workflowDraftSchema.pick({ nodes: true, edges: true, settings: true }).partial()),
   ),
   getWorkflow: endpoint(
     { method: 'GET', path: '/api/workflows/:id', description: 'Get one workflow: its nodes, edges and chat settings.' },
@@ -52,11 +52,11 @@ export const workflowEndpoints = {
       method: 'PUT',
       path: '/api/workflows/:id',
       description:
-        'Replace a workflow with the given one (settings are kept when omitted). Edges to ports that do not exist are not stored: their ids come back in droppedEdgeIds. The workflow is saved even when invalid (a draft may be incomplete); issues lists what still prevents it from running (each may name edgeId and nodeIds).',
+        'Replace a workflow with the given one (settings are kept when omitted). A node may omit position: it keeps the position it has in the stored workflow, or else the server lays it out left to right along the edges. Edges to ports that do not exist are not stored: their ids come back in droppedEdgeIds. The workflow is saved even when invalid (a draft may be incomplete); issues lists what still prevents it from running (each may name edgeId and nodeIds).',
     },
     savedWorkflowSchema,
     // An omitted `settings` keeps the stored declarations.
-    workflowSchema.pick({ name: true, nodes: true, edges: true, settings: true }),
+    workflowDraftSchema.pick({ name: true, nodes: true, edges: true, settings: true }),
     idParamsSchema,
   ),
   deleteWorkflow: endpoint(

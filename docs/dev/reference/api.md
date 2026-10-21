@@ -48,6 +48,10 @@ run's on success, the failing run's on failure, absent when no workflow of the c
 | `GET /api/node-types` | | `200` every node type's descriptor (ports, config schema, defaults, `sink`, `dynamicPorts`). |
 | `POST /api/node-types/:type/ports` | the node's config | `200` its resolved inputs and outputs (for `dynamicPorts` types). |
 
+**Positions.** A node in a create or update body may omit `position`; the stored workflow always has one. On update a node
+keeps the position of the stored node with the same id, and the others are laid out (`layoutNodes` in shared) below
+every positioned node, as a left-to-right graph of their own.
+
 **The save report.** Create and update run the same step (`checkWorkflowForSave`): edges to ports that no longer exist are
 pruned, then the stored workflow is validated, and the answer carries two extra fields: `droppedEdgeIds` and `issues`
 (`ValidationIssue[]`, the same as `validate`'s). The save is never refused for issues, since a draft may be incomplete.

@@ -18,6 +18,8 @@ export const nodeSchema = z
     position: z.object({ x: z.number(), y: z.number() }),
   })
   .passthrough();
+/** A node as a client may write it: `position` is optional, and the server lays out the nodes that have none. */
+export const nodeDraftSchema = nodeSchema.extend({ position: nodeSchema.shape.position.optional() });
 export const edgeSchema = z
   .object({
     id: z.string().min(1),
@@ -40,6 +42,8 @@ export const workflowSchema = z
     updatedAt: z.string(),
   })
   .passthrough();
+/** A workflow as a client may write it: its nodes may have no position (see `nodeDraftSchema`). */
+export const workflowDraftSchema = workflowSchema.extend({ nodes: z.array(nodeDraftSchema) });
 export const messageSchema = z
   .object({
     id: z.string(),
@@ -186,6 +190,8 @@ export const nodeTypeDescriptorSchema = z.object({
 export type Workflow = z.infer<typeof workflowSchema>;
 export type ValidationIssue = z.infer<typeof validationIssueSchema>;
 export type NodeInstance = z.infer<typeof nodeSchema>;
+export type NodeDraft = z.infer<typeof nodeDraftSchema>;
+export type WorkflowDraft = z.infer<typeof workflowDraftSchema>;
 export type Edge = z.infer<typeof edgeSchema>;
 export type ChatMessage = z.infer<typeof messageSchema>;
 export type Session = z.infer<typeof sessionSchema>;

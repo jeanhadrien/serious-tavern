@@ -26,6 +26,7 @@ Fastify 5 on port 3001. Turns, runs, story state, alternatives and fork are in `
 
 ## Workflows
 - **Create and update share `checkWorkflowForSave`** (`services/workflow-save.ts`): prune, then validate, inside the update's lock. Validation only reports (`issues` in the response): a draft may be incomplete, so never refuse a save for it. The response's `droppedEdgeIds`/`issues` are never stored; `withoutSaveReport` strips them from a body.
+- **Positions:** the body schema (`workflowDraftSchema`) makes `position` optional, the stored `workflowSchema` keeps it required. `checkWorkflowForSave` fills the gaps with `layoutNodes` after pruning (so a dropped edge never shapes the layout); on update a node first keeps the stored position of its id.
 
 ## Change events (`GET /api/events`)
 - File-backed resources emit `presets|providers|collections|stateDefinitions.changed` with the currently invalid files. Records emit `workflows|characters|personas|sessions.changed` (`{ type, id? }`). On connect, every event type is sent once (id-less for records) so clients resync.

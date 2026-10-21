@@ -10,6 +10,9 @@ Story state, message links and prompt messages have their own notes: `src/state/
 - `description` is optional, plain language for API consumers (an MCP agent reads it): what the call does and what to watch for, never how the server does it. Keep it true when behaviour changes.
 - Server routes register through `route()` from the contract, so nothing here is copied into a route; the web client still writes its own paths until it moves onto these.
 
+## Workflow nodes
+- `position` is required in the stored `nodeSchema` and optional only in the write schemas (`nodeDraftSchema`, `workflowDraftSchema`). `layoutNodes` is the one rule that fills it: the server calls it on save; the sizes it spaces by are the editor's node cards (`.flow-node` in the web's `style.css`), so revisit them together.
+
 ## Templates and macros
 Preset content and template-taking node configs are rendered with the `handlebars` runtime (`noEscape: true`, no code eval) over a data object built from the turn context. The syntax and the helper list are documented in `docs/TEMPLATING.md`.
 - The macro registry (`macros.ts`) defines every available path, and the helper list lives next to it. Preset validation walks the parsed AST, so editor hints and warnings stay in step with what renders. **Never hand-write a hint or key list:** settings keys come from workflow declarations (`macroHints(inputs, settings)`, `settingsCatalog` unions them across workflows), state paths from `stateHints(definitions)`.

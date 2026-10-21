@@ -1,11 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { apiContract, replyWorkflows, type Workflow, type WorkflowInvalidDetails } from '@st/shared';
+import { apiContract, replyWorkflows, type WorkflowDraft, type WorkflowInvalidDetails } from '@st/shared';
 import { validateWorkflow } from '@st/engine';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
 import { nodeResources } from '../services/node-resources.js';
-import { checkWorkflowForSave, withoutSaveReport, type WorkflowSaveReport } from '../services/workflow-save.js';
+import {
+  checkWorkflowForSave,
+  withStoredPositions,
+  withoutSaveReport,
+  type WorkflowSaveReport,
+} from '../services/workflow-save.js';
 import { route } from './route.js';
 
 export function registerWorkflows(app: FastifyInstance, context: AppContext) {
@@ -14,7 +19,7 @@ export function registerWorkflows(app: FastifyInstance, context: AppContext) {
   route(app, 'createWorkflow', async (request, reply) => {
     const body = apiContract.createWorkflow.body.parse(request.body);
     const date = now();
-    const draft: Workflow = {
+    const draft: WorkflowDraft = {
       id: randomUUID(),
       name: body.name,
       nodes: body.nodes ?? [],
@@ -38,7 +43,7 @@ export function registerWorkflows(app: FastifyInstance, context: AppContext) {
     // unknown fields from newer versions (migrate-on-write).
     const workflow = await workflows.update(id, async (old) => {
       const checked = await checkWorkflowForSave(
-        { ...old, ...body, id, createdAt: old.createdAt },
+        { ...old, ...body, nodes: withStoredPositions(body.nodes, old.nodes), id, createdAt: old.createdAt },
         nodeResources(context),
       );
       report = checked.report;
