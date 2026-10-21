@@ -99,6 +99,35 @@ describe('executor', () => {
     expect(JSON.parse(result.replies[0]!.content)).toEqual({ a: 'done', b: 'done' });
     expect(result.execution.nodes.output?.status).toBe('completed');
   });
+  it('says why a node was skipped, and which skipped node a required input came from', async () => {
+    const events: { type: string; nodeId?: string; detail?: unknown }[] = [];
+    const result = await executeWorkflow(
+      workflow(
+        [
+          node('input', 'chat-input'),
+          node('condition', 'condition', { right: 'other' }),
+          node('mid', 'http-request'),
+          node('after', 'chat-output'),
+          node('output', 'chat-output'),
+        ],
+        [
+          edge('input', 'message', 'condition', 'value'),
+          edge('condition', 'true', 'mid', 'input'),
+          edge('mid', 'body', 'after', 'value'),
+          edge('condition', 'false', 'output', 'value'),
+        ],
+      ),
+      { ...options, onEvent: (event) => events.push(event) },
+    );
+    expect(result.execution.nodes.mid?.skip).toEqual({ reason: 'inactive-inputs' });
+    expect(result.execution.nodes.after?.skip).toEqual({ reason: 'source-skipped', by: 'mid' });
+    expect(events).toContainEqual({
+      type: 'node:skipped',
+      nodeId: 'after',
+      detail: { reason: 'source-skipped', by: 'mid' },
+    });
+    expect(result.execution.nodes.output?.skip).toBeUndefined();
+  });
   it('propagates a condition skip and merges the taken branch', async () => {
     const graph = workflow(
       [
@@ -135,6 +164,7 @@ describe('executor', () => {
     );
     const result2 = await executeWorkflow(skipped, options);
     expect(result2.execution.nodes.mid?.status).toBe('skipped');
+    expect(result2.execution.nodes.mid?.skip).toEqual({ reason: 'inactive-inputs' });
     expect(result2.replies[0]!.content).toBe('{"b":"hello"}');
     expect(result2.execution.nodes.condition?.output).toEqual({ false: 'hello' });
   });
@@ -335,6 +365,7 @@ describe('executor', () => {
     expect(result.replies[0]!.content).toBe('hello');
     expect(run).not.toHaveBeenCalled();
     expect(result.execution.nodes.unused?.status).toBe('skipped');
+    expect(result.execution.nodes.unused?.skip).toEqual({ reason: 'not-needed' });
   });
   it('fails when a connected required output is omitted but permits optional branch omission', async () => {
     registry.set('missing-test', {

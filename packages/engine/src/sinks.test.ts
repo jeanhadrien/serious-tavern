@@ -101,7 +101,7 @@ describe('sinks', () => {
     expect(dead).not.toHaveBeenCalled();
     expect(result.execution.nodes.dead?.status).toBe('skipped');
     expect(result.execution.nodes.sink?.status).toBe('completed');
-    expect(events).toContainEqual({ type: 'node:skipped', nodeId: 'dead', detail: 'not needed by any output' });
+    expect(events).toContainEqual({ type: 'node:skipped', nodeId: 'dead', detail: { reason: 'not-needed' } });
   });
 
   it('runs the upstream a sink and a Chat Output share only once', async () => {

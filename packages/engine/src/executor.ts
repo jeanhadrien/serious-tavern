@@ -7,6 +7,7 @@ import type {
   ChatMessage,
   ExecutionLog,
   Edge,
+  NodeSkip,
   Persona,
   StateSnapshot,
   StateWrite,
@@ -127,14 +128,10 @@ export async function executeWorkflow(
   const pending = new Set(workflow.nodes.filter((node) => reachable.has(node.id)).map((node) => node.id));
   for (const { id: nodeId } of workflow.nodes.filter((node) => !reachable.has(node.id))) {
     const timestamp = new Date().toISOString();
-    execution.nodes[nodeId] = {
-      status: 'skipped',
-      startedAt: timestamp,
-      finishedAt: timestamp,
-      durationMs: 0,
-    };
+    const skip: NodeSkip = { reason: 'not-needed' };
+    execution.nodes[nodeId] = { status: 'skipped', startedAt: timestamp, finishedAt: timestamp, durationMs: 0, skip };
     resolved.set(nodeId, { output: {}, skipped: true });
-    emit({ type: 'node:skipped', nodeId, detail: 'not needed by any output' });
+    emit({ type: 'node:skipped', nodeId, detail: skip });
   }
   try {
     while (pending.size) {
@@ -177,23 +174,26 @@ export async function executeWorkflow(
                 ];
               }),
             );
-            const requiredSkipped = ports
-              .get(node.id)!
-              .inputs.some(
-                (p) =>
-                  (p.required || p.requiredIfConnected) &&
-                  edges.some((e) => e.targetHandle === p.name) &&
-                  !Object.hasOwn(inputs, p.name),
-              );
-            // A node whose every gating connection is inactive is skipped; `neverSkips` inputs never gate.
             const nodeInputs = ports.get(node.id)!.inputs;
+            // A connected required input (or one required once connected) that gave nothing skips the node.
+            const missing = edges.find((e) => {
+              const port = nodeInputs.find((p) => p.name === e.targetHandle);
+              return (port?.required || port?.requiredIfConnected) && !Object.hasOwn(inputs, e.targetHandle);
+            });
+            // A node whose every gating connection is inactive is skipped; `neverSkips` inputs never gate.
             const gates = (e: Edge) => !nodeInputs.find((p) => p.name === e.targetHandle)?.neverSkips;
             const gating = edges.filter(gates);
-            if ((gating.length > 0 && !active.some(gates)) || (node.type !== 'merge' && requiredSkipped)) {
+            const requiredMissing = node.type !== 'merge' ? missing : undefined;
+            if ((gating.length > 0 && !active.some(gates)) || requiredMissing) {
+              // The source itself was skipped, or it ran and didn't produce that port (a branch not taken).
+              const skip: NodeSkip =
+                requiredMissing && resolved.get(requiredMissing.source)?.skipped
+                  ? { reason: 'source-skipped', by: requiredMissing.source }
+                  : { reason: 'inactive-inputs' };
               const now = new Date().toISOString();
-              execution.nodes[node.id] = { status: 'skipped', startedAt: now, finishedAt: now, durationMs: 0 };
+              execution.nodes[node.id] = { status: 'skipped', startedAt: now, finishedAt: now, durationMs: 0, skip };
               resolved.set(node.id, { output: {}, skipped: true });
-              emit({ type: 'node:skipped', nodeId: node.id });
+              emit({ type: 'node:skipped', nodeId: node.id, detail: skip });
               return;
             }
             execution.nodes[node.id] = { status: 'running', startedAt: new Date(start).toISOString() };

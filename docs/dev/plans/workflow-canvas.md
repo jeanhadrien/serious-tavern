@@ -1,6 +1,6 @@
 # Workflow canvas: plan
 
-Six improvements to the workflow editor (`apps/web/src/pages/workflows/`, React Flow 12.12) are left. Phases A (canvas
+Five improvements to the workflow editor (`apps/web/src/pages/workflows/`, React Flow 12.12) are left. Phases A (canvas
 basics) and B (validation: draft endpoint, issues on the canvas, template warnings in panels) are built; they live in
 `docs/dev/reference/web.md` and the `AGENTS.md` files. When an item lands, move what it decided there and strike it from this plan. Delete the file
 once it is empty.
@@ -46,7 +46,7 @@ independent.
 
 | Phase | Commits |
 | --- | --- |
-| C. Runs | 5 skip reasons · 6 node focus · 8a stream contract · 8b live status · 9a move coercion to shared · 9b last run in the panel |
+| C. Runs | 6 node focus · 8a stream contract · 8b live status · 9a move coercion to shared · 9b last run in the panel |
 | D. Larger additions | 7 node summaries · 13 sticky notes |
 
 Phase C builds the cross-view store in 8b, and 9b reuses it. 13 comes last because it touches every reader of the
@@ -55,22 +55,6 @@ canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
 ---
 
 ## Phase C: runs
-
-### 5. Why a node was skipped
-
-- **Schema (`shared/src/models.ts`, `nodeExecutionSchema`):** a new optional `skip` field:
-  - `reason`: one of `'not-needed'`, `'inactive-inputs'`, `'source-skipped'`;
-  - `by`: an optional node id, for `source-skipped` (the upstream node that caused it).
-  - Use `.optional().catch(undefined)` so an unreadable value never fails a log. Additive only; old logs have no
-    reason.
-  - Codes and ids, never free text ("data travels as data"). The plain words live in one shared function
-    (`skipReasonText`), used by the chat's Execution details and the editor.
-- **Engine (`executor.ts`):** the "not needed" site writes `not-needed`. The branch site splits its two causes from
-  the booleans it already computes. The `node:skipped` event carries the same object as `detail`.
-- **Merge** is exempt from the required-input rule; its skips can only be `inactive-inputs`.
-- **Web:** `ExecutionDetails.tsx` shows the reason next to `skipped`.
-- **Docs:** `reference/engine.md` (execution logs), `engine/AGENTS.md` (every skip records a reason code), the shared
-  schema comment.
 
 ### 6. "Show on canvas" from Execution details
 
@@ -234,4 +218,3 @@ canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
 5. **Notes (item 13):** separate state (a, proposed) or a second node type (b)? Should Tidy (14) move notes, and
    should copy and paste carry them? The proposal: Tidy leaves notes where they are, and copy and paste come later.
    Undo and the dirty check are required either way.
-6. **Skip reason granularity (item 5):** is `by` (the upstream node) worth storing, or is the code enough?

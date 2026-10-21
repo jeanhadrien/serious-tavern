@@ -117,11 +117,22 @@ export const wireExchangeSchema = z
     response: z.unknown().optional(),
   })
   .passthrough();
+/**
+ * Why a node was skipped, as codes and ids (the plain words are `skipReasonText`): `not-needed` (no output depends on
+ * it), `inactive-inputs` (every connection into it was on a branch not taken) or `source-skipped` (a required input's
+ * source was skipped; `by` is that node). Additive: logs written before it have none.
+ */
+export const nodeSkipSchema = z.object({
+  reason: z.enum(['not-needed', 'inactive-inputs', 'source-skipped']),
+  by: z.string().optional(),
+});
 export const nodeExecutionSchema = z
   .object({
     /** Display name (`Label #k (type)`) stamped at run time; absent in older logs. */
     name: z.string().optional(),
     status: z.enum(['running', 'completed', 'skipped', 'cancelled', 'error']),
+    /** On a skipped node: why. Absent in older logs; an unreadable value reads as absent. */
+    skip: nodeSkipSchema.optional().catch(undefined),
     startedAt: z.string().optional(),
     finishedAt: z.string().optional(),
     durationMs: z.number().optional(),
@@ -187,6 +198,7 @@ export const nodeTypeDescriptorSchema = z.object({
 });
 export type Workflow = z.infer<typeof workflowSchema>;
 export type ValidationIssue = z.infer<typeof validationIssueSchema>;
+export type NodeSkip = z.infer<typeof nodeSkipSchema>;
 export type NodeInstance = z.infer<typeof nodeSchema>;
 export type Edge = z.infer<typeof edgeSchema>;
 export type ChatMessage = z.infer<typeof messageSchema>;
