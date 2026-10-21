@@ -1,6 +1,6 @@
 # packages/engine — agent notes
 
-Graph validation, the wave-based parallel executor, templating and node types. Node rules are in `src/nodes/AGENTS.md`, the LLM adapter in `src/providers/AGENTS.md`, the tool loop and LLM node in `src/tools/AGENTS.md`. Template and macro rules: `packages/shared/AGENTS.md`.
+Graph validation, the wave-based parallel executor, templating and node types. Node rules are in `src/nodes/AGENTS.md` (the LLM node in `src/nodes/llm/AGENTS.md`), the LLM adapter in `src/providers/AGENTS.md`, the tool loop in `src/tools/AGENTS.md`. Template and macro rules: `packages/shared/AGENTS.md`.
 
 ## Preparing and validating
 - `prepareWorkflow` parses configs, resolves ports and snapshots resources **once**. `validateWorkflow` wraps it, and `executeWorkflow` accepts its result. Prepare again for each turn, and load node resources through the resolvers.

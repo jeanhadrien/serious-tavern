@@ -1,6 +1,6 @@
 # Node types — agent notes
 
-The LLM node and its tool loop: read `../tools/AGENTS.md` and `../providers/AGENTS.md` first.
+The LLM node has its own notes in `llm/AGENTS.md`; its tool loop and adapter are in `../tools/AGENTS.md` and `../providers/AGENTS.md`.
 
 ## Adding a node type
 1. Create `nodes/<type>/index.ts` exporting a `NodeDefinition`: `type`, `label`, `category`, typed `inputs`/`outputs` with `dataType` and `description`, zod `configSchema`, `defaultConfig`, and `execute(ctx)`, which returns one key per output port.

@@ -6,7 +6,7 @@ This file holds what applies to every task. Each area of the code has its own `A
 - `PLAN.md` is the vision. `README.md` covers usage and architecture: read the sections for the area you touch, not the whole file.
 - **Read the `AGENTS.md` of every area you will touch before you plan**, not only before you edit. An area's file loads on its own only once a file inside it is read, which can be too late for a plan. The areas:
   - `packages/shared/`, with `src/state/` (story state), `src/links/` (message links), `src/conversation/` (prompt messages, threads)
-  - `packages/engine/`, with `src/nodes/` (node types), `src/providers/` (LLM adapter), `src/tools/` (tool loop, LLM node)
+  - `packages/engine/`, with `src/nodes/` (node types), `src/nodes/llm/` (the LLM node), `src/providers/` (LLM adapter), `src/tools/` (tool loop)
   - `packages/node-ui/`
   - `apps/server/`, with `src/services/` (turns, runs, story state, alternatives, fork)
   - `apps/web/`, with `src/pages/chat/`, `src/pages/chat/story/`, `src/pages/workflows/`, `src/pages/stateDefinitions/`

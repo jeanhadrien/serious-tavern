@@ -23,7 +23,7 @@ Run these commands from the repository root; the configuration covers all npm wo
 | `npm run knip` | Find unused source files, exports, types, and dependencies across workspaces. |
 | `npm run build` | Typecheck and build the production web bundle. |
 
-Biome uses the recommended lint preset, two-space indentation, single-quoted JavaScript/TypeScript strings, semicolons, and a 120-column target. Import organizing and other assists are **disabled** to avoid noisy import-order changes. Generated output, `node_modules`, data directories, coverage, Playwright reports/results, TypeScript build metadata, and the lockfile are excluded. `AGENTS.md` and `PLAN.md` are owned by the orchestrator and excluded from automated changes.
+Biome uses the recommended lint preset, two-space indentation, single-quoted JavaScript/TypeScript strings, semicolons, and a 120-column target. Import organizing and other assists are **disabled** to avoid noisy import-order changes. Generated output, `node_modules`, data directories, coverage, Playwright reports/results, TypeScript build metadata, and the lockfile are excluded. The `AGENTS.md` files and `PLAN.md` are excluded from automated changes.
 
 Rule tuning intentionally keeps this tooling adoption behavior-preserving:
 
