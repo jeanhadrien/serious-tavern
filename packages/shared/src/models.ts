@@ -152,6 +152,8 @@ export const executionLogSchema = z
   .object({
     id: z.string(),
     workflowId: z.string(),
+    /** The workflow's `updatedAt` when the run started, so a reader can tell whether the graph changed since. Absent in older logs. */
+    workflowUpdatedAt: z.string().optional(),
     sessionId: z.string(),
     status: z.enum(['running', 'completed', 'error']),
     startedAt: z.string(),

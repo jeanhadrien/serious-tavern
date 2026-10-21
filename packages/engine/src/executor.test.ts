@@ -99,6 +99,16 @@ describe('executor', () => {
     expect(JSON.parse(result.replies[0]!.content)).toEqual({ a: 'done', b: 'done' });
     expect(result.execution.nodes.output?.status).toBe('completed');
   });
+  it('stamps the log with the version of the workflow that ran', async () => {
+    const versioned = {
+      ...workflow(
+        [node('input', 'chat-input'), node('output', 'chat-output')],
+        [edge('input', 'message', 'output', 'value')],
+      ),
+      updatedAt: '2030-05-06T07:08:09.000Z',
+    };
+    expect((await executeWorkflow(versioned, options)).execution.workflowUpdatedAt).toBe('2030-05-06T07:08:09.000Z');
+  });
   it('says why a node was skipped, and which skipped node a required input came from', async () => {
     const events: { type: string; nodeId?: string; detail?: unknown }[] = [];
     const result = await executeWorkflow(

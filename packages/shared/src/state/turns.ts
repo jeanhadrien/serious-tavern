@@ -1,6 +1,6 @@
 import { activeMessages } from '../alternatives.js';
 import type { ChatMessage } from '../models.js';
-import { readTurnEntries, type TurnEntry } from './writes.js';
+import { readTurnEntries, type TurnEntry, type TurnRun } from './writes.js';
 
 /** The part of a message that decides whether a turn is still in the chat. */
 export type PresenceMessage = Pick<ChatMessage, 'role' | 'executionId' | 'status' | 'inactive'>;
@@ -52,4 +52,19 @@ export function sessionUsesDefinition(
       turn !== null &&
       entry.writes.some((write) => write.target.kind === 'definition' && write.target.definitionId === definitionId),
   );
+}
+
+/**
+ * The latest run of each workflow in the turns still in the chat, by workflow id: the run whose log shows what the
+ * workflow last did here. Runs still `running` have no settled log yet and are left out; both sections count.
+ */
+export function latestRunsByWorkflow(session: {
+  messages: readonly PresenceMessage[];
+  state?: unknown;
+}): Map<string, TurnRun> {
+  const latest = new Map<string, TurnRun>();
+  for (const { entry, turn } of turnPresence(session.messages, readTurnEntries(session.state)))
+    if (turn !== null)
+      for (const run of entry.runs ?? []) if (run.status !== 'running') latest.set(run.workflowId, run);
+  return latest;
 }

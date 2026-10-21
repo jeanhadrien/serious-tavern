@@ -161,6 +161,39 @@
     animation: none;
   }
 }
+/* A node's inputs and output from the open chat's last run: collapsed, and greyed when the graph may have changed since. */
+.last-run {
+  margin-top: 12px;
+  border-top: 1px solid #363b46;
+  padding-top: 8px;
+  font-size: 0.82rem;
+}
+.last-run.stale > :not(summary) {
+  opacity: 0.55;
+}
+.last-run summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.last-run .hint,
+.last-run .error {
+  margin: 6px 0;
+  text-transform: none;
+}
+.last-run-value small {
+  display: block;
+  margin-top: 8px;
+  text-transform: none;
+  color: #a8b1c4;
+}
+.last-run pre {
+  margin: 4px 0;
+  max-height: 14em;
+  overflow: auto;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 /* Links in node config panels ("Edit preset", "Edit" a collection): readable on the dark panel. */
 .config-panel a {
   color: #9fb0ff;

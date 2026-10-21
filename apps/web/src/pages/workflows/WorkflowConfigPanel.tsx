@@ -3,6 +3,8 @@ import { NodeConfigPanel, type NodePanelContext } from '@st/node-ui';
 import type { Character, NodeInstance, Preset, WorkflowSetting } from '@st/shared';
 import { providersApi } from '../../api.js';
 import { IconButton } from '../../components/IconButton.js';
+import { LastRun } from './LastRun.js';
+import type { LastRunIO } from './lastRunIO.js';
 import type { CanvasNode } from './model.js';
 import { PanelLink } from './PanelLink.js';
 import './modelPicker.css';
@@ -20,6 +22,7 @@ export function WorkflowConfigPanel({
   settings,
   stateDefinitions,
   updateConfig,
+  lastRun,
   onDelete,
   onClose,
 }: {
@@ -34,6 +37,8 @@ export function WorkflowConfigPanel({
   /** State definitions, for the State panels and `{{state.*}}` hints. */
   stateDefinitions?: NodePanelContext['stateDefinitions'];
   updateConfig: (config: NodeInstance['config']) => void;
+  /** The node in the open chat's last run of this workflow; absent while the chat has no run of it. */
+  lastRun?: { io: LastRunIO | undefined; stale: boolean; nameOf: (nodeId: string) => string | undefined };
   onDelete: (id: string) => void;
   onClose: () => void;
 }) {
@@ -72,6 +77,7 @@ export function WorkflowConfigPanel({
           }}
         />
       )}
+      {lastRun && <LastRun {...lastRun} />}
     </aside>
   );
 }

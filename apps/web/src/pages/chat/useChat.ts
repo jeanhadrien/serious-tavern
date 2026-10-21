@@ -26,6 +26,7 @@ import {
   settleRegenerate,
   settleTurn,
 } from './turnMessages.js';
+import { useChatRuns } from './useChatRuns.js';
 import { useMessageActions } from './useMessageActions.js';
 
 export function useChat() {
@@ -60,6 +61,8 @@ export function useChat() {
     show(next ? loadDraft(next.id) : '');
   };
   const [busy, setBusy] = useState(false);
+  // The workflow editor shows a node's last run in this chat: publish which run that is for each workflow.
+  useChatRuns(session, busy);
   const busyRef = useRef(false);
   // A sent message the server has not started yet: it may wait behind another turn or a run after the reply.
   const [queued, setQueued] = useState(false);

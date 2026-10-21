@@ -15,6 +15,8 @@ import { WorkflowSettingsPanel } from './workflows/WorkflowSettingsPanel.js';
 import { canvasToWorkflow } from './workflows/model.js';
 import { toggleSettingsPanel } from './workflows/settingsDraft.js';
 import { listedIssues } from './workflows/issueOverlay.js';
+import { lastRunIO, lastRunIsStale } from './workflows/lastRunIO.js';
+import { useLastRunLog } from './workflows/useLastRunLog.js';
 import { duplicateWorkflow } from './workflows/workflowActions.js';
 import './workflows/workflows.css';
 
@@ -60,6 +62,20 @@ function WorkflowEditor() {
   // The open chat's streaming run, when it is a run of this workflow (reply section only, and only in this tab).
   const activity = useRunActivity();
   const runStatus = workflow && activity.workflowId === workflow.id ? activity.nodes : NO_RUN_STATUS;
+  // The node's inputs and output in the open chat's last run of this workflow (rebuilt from the log, so greyed when the
+  // graph may have changed since).
+  const lastLog = useLastRunLog(workflow?.id);
+  const lastRun = useMemo(
+    () =>
+      lastLog && workflow && canvas.current
+        ? {
+            io: lastRunIO(lastLog, canvas.current.id, canvas.edges, canvas.nodes),
+            stale: lastRunIsStale(lastLog, dirty, workflow.updatedAt),
+            nameOf: (nodeId: string) => lastLog.nodes[nodeId]?.name,
+          }
+        : undefined,
+    [lastLog, workflow, canvas.current, canvas.edges, canvas.nodes, dirty],
+  );
   const problems = useMemo(() => listedIssues(issues ?? []), [issues]);
   // Validate asks the engine at once: all clear is a toast, otherwise the list opens (or the settings panel, when
   // the problems are only the chat settings').
@@ -140,6 +156,7 @@ function WorkflowEditor() {
                 stateDefinitions={stateDefinitionsList}
                 settings={hinted}
                 updateConfig={canvas.updateConfig}
+                lastRun={lastRun}
                 onDelete={canvas.deleteNode}
                 onClose={() => canvas.setSelected(undefined)}
               />

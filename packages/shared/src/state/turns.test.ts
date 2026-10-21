@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sessionUsesDefinition, turnPresence } from './turns.js';
+import { latestRunsByWorkflow, sessionUsesDefinition, turnPresence } from './turns.js';
 import { addWrite, DEF, deleteWrite, reply, setWrite, turnEntry, userMessage } from './test-fixtures.js';
 
 const OTHER = '22222222-2222-4222-8222-222222222222';
@@ -93,5 +93,39 @@ describe('sessionUsesDefinition', () => {
       turns: [turnEntry('a', [{ ...setWrite('n', 1), target: { kind: 'node', nodeId: DEF, key: 'n' } }])],
     };
     expect(sessionUsesDefinition({ messages: [reply('a')], state: nodeOnly }, DEF)).toBe(false);
+  });
+});
+
+describe('latestRunsByWorkflow', () => {
+  const run = (executionId: string, workflowId: string, status: 'completed' | 'error' | 'running' = 'completed') => ({
+    executionId,
+    workflowId,
+    part: 'reply' as const,
+    status,
+  });
+  const state = {
+    turns: [
+      turnEntry('a', [], { runs: [run('a', 'w1'), run('a-post', 'w2')] }),
+      turnEntry('b', [], { runs: [run('b', 'w1', 'error')] }),
+      turnEntry('c', [], { runs: [run('c', 'w1'), run('c2', 'w3', 'running')] }),
+    ],
+  };
+  const ids = (messages: Parameters<typeof latestRunsByWorkflow>[0]['messages']) =>
+    Object.fromEntries(
+      [...latestRunsByWorkflow({ messages, state })].map(([workflow, found]) => [workflow, found.executionId]),
+    );
+
+  it('takes the latest run of each workflow among the turns still in the chat', () => {
+    expect(ids([reply('a', 'final'), reply('b', 'final')])).toEqual({ w1: 'b', w2: 'a-post' });
+  });
+
+  it('skips a turn whose replies are gone and a run that is still running', () => {
+    expect(ids([reply('a', 'final'), reply('c', 'final')])).toEqual({ w1: 'c', w2: 'a-post' });
+    expect(ids([reply('a', 'final')])).toEqual({ w1: 'a', w2: 'a-post' });
+  });
+
+  it('is empty without readable runs', () => {
+    expect(latestRunsByWorkflow({ messages: [reply('a')], state: { turns: [turnEntry('a')] } }).size).toBe(0);
+    expect(latestRunsByWorkflow({ messages: [], state: 'junk' }).size).toBe(0);
   });
 });

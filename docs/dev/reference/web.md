@@ -145,6 +145,15 @@ conversion model (unknown node types become read-only placeholders).
   one request in flight (a newer draft aborts the older request, so a stale answer never shows). The toolbar's Validate
   asks at once, toasts the count and reports failures, and no longer saves first.
 - **Template warnings in node panels** are node-ui's (`templateFieldWarnings` over shared's `templateWarnings`), shown under each template field of the generic form. They are panel-only: never validation issues, never badges.
+- **Last run in the config panel.** The chat publishes the execution id of its latest settled run of each workflow
+  (`stores/chatRuns.ts`, from `latestRunsByWorkflow` over the story state's turn entries, on settle only: never per
+  token). `useLastRunLog` fetches that log, `lastRunIO` (pure) reads the node's output from it and REBUILDS its inputs
+  from the sources' outputs along the draft's edges with shared's `canConnect`/`coerceValue`, and `LastRun` shows them
+  collapsed, values cut at 600 characters with a "Show all". It is greyed with a note when the draft is dirty or the log's
+  `workflowUpdatedAt` (stamped by the engine from the prepared workflow) differs from the saved workflow's `updatedAt`
+  (a log with no stamp is always greyed). Approximations: `requiredIfConnected` skips, `neverSkips` inputs and dynamic
+  ports that changed since the run are only right while the graph is unchanged, and a reply deleted afterwards leaves
+  its turn's run listed until the story state next changes. The default for "which run" is the open chat's, not any chat's.
 - **Live run status.** `stores/runActivity.ts` is the one cross-view store: `useChat` writes it (`run.start` starts a run,
   each `node.*` frame sets a node's status through `TurnHandlers.onNode`, the end of the turn lets the marks linger 3 s),
   and the editor reads it through `CanvasOverlayContext.runStatus` when `workflowId` is the open workflow. It holds no

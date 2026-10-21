@@ -50,6 +50,11 @@ with the chat moved to the right so you can test as you go.
   workflows that make the reply show it (the ones that run after the reply don't), only in the browser tab that sent the
   message, and the marks follow the node ids of the saved workflow that ran, so a node you added or removed since shows
   nothing.
+- **Last run:** with a node selected, the settings panel ends with a collapsed **Last run** section: that node's inputs
+  and output from the open chat's most recent run of this workflow (for a skipped node, why it was skipped). The
+  inputs are rebuilt from the outputs of the nodes before it, so they are greyed, with a note, when you have unsaved
+  edits or the workflow was saved after that run (an older run can't tell, and is always greyed). Long values are cut,
+  with **Show all**.
 - **Save** when you're done. A workflow with a problem (a required input not connected, a setting missing, a node
   pointing at a deleted preset) can still be saved. **Validate** in the toolbar checks right away, without saving, and opens the list of problems, and a chat that
   runs it gets a message naming the node, with a link that opens the workflow and highlights the wire.

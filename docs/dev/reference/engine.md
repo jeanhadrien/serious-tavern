@@ -31,6 +31,7 @@ dependencies, sink reachability, and execution-scoped resources.
   whose connections are all inactive is skipped, a `required` input fed by a skipped node skips its node, and a
   `requiredIfConnected` input does the same once connected. `neverSkips` inputs never count toward skipping (Recall's
   extra `text`, the Trigger's signals, Thread's `history`). Merge only sees the inputs that ran.
+- **The workflow version** a run used is stamped on the log as `workflowUpdatedAt` (the prepared workflow's `updatedAt`); the editor's last-run panel greys itself when it differs from the saved workflow's. Absent in older logs.
 - **Why a node was skipped** is recorded in the execution log as `nodes[id].skip` (`nodeSkipSchema`: `reason` is `not-needed`, `inactive-inputs` or `source-skipped`, with `by` naming the skipped source node of the last). The `node:skipped` event carries the same object as `detail`. Logs written before it have none (and an unreadable value reads as none). The words are shared's `skipReasonText`, used by Execution details.
 - **Outputs.** A connected output port a node doesn't return is an error unless the port is `optional`.
 - **Replies.** Each Chat Output that completes appends one reply. Order: Y before X when Y's transitive upstream set is

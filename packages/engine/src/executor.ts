@@ -93,6 +93,7 @@ export async function executeWorkflow(
   const execution: ExecutionLog = {
     id: options.executionId ?? randomUUID(),
     workflowId: workflow.id,
+    workflowUpdatedAt: workflow.updatedAt,
     sessionId: options.sessionId,
     seed,
     settings: { ...settings },

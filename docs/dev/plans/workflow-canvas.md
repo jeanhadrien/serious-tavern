@@ -1,9 +1,9 @@
 # Workflow canvas: plan
 
-Five improvements to the workflow editor (`apps/web/src/pages/workflows/`, React Flow 12.12) are left. Phases A (canvas
-basics) and B (validation: draft endpoint, issues on the canvas, template warnings in panels) are built; they live in
-`docs/dev/reference/web.md` and the `AGENTS.md` files. When an item lands, move what it decided there and strike it from this plan. Delete the file
-once it is empty.
+Two improvements to the workflow editor (`apps/web/src/pages/workflows/`, React Flow 12.12) are left. Phases A (canvas
+basics), B (validation) and C (runs: skip reasons, node focus, live status, last run) are built; they live in
+`docs/dev/reference/web.md` and the `AGENTS.md` files. When an item lands, move what it decided there and strike it from
+this plan. Delete the file once it is empty.
 
 Out of scope: MiniMap, alignment guides, subflows, cmdk, performance work.
 
@@ -15,10 +15,6 @@ Read first: the root `AGENTS.md`, `apps/web/AGENTS.md`, `apps/web/src/pages/work
 
 The brief came from an earlier review. These points differ from it and shape the plan:
 
-- **Item 9 has no data source.** No endpoint lists the executions of a workflow, and scanning `data/executions`
-  (one file per run) is not an option.
-  - `coerceValue` and `stringify` now live in shared, beside `canConnect`, so the web can use them.
-  - The execution log does not record which version of the workflow ran.
 - **Item 7:** descriptors are JSON, sent through `/api/node-types`, so a formatter function can't live there. Also,
   `nodeTypeDescriptorSchema` is a plain `z.object`, which strips unknown keys.
 - **Item 13 is the largest item.** See its section.
@@ -35,42 +31,10 @@ independent.
 
 | Phase | Commits |
 | --- | --- |
-| C. Runs | 9b last run in the panel |
 | D. Larger additions | 7 node summaries · 13 sticky notes |
 
 13 comes last because it touches every reader of the
 canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
-
----
-
-## Phase C: runs
-
-### 9b. Last run in the config panel
-
-- **Goal:** the config panel shows the selected node's inputs and output from the last run of this workflow, collapsed
-  by default.
-  - The output is the log's `nodes[id].output`.
-  - The inputs are rebuilt from the upstream outputs in the log, the draft's edges, and `canConnect` plus `coerceValue`
-    (shared `coerceValue`).
-  - Skipped nodes show the item 5 reason.
-- **Which run:** see the open questions. The default proposal is the open chat's most recent run of this workflow,
-  from the session's turn entries (`readTurnEntries`, `runs[]` holds `workflowId` and `executionId`). The live store
-  (`stores/runActivity.ts`) keeps no run id and clears after the turn, so it is no source. The log comes from `executionsApi.get`, which is already cached by id.
-- **Greyed out:** greying when the draft is dirty is not enough. A save made after the run also changes the edges the
-  inputs are rebuilt from. Add `workflowUpdatedAt` to the execution log (additive, optional; the engine stamps it from
-  the prepared workflow). Grey the panel when the log's stamp differs from the saved workflow's `updatedAt`, or when
-  the draft is dirty. Old logs have no stamp: grey. The server's edge prunes after a preset or definition update
-  (`services/presets.ts`, `state-definition-usage.ts`) already bump `updatedAt`, so the stamp catches them too.
-- **Touches:**
-  - a pure `lastRunIO.ts` (log, node id, edges, ports) → `{ inputs, output, skip }`, with tests;
-  - `WorkflowConfigPanel.tsx`;
-  - `engine/executor.ts` (the stamp);
-  - `shared/models.ts`.
-- **Risks:**
-  - Rebuilding is an approximation. `requiredIfConnected` skips, `neverSkips` inputs and dynamic ports that changed
-    since the run are only right while the graph is unchanged; the stamp is what keeps that honest.
-  - Large values: Chat Input's history and LLM outputs. Show them truncated, with an expander.
-- **Docs:** `docs/WORKFLOWS.md`, `reference/web.md`, `reference/engine.md` (log fields).
 
 ---
 
@@ -136,10 +100,6 @@ canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
 1. **Categories (palette, built in phase A).** The palette keeps the engine's categories and only changes how a lone category renders. Do
    you also want Random moved to Creativity in the engine? That is a real regrouping, and it changes node headers and
    the `docs/WORKFLOWS.md` headings.
-2. **Which "last run" (item 9):** the open chat's last run of the workflow (proposed), or any chat's? Any chat needs a
-   per-workflow index of executions on the server, which does not exist.
-3. **Rebuild or record inputs (item 9).** Rebuilding (proposed) is approximate even with the version stamp. Recording
-   each node's inputs in the log is exact, but it bloats every log: every LLM node's `history` would be stored again.
-4. **Notes (item 13):** separate state (a, proposed) or a second node type (b)? Should Tidy (14) move notes, and
+2. **Notes (item 13):** separate state (a, proposed) or a second node type (b)? Should Tidy (14) move notes, and
    should copy and paste carry them? The proposal: Tidy leaves notes where they are, and copy and paste come later.
    Undo and the dirty check are required either way.
