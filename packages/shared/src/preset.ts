@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { findMacro, macroInputKey, templateMacros } from './macros.js';
+import { macroInputKey, templateMacros } from './macros.js';
 import { conversationMessageSchema } from './conversation/index.js';
 import { importAppSchema } from './imports.js';
 import { analyzeTemplate } from './template-analysis.js';
+import { templateWarnings } from './template-warnings.js';
 
 export const presetRoleSchema = z.enum(['system', 'user', 'assistant']);
 
@@ -204,12 +205,7 @@ export function presetWarnings(preset: Preset): PresetWarning[] {
   preset.entries.forEach((entry, index) => {
     if (entry.kind !== 'message' || !entry.enabled) return;
     for (const { field, template } of entryTemplates(entry)) {
-      const { references, problems } = analyzeTemplate(template);
-      for (const problem of problems) warnings.push({ path: ['entries', index, field], message: problem });
-      for (const reference of references) {
-        if (reference.root && !findMacro(reference.name))
-          warnings.push({ path: ['entries', index, field], message: `Unknown macro: ${reference.expression}` });
-      }
+      for (const message of templateWarnings(template)) warnings.push({ path: ['entries', index, field], message });
     }
   });
   return warnings;

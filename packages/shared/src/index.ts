@@ -19,4 +19,5 @@ export * from './imports.js';
 export * from './character.js';
 export * from './macros.js';
 export * from './template-analysis.js';
+export * from './template-warnings.js';
 export * from './api/index.js';
