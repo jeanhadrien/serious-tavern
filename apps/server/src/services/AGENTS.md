@@ -52,5 +52,8 @@ The core model (turn, run, reply and after sections) is in the root AGENTS.md; t
   - **Ids are kept on purpose** (message ids, `executionId`, `runId`, `alternativeOf`): links store message ids, and replies open their logs by `runId ?? executionId`. So **a fork shares the source's execution logs**; a future per-chat log cleanup must not delete logs a fork still points to.
   - The app setting `forkKeepsAlternatives` (default on) decides whether the fork keeps inactive messages.
 
+## Text stats (`GET /api/sessions/:id/stats`)
+`sessionStats` reads the app setting first and computes nothing when it is off. The window of a reply is `historyMessages` (the one "chat history" rule), passed to the engine's `chatStats`, which owns every metric rule: never re-implement one here. Replies are shown from `activeMessages`, so a hidden alternative has no stats.
+
 ## Chat settings
 Only `PATCH /api/sessions/:id` changes them: a partial merge where `null` removes any key; a non-null value for an undeclared key, or one that doesn't fit, is `400 CHAT_SETTING_INVALID` and writes nothing (`mergeSettings`). Turns never write them, and edits, deletes and regenerates never rewind them.

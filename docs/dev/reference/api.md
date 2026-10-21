@@ -24,6 +24,7 @@ envelope), `404 NOT_FOUND` for a missing record, and the specific codes below.
 | `PATCH /api/sessions/:id/alternative` | `{ executionId }` | `200` the session. `409 TURN_RUNNING` while any job holds the chat; `400 NOT_AN_ALTERNATIVE` unless it is an alternative of the last turn. |
 | `POST /api/sessions/:id/fork` | `{ messageId }` | `201` the new session. `400 NOT_A_FORK_POINT`; `404` unknown chat, unknown or inactive message; `409 TURN_RUNNING`. |
 | `GET /api/sessions/:id/state` | | `200` the computed story state view (see [story-state.md](story-state.md#the-state-view)). |
+| `GET /api/sessions/:id/stats` | | `200` `{ enabled, messages }`: the text stats of the chat's assistant replies by message id (see [engine.md](engine.md#text-stats)). Computed on read, never stored. `enabled` is the `showMessageStats` app setting; when false nothing is computed and `messages` is empty. A stopped reply has stats but is never in another's window; user messages and streaming rows have none. `404` for an unknown chat. |
 | `GET /api/executions/:id` | | `200` one run's execution log. |
 
 **Sending a message.** Every enabled workflow is prepared before anything is stored: `400 NO_ENABLED_WORKFLOW` when

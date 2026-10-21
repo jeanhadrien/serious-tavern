@@ -263,6 +263,8 @@ it('returns payloads conforming to every shared endpoint response contract', asy
       payload: { forkKeepsAlternatives: false },
     });
     expect(settings.forkKeepsAlternatives).toBe(false);
+    const stats = await request('getSessionStats', { method: 'GET', url: `/api/sessions/${session.id}/stats` });
+    expect(stats.enabled).toBe(false);
     await request('stopTurn', { method: 'POST', url: `/api/sessions/${session.id}/stop` });
     await request('updateMessage', {
       method: 'PATCH',

@@ -10,6 +10,7 @@ import { catalogEndpoints } from './catalog.js';
 import { importEndpoints } from './imports.js';
 import { eventEndpoints } from './events.js';
 import { appSettingsEndpoints } from './app-settings.js';
+import { messageStatsEndpoints } from './message-stats.js';
 
 export * from './common.js';
 export * from './sessions.js';
@@ -23,6 +24,7 @@ export * from './catalog.js';
 export * from './imports.js';
 export * from './events.js';
 export * from './app-settings.js';
+export * from './message-stats.js';
 
 export const apiContract = {
   ...sessionEndpoints,
@@ -36,6 +38,7 @@ export const apiContract = {
   ...importEndpoints,
   ...eventEndpoints,
   ...appSettingsEndpoints,
+  ...messageStatsEndpoints,
 };
 export type ApiEndpoint = keyof typeof apiContract;
 export type ApiBody<K extends ApiEndpoint> = z.input<(typeof apiContract)[K]['body']>;
