@@ -5,8 +5,9 @@ import { define, edge, makeWorkflow, node, send, tempApps, type App } from './st
 import { stateView, waitForPostRun } from './post.js';
 import { makeListSession } from './triggers.js';
 
-// Helpers of the message link tests: a workflow that wires summaries the way the README does, stand-ins for the
-// summarizing LLM and for nodes that fail or hold a run, and checks over the items a chat's summaries key holds.
+// Helpers of the message link tests: a workflow that wires summaries the way docs/dev/reference/story-state.md
+// describes, stand-ins for the summarizing LLM and for nodes that fail or hold a run, and checks over the items a
+// chat's summaries key holds.
 
 const SUMMARIZER = 'link-test-llm';
 const FAILER = 'link-test-fail';

@@ -3,8 +3,8 @@ import { errorEnvelopeSchema, stateDefinitionInUseDetailsSchema } from '@st/shar
 import { deleteMessage, makeWorkflow, node } from './test-support/story.js';
 import { linkHarness, patchMessage, say, storedItems } from './test-support/links.js';
 
-// Summaries, wired the way the README does: the reply shows the intact summaries and the messages no summary stands
-// for; the workflow below it, which runs after the reply, summarizes the next chunk.
+// Summaries, wired the way docs/dev/reference/story-state.md describes: the reply shows the intact summaries and the
+// messages no summary stands for; the workflow below it, which runs after the reply, summarizes the next chunk.
 
 const harness = linkHarness('links-flow');
 afterEach(() => harness.cleanup());

@@ -1,6 +1,6 @@
 # Serious Tavern — Plan & Vision (remaining work)
 
-The foundations and the MVP are built (see `README.md` for the architecture).
+The foundations and the MVP are built (see `docs/dev/ARCHITECTURE.md` for the architecture).
 This file now tracks only what is left to do.
 
 ## Vision
@@ -39,7 +39,7 @@ Each step below is one commit (or a few), passes `npm run check`, and keeps exis
 - **Seeds and fixtures:** seeded presets (`apps/server/src/seed.ts`) and all test fixtures use `displayName`.
 - **Web:** the entry list and editor show and edit `displayName`. Message entries get a "Name" field (optional, with the existing template hints/warnings), described as the message name sent to the model. The preset preview shows a message's rendered name when it has one.
 - **Tests:** legacy file read (label preserved, no message name, new shape on save), name rendering incl. empty-name omission and macros, validation of name templates, mapper output.
-- **Docs:** README (preset format) and AGENTS.md Key contracts (`displayName` vs `name`, the legacy rule).
+- **Docs:** the preset format (now `docs/PRESETS.md`) and the AGENTS.md contracts (`displayName` vs `name`, the legacy rule).
 
 ### Step 2 — provider records and resolution ✅ done
 - **Record (`packages/shared`, zod, passthrough):**

@@ -4,5 +4,5 @@ export const byText = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 export const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/** The implicit key Draw remembers its draws under (a node key: see "Implicit node state" in the README). */
+/** The implicit key Draw remembers its draws under (a node key: see docs/dev/reference/story-state.md). */
 export const DRAW_STATE_KEY = 'draws';

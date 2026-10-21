@@ -10,7 +10,8 @@ parts of the app that help with that, and how they fit together:
 - **Workflows after the reply:** workflows listed below the one that replies, which run once the reply is on screen, such as writing a summary.
 - **Message links and summaries:** a summary is a remembered text that knows which messages it stands for.
 - **The Trigger:** decides *whether* to inject something this turn and *how strongly*.
-- **Two ready-made examples** that put all of it together: "Fresh texture (example)" and "Rolling summaries (example)".
+- **Three ready-made examples** that put all of it together: "Fresh texture (example)", "Rolling summaries (example)"
+  and "Scenarist (example)".
 
 You don't need to read it in order. If you want to see it work first, start with [Try the examples](#try-the-examples).
 
@@ -23,6 +24,7 @@ You don't need to read it in order. If you want to see it work first, start with
 - [The Trigger](#the-trigger)
 - [Example 1: Fresh texture](#example-1-fresh-texture)
 - [Example 2: Rolling summaries](#example-2-rolling-summaries)
+- [Example 3: A scenarist with tools](#example-3-a-scenarist-with-tools)
 - [Seeing what happened](#seeing-what-happened)
 - [Known limitations](#known-limitations)
 
@@ -32,13 +34,15 @@ Related guides: [docs/COLLECTIONS.md](COLLECTIONS.md) (the file format, Recall a
 
 ## Try the examples
 
-Two example workflows are added to your data the first time the server starts after an upgrade, whether or not you
+Three examples are added to your data the first time the server starts after an upgrade, whether or not you
 already have workflows of your own:
 
 - **Fresh texture (example):** now and then a small detail from a deck of forest textures is put into the prompt,
   worded as an offer. The story gets variety without you writing it.
 - **Rolling summaries (example):** older messages are condensed into summaries, so a long chat keeps its memory
   without sending every message every time.
+- **Scenarist (example):** after each reply, a second model steers the plot (tension, story beat, open threads)
+  through tools, and the narrator reads its decisions from story state.
 
 Each example comes with the records it needs: a collection, state definitions and presets. They are named
 "... (example)" and each record is created once:
@@ -65,8 +69,10 @@ example in the workflow editor, click each **LLM** node, pick your own provider 
 [docs/PROVIDERS.md](PROVIDERS.md)). Rolling summaries has two LLM nodes: the one that answers and the one that
 summarizes.
 
-Then start a **New chat**, pick the example in the workflow dropdown in the chat header, and read the walkthroughs
-below: [Fresh texture](#example-1-fresh-texture), [Rolling summaries](#example-2-rolling-summaries).
+Then start a new chat (**+ New** in the chat list), open the chat panel (sliders icon in the chat header) and, under
+**On reply**, add the example's workflows and remove the others. The walkthroughs below say which:
+[Fresh texture](#example-1-fresh-texture), [Rolling summaries](#example-2-rolling-summaries),
+[Scenarist](#example-3-a-scenarist-with-tools).
 
 ## Chat settings
 
@@ -457,6 +463,35 @@ chat then summarizes messages 1 to 4 after turn 3 and the next four after turn 5
 
 One caveat: summaries and raw messages are separate prompt inputs. When a summary in the middle is broken, its raw
 messages appear after later summaries until the next turn redoes it.
+
+## Example 3: A scenarist with tools
+
+**What it does.** Two models share the work. The narrator writes the replies. After each reply, a **scenarist**
+model reads the chat and steers the plot: it raises or lowers the tension, moves the story to its next beat, and opens
+or closes plot threads, through [tools](WORKFLOWS.md#llm) that write story state. The narrator's preset reads those
+values, so the scenarist's decisions reach the story without ever appearing in the chat.
+
+**The pieces.**
+
+- The `plot` definition: `tension` (0 to 10), `beat` (setup, rising, twist, crisis, climax, aftermath), `threads`
+  (a list of open plot threads, at most 10) and `notes` (a [thread key](#thread-keys), at most 20). Each key has a
+  description the scenarist sees in its tool list.
+- The narrator workflow, **Narrator with a scenarist (example)**: Chat Input → LLM → Chat Output. Its preset is the
+  Default preset plus a system entry that reads `{{state.plot.beat}}`, `{{state.plot.tension}}` and the open
+  `{{state.plot.threads}}`.
+- The **Scenarist (example)** workflow, with no Chat Output, listed **below** the narrator so it runs after the reply:
+  Chat Input → **Thread** (`plot.notes`, woven into Chat Input's history) → **LLM** with the Scenarist preset (it may
+  read and write `tension`, `beat` and `threads`, at most 6 steps) → **State Write** that adds the LLM's
+  `Exchange` to `plot.notes`.
+- The thread is the scenarist's memory: the next turn's Thread node puts its earlier tool calls and their results back
+  into the chat, after the reply they belong to, so it remembers what it already changed. The model never writes the
+  thread itself; the State Write does.
+
+**Try it.** In a new chat, list **Narrator with a scenarist (example)** first and **Scenarist (example)** below it
+under **On reply**, then send a message. The scenarist's run shows as a quiet row above the composer; afterwards the
+turn's chip lists what it stored, and its log shows every tool call. The chat panel's **Story state** shows `plot`.
+Delete the reply and `plot` reads as it did before that turn. Without the scenarist in the list, the narrator just
+sees the default `plot` values.
 
 ## Seeing what happened
 

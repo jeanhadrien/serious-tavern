@@ -5,7 +5,7 @@ Zod schemas, types and the pure rules that the engine, the server, node-ui and t
 Story state, message links and prompt messages have their own notes: `src/state/AGENTS.md`, `src/links/AGENTS.md`, `src/conversation/AGENTS.md`.
 
 ## Templates and macros
-Preset content and template-taking node configs are rendered with the `handlebars` runtime (`noEscape: true`, no code eval) over a data object built from the turn context. The README documents the syntax and the helper list.
+Preset content and template-taking node configs are rendered with the `handlebars` runtime (`noEscape: true`, no code eval) over a data object built from the turn context. The syntax and the helper list are documented in `docs/TEMPLATING.md`.
 - The macro registry (`macros.ts`) defines every available path, and the helper list lives next to it. Preset validation walks the parsed AST, so editor hints and warnings stay in step with what renders. **Never hand-write a hint or key list:** settings keys come from workflow declarations (`macroHints(inputs, settings)`, `settingsCatalog` unions them across workflows), state paths from `stateHints(definitions)`.
 - Namespaces: `{{character.<field>}}`, `{{persona.name|description}}`, `{{input.<key>}}`, `{{trigger.*}}` (including `trigger.turn`), `{{settings.<key>}}`, `{{state.<definition>.<key>}}`. Short aliases: `{{char}}`, `{{user}}` (defaults to "User"), `{{description}}`, `{{personality}}`, `{{scenario}}`, `{{persona}}` (the persona description).
 - `{{char.*}}`/`{{user.*}}` were removed on purpose. Don't add legacy `<BOT>`/`<USER>` or SillyTavern's extra macros unless asked.

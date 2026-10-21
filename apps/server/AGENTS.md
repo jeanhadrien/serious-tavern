@@ -44,7 +44,7 @@ Fastify 5 on port 3001. Turns, runs, story state, alternatives and fork are in `
 
 ## Seeds and example packs
 - The seeded workflows ("Default Assistant", "Parallel demo") and every example pack's workflows must keep validating: `seed-examples.test.ts` validates every workflow of a freshly seeded store.
-- Example packs have fixed ids and are created only when the id is absent AND not in the ledger `data/.seeded.json`: deleted examples stay deleted, edited ones are never overwritten. A pack is all or nothing, and each of its workflows is its own ledger item. The packs themselves are described in the README ("Example seeds").
+- Example packs have fixed ids and are created only when the id is absent AND not in the ledger `data/.seeded.json`: deleted examples stay deleted, edited ones are never overwritten. A pack is all or nothing, and each of its workflows is its own ledger item. The packs themselves are described in `docs/dev/reference/storage.md` and, for users, `docs/STATE-AND-LORE.md`.
 - A definition name clash (or a same-id definition) is resolved by the pack's `uses` key-fit rule, or skips the pack. The warning appears only while the pack still has records to create.
 - An unreadable ledger seeds nothing and is never rewritten. Ledger lines are `<pack>/<kind>:<id>` (bare older lines still read and are renamed); the ledger is written after every pack. A failing pack is logged and skipped: **seeding never stops startup**.
 - A correctly wired example must run without warnings (Fresh texture routes Draw's `entry` through Pick Fields so State Write's "Left out fields" log stays meaningful).

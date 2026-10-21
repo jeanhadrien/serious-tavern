@@ -3,14 +3,14 @@
 This file holds what applies to every task. Each area of the code has its own `AGENTS.md` with the contracts of that area.
 
 ## Before you start
-- `PLAN.md` is the vision. `README.md` covers usage and architecture: read the sections for the area you touch, not the whole file.
+- `PLAN.md` is the vision. `docs/dev/ARCHITECTURE.md` is the overview of the code; `docs/dev/reference/` explains each area in detail (read the file for the area you touch). `README.md` is a short user-facing entry point.
 - **Read the `AGENTS.md` of every area you will touch before you plan**, not only before you edit. An area's file loads on its own only once a file inside it is read, which can be too late for a plan. The areas:
   - `packages/shared/`, with `src/state/` (story state), `src/links/` (message links), `src/conversation/` (prompt messages, threads)
   - `packages/engine/`, with `src/nodes/` (node types), `src/nodes/llm/` (the LLM node), `src/providers/` (LLM adapter), `src/tools/` (tool loop)
   - `packages/node-ui/`
   - `apps/server/`, with `src/services/` (turns, runs, story state, alternatives, fork)
   - `apps/web/`, with `src/pages/chat/`, `src/pages/chat/story/`, `src/pages/workflows/`, `src/pages/stateDefinitions/`
-- Docs: `docs/*.md` are **user guides**; keep them in sync when user-visible behaviour changes. `docs/dev/` is **technical**: `design/` holds the agreed web layout and UX references (`FRONTEND-LAYOUT.md`, `FRONTEND-UX.md`), `plans/` the feature plans, `explorations/` research and design proposals.
+- Docs: `docs/*.md` are **user guides**; keep them in sync when user-visible behaviour changes. `docs/dev/` is **technical**: `ARCHITECTURE.md` (the overview), `reference/` (how each area works; update it with the code), `TOOLING.md`, `design/` (the agreed web layout and UX references, `FRONTEND-LAYOUT.md` and `FRONTEND-UX.md`), `plans/` (feature plans) and `explorations/` (research and design proposals).
 
 ## What this is
 A chatbot web app. Each chat reply comes from a user-built workflow of nodes, edited visually in an n8n-style editor. The frontend is a **thin client**: all storage, secrets and workflow execution live in the backend.
@@ -27,7 +27,7 @@ The core model, used everywhere:
 ## Working conventions
 - **Commits:** one feature per commit. Commit any pending changes before starting new work. `npm run check` must pass before every commit.
 - **PLAN.md is owned by the user.** Don't modify or delete it unless asked.
-- **Where knowledge goes:** a new convention, contract or gotcha goes into the `AGENTS.md` of the area where it would be broken (create one for a new area and list it above). This file only gets rules that hold everywhere. A rule about one module is often better as a comment in that module. Explanations go to the README or `docs/dev/`, user-visible behaviour to `docs/*.md`.
+- **Where knowledge goes:** a new convention, contract or gotcha goes into the `AGENTS.md` of the area where it would be broken (create one for a new area and list it above). This file only gets rules that hold everywhere. A rule about one module is often better as a comment in that module. Explanations of how the code works go to `docs/dev/reference/` (and `ARCHITECTURE.md` when the big picture changes), user-visible behaviour to the user guides in `docs/*.md`. Keep `README.md` minimal.
 - **What an AGENTS.md line is for:** rules the code can't show by itself (invariants, "never", "only through", the reason behind a choice). Don't record where code lives: CodeGraph answers that.
 - **Scope:** keep it modular and simple.
 
@@ -45,7 +45,7 @@ npm workspaces, TypeScript strict, ESM, packages consumed as TS source.
 - **`npm run check`** runs Biome (format and lint, without writing), typecheck, tests and knip in about 7 seconds.
   - `npm run fix` applies Biome formatting and safe lint fixes.
   - knip reports unused files, exports and dependencies. Delete dead code; configure `knip.json` only for real false positives.
-  - Tuned lint rules and their reasons are in the README. Don't disable more rules without a reason.
+  - Tuned lint rules and their reasons are in `docs/dev/TOOLING.md`. Don't disable more rules without a reason.
   - Large mechanical reformats go in their own `style:` commit, which is added to `.git-blame-ignore-revs`.
 
 ## Contracts that hold everywhere

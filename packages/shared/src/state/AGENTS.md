@@ -1,6 +1,6 @@
 # Story state — agent notes
 
-Per-chat state that workflow turns write. It lives exactly as long as the replies of the turns that wrote it. Definitions are YAML records (`data/state/definitions/`); the stored truth is `session.state.turns`. User guide: `docs/STATE-AND-LORE.md`; README "Story state".
+Per-chat state that workflow turns write. It lives exactly as long as the replies of the turns that wrote it. Definitions are YAML records (`data/state/definitions/`); the stored truth is `session.state.turns`. User guide: `docs/STATE-AND-LORE.md`; reference: `docs/dev/reference/story-state.md`.
 
 ## Turn presence is the one rule
 - The server appends a `TurnEntry` for EVERY settled turn (success, failure, stop; writes or not), in the same session update that saves the replies.
