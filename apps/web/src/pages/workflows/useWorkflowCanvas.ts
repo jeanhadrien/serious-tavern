@@ -174,6 +174,25 @@ export function useWorkflowCanvas(
     );
     if (!result.ok) alerts.info(result.reason);
   };
+  // The quick add: the picker listing every type, from a double-click on empty canvas or `/`. `/` opens it where the
+  // pointer last was over the canvas, else at the centre.
+  const pointer = useRef<{ x: number; y: number }>(undefined);
+  const trackPointer = (event: React.PointerEvent) => {
+    pointer.current = { x: event.clientX, y: event.clientY };
+  };
+  const forgetPointer = () => {
+    pointer.current = undefined;
+  };
+  const quickAdd = (): boolean => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return false;
+    return picker.openAt(pointer.current ?? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+  };
+  // Only the pane itself counts: a node, an edge, a control or a panel is another target.
+  const onDoubleClick = (event: React.MouseEvent) => {
+    if (event.target instanceof Element && event.target.classList.contains('react-flow__pane'))
+      picker.openAt({ x: event.clientX, y: event.clientY });
+  };
   const addAtCenter = (descriptor: NodeTypeDescriptor) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -228,6 +247,10 @@ export function useWorkflowCanvas(
     picker: picker.picker,
     pickCandidate: picker.pick,
     closePicker: picker.close,
+    quickAdd,
+    onDoubleClick,
+    trackPointer,
+    forgetPointer,
     addAtCenter,
     onDrop,
     updateConfig,

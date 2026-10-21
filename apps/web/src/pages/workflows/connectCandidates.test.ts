@@ -73,7 +73,7 @@ describe('connectCandidates rules', () => {
   });
   it('takes the first exact port when several fit', () => {
     const twin = type('twin', 'X', [port('a', 'text'), port('b', 'text')], []);
-    expect(connectCandidates(output('text'), [twin], { hasChatInput: false })[0]?.port.name).toBe('a');
+    expect(connectCandidates(output('text'), [twin], { hasChatInput: false })[0]?.port?.name).toBe('a');
   });
   it('judges dynamic-port types by their default ports', () => {
     const dynamic = type('dyn', 'X', [], [], { dynamicPorts: true });
@@ -89,10 +89,30 @@ describe('connectCandidates rules', () => {
   });
 });
 
+describe('connectCandidates without an origin (quick add)', () => {
+  it('offers every type in the one order, with no port and no conversion', () => {
+    const list = connectCandidates(undefined, types, { hasChatInput: false });
+    expect(names(list)).toEqual(['llm', 'chat-input', 'chat-output', 'history', 'counter']);
+    expect(list.every((candidate) => candidate.port === undefined && !candidate.coerce)).toBe(true);
+  });
+  it('still leaves out a second chat-input', () => {
+    expect(names(connectCandidates(undefined, types, { hasChatInput: true }))).not.toContain('chat-input');
+  });
+  it('keeps types whose default ports fit nothing, since no port is needed', () => {
+    const dynamic = type('dyn', 'X', [], [], { dynamicPorts: true });
+    expect(names(connectCandidates(undefined, [dynamic], { hasChatInput: false }))).toEqual(['dyn']);
+  });
+});
+
 describe('filterCandidates', () => {
   const all = connectCandidates(output('text'), types, { hasChatInput: false });
   it('keeps everything for a blank filter', () => {
     expect(filterCandidates(all, '  ')).toBe(all);
+  });
+  it('matches a candidate with no port on its type words alone', () => {
+    const quick = connectCandidates(undefined, types, { hasChatInput: false });
+    expect(names(filterCandidates(quick, 'chat'))).toEqual(['chat-input', 'chat-output']);
+    expect(names(filterCandidates(quick, 'undefined'))).toEqual([]);
   });
   it('matches label, category and port words, ignoring case', () => {
     expect(names(filterCandidates(all, 'OUTPUT'))).toEqual(['chat-output']);

@@ -45,6 +45,7 @@ export function useShortcutArea(view: ViewKey, handlers: ShortcutHandlers) {
       registerShortcutArea(view, {
         undo: () => latest.current.undo?.() ?? false,
         redo: () => latest.current.redo?.() ?? false,
+        quickAdd: () => latest.current.quickAdd?.() ?? false,
         copy: (event) => latest.current.copy?.(event) ?? false,
         paste: (event) => latest.current.paste?.(event) ?? false,
       }),

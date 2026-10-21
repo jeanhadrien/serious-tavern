@@ -9,7 +9,8 @@ const SIZE = { width: 240, height: 300 };
 
 /**
  * The small node picker at the point where a connection was dropped on empty canvas: a filter and the node types
- * with a port that accepts it. Arrows move, Enter picks, Escape or a click outside closes it.
+ * with a port that accepts it. The quick add (no connection) lists every type. Arrows move, Enter picks, Escape or a
+ * click outside closes it.
  */
 export function ConnectPicker({
   picker,
@@ -56,12 +57,13 @@ export function ConnectPicker({
     }
   };
   const { x, y } = clampToBounds(picker.at, picker.bounds, SIZE);
+  const connecting = picker.from !== undefined;
   return (
     <div
       className="connect-picker"
       ref={root}
       role="dialog"
-      aria-label="Add a connected node"
+      aria-label={connecting ? 'Add a connected node' : 'Add a node'}
       style={{ left: x, top: y }}
     >
       <input
@@ -80,7 +82,12 @@ export function ConnectPicker({
         }}
         onKeyDown={onKeyDown}
       />
-      <div className="connect-picker-list" id="connect-picker-list" role="listbox" aria-label="Compatible nodes">
+      <div
+        className="connect-picker-list"
+        id="connect-picker-list"
+        role="listbox"
+        aria-label={connecting ? 'Compatible nodes' : 'Nodes'}
+      >
         {shown.map((candidate, position) => (
           // Mouse down must not blur the input, or the picker's filter loses focus before the click lands.
           // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection is handled on the filter input
@@ -98,14 +105,14 @@ export function ConnectPicker({
           >
             <span className="connect-option-label">{candidate.descriptor.label}</span>
             <small>
-              {candidate.descriptor.category} · {candidate.port.label}
-              {candidate.coerce ? ' → text' : ''}
+              {candidate.descriptor.category}
+              {candidate.port && ` · ${candidate.port.label}${candidate.coerce ? ' → text' : ''}`}
             </small>
           </div>
         ))}
         {!shown.length && (
           <p className="connect-picker-empty">
-            {picker.candidates.length ? 'No node matches.' : 'No node type accepts this connection.'}
+            {picker.candidates.length || !connecting ? 'No node matches.' : 'No node type accepts this connection.'}
           </p>
         )}
       </div>

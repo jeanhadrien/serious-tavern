@@ -49,3 +49,13 @@ it('lists the candidates as options with their port, marks coercion and keeps th
 it('says so when nothing accepts the connection', () => {
   expect(render(picker([]))).toContain('No node type accepts this connection.');
 });
+
+it('as a quick add (no connection) shows the category alone and names itself for a plain add', () => {
+  const { from: _from, ...quick } = picker([{ descriptor: descriptor('counter', 'Counter'), coerce: false }]);
+  const html = render(quick);
+  expect(html).toContain('aria-label="Add a node"');
+  expect(html).toContain('aria-label="Nodes"');
+  expect(html).toContain('>Chat</small>');
+  expect(html).not.toContain('·');
+  expect(render({ ...quick, candidates: [] })).toContain('No node matches.');
+});

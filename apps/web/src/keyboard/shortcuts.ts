@@ -7,6 +7,7 @@ export const SHORTCUTS = [
   { keys: 'Mod+Y', scope: 'canvas', description: 'Redo on the workflow canvas (not inside a field)' },
   { keys: 'Mod+C', scope: 'canvas', description: 'Copy the selected nodes (not inside a field)' },
   { keys: 'Mod+V', scope: 'canvas', description: 'Paste copied nodes (not inside a field)' },
+  { keys: '/', scope: 'canvas', description: 'Quick add: pick a node to add at the pointer (not inside a field)' },
 ] as const;
 
 interface ShortcutEvent {
@@ -18,7 +19,7 @@ interface ShortcutEvent {
 }
 
 /** Shortcuts that act on the view with the keyboard (`useShortcutArea`), but never inside a field. */
-export type AreaShortcut = 'undo' | 'redo';
+export type AreaShortcut = 'undo' | 'redo' | 'quickAdd';
 export type Shortcut = 'save' | AreaShortcut;
 /**
  * Shortcuts that are the browser's native `copy` and `paste` events, not keys (`matchShortcut` never returns them): the
@@ -28,6 +29,8 @@ export type ClipboardShortcut = 'copy' | 'paste';
 
 /** The shortcut an event is, if any. `Mod` is Ctrl, or Cmd on macOS. */
 export function matchShortcut(event: ShortcutEvent): Shortcut | undefined {
+  // `/` is matched on the character, not the key position, and Shift is allowed: it is Shift+`:` on AZERTY.
+  if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey) return 'quickAdd';
   const mod = event.ctrlKey !== event.metaKey; // exactly one of them
   if (!mod || event.altKey) return;
   const key = event.key.toLowerCase();

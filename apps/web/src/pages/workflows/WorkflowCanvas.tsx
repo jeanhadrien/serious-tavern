@@ -39,6 +39,9 @@ export function WorkflowCanvas({ canvas }: { canvas: ReturnType<typeof useWorkfl
         event.dataTransfer.dropEffect = 'copy';
       }}
       onDrop={canvas.onDrop}
+      onDoubleClick={canvas.onDoubleClick}
+      onPointerMove={canvas.trackPointer}
+      onPointerLeave={canvas.forgetPointer}
     >
       {/* Remounted for each loaded workflow, so `fitView` fits it into this (possibly narrow) column. */}
       <ReactFlow
@@ -59,6 +62,7 @@ export function WorkflowCanvas({ canvas }: { canvas: ReturnType<typeof useWorkfl
         onPaneClick={() => canvas.setSelected(undefined)}
         deleteKeyCode={['Backspace', 'Delete']}
         minZoom={0.2}
+        zoomOnDoubleClick={false}
         connectionRadius={touch ? TOUCH_CONNECTION_RADIUS : undefined}
       >
         <FitWhenMeasured />

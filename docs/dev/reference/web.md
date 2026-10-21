@@ -118,7 +118,11 @@ conversion model (unknown node types become read-only placeholders).
 - **Connect picker.** Dropping a connection on empty canvas opens `ConnectPicker` at the drop point. The pure
   `connectCandidates` lists the node types with a port that accepts it (an exact port before one that coerces through
   `canConnect`; no second Chat Input; dynamic types judged by their default ports), in the editor's one type order (`nodeTypeOrder.ts`: category, then label, shared with the palette).
-  The new node is created and connected through the same edge rules as a manual connection.
+  The new node is created and connected through the same edge rules as a manual connection. The **quick add** is the
+  same picker with no origin (`connectCandidates(undefined, …)` offers every type, `Candidate.port` absent, still no
+  second Chat Input; `filterCandidates` is still the one matching rule): `useConnectPicker.openAt(screenPoint)` is
+  opened by a double-click on the pane itself (`zoomOnDoubleClick` is off) and by the `/` area shortcut, and `pick` then
+  adds the node with no edge.
 - **History** (`canvasHistory.ts` pure, `useCanvasHistory`): up to 100 snapshots of nodes and edges (without
   selection or measurements). A step is an add, a removal, a connection, a drag that moved something, or a config
   change (changes to one node's config less than a second apart are one step). Selection, name, chat settings and

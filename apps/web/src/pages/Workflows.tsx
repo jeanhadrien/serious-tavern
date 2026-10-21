@@ -65,10 +65,11 @@ function WorkflowEditor() {
     return true;
   });
   // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or +Y step through the canvas history; the copy and paste events copy and paste
-  // nodes (never inside a field).
+  // nodes, and `/` opens the quick add (never inside a field).
   useShortcutArea('editor:workflows', {
     undo: canvas.undo,
     redo: canvas.redo,
+    quickAdd: canvas.quickAdd,
     copy: canvas.copy,
     paste: canvas.paste,
   });

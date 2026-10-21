@@ -22,6 +22,10 @@ with the chat moved to the right so you can test as you go.
   replaces the old. Hover a port to see its type and description. A small red dot after an input's name means the
   node can't run without it. A connection that converts the data (a number into
   text) is dashed; one that can't work is refused, and a saved one that no longer fits is drawn red until you fix it.
+- **Quick add:** double-click empty canvas, or press **/** while the editor has the keyboard (and you're not typing in
+  a field), to get the same list with every node type. The node is added where you clicked, or where the pointer last
+  was over the canvas (the middle of it if it never was), with no wire. Double-click no longer zooms; use the zoom
+  buttons or the wheel.
 - **Drop a wire on empty canvas** to get a short list of the nodes that can take it (type to filter, arrows and Enter
   to pick, Escape to close). The new node comes already connected.
 - **Configure:** select a node to open its settings panel. Fields that accept templates (`{{...}}`) list the available

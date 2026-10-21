@@ -32,6 +32,11 @@ it.each([
   ['Ctrl+C is the native copy event, not a key shortcut', press('c', { ctrlKey: true }), undefined],
   ['Ctrl+V is the native paste event, not a key shortcut', press('v', { ctrlKey: true }), undefined],
   ['Escape', press('Escape'), undefined],
+  ['a slash', press('/'), 'quickAdd'],
+  ['a slash typed with Shift, as on AZERTY', press('/', { shiftKey: true }), 'quickAdd'],
+  ['Ctrl+/', press('/', { ctrlKey: true }), undefined],
+  ['Cmd+/', press('/', { metaKey: true }), undefined],
+  ['Alt+/ (AltGr is Ctrl+Alt)', press('/', { altKey: true }), undefined],
 ])('%s', (_name, event, expected) => {
   expect(matchShortcut(event)).toBe(expected);
 });
@@ -41,9 +46,9 @@ it('declares each shortcut once', () => {
   expect(new Set(keys).size).toBe(keys.length);
 });
 
-it('declares the undo, redo, copy and paste keys in the canvas scope', () => {
+it('declares the undo, redo, copy, paste and quick add keys in the canvas scope', () => {
   const canvas = SHORTCUTS.filter((shortcut) => shortcut.scope === 'canvas').map((shortcut) => shortcut.keys);
-  expect(canvas).toEqual(['Mod+Z', 'Mod+Shift+Z', 'Mod+Y', 'Mod+C', 'Mod+V']);
+  expect(canvas).toEqual(['Mod+Z', 'Mod+Shift+Z', 'Mod+Y', 'Mod+C', 'Mod+V', '/']);
 });
 
 it.each([

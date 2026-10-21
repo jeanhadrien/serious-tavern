@@ -68,8 +68,8 @@ export function NodePalette({
         ),
       )}
       <p className="hint">
-        Click to add at center or drag onto the canvas. Drag nodes to move; connect handles; press Delete or the bin
-        button to remove the selection.
+        Click to add at center or drag onto the canvas. Double-click empty canvas or press / to search every node. Drag
+        nodes to move; connect handles; press Delete or the bin button to remove the selection.
       </p>
       <div className="port-legend">
         <h3>Port types</h3>

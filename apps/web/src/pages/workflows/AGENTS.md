@@ -11,6 +11,9 @@
 - The palette, the connect picker and quick add list node types in one order, `nodeTypeOrder.ts` (category, then label). Never sort types anywhere else.
 - The palette renders a category with exactly one type as a plain button (a count rule, never a per-category branch) and one with several as a `<details>`. Its open state is one `localStorage` key, `st.palette.open` (JSON map category → boolean, absent means open), read and written only through `paletteOpen.ts`, which guards both.
 
+## Quick add
+- It is the connect picker with no origin, never a second picker. A double-click acts only when its target is the `.react-flow__pane` element itself (nodes live inside the pane, so `closest` would match them). `/` is the `quickAdd` area shortcut, kept out of fields by `areaShortcutAllowed`.
+
 ## History (undo/redo)
 - Snapshots hold nodes and edges without selection, `dragging`, `resizing` or `measured` (`snapshotOf`). A restore keeps the live nodes' `measured` (`restoreNodes`) so they don't blink out.
 - The canvas calls `history.record(before?, groupKey?)` right BEFORE it changes nodes or edges. Calls in the same tick count once (one user action may change both); a `groupKey` repeated within a second joins the last step (`config:<nodeId>`); a drag records its start snapshot on drag stop, only if a node moved.

@@ -8,29 +8,35 @@ export interface DragOrigin {
   port: PortDef;
 }
 
-/** A node type that can take the dragged connection, and the port it would use. */
+/** A node type the picker offers, and the port a dragged connection would use. */
 export interface Candidate {
   descriptor: NodeTypeDescriptor;
-  port: PortDef;
+  /** Absent for a quick add, where no connection is being made. */
+  port?: PortDef;
   /** The connection needs a conversion (e.g. number → text), like a dashed edge on the canvas. */
   coerce: boolean;
 }
 
 /**
  * The node types offered when a connection is dropped on empty canvas: those with a port the dragged one can connect
- * to, in the editor's one type order (`compareTypes`). Per type the first exact fit wins over one that coerces.
+ * to, in the editor's one type order (`compareTypes`). Without an origin (quick add) every type is offered, with no
+ * port. Per type the first exact fit wins over one that coerces.
  *
  * A type with `dynamicPorts` is judged by the ports its descriptor lists (its defaults); one whose defaults don't
  * fit isn't offered, because its real ports are only known once it has a config.
  */
 export function connectCandidates(
-  origin: DragOrigin,
+  origin: DragOrigin | undefined,
   types: NodeTypeDescriptor[],
   options: { hasChatInput: boolean },
 ): Candidate[] {
   const candidates: Candidate[] = [];
   for (const descriptor of types) {
     if (descriptor.type === 'chat-input' && options.hasChatInput) continue;
+    if (!origin) {
+      candidates.push({ descriptor, coerce: false });
+      continue;
+    }
     const ports = origin.side === 'source' ? descriptor.inputs : descriptor.outputs;
     let best: Candidate | undefined;
     for (const port of ports) {
@@ -48,12 +54,12 @@ export function connectCandidates(
   return candidates.sort((a, b) => compareTypes(a.descriptor, b.descriptor));
 }
 
-/** Keeps candidates whose type label, category or port matches every word of the filter (case-insensitive). */
+/** Keeps candidates whose type label, category or port (when there is one) matches every word of the filter (case-insensitive). */
 export function filterCandidates(candidates: Candidate[], query: string): Candidate[] {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return candidates;
   return candidates.filter(({ descriptor, port }) => {
-    const text = [descriptor.label, descriptor.type, descriptor.category, port.label, port.name]
+    const text = [descriptor.label, descriptor.type, descriptor.category, port?.label, port?.name]
       .join(' ')
       .toLowerCase();
     return words.every((word) => text.includes(word));
