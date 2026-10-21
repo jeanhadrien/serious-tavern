@@ -92,11 +92,11 @@ run's on success, the failing run's on failure, absent when no workflow of the c
 
 | Method and path | Purpose |
 | --- | --- |
-| `GET/POST /api/characters`, `GET/PUT/DELETE /api/characters/:id` | CRUD |
+| `GET/POST /api/characters`, `GET/PUT/DELETE /api/characters/:id` | CRUD. `PUT` is a partial update: fields left out keep their stored value (defaults apply on `POST` only) |
 | `POST /api/characters/import` | Multipart JSON or PNG cards; `{ imported, failed }` |
 | `GET/PUT /api/characters/:id/avatar` | The avatar image (20 MB per upload) |
 | `GET /api/characters/:id/export?format=json\|png` | The card, V2 and V3 |
-| `GET/POST /api/personas`, `GET/PUT/DELETE /api/personas/:id` | CRUD |
+| `GET/POST /api/personas`, `GET/PUT/DELETE /api/personas/:id` | CRUD, `PUT` partial like characters |
 | `POST /api/personas/import` | Images (a card inside is used when present); `{ imported, failed }` |
 | `GET/PUT /api/personas/:id/avatar` | The avatar image |
 

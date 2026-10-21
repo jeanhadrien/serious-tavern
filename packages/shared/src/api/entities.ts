@@ -22,6 +22,11 @@ export const personaFieldsSchema = z.object({
   name: personaSchema.shape.name,
   description: personaSchema.shape.description.default(''),
 });
+// Update bodies are built from the stored schema (no `.default()`), so a field the client left out stays out of
+// the parsed body and `updateEntity` keeps the stored value. Defaults belong to the create bodies only.
+const serverOwnedFields = { id: true, avatar: true, createdAt: true, updatedAt: true } as const;
+export const characterUpdateSchema = z.object(characterSchema.omit(serverOwnedFields).shape).partial();
+export const personaUpdateSchema = z.object(personaSchema.omit(serverOwnedFields).shape).partial();
 export const importFailureSchema = z.object({
   filename: z.string(),
   error: z.object({ code: z.string(), message: z.string() }),
@@ -46,7 +51,7 @@ export const entityEndpoints = {
   listCharacters: endpoint(z.array(characterSchema)),
   createCharacter: endpoint(characterSchema, characterFieldsSchema),
   getCharacter: endpoint(characterSchema, undefined, idParamsSchema),
-  updateCharacter: endpoint(characterSchema, characterFieldsSchema.partial(), idParamsSchema),
+  updateCharacter: endpoint(characterSchema, characterUpdateSchema, idParamsSchema),
   deleteCharacter: endpoint(noContentSchema, undefined, idParamsSchema),
   importCharacters: endpoint(characterImportResultSchema, binarySchema),
   getCharacterAvatar: endpoint(binarySchema, undefined, idParamsSchema),
@@ -60,7 +65,7 @@ export const entityEndpoints = {
   listPersonas: endpoint(z.array(personaSchema)),
   createPersona: endpoint(personaSchema, personaFieldsSchema),
   getPersona: endpoint(personaSchema, undefined, idParamsSchema),
-  updatePersona: endpoint(personaSchema, personaFieldsSchema.partial(), idParamsSchema),
+  updatePersona: endpoint(personaSchema, personaUpdateSchema, idParamsSchema),
   deletePersona: endpoint(noContentSchema, undefined, idParamsSchema),
   importPersonas: endpoint(personaImportResultSchema, binarySchema),
   getPersonaAvatar: endpoint(binarySchema, undefined, idParamsSchema),

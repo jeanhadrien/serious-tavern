@@ -8,19 +8,20 @@ import {
   stateDefinitionInUseDetailsSchema,
 } from './index.js';
 
-it('preserves existing entity defaults, including defaults on partial updates', () => {
+it('applies entity defaults on create bodies only; update bodies keep just the sent fields', () => {
   expect(apiContract.createCharacter.body.parse({ name: '  Alice  ' })).toMatchObject({
     name: 'Alice',
     description: '',
     tags: [],
     extensions: {},
   });
-  expect(apiContract.updateCharacter.body.parse({ name: 'Alice' })).toMatchObject({
-    name: 'Alice',
-    description: '',
-    tags: [],
+  expect(apiContract.createPersona.body.parse({ name: 'Bob' })).toEqual({ name: 'Bob', description: '' });
+  expect(apiContract.updateCharacter.body.parse({ name: ' Alice ' })).toEqual({ name: 'Alice' });
+  expect(apiContract.updateCharacter.body.safeParse({ name: '  ' }).success).toBe(false);
+  expect(apiContract.updatePersona.body.parse({})).toEqual({});
+  expect(apiContract.updatePersona.body.parse({ description: 'x', id: 'other', avatar: 'a.png' })).toEqual({
+    description: 'x',
   });
-  expect(apiContract.updatePersona.body.parse({})).toEqual({ description: '' });
 });
 
 it('validates preset writes with the same cross-field rules as complete presets', () => {
