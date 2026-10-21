@@ -1,6 +1,6 @@
 # Prompt messages and threads — agent notes
 
-Prompt messages are the OpenAI Chat Completions message. Plan: `docs/dev/plans/tools/`.
+Prompt messages are the OpenAI Chat Completions message. Reference: `docs/dev/reference/engine.md` ("The LLM node") and `docs/dev/reference/story-state.md` ("Thread keys").
 
 ## The canonical message
 - `promptMessageSchema` is `conversationMessageSchema` (passthrough): `role` `system|user|assistant|tool`, `content`, `name`, `tool_calls` (assistant only), `tool_call_id` (required on `tool`), plus the app-only `reasoning`, `provider_data` and `provenance { providerId, model, nodeId }`, which the adapter never sends as is.
@@ -12,7 +12,6 @@ Prompt messages are the OpenAI Chat Completions message. Plan: `docs/dev/plans/t
 - `messagesToText` (`transcript.ts`) writes calls as `assistant -> name(arguments)` and results as `tool <name>: <content>`; the flattening reuses its lines.
 
 ## Weaving a thread into the chat
-Plan: `docs/dev/plans/tools/06-thread-node.md`.
 - The rules live only in `weaveThread` (and `threadAlone` for a thread without history). Callers order and slice the items, then call them; they never place an exchange themselves.
 - **Placement is structural**, never by message positions, parsed ids or text comparison:
   - a chat message's `executionId` is an item's `turnId`;

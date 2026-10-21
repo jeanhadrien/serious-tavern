@@ -9,7 +9,8 @@ Docs for people and agents working on the code. User guides live one level up, i
 - [`TOOLING.md`](TOOLING.md): commands, Biome, knip, live checks.
 - `design/`: agreed design references for the web app. `FRONTEND-LAYOUT.md` covers where things are, and
   `FRONTEND-UX.md` covers how they behave: keyboard, Escape, unsaved work, confirmations, drag and drop, resizing.
-- `plans/`: specs and step-by-step implementation plans, one folder per feature.
+- `plans/`: specs and step-by-step plans for work not built yet, one folder per feature. Once a plan is built, what
+  it decided moves to `reference/` and the `AGENTS.md` files, and the plan is deleted.
 - `explorations/`: research notes and design proposals. Later ones may amend or replace earlier ones.
 
 Rules for working on the code are in the `AGENTS.md` files: the one at the repo root, and one in each area. The

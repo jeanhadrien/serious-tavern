@@ -10,7 +10,7 @@ This file holds what applies to every task. Each area of the code has its own `A
   - `packages/node-ui/`
   - `apps/server/`, with `src/services/` (turns, runs, story state, alternatives, fork)
   - `apps/web/`, with `src/pages/chat/`, `src/pages/chat/story/`, `src/pages/workflows/`, `src/pages/stateDefinitions/`
-- Docs: `docs/*.md` are **user guides**; keep them in sync when user-visible behaviour changes. `docs/dev/` is **technical**: `ARCHITECTURE.md` (the overview), `reference/` (how each area works; update it with the code), `TOOLING.md`, `design/` (the agreed web layout and UX references, `FRONTEND-LAYOUT.md` and `FRONTEND-UX.md`), `plans/` (feature plans) and `explorations/` (research and design proposals).
+- Docs: `docs/*.md` are **user guides**; keep them in sync when user-visible behaviour changes. `docs/dev/` is **technical**: `ARCHITECTURE.md` (the overview), `reference/` (how each area works; update it with the code), `TOOLING.md`, `design/` (the agreed web layout and UX references, `FRONTEND-LAYOUT.md` and `FRONTEND-UX.md`), `plans/` (plans for work not built yet: once built, move what they decided into `reference/` and the `AGENTS.md` files, then delete them) and `explorations/` (research and design proposals).
 
 ## What this is
 A chatbot web app. Each chat reply comes from a user-built workflow of nodes, edited visually in an n8n-style editor. The frontend is a **thin client**: all storage, secrets and workflow execution live in the backend.

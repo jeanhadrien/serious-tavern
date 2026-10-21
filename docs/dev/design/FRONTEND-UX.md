@@ -2,7 +2,7 @@
 
 Design reference for how the web app behaves under the user's hands: keyboard, Escape, drag and drop, resizing, confirmations, unsaved work. `FRONTEND-LAYOUT.md` says **where** things are; this file says **how they behave**.
 
-Status: agreed and built (October 2026). Plans and decisions per step are in `docs/dev/plans/frontend-ux/`; open items are under Follow-ups.
+Status: agreed and built (October 2026); open items are under Follow-ups.
 
 Functionality comes before style. Nothing here asks for visual polish.
 
@@ -168,7 +168,7 @@ One commit (or a few) per step; each passes `npm run check`.
 4. **Shared draft hook and editor header**, one editor at a time. Done.
 5. **`SortableList`** (dnd-kit) across the reorderable lists: four on dnd-kit, the node-ui picker with buttons and `Alt+↑/↓`. Done.
 6. **Splitter** inside editors. Done.
-7. **Features**: composer draft and copy message (7a), the canvas (drag to empty space, undo/redo, copy/paste), and regenerate and swipes (spec and plan in `docs/dev/plans/frontend-ux/07e-swipes.md`). Done.
+7. **Features**: composer draft and copy message (7a), the canvas (drag to empty space, undo/redo, copy/paste), and regenerate and swipes. Done.
 
 ## Follow-ups
 
@@ -176,7 +176,7 @@ Not scheduled; found while building:
 
 - `pages/chat/useChat.ts` is about 310 lines (the shared send/regenerate stream stays inside the hook for its refs). Split it by concern.
 - Provider overrides are YAML text, so they are not a reorderable list; only the reasoning fields are.
-- Later, as decided: collapsing a side column by dragging, Escape stopping workflows running after the reply, swiping older turns, deleting one alternative, a help list built from `SHORTCUTS`.
+- Later, as decided: collapsing a side column by dragging, Escape stopping workflows running after the reply, swiping older turns, swiping with ←/→, deleting one alternative, a help list built from `SHORTCUTS`.
 - `apps/server/src/storage/directory-watcher.test.ts` ("reports a burst of writes once") failed once under load during this work and passed on reruns; it predates it.
 
 ## Testing

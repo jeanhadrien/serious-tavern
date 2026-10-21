@@ -1,6 +1,6 @@
 # Tools and the tool loop — agent notes
 
-The LLM node that runs the loop has its own notes in `../nodes/llm/AGENTS.md`. Plan: `docs/dev/plans/tools/03-tool-loop.md`; reference: `docs/dev/reference/engine.md` ("The LLM node").
+The LLM node that runs the loop has its own notes in `../nodes/llm/AGENTS.md`. Reference: `docs/dev/reference/engine.md` ("The LLM node").
 
 ## Tools
 - Tools are engine code generated from the node's settings (`tools.read`/`tools.write` state targets), never user-written. A tool is `EngineTool { definition, run(args, ctx) }`; `run` checks its own arguments and throws plain messages.

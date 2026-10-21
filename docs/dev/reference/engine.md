@@ -194,6 +194,12 @@ after a write in the same loop sees it, through `ctx.pendingState()`; without `f
 the turn-start snapshot. Known difference: if another node of the same run writes the same key, the stored value may
 differ from what this node read, because the final resolve orders every node.
 
+**Open questions.**
+- *Models without tool support:* the backend's error surfaces as a node error. A per-model `tools: false` override
+  on the provider record (so the node refuses before calling) only if users hit it; no text-protocol fallback.
+- *Reasoning on chat replies:* replies keep `reasoning` but carry no provenance, so the replay policy never replays
+  it. Recording the provider and model next to `sourceNodeId` would make it replayable; not needed so far.
+
 **Reasoning in the chat.** Streamed reasoning arrives per chunk; a non-stream call emits the whole trace as one
 `reasoningDelta` afterwards. It reaches the chat only through the streaming endpoint and only for passthrough Chat
 Outputs (LLM `text` straight into `value`).

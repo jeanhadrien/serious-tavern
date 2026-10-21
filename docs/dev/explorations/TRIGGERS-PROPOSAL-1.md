@@ -222,9 +222,8 @@ LLM-raised custom events are not planned: they are state plus a Condition (see "
    pack becomes two workflows.
 4. Later triggers, in the order above.
 
-The implementation does phase 3 before phase 2 (plans in `docs/dev/plans/triggers/`), so the scheduler only has
-one kind of run. Phase 1 alone delivers the feature with correct results; phase 2 only makes it faster, so it can be
-measured before it is built.
+The implementation did phase 3 before phase 2, so the scheduler only has one kind of run. Phase 1 alone delivers the
+feature with correct results; phase 2 only makes it faster and is not built.
 
 ## Open questions
 

@@ -125,11 +125,12 @@ an alternative not shown carry `inactive: true` (absent = active). The pure rule
   presence. Every run of the turn flips together, since they share `executionId`.
 - Everything that means "the chat" reads `activeMessages`: run histories, links, the state view, the preset preview,
   message counts, edit and delete.
+- **Later ideas:** swiping older turns, regenerating with a different workflow, deleting one alternative, pruning
+  inactive replies.
 
 ## Fork
 
-`POST .../fork { messageId }` creates a chat that copies the source up to the end of a turn (plan:
-`docs/dev/plans/fork/01-fork.md`).
+`POST .../fork { messageId }` creates a chat that copies the source up to the end of a turn.
 
 - **Fork points** (`forkPoints` in `packages/shared/src/fork.ts`) are the last shown, settled reply of each turn. A
   user message is not one, and neither is a reply followed by another reply of the same turn: story state is per turn,
@@ -144,6 +145,8 @@ an alternative not shown carry `inactive: true` (absent = active). The pure rule
 - The app setting `forkKeepsAlternatives` (default on) decides whether the fork keeps the forked turn's inactive
   alternatives.
 - The source is read under its lock and never modified.
+- **Later ideas:** forking from a user message, a "Forked from …" link (`forkedFrom` is stored for it), forking a
+  running chat, copying the composer draft.
 
 ## Chat settings
 

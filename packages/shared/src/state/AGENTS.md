@@ -30,7 +30,7 @@ Per-chat state that workflow turns write. It lives exactly as long as the replie
 `node-values.ts` holds the rules the engine and the panels both check, never copied: which operations a key allows (`stateOpsFor`), read modes (`stateReads`), an item's fit (`collectionItem`/`itemFieldNeeds`), what a thread item is (`threadItem`). `parseDecimal` is the UI-side rule for typed number boxes; the engine never parses text into numbers.
 
 ## Thread keys
-Key type `thread` (`{ cap?, description? }`; plan `docs/dev/plans/tools/04-thread-keys.md`): a list key whose items are LLM exchanges, `{ id, text, exchange: ConversationMessage[], input?, turnId, runId }`.
+Key type `thread` (`{ cap?, description? }`): a list key whose items are LLM exchanges, `{ id, text, exchange: ConversationMessage[], input?, turnId, runId }`.
 - The fold treats it as a collection (`isListKeyType`, `cap` included; items unchecked, no link check, ops add/remove/delete). Every new switch on the key type gets a `thread` case, and code that means "a list key" uses `isListKeyType`.
 - **The field is `exchange`, never `messages`:** `messages` is the built-in link to chat messages on collection items.
 - `threadItem(value, input?, { keepReasoning })` is the one rule for what is stored: a non-empty list of canonical messages that parses, `reasoning` and `provider_data` stripped unless `keepReasoning` (`provenance` always stays); `input` text becomes a user message, or one message (only role, content and name kept; blank text is none).
