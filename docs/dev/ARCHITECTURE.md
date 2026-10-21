@@ -164,7 +164,7 @@ Details: [reference/web.md](reference/web.md).
 | [reference/api.md](reference/api.md) | Every endpoint, with its status codes |
 | [reference/engine.md](reference/engine.md) | Preparation, execution semantics, templates, presets rendering, the LLM node and tools, node internals, logs |
 | [reference/providers.md](reference/providers.md) | Provider records, the OpenAI-compatible adapter, the wire log, model lists |
-| [reference/turns.md](reference/turns.md) | The chat queue, streaming, the reply list, the after section, failures, regenerate, swipes, fork |
+| [reference/turns.md](reference/turns.md) | The chat queue, streaming, the reply list, the after section, failures, regenerate, swipes, fork, chat settings |
 | [reference/story-state.md](reference/story-state.md) | Definitions, turn entries, the fold, State nodes, message links, threads, the state view |
 | [reference/storage.md](reference/storage.md) | Files, YAML repositories, change events, locks, secrets, app settings, seeds, imports |
 | [reference/web.md](reference/web.md) | The shell and URL, stores and editors, the workflow editor, the chat, story state in the chat |

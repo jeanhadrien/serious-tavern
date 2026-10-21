@@ -37,7 +37,7 @@ the slot's length lands at its start. With history `[user: Hello, assistant: Hi]
 lands between them.
 
 **Checks.** Problems show in the editor as you type. Referring to an input the preset doesn't declare
-(`{{input.x}}`) is an error. An unknown variable, a template that doesn't parse, or an input that nothing uses is a
+(`{{input.x}}`) is an error, and so are two input keys that differ only in case (`mood` and `Mood`). An unknown variable, a template that doesn't parse, or an input that nothing uses is a
 warning: the prompt still works (an unknown variable renders empty, a broken template is sent as written).
 
 **Preview** renders the prompt as a model would get it, from a chat's history or a sample conversation, including

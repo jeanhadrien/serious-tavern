@@ -97,8 +97,11 @@ control per setting: a slider plus a number box, a checkbox, a dropdown, or a te
 at once, typed values after a short pause. The reset arrow (only shown when you stored a value) goes back to the
 default.
 
-If a stored value stops fitting (you lowered the workflow's max below it), the chat uses the default and the panel
-says why ("Stored value 0.8 is above max 0.5; using default 0.3"). The stored value is kept, never rewritten.
+A setting you never changed follows the workflow's default, so changing the default in the workflow reaches every chat
+that hasn't set its own value. If a stored value stops fitting (you lowered the workflow's max below it), the chat uses
+the default and the panel says why ("Stored value 0.8 is above max 0.5; using default 0.3"). The stored value is
+kept, never rewritten, and so are the values of settings a workflow no longer declares: switch the chat back to it and
+they return.
 
 ## Collections: Recall and Draw
 

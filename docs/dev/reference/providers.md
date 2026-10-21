@@ -82,7 +82,9 @@ each report replacing the last, so a failed or timed-out call still shows what w
 - `normalizeModels` (shared) reads every backend the same way: `id`, `name`, `description`, `contextLength`,
   `maxOutputTokens`, input and output modalities, `supportedParameters`, and `pricing` in USD per token (zero kept;
   missing, blank, non-numeric and negative values such as OpenRouter's `-1` dropped). Entries without a string id and
-  repeated ids are skipped; a payload without a `data` array is an error.
+  repeated ids are skipped; a payload without a `data` array is an error (an empty array is a valid, empty list).
+  Errors name the provider (`<name> 401: ...`, `<name> could not be reached: ...`) and never contain the key
+  (`withoutSecret`). The missing-secret text is shared with the LLM node (`missingSecretMessage`).
 - **The catalog** (`ModelCatalog`, server) keeps lists in memory per provider for an hour, so the key never reaches the
   browser. An entry goes stale when the record changes (compared as a fingerprint of the whole record, since a file
   edited on disk keeps its timestamp) or any secret is written or deleted (`SecretStore.revision`). Concurrent requests

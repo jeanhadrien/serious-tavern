@@ -178,9 +178,17 @@ is within 96 px of it and observes content resizing.
   `forkPoints(activeMessages(...))`, computed in `Chat.tsx` once per change of the messages.
 - **The chat panel** (`ChatPanel`, local state of the chat view, not a layout view): **On reply**
   (`pages/chat/panel/ReplySection.tsx`, `replyList.ts`, saved through `createReplySaver`, which keeps one PATCH in
-  flight and sends the newest whole list), **Settings** (one control per declared setting from `listedSettings`;
-  checkboxes and dropdowns save at once, typed values after 500 ms, on blur or on close, through `createSettingSaver`,
-  with a `keepalive` send on `pagehide`) and **Story state**. Below 760 px of chat width it covers the messages.
+  flight and sends the newest whole list), **Settings** and **Story state**. Below 760 px of chat width it covers the
+  messages.
+- **The Settings section** shows one control per setting from `listedSettings` (the rule the server checks values
+  against; it follows the saved list, never a change still being saved): a slider plus a number field for a number
+  with both `min` and `max`, a number field otherwise (partial input such as `-` stays editable; an invalid number
+  shows why, isn't saved, and cancels the pending save of an earlier valid prefix), a checkbox, a dropdown, a text
+  field or a textarea for `multiline` text, with the description, the resolver's issue, and a reset button when a
+  value is stored. Checkboxes and dropdowns save at once; typed values and slider moves after a 500 ms pause, on blur
+  or when the panel closes (`saveMode`, `createSettingSaver`, one request in flight, values that came due meanwhile
+  sent together, a `keepalive` send on `pagehide`). `useChat.updateSettings` takes only `settings` from each answer,
+  so a change made while a turn streams never disturbs it. With no declaration, the section links to the workflow.
 
 ## Story state in the chat
 

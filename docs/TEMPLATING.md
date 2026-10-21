@@ -31,7 +31,8 @@ The editor lists what is available under **Variables (click to insert)**.
 
 - In presets, `{{history}}` and a messages input render as a `role: content` transcript, and an object as indented
   JSON. In node fields they render as compact JSON. `{{#each history}}` walks the messages themselves (`this.role`,
-  `this.content`, `this.name`).
+  `this.content`, `this.name`). `{{input}}` alone renders every input (indented JSON in presets, compact in nodes),
+  and `{{trigger}}` renders as compact JSON.
 - Character and persona fields may contain variables themselves; they are filled in when used (a field that ends up
   referring to itself renders empty).
 - A known variable without a value renders empty; only `{{user}}` has a fallback.

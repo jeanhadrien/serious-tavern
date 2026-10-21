@@ -48,7 +48,9 @@ files while the server runs, so:
   CR characters) is double-quoted. Unknown fields survive at every level.
 - **Presets.** UUID entry and input ids are not written: they are derived from positions (`entry-<n>`, `input-<n>`) on
   read, and a slot targeted by a depth placement gets a readable id from its label. Entry keys are written as `id,
-  displayName, name, kind, …`. Legacy entries (`name` without `displayName`) are upgraded in memory on read
+  displayName, name, kind, …`. Deleting a preset an LLM node uses is refused (`PRESET_IN_USE`), but a file removed
+  or broken on disk can't be: the workflow then fails with `WORKFLOW_INVALID`, the issue naming the node and the
+  missing preset id. Legacy entries (`name` without `displayName`) are upgraded in memory on read
   (`upgradeLegacyPreset`) and get the new shape on their next save. Format details: `preset-yaml.ts`.
 - **Preset migration.** At startup, before seeding, each `data/presets/<id>.json` that parses is written as YAML, read
   back and compared (only machine ids may differ), then renamed to `<id>.json.migrated`. A failed check removes the

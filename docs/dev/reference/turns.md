@@ -145,9 +145,45 @@ an alternative not shown carry `inactive: true` (absent = active). The pure rule
   alternatives.
 - The source is read under its lock and never modified.
 
-## Chat settings in a turn
+## Chat settings
 
-`startTurn` resolves the session's values per enabled workflow (`resolveChatSettings`: a stored value that fits, else
-the default with an issue), records them in `execution.settings` and the issues in `execution.warnings`. A change made
-while a turn streams applies from the next turn. `PATCH` checks values against the union of every listed workflow's
-declarations (`listedSettings`, enabled or not, first declaration of a key wins), as the list will be after the patch.
+Knobs a workflow declares and each chat sets. Turns only read them; edits, deletes and regenerates never change them.
+
+**Declarations** live in the workflow record (`settings`, absent in older files; read through `workflowSettings()`):
+
+```yaml
+settings:
+  - key: volatility        # letters, digits and _, not starting with a digit; unique
+    label: Volatility      # optional; the UI falls back to the key
+    type: number           # number | boolean | enum | text
+    default: 0.3           # number 0, boolean false, text '', enum: the first option
+    min: 0                 # number only, optional
+    max: 1
+    step: 0.05             # UI granularity only, never enforced on stored values
+    description: How often fresh material is injected
+  - key: maxLevel
+    type: enum
+    options: ['1', '2', '3']   # text; compare with (eq settings.maxLevel "2")
+    default: '2'
+  - key: authorsNote
+    type: text
+    multiline: true
+```
+
+- **Validation** (`workflowSettingIssues`, reported by `prepareWorkflow`, so a turn fails with `WORKFLOW_INVALID`):
+  `settings` not a list; a missing, unusable or reserved key (`this`, `true`, `false`, `null`, `undefined`,
+  `toString`, `constructor`, `prototype`, `__proto__`); a duplicate key; `min` above `max`; a number default outside
+  the bounds; a non-positive `step`; an enum without options or whose default isn't one. A declaration of an unknown
+  `type`, or with a field of the wrong type, is refused when the workflow is saved (`400`).
+- **Values** live on the session (`settings: { [key]: value }`). A key the user never set isn't stored, so the
+  declared default applies, and a changed default reaches every chat that hasn't overridden it. Keys no workflow
+  declares are kept but unused, so switching workflows and back keeps their values.
+- **Resolving** (`resolveChatSettings`, the only place that decides): a stored value is used when it fits (right type,
+  a finite number within the bounds, one of the options); otherwise the default, with an issue such as
+  `Stored value 12 is above max 10; using default 3`, shown in the chat panel and added to the run's warnings.
+- **In a turn:** `startTurn` resolves the values per enabled workflow against its own declarations and records them in
+  `execution.settings`. A change made while a turn streams applies from the next turn.
+- **Patching:** `PATCH /api/sessions/:id` checks values against the union of every listed workflow's declarations
+  (`listedSettings`, enabled or not, first declaration of a key wins), as the list will be after the patch.
+- **Preset preview** with a session renders that chat's resolved values over the same union; without one, each key
+  renders the default of the first workflow declaring it (the catalog the preset editor hints).
