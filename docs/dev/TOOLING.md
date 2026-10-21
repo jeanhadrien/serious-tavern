@@ -4,7 +4,7 @@ Commands for working on the code. Run them from the repository root; they cover 
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Server (port 3001, `tsx`) and web (Vite, port 5173) together. |
+| `npm run dev` | Server (`tsx`) and web (Vite) together, on the first free ports from 3001 and 5173 (printed at start), so every checkout and worktree can run its own. `DATA_DIR` sets the data folder; a worktree defaults to the main checkout's `apps/server/data`. |
 | `npm run check` | The one pre-commit command: Biome format and lint checks (no writes), TypeScript, every Vitest test, then knip. Stops at the first failing step; takes about 7 seconds. |
 | `npm run typecheck` | TypeScript for every package. |
 | `npm test` | Vitest, all packages. |

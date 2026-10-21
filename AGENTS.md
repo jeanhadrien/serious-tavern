@@ -40,7 +40,7 @@ npm workspaces, TypeScript strict, ESM, packages consumed as TS source.
 - `apps/web`: React 19 + Vite on port 5173, proxying `/api` to the server.
 
 ## Commands
-- `npm run dev`: server and web together.
+- `npm run dev`: server and web together (`scripts/dev.mjs`). It takes the first free ports from 3001 and 5173, so several checkouts run side by side, and prints the URL. `DATA_DIR` picks the data folder; a **git worktree** defaults to the **main checkout's** `apps/server/data`.
 - `npm run typecheck`, `npm test` (vitest, all packages), `npm run build` (typecheck and web build).
 - **`npm run check`** runs Biome (format and lint, without writing), typecheck, tests and knip in about 7 seconds.
   - `npm run fix` applies Biome formatting and safe lint fixes.
@@ -69,8 +69,8 @@ Note: run tests sparringly as they are slow and long.
   - Corrupt files are never deleted automatically.
 
 ## Gotchas
-- **Never reset or delete `data/`**, and never run tests or scripts against `apps/server/data`. Tests use temp dirs. For live checks, run the server against a copy of the data:
-  - Run `node <repo>/node_modules/tsx/dist/cli.mjs <repo>/apps/server/src/main.ts` with the copy's parent as cwd (the server uses `./data`) and `PORT` set (the startup log always says 3001). `node --import tsx` fails from a temp cwd because tsx doesn't resolve there.
+- **Never reset or delete `data/`**, and never run tests or scripts against `apps/server/data`. Tests use temp dirs. For live checks, run the server against a copy of the data. **`npm run dev` in a worktree uses the real data unless `DATA_DIR` is set**, so an agent always sets it to a copy (or an empty temp dir). The manual way:
+  - Run `node <repo>/node_modules/tsx/dist/cli.mjs <repo>/apps/server/src/main.ts` with `DATA_DIR` set to the copy and `PORT` set to a free port. `node --import tsx` fails from a temp cwd because tsx doesn't resolve there.
   - Delete the copy afterwards: it holds the encrypted secrets and the master key.
 - **Environment:** Windows/PowerShell.
   - Stop processes only by PID. Find them with `Get-NetTCPConnection -LocalPort 3001,5173 -State Listen`. Killing the npm/npx parent leaves node child processes running.

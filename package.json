@@ -7,7 +7,7 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev -w @st/server\" \"npm run dev -w @st/web\"",
+    "dev": "node scripts/dev.mjs",
     "build": "npm run typecheck && npm run build -w @st/web",
     "typecheck": "tsc --noEmit -p packages/shared && tsc --noEmit -p packages/engine && tsc --noEmit -p packages/node-ui && tsc --noEmit -p apps/server && tsc --noEmit -p apps/web",
     "test": "vitest run",

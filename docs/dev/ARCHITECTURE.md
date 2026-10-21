@@ -16,7 +16,7 @@ flowchart LR
     nodeui["packages/node-ui<br/>node config panels"]
   end
   subgraph server[Node.js]
-    srv["apps/server<br/>Fastify 5, port 3001"]
+    srv["apps/server<br/>Fastify 5, port 3001 by default"]
     engine["packages/engine<br/>executor, nodes, templates, LLM adapters"]
   end
   shared["packages/shared<br/>schemas, API contract, shared rules"]

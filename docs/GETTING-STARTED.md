@@ -25,7 +25,7 @@ You need **Node.js 24** and npm.
 
 1. In the project folder, run `npm install` once.
 2. Run `npm run dev`. It starts the server and the web app together.
-3. Open the address shown in the terminal, normally http://127.0.0.1:5173.
+3. Open the address shown in the terminal, normally http://127.0.0.1:5173 (the next free port if another copy of the app is already running).
 
 The app has no accounts: it is meant to run on your own machine. If you ever put it on a network, see
 [Your data, backups and secrets](#your-data-backups-and-secrets).

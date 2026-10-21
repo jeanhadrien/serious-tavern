@@ -1,6 +1,6 @@
 # apps/server — agent notes
 
-Fastify 5 on port 3001. Turns, runs, story state, alternatives and fork are in `src/services/AGENTS.md`, and so are the rules of the message routes (streaming, stop, client lifetime): read it before touching `routes/messages.ts`.
+Fastify 5 on `PORT` (default 3001; `npm run dev` picks a free one). Data lives in `DATA_DIR`, default `./data` of the working directory. Turns, runs, story state, alternatives and fork are in `src/services/AGENTS.md`, and so are the rules of the message routes (streaming, stop, client lifetime): read it before touching `routes/messages.ts`.
 
 ## Structure
 - `app.ts` only wires things together. `context.ts` sets up the repositories and secrets; `errors.ts` has `HttpError` and the error handler.
