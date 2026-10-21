@@ -106,20 +106,26 @@ const describeItem = ({ text, linked, exchange }: Item) =>
       ? `${quote(text, ITEM_MAX)} (exchange: ${exchange})`
       : quote(text, ITEM_MAX);
 
-/** What an item list change reads as: the items it forgets and the ones it brings back, at most three in all. */
+/**
+ * What an item list change reads as: the items it forgets, the ones it brings back and the ones whose earlier text it
+ * puts back (an item update undone), at most three in all.
+ */
 function itemChange(before: unknown, after: unknown): string {
   const ids = (items: Item[]) => new Set(items.map((item) => item.id));
   const was = itemsOf(before);
   const now = itemsOf(after);
   const gone = was.filter((item) => !ids(now).has(item.id));
   const back = now.filter((item) => !ids(was).has(item.id));
+  const rewritten = now.filter((item) => was.some((old) => old.id === item.id && old.text !== item.text));
   const forgotten = gone.slice(0, ITEMS_LISTED);
   const restored = back.slice(0, ITEMS_LISTED - forgotten.length);
-  const more = gone.length - forgotten.length + (back.length - restored.length);
+  const reverted = rewritten.slice(0, ITEMS_LISTED - forgotten.length - restored.length);
+  const more = gone.length - forgotten.length + (back.length - restored.length) + (rewritten.length - reverted.length);
   const list = (items: Item[]) => items.map(describeItem).join(', ');
   return [
     forgotten.length && `forgets ${list(forgotten)}`,
     restored.length && `brings back ${list(restored)}`,
+    reverted.length && `puts back the earlier text ${list(reverted)}`,
     more && `and ${more} more`,
   ]
     .filter(Boolean)

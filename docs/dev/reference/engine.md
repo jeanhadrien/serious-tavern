@@ -199,7 +199,8 @@ line. Every step streams, but only the last step's text is the answer (each late
 delta that resets the rows the LLM feeds); reasoning accumulates across steps. **Reading your own writes:** a read
 after a write in the same loop sees it, through `ctx.pendingState()`; without `foldWith` (tests, the preview) reads see
 the turn-start snapshot. Known difference: if another node of the same run writes the same key, the stored value may
-differ from what this node read, because the final resolve orders every node.
+differ from what this node read, because the final resolve orders every node. A `replace` or `append` is stored as
+the whole new text, so it can also overwrite another node's write to that key in the same run.
 
 **Open questions.**
 - *Models without tool support:* the backend's error surfaces as a node error. A per-model `tools: false` override

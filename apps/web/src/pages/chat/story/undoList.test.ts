@@ -165,6 +165,23 @@ describe('collections', () => {
     expect(undo('m-e2')).toEqual(["scene.injected (brings back 'first')"]);
   });
 
+  it('puts back the earlier text of an item the reply rewrote, linked or not', () => {
+    const messages = { ids: ['m1'], fingerprint: 'f' };
+    const rewrite = (itemId: string, text: string): StateWrite => ({
+      ...removeWrite('injected', itemId),
+      op: 'update',
+      itemId,
+      text,
+    });
+    const { undo } = chat([
+      [addWrite('injected', 'i1', 'a bell'), addWrite('injected', 'i2', 'They talked', { messages })],
+      [rewrite('i1', 'a gong'), rewrite('i2', 'They argued'), rewrite('gone', 'never')],
+    ]);
+    expect(undo('m-e2')).toEqual([
+      "scene.injected (puts back the earlier text 'They talked' (linked to 1 message), 'a bell')",
+    ]);
+  });
+
   it('reveals the item the cap had cut off', () => {
     const capped = { ...scene, keys: { ...scene.keys, injected: { type: 'collection' as const, cap: 2 } } };
     const { undo } = chat(
