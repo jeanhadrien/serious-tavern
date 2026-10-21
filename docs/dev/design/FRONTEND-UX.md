@@ -138,6 +138,7 @@ Rules:
 - **Copy a message.** A button in the message actions copies its text (raw Markdown). A clipboard failure is a toast.
 - **Workflow canvas:**
   - **Drag to empty space.** Dropping a connection on empty canvas opens a node picker at that point, listing only node types with a port that accepts the connection (through `canConnect`). Picking one creates the node there and connects it.
+  - **Touch.** On a coarse pointer the handles get an invisible hit area (the drawn handle keeps its size; it stays within the port's row so it doesn't steal taps meant for selecting the node) and a dropped connection snaps to a handle within 40px instead of React Flow's 20. Checked by hand with DevTools touch emulation, not in tests.
   - **Undo/redo.** The editor keeps a history of canvas snapshots (nodes, edges, configs). A drag counts once (recorded on drag stop) and typing in a config field is grouped. The history resets when another workflow opens; saving doesn't clear it.
   - **Copy/paste nodes.** Copies the selected nodes and the edges between them; paste gives them new ids and offsets them. It works across tabs (the system clipboard carries JSON). A second Chat Input is not pasted (a toast says why).
 - **Chat panel: On reply.** The chat's workflows live in the chat panel's first section, not in the header. A row is the workflow's name (a link that opens it in the editor), an on/off checkbox, move up, move down and remove (never on the only row); the rows reorder by drag, buttons or `Alt+↑/↓`, and an Add workflow dropdown lists the workflows not listed yet.

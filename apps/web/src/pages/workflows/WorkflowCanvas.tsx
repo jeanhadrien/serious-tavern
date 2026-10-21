@@ -3,11 +3,15 @@ import { ReactFlow, Background, Controls, Panel, useNodesInitialized, useReactFl
 import { Redo2, Trash2, Undo2 } from 'lucide-react';
 import { IconButton } from '../../components/IconButton.js';
 import { checkConnection } from '../../connection.js';
+import { useMediaQuery } from '../../useMediaQuery.js';
 import { ConnectPicker } from './ConnectPicker.js';
 import { WorkflowNode } from './WorkflowNode.js';
 import type { useWorkflowCanvas } from './useWorkflowCanvas.js';
 
 const nodeTypes = { workflow: WorkflowNode };
+
+// How near a handle a dropped connection still snaps to it: a finger is less exact than a mouse (React Flow's own is 20).
+const TOUCH_CONNECTION_RADIUS = 40;
 
 // React Flow's `fitView` prop can run before the nodes are measured and then zooms right in on nothing.
 // This fits once they are, once per mounted canvas (it remounts for each loaded workflow): nodes added later
@@ -25,6 +29,7 @@ function FitWhenMeasured() {
 }
 
 export function WorkflowCanvas({ canvas }: { canvas: ReturnType<typeof useWorkflowCanvas> }) {
+  const touch = useMediaQuery('(pointer: coarse)');
   return (
     <div
       className="canvas"
@@ -54,6 +59,7 @@ export function WorkflowCanvas({ canvas }: { canvas: ReturnType<typeof useWorkfl
         onPaneClick={() => canvas.setSelected(undefined)}
         deleteKeyCode={['Backspace', 'Delete']}
         minZoom={0.2}
+        connectionRadius={touch ? TOUCH_CONNECTION_RADIUS : undefined}
       >
         <FitWhenMeasured />
         <Background color="#414652" gap={20} />
