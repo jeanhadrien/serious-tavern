@@ -25,6 +25,9 @@ export const sessionsApi = {
   /** The chat's computed story state (read-only; the fold the next turn starts from). */
   state: (id: string, options?: RequestOptions) =>
     api<ApiResponse<'getSessionState'>>(`/sessions/${id}/state`, options),
+  /** Text statistics of the chat's assistant replies (`enabled` is false when the app setting is off). */
+  stats: (id: string, options?: RequestOptions) =>
+    api<ApiResponse<'getSessionStats'>>(`/sessions/${id}/stats`, options),
   stopTurn: (id: string, options?: RequestOptions) =>
     api<ApiResponse<'stopTurn'>>(`/sessions/${id}/stop`, { ...json('POST'), ...options }),
 };

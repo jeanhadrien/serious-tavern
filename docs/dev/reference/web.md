@@ -171,6 +171,12 @@ is within 96 px of it and observes content resizing.
   rejected; soft line breaks kept with `white-space: pre-line`; links open in a new tab. Every message element carries
   `data-message-id` (and `data-execution-id`), which scrolling and markers rely on. Copy, edit and delete appear on
   hover or focus (always on touch screens). A row still streaming has no log yet.
+- **Text statistics:** `useMessageStats` always calls `GET /api/sessions/:id/stats` (the web never reads the
+  `showMessageStats` setting; `enabled: false` means no map, so nothing shows). It loads through the same
+  `startSessionLoader` as the story state: once per chat, again 100 ms after this chat's `sessions.changed` or an
+  `appSettings.changed`, and when the chat goes idle. `Chat.tsx` hands the map to `MessageList`, which gives each
+  `ChatMessageView` its own entry; `MessageStats` (numbers from `statItems`) shows on non-streaming assistant replies
+  only: icon plus raw number, `—` for a `null`, the explanation in the `title`.
 - **Alternatives and fork:** `AlternativeControls` sits on the last reply of the last turn
   (`alternativesOfLastTurn(...).lastReplyId`, only while nothing runs). Regenerate streams through
   `streamRegenerate`; the current replies stay until the server starts the run, are hidden locally while new rows
@@ -196,7 +202,7 @@ is within 96 px of it and observes content resizing.
 `foldStoryState`.
 
 - **Loading.** `useStoryState` makes one fetch of the state view per open chat and shares it with the panel, the chips
-  and the delete check. `startStoryLoader` reloads, debounced (100 ms), after this chat's `sessions.changed` and after
+  and the delete check. `startStoryLoader` (over the generic `startSessionLoader`) reloads, debounced (100 ms), after this chat's `sessions.changed` and after
   `stateDefinitions.changed` (300 ms, since a saved definition is announced twice); a change during a fetch causes one
   more fetch and drops the older answer. Streamed tokens cause nothing.
 - **The panel section:** per definition a present turn wrote, each key's value, a sparkline for numbers written in at

@@ -65,6 +65,13 @@ To try the app without any key, make a workflow with just **Chat Input** `messag
 - Editing or deleting a message changes the chat's history for the next turns. It never re-runs a workflow, and it
   doesn't change the logs of past runs. Deleting the last reply of a turn that stored story state can undo what it
   stored: the app lists what would change and asks first (see [the rewind rule](STATE-AND-LORE.md#the-rewind-rule)).
+- **Text statistics** (off by default; turn on **Show text statistics under assistant replies** in Settings) put a
+  quiet row of raw numbers under each reply, with no verdict. Hover a number for its meaning: **words** in the reply;
+  **MTLD**, the vocabulary diversity (higher means more varied; not shown for short replies); **overused words**, a
+  count of words language models tend to overuse; **repeated phrasing**, the share of the reply's four-word sequences
+  that already appeared in the last five replies; **recycled sentences**, sentences repeated word for word from those
+  replies. A `—` means the number can't be computed for that reply (for example no earlier reply to compare with).
+  English only.
 - **Execution details** under a message show the run that wrote it: every node with its status, timing, outputs and
   errors, the chat settings and the random seed it used, and for an LLM node the exact request sent to the provider.
 - If a turn fails, the replies already written are kept and the error is shown. Sending again starts a new turn.

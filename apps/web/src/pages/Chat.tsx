@@ -12,6 +12,7 @@ import { runningPostRun } from './chat/story/postRuns.js';
 import { undoneByDelete } from './chat/story/undoList.js';
 import { usePostRunAlerts } from './chat/story/usePostRunAlerts.js';
 import { useStoryState } from './chat/story/useStoryState.js';
+import { useMessageStats } from './chat/useMessageStats.js';
 import { stateDefinitionsStore, useList } from '../stores/index.js';
 import './chat/chat.css';
 
@@ -39,6 +40,8 @@ export function Chat({ chat }: { chat: ChatState }) {
   const revealed = useCallback(() => setReveal(undefined), []);
   // One fetch of the chat's story state; it reloads when a turn or a message change finishes, never per token.
   const story = useStoryState(session?.id, !locked);
+  // One fetch of the replies' text statistics (empty while the app setting is off), refreshed like the story state.
+  const stats = useMessageStats(session?.id, !locked);
   // The workflows running after the latest reply: a quiet status row while one works, one toast if it fails.
   const postRun = useMemo(() => runningPostRun(story.view), [story.view]);
   usePostRunAlerts(session?.id, story.view);
@@ -96,6 +99,7 @@ export function Chat({ chat }: { chat: ChatState }) {
                 persona={chat.personas.find((item) => item.id === session.personaId)}
                 logs={chat.logs}
                 story={story.view}
+                stats={stats}
                 undoOnDelete={undoOnDelete}
                 busy={chat.busy}
                 runningWorkflow={several ? chat.runningWorkflow : undefined}

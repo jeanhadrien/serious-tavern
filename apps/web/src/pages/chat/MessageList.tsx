@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import type { Character, ChatMessage, ExecutionLog, LastTurnAlternatives, Persona, SessionStateView } from '@st/shared';
 import { ChatMessageView } from './ChatMessageView.js';
+import type { MessageStatsMap } from './useMessageStats.js';
 import { messageLinks } from './story/linkMarkers.js';
 import { runningPostRun } from './story/postRuns.js';
 import { POST_WAITING_LABEL } from './story/postRunText.js';
@@ -17,6 +18,8 @@ interface MessageListProps {
   logs: Record<string, ExecutionLog>;
   /** The chat's story state view, for the "What this turn stored" chips. */
   story?: SessionStateView;
+  /** The replies' text statistics by message id; none while the app setting is off. Each message gets its own entry. */
+  stats?: MessageStatsMap;
   /** What deleting a message would undo of the story state; asked lazily, on the delete click. */
   undoOnDelete?: (messageId: string) => readonly string[] | undefined;
   busy: boolean;
@@ -49,6 +52,7 @@ export function MessageList({
   persona,
   logs,
   story,
+  stats,
   undoOnDelete,
   busy,
   runningWorkflow,
@@ -108,6 +112,7 @@ export function MessageList({
             character={characters.find((card) => card.id === message.characterId)}
             persona={persona}
             execution={logs[messageLogId(message) ?? '']}
+            stats={stats?.[message.id]}
             storyChip={chips.get(message.id)}
             links={links.get(message.id)}
             undoOnDelete={undoOnDelete && (() => undoOnDelete(message.id))}

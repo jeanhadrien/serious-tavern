@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import type { Character, ChatMessage, ExecutionLog, Persona } from '@st/shared';
+import type { Character, ChatMessage, ExecutionLog, Persona, TextStats } from '@st/shared';
 import { Bot, User } from 'lucide-react';
 import { charactersApi, personasApi } from '../../api.js';
 import { AlternativeControls, type AlternativeControlsProps } from './AlternativeControls.js';
@@ -7,6 +7,7 @@ import { ExecutionDetails } from './ExecutionDetails.js';
 import { MessageContent } from './MessageContent.js';
 import { MessageActions } from './MessageActions.js';
 import { MessageEditor } from './MessageEditor.js';
+import { MessageStats } from './MessageStats.js';
 import { useLinkMarker } from './story/LinkMarker.js';
 import { changeNote, type MessageLinkNote } from './story/linkMarkers.js';
 import { TurnChip } from './story/TurnChip.js';
@@ -18,6 +19,8 @@ interface ChatMessageViewProps {
   character?: Character;
   persona?: Persona;
   execution?: ExecutionLog;
+  /** The raw text statistics of this reply (assistant replies only; none while streaming or when the setting is off). */
+  stats?: TextStats;
   /** What the message's turn stored in the chat's story state (only on the last reply of a turn that stored any). */
   storyChip?: StoryChip;
   /** The story state items that link to this message (see `messageLinks`). */
@@ -50,6 +53,7 @@ export function ChatMessageView({
   character,
   persona,
   execution,
+  stats,
   storyChip,
   links,
   undoOnDelete,
@@ -147,6 +151,7 @@ export function ChatMessageView({
             </details>
           )}
           <MessageContent content={message.content} />
+          {stats && !user && !streaming && <MessageStats stats={stats} />}
           {message.status === 'partial' && <small className="message-stopped">Stopped before it finished</small>}
         </>
       )}

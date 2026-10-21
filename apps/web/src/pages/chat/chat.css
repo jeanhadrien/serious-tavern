@@ -225,6 +225,23 @@
   white-space: pre-wrap;
   font-size: 0.85rem;
 }
+.message-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  color: #a0a6b4;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+.message-stats li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: help;
+}
 .message-stopped {
   display: block;
   margin-top: 8px;

@@ -5,6 +5,10 @@ Story state in the chat (chips, delete check, linked items, after runs) is in `s
 ## The token path
 `useChat` re-renders on every streamed token. Nothing that fetches, or depends on more than the streaming rows, may sit in that path: memoize what the token path passes on, and keep prop identities stable.
 
+## Server-computed views
+- `startSessionLoader` is the one loader for what the server computes per chat (story state, message statistics): this chat's `sessions.changed` plus the caller's `alsoOn` events, debounced, one more fetch for a change during a fetch. A new view of this kind is a new caller, not a new loader.
+- `useMessageStats` returns a map that keeps its identity until a load delivers a new one; `MessageList` passes each message only its own entry. The web never reads the `showMessageStats` setting: no map means nothing is shown.
+
 ## Composer draft and copy
 - **The composer draft is per chat in `localStorage`** (`st.composer.<sessionId>`), never in the token path. Only typing writes it (`useChat.setContent`, stable identity, debounced by `createDraftSaver`, which carries the chat id with the pending text).
 - `enter` (open, create, close) flushes the previous chat's draft and loads the new one; `pagehide` and unmount flush; `send` removes the stored draft before the request, and only a cancelled queued message is put back.
