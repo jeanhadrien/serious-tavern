@@ -4,10 +4,12 @@ import {
   oldestFirst,
   stateSnapshot,
   type ChatMessage,
+  type FoldInput,
   type Session,
   type StateDefinition,
   type StateSnapshot,
   type StoryState,
+  type StateWrite,
 } from '@st/shared';
 import type { StateDefinitionRepository } from '../storage/state-definition-repository.js';
 
@@ -33,13 +35,13 @@ export async function listDefinitions(repository: Pick<StateDefinitionRepository
  * that link to messages carry their computed `link` in the snapshot (the SAME history the nodes judge links by).
  * `scope` is for the run of one workflow: its `workflowId` scopes the nodes' own state (`FoldInput.workflowId`; a caller
  * that runs a workflow always gives it) and `including` is the turn being run (`FoldInput.including`), for the later
- * runs of a turn whose first run has settled.
+ * runs of a turn whose first run has settled; `pending` is the run's own unstored writes (`FoldInput.pending`).
  */
 export function foldSession(
   definitions: StateDefinition[],
   session: Pick<Session, 'messages' | 'state'>,
   history?: readonly ChatMessage[],
-  scope: { workflowId?: string; including?: string } = {},
+  scope: Pick<FoldInput, 'workflowId' | 'including' | 'pending'> = {},
 ): SessionStory {
   const story = foldStoryState({
     definitions,
@@ -58,6 +60,22 @@ export function foldSession(
       ...duplicateNameIssues(definitions),
     ],
   };
+}
+
+/**
+ * `executeWorkflow`'s `foldWith` for a run whose snapshot came from `foldSession(definitions, session, history, scope)`:
+ * the same fold over the same arguments plus the run's `pending` writes, giving the snapshot a node reads its own
+ * writes from. The session's messages are copied now, so a write to the chat while the run goes on cannot make the
+ * answer disagree with the run's own snapshot. The engine never sees the session, only this closure.
+ */
+export function foldWithOf(
+  definitions: StateDefinition[],
+  session: Pick<Session, 'messages' | 'state'>,
+  history: readonly ChatMessage[] | undefined,
+  scope: Pick<FoldInput, 'workflowId' | 'including'>,
+): (pending: StateWrite[]) => StateSnapshot {
+  const fixed = { messages: [...session.messages], state: session.state };
+  return (pending) => foldSession(definitions, fixed, history, { ...scope, pending }).snapshot;
 }
 
 export async function loadStoryState(

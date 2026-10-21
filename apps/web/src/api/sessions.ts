@@ -19,6 +19,9 @@ export const sessionsApi = {
   /** Shows another alternative of the last turn; the answer is the whole stored session. */
   setAlternative: (id: string, body: ApiBody<'setAlternative'>, options?: RequestOptions) =>
     api<ApiResponse<'setAlternative'>>(`/sessions/${id}/alternative`, { ...json('PATCH', body), ...options }),
+  /** Starts a new chat as a copy of this one, cut after the reply `messageId`; the answer is the new session. */
+  fork: (id: string, body: ApiBody<'forkSession'>, options?: RequestOptions) =>
+    api<ApiResponse<'forkSession'>>(`/sessions/${id}/fork`, { ...json('POST', body), ...options }),
   /** The chat's computed story state (read-only; the fold the next turn starts from). */
   state: (id: string, options?: RequestOptions) =>
     api<ApiResponse<'getSessionState'>>(`/sessions/${id}/state`, options),

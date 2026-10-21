@@ -36,6 +36,17 @@ it('creates one streaming row per output and grows it with text and reasoning', 
   expect(messages[2]?.reasoning).toBeUndefined();
 });
 
+it('clears the text of a row on reset, keeps its reasoning, and appends the delta that came with the reset', () => {
+  let messages = applyDelta([user('u')], { nodeId: 'out', textDelta: 'Let me check', reasoningDelta: 'step 1' });
+  messages = applyDelta(messages, { nodeId: 'out', reset: true, reasoningDelta: '\n\nstep 2' });
+  expect(messages[1]).toMatchObject({ content: '', reasoning: 'step 1\n\nstep 2' });
+  messages = applyDelta(messages, { nodeId: 'out', textDelta: 'The answer' });
+  expect(messages[1]?.content).toBe('The answer');
+  messages = applyDelta(messages, { nodeId: 'out', reset: true, textDelta: 'Restart' });
+  expect(messages[1]?.content).toBe('Restart');
+  expect(messages).toHaveLength(2);
+});
+
 it('keys a row by its run and node together: two workflows may use the same node id', () => {
   let messages = applyDelta([user('u')], { nodeId: 'out', runId: 'r1', textDelta: 'A' });
   messages = applyDelta(messages, { nodeId: 'out', runId: 'r2', textDelta: 'B' });

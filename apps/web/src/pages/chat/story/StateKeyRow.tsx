@@ -3,6 +3,8 @@ import { formatValue, fullText, shortText } from './format.js';
 import { LinkedItems } from './LinkedItems.js';
 import { Sparkline } from './Sparkline.js';
 import type { Item, KeyRow } from './storyModel.js';
+import { ThreadItemNote } from './ThreadItemNote.js';
+import { exchangeCount } from './threadItems.js';
 
 const ITEM_TEXT_MAX = 90;
 const OPEN_UP_TO = 5;
@@ -20,6 +22,7 @@ function Items({ items }: { items: readonly Item[] }) {
               {item.extras.map((extra) => ` · ${extra.name} ${extra.value}`).join('')}
             </small>
           )}
+          {item.thread && <ThreadItemNote thread={item.thread} />}
         </li>
       ))}
     </ul>
@@ -60,7 +63,13 @@ export const StateKeyRow = memo(function StateKeyRow({
       </div>
       {list && (
         <details className="story-list" open={row.items.length <= OPEN_UP_TO || undefined}>
-          <summary>{row.items.length === 1 ? '1 item' : `${row.items.length} items`}</summary>
+          <summary>
+            {row.exchanges
+              ? exchangeCount(row.items.length)
+              : row.items.length === 1
+                ? '1 item'
+                : `${row.items.length} items`}
+          </summary>
           {row.linked && <LinkedItems groups={row.linked} onJumpMessage={onJumpMessage} />}
           {row.plain.length > 0 && <Items items={row.plain} />}
         </details>

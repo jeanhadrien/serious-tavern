@@ -1,6 +1,6 @@
 /** Every keyboard shortcut, declared once: the source for a later help list or rebinding. */
 export const SHORTCUTS = [
-  { keys: 'Escape', scope: 'global', description: 'Close the innermost thing (see docs/FRONTEND-UX.md)' },
+  { keys: 'Escape', scope: 'global', description: 'Close the innermost thing (see docs/dev/design/FRONTEND-UX.md)' },
   { keys: 'Mod+S', scope: 'editor', description: 'Save the editor you are in' },
   { keys: 'Mod+Z', scope: 'canvas', description: 'Undo on the workflow canvas (not inside a field)' },
   { keys: 'Mod+Shift+Z', scope: 'canvas', description: 'Redo on the workflow canvas (not inside a field)' },

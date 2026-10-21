@@ -38,8 +38,27 @@ describe('toDraft and compile', () => {
     expect(bodyOf(draft)?.keys.flags).toMatchObject({ schema: { a: 'number' }, 'x-note': 'keep me' });
   });
 
+  it('keeps a key description out of the unknown properties, trims it, and drops a blank one', () => {
+    const stored = definition({ keys: { tension: { type: 'number', description: 'How tense it is', max: 10 } } });
+    const draft = toDraft(stored);
+    expect(draft.keys[0]).toMatchObject({ description: 'How tense it is', rest: {} });
+    expect(bodyOf(draft)?.keys.tension).toEqual({ type: 'number', description: 'How tense it is', max: 10 });
+    const edited = { ...draft, keys: [{ ...draft.keys[0]!, description: '  Tension  ' }] };
+    expect(bodyOf(edited)?.keys.tension).toMatchObject({ description: 'Tension' });
+    expect(draftChanged(edited, stored)).toBe(true);
+    expect(bodyOf({ ...draft, keys: [{ ...draft.keys[0]!, description: ' ' }] })?.keys.tension).toEqual({
+      type: 'number',
+      max: 10,
+    });
+  });
+
+  it('keeps the description when the key type changes', () => {
+    const key = { ...newKeyDraft(), name: 'k', description: 'About k', min: '1' };
+    expect(changeKeyType(key, 'text')).toMatchObject({ description: 'About k', min: '' });
+  });
+
   it('numbers the rows k0..kn in key order', () => {
-    expect(toDraft(definition()).keys.map((key) => key.uid)).toEqual(['k0', 'k1', 'k2', 'k3', 'k4', 'k5', 'k6']);
+    expect(toDraft(definition()).keys.map((key) => key.uid)).toEqual(['k0', 'k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7']);
   });
 
   it('does not carry unknown top-level fields (the server keeps them)', () => {
@@ -69,6 +88,56 @@ describe('changeKeyType', () => {
     expect(changed.rest).toEqual({ 'x-note': 'n', min: 'stale' });
     // A property the new type edits does not travel as an unknown one.
     expect(changeKeyType(number, 'number').rest).toEqual({ 'x-note': 'n' });
+  });
+});
+
+describe('a thread key', () => {
+  const threadOf = (draft: DefinitionDraft) => draft.keys.find((key) => key.type === 'thread')!;
+
+  it('round-trips with its cap, description and unknown properties', () => {
+    const stored = definition({
+      keys: { log: { type: 'thread', cap: 5, description: 'What the scenarist did', 'x-note': 'keep me' } },
+    });
+    const draft = toDraft(stored);
+    expect(draft.keys[0]).toMatchObject({ type: 'thread', cap: '5', description: 'What the scenarist did' });
+    expect(draft.keys[0]?.rest).toEqual({ 'x-note': 'keep me' });
+    expect(bodyOf(draft)?.keys).toEqual(stored.keys);
+    expect(draftChanged(draft, stored)).toBe(false);
+  });
+
+  it('has no cap text for an uncapped thread, and a cap edit is a change', () => {
+    const stored = definition({ keys: { log: { type: 'thread' } } });
+    const draft = toDraft(stored);
+    expect(threadOf(draft).cap).toBe('');
+    expect(bodyOf(draft)?.keys.log).toEqual({ type: 'thread' });
+    const capped = { ...draft, keys: [{ ...threadOf(draft), cap: '3' }] };
+    expect(bodyOf(capped)?.keys.log).toEqual({ type: 'thread', cap: 3 });
+    expect(draftChanged(capped, stored)).toBe(true);
+  });
+
+  it('keeps a stored property the thread form does not edit (item fields from a collection) instead of dropping it', () => {
+    const stored = definition({ keys: { log: { type: 'thread', fields: { level: 'number' } } } } as never);
+    const draft = toDraft(stored);
+    expect(threadOf(draft).rest).toEqual({ fields: { level: 'number' } });
+    expect(bodyOf(draft)?.keys.log).toEqual({ type: 'thread', fields: { level: 'number' } });
+  });
+
+  it('switches from a collection and back like any type change: the cap is blank, the item fields and description stay put', () => {
+    const collection = toDraft(definition()).keys.find((key) => key.type === 'collection')!;
+    const thread = changeKeyType(collection, 'thread');
+    expect(thread).toMatchObject({ uid: collection.uid, name: 'injected', type: 'thread', cap: '', fields: '' });
+    const withCap = { ...thread, cap: '4', description: 'About it' };
+    const draft: DefinitionDraft = { name: 'scene', description: '', keys: [withCap] };
+    expect(bodyOf(draft)?.keys.injected).toEqual({ type: 'thread', cap: 4, description: 'About it' });
+    const back = changeKeyType(withCap, 'collection');
+    expect(back).toMatchObject({ type: 'collection', cap: '', fields: '', description: 'About it' });
+    expect(bodyOf({ ...draft, keys: [back] })?.keys.injected).toEqual({ type: 'collection', description: 'About it' });
+  });
+
+  it('never sends the item fields of a key that became a thread', () => {
+    const collection = { ...toDraft(definition()).keys.find((key) => key.type === 'collection')! };
+    const body = bodyOf({ name: 'scene', description: '', keys: [changeKeyType(collection, 'thread')] });
+    expect(body?.keys.injected).toEqual({ type: 'thread' });
   });
 });
 

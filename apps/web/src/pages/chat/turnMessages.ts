@@ -1,7 +1,14 @@
 import { alternativesOfLastTurn, type ChatMessage, type ExecutionLog } from '@st/shared';
 
 /** One streamed fragment of a Chat Output: `runId` tells apart the runs of a reply list (absent: a single-run server). */
-export type DeltaTarget = { nodeId: string; runId?: string; textDelta?: string; reasoningDelta?: string };
+export type DeltaTarget = {
+  nodeId: string;
+  runId?: string;
+  /** Clear the row's text before appending (a tool-using model started its next step). Reasoning is kept. */
+  reset?: boolean;
+  textDelta?: string;
+  reasoningDelta?: string;
+};
 
 /**
  * Appends streamed text to the row of a Chat Output, creating its row on the first delta. A row is one Chat Output of
@@ -9,7 +16,7 @@ export type DeltaTarget = { nodeId: string; runId?: string; textDelta?: string; 
  */
 export function applyDelta(
   messages: ChatMessage[],
-  { nodeId, runId, textDelta = '', reasoningDelta = '' }: DeltaTarget,
+  { nodeId, runId, reset = false, textDelta = '', reasoningDelta = '' }: DeltaTarget,
   fresh: () => ChatMessage = () => ({
     id: crypto.randomUUID(),
     role: 'assistant',
@@ -24,7 +31,7 @@ export function applyDelta(
     message.status === 'streaming' && message.nodeId === nodeId && message.runId === runId;
   const grow = (message: ChatMessage): ChatMessage => ({
     ...message,
-    content: message.content + textDelta,
+    content: (reset ? '' : message.content) + textDelta,
     ...(reasoningDelta ? { reasoning: (message.reasoning ?? '') + reasoningDelta } : {}),
   });
   return messages.some(live) ? messages.map((m) => (live(m) ? grow(m) : m)) : [...messages, grow(fresh())];

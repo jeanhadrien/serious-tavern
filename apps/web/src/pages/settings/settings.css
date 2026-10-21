@@ -35,3 +35,12 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+.chats-settings {
+  margin-top: 28px;
+  display: grid;
+  gap: 8px;
+}
+.settings-check {
+  text-transform: none;
+}

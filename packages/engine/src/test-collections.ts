@@ -41,17 +41,20 @@ export async function runNode(
     draws?: number[];
     // The story state the node runs against; its writes come back resolved, as the executor would store them.
     state?: StateSnapshot;
+    // The running turn's id (`ctx.trigger.turnId`).
+    turnId?: string;
   },
 ) {
   const logs: string[] = [];
   const queue = options.draws ? [...options.draws] : undefined;
   let drawn = 0;
   const writes = new StateWriteBuffer(options.state, 'run');
+  const state = createStateAccess(options.state, definition.type);
   const ctx: ExecutionContext = {
     nodeId: definition.type,
     inputs: options.inputs ?? {},
     config: definition.configSchema.parse(config),
-    trigger: { message: options.message ?? '', sessionId: 's' },
+    trigger: { message: options.message ?? '', sessionId: 's', ...(options.turnId && { turnId: options.turnId }) },
     settings: {},
     history: options.history ?? [],
     replies: [],
@@ -59,7 +62,8 @@ export async function runNode(
     resources: options.resources,
     signal: new AbortController().signal,
     log: (line) => logs.push(line),
-    state: createStateAccess(options.state, definition.type),
+    state,
+    pendingState: () => state,
     writeState: writes.writer(definition.type),
     random: () => {
       drawn++;
@@ -68,6 +72,7 @@ export async function runNode(
       return queue.shift()!;
     },
     recordWire: () => {},
+    beginWire: () => {},
     emit: () => {},
   };
   const output = await definition.execute(ctx);

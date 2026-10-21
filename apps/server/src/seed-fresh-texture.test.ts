@@ -7,7 +7,7 @@ import { apiContract, type SessionStateView } from '@st/shared';
 import type { ChatRequest } from '@st/engine';
 import { createApp } from './app.js';
 import { FRESH_TEXTURE_WORKFLOW_ID, freshTexture } from './examples/fresh-texture.js';
-import { restoreAdapter, useAdapter } from './test-support/adapter.js';
+import { chatResponse, restoreAdapter, useAdapter } from './test-support/adapter.js';
 import { entriesOf, makeSession, readSession, turn, type App } from './test-support/story.js';
 
 let directory: string;
@@ -47,7 +47,7 @@ it('answers every turn, injects a leveled detail now and then, and takes it back
   useAdapter({
     chat: async (request) => {
       requests.push(request);
-      return { text: `reply ${requests.length}`, raw: {} };
+      return chatResponse(`reply ${requests.length}`);
     },
   });
   app = await createApp(directory, { seed: true, examples: true });

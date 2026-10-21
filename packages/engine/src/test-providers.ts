@@ -1,5 +1,5 @@
 import { findBuiltInProvider, type Provider } from '@st/shared';
-import { adapters, type LlmAdapter } from './providers/index.js';
+import { adapters, type ChatResponse, type LlmAdapter } from './providers/index.js';
 import { openaiCompatible } from './providers/openai-compatible.js';
 
 /** The built-in OpenRouter record. */
@@ -24,3 +24,11 @@ export const providerResources = (...records: Provider[]) => ({
 /** Makes every provider record call `adapter`, until `restoreAdapter`. */
 export const useAdapter = (adapter: LlmAdapter) => adapters.set('openai-compatible', adapter);
 export const restoreAdapter = () => adapters.set('openai-compatible', openaiCompatible);
+
+/** A canned adapter reply: the text and its canonical assistant message; `extra` overrides any field. */
+export const chatResponse = (text: string, extra: Partial<ChatResponse> = {}): ChatResponse => ({
+  text,
+  message: { role: 'assistant', content: text },
+  raw: {},
+  ...extra,
+});

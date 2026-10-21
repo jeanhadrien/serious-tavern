@@ -1,4 +1,5 @@
 import {
+  isListKeyType,
   stateKeyPortType,
   stateOpsFor,
   type PortDataType,
@@ -30,10 +31,11 @@ const gate: PortDef = {
 /**
  * The node's fixed `value` setting, or undefined when it has none. It stands in for the `value` input while that
  * is not connected (a connected input wins). A cleared (null) setting counts as none; any other value, an
- * empty text included, is a value, and is checked like one from the input.
+ * empty text included, is a value, and is checked like one from the input. A thread key has none: its `value` is
+ * always an exchange from an LLM node.
  */
-export function fixedValue(config: Record<string, unknown>): unknown {
-  return config.value ?? undefined;
+export function fixedValue(config: Record<string, unknown>, def: StateKeyDef): unknown {
+  return def.type === 'thread' ? undefined : (config.value ?? undefined);
 }
 
 /**
@@ -57,6 +59,16 @@ function valueInput(def: StateKeyDef, op: StateNodeOp, fixed: boolean): PortDef[
         },
       ];
     case 'add':
+      if (def.type === 'thread')
+        return [
+          {
+            name: 'value',
+            label: 'Exchange',
+            dataType: 'messages',
+            required: true,
+            description: "The exchange to store: an LLM node's Exchange output (its messages, tool calls included).",
+          },
+        ];
       return [
         {
           name: 'value',
@@ -107,8 +119,26 @@ function linkInput(def: StateKeyDef, op: StateNodeOp): PortDef[] {
   ];
 }
 
+/**
+ * The optional `input` of an `add` on a thread key: what the exchange answers, stored with it as its user side.
+ * `requiredIfConnected` like `messages`, so a branch that is not taken skips the write.
+ */
+function threadInput(def: StateKeyDef, op: StateNodeOp): PortDef[] {
+  if (def.type !== 'thread' || op !== 'add') return [];
+  return [
+    {
+      name: 'input',
+      label: 'Input',
+      dataType: 'any',
+      requiredIfConnected: true,
+      description:
+        'Optional. What the exchange answers, stored with it: text (kept as a user message) or one message, e.g. the chat message or the prompt.',
+    },
+  ];
+}
+
 const outputType = (def: StateKeyDef, op: StateNodeOp): PortDataType =>
-  def.type === 'collection' && (op === 'add' || op === 'remove') ? 'object' : stateKeyPortType(def.type);
+  isListKeyType(def.type) && (op === 'add' || op === 'remove') ? 'object' : stateKeyPortType(def.type);
 
 const OUTPUT_DESCRIPTION: Record<StateNodeOp, string> = {
   set: 'The value that was stored (numbers are clamped to the key bounds)',
@@ -125,7 +155,7 @@ export function writePorts(
   fixed = false,
 ): { inputs: PortDef[]; outputs: PortDef[] } {
   return {
-    inputs: [...valueInput(def, op, fixed), ...linkInput(def, op), gate],
+    inputs: [...valueInput(def, op, fixed), ...linkInput(def, op), ...threadInput(def, op), gate],
     outputs: [
       {
         name: 'value',

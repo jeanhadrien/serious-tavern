@@ -5,7 +5,7 @@ import { afterEach, expect, it } from 'vitest';
 import type { ChatRequest, StreamOptions } from '@st/engine';
 import { alternativesOfLastTurn, apiContract, type Edge } from '@st/shared';
 import { createApp } from './app.js';
-import { restoreAdapter, useAdapter } from './test-support/adapter.js';
+import { chatResponse, restoreAdapter, useAdapter } from './test-support/adapter.js';
 import { parseEventStream } from './test-support/event-stream.js';
 import { waitFor } from './test-support/post.js';
 import { assistantRows, entriesOf, readSession, turn } from './test-support/story.js';
@@ -36,7 +36,7 @@ it('shows the partial reply of a stopped regenerate in place of the old one', as
       calls++;
       if (calls === 1) {
         onToken('First');
-        return { text: 'First', raw: {} };
+        return chatResponse('First');
       }
       onToken('Par');
       await new Promise<never>((_resolve, reject) =>

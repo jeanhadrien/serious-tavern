@@ -9,36 +9,42 @@ import { RESERVED_ITEM_FIELDS } from './node-values.js';
  * Records keep unknown fields (record and key), and they are read through the YAML codec, which parses every
  * file on read, so `.default()` is safe here (consumers always see concrete values).
  */
-export const stateKeyTypes = ['number', 'boolean', 'enum', 'text', 'object', 'collection'] as const;
+export const stateKeyTypes = ['number', 'boolean', 'enum', 'text', 'object', 'collection', 'thread'] as const;
 
 /** Why a name is refused: definition, key and item field names are template path segments (`{{state.scene.tension}}`). */
 export const TEMPLATE_NAME_RULE =
   'Use letters, digits and _, not starting with a digit; words such as this, true or toString are reserved';
 const templateName = z.string().refine(isSettingKey, TEMPLATE_NAME_RULE);
 
+// What the key is for. Not used by the fold; the LLM node's state tools show it to the model.
+const keyDescription = z.string().optional();
+
 export const stateKeyDefSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('number'),
+      description: keyDescription,
       // Absent means 0, kept inside min..max.
       default: z.number().optional(),
       min: z.number().optional(),
       max: z.number().optional(),
     })
     .passthrough(),
-  z.object({ type: z.literal('boolean'), default: z.boolean().optional() }).passthrough(),
+  z.object({ type: z.literal('boolean'), description: keyDescription, default: z.boolean().optional() }).passthrough(),
   z
     .object({
       type: z.literal('enum'),
+      description: keyDescription,
       options: z.array(z.string()).min(1, 'An enum needs at least one option'),
       // Absent means the first option.
       default: z.string().optional(),
     })
     .passthrough(),
-  z.object({ type: z.literal('text'), default: z.string().optional() }).passthrough(),
+  z.object({ type: z.literal('text'), description: keyDescription, default: z.string().optional() }).passthrough(),
   z
     .object({
       type: z.literal('object'),
+      description: keyDescription,
       default: z.record(z.string(), z.unknown()).optional(),
       // Kept for later; nothing is checked against it yet.
       schema: z.unknown().optional(),
@@ -47,18 +53,33 @@ export const stateKeyDefSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('collection'),
+      description: keyDescription,
       // Keeps the `cap` newest items when read.
       cap: z.number().int().min(1).optional(),
       // Declared extra fields of an item (`id` and `text` always exist).
       fields: z.record(templateName, z.enum(['text', 'number', 'boolean'])).optional(),
     })
     .passthrough(),
+  // One exchange (the messages of an LLM node run, tool calls included) per item: see `threadItem`.
+  z
+    .object({
+      type: z.literal('thread'),
+      description: keyDescription,
+      // Keeps the `cap` newest exchanges when read.
+      cap: z.number().int().min(1).optional(),
+    })
+    .passthrough(),
 ]);
 export type StateKeyDef = z.infer<typeof stateKeyDefSchema>;
 export type StateKeyType = StateKeyDef['type'];
 export type NumberKeyDef = Extract<StateKeyDef, { type: 'number' }>;
-export type ScalarKeyDef = Exclude<StateKeyDef, { type: 'collection' }>;
+export type ScalarKeyDef = Exclude<StateKeyDef, { type: 'collection' | 'thread' }>;
 export type CollectionKeyDef = Extract<StateKeyDef, { type: 'collection' }>;
+export type ThreadKeyDef = Extract<StateKeyDef, { type: 'thread' }>;
+
+/** Whether a key type holds a list of items (`add`, `remove`, `delete`; the fold's collection rules, `cap` included). */
+export const isListKeyType = (type: StateKeyType): type is 'collection' | 'thread' =>
+  type === 'collection' || type === 'thread';
 
 // Plain-language problems the shapes above cannot express. Paths point at the field so that a YAML file's
 // invalid reason reads `invalid state definition: keys.tension.max: ...`.
@@ -139,6 +160,7 @@ export function keyDefault(def: StateKeyDef): unknown {
     case 'object':
       return structuredClone(def.default ?? {});
     case 'collection':
+    case 'thread':
       return [];
   }
 }
@@ -187,6 +209,7 @@ export function stateOpsFor(type: StateKeyType): StateNodeOp[] {
     case 'number':
       return ['set', 'increment', 'delete'];
     case 'collection':
+    case 'thread':
       return ['add', 'remove', 'delete'];
     default:
       return ['set', 'delete'];
@@ -201,6 +224,7 @@ export function stateKeyPortType(type: StateKeyType): PortDataType {
     case 'object':
       return type;
     case 'collection':
+    case 'thread':
       return 'array';
     default:
       return 'text';

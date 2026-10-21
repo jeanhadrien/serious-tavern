@@ -4,7 +4,7 @@ import { ApiError, apiErrorFrom, networkError } from './transport.js';
 export type TurnResult = ApiResponse<'sendMessage'>;
 
 /** Streamed text of one Chat Output of one run. `runId` is absent in events of a server from before reply lists. */
-type TurnDelta = { nodeId: string; runId?: string; textDelta?: string; reasoningDelta?: string };
+type TurnDelta = { nodeId: string; runId?: string; reset?: boolean; textDelta?: string; reasoningDelta?: string };
 /** A run of the reply list is starting: its node events follow, tagged with its `runId`. */
 type RunStart = { runId: string; workflowId: string; workflowName: string };
 
@@ -116,6 +116,7 @@ function handleFrame(frame: string, handlers: TurnHandlers): boolean {
       handlers.onDelta?.({
         nodeId: event.nodeId,
         ...(event.runId !== undefined && { runId: event.runId }),
+        ...(event.reset && { reset: true }),
         ...(event.textDelta !== undefined && { textDelta: event.textDelta }),
         ...(event.reasoningDelta !== undefined && { reasoningDelta: event.reasoningDelta }),
       });

@@ -22,6 +22,7 @@ const run = (fields: string, value: unknown) => {
     log: (line) => logs.push(line),
     random: () => 0.5,
     recordWire: () => {},
+    beginWire: () => {},
     emit: () => {},
   };
   return { result: pickFields.execute(ctx), logs };

@@ -4,7 +4,7 @@ import { definitionOptions, keyOptions, pickDefinition, pickKey, pickerHint, typ
 interface StateKeyPickerProps {
   /**
    * State Write also fits its operation to the key and drops its fixed value when the target changes; a node that
-   * works on a list (`collection`) only offers collection keys.
+   * works on a list (`collection`) only offers collection keys, and the Thread node (`thread`) only thread keys.
    */
   kind: PickerKind;
   config: Record<string, unknown>;
@@ -12,7 +12,7 @@ interface StateKeyPickerProps {
   context?: NodePanelContext;
 }
 
-/** The state definition and key a State Read, State Write, Next Chunk or Unlinked Messages node targets. */
+/** The state definition and key a State Read, State Write, Next Chunk, Unlinked Messages or Thread node targets. */
 export function StateKeyPicker({ kind, config, onChange, context }: StateKeyPickerProps) {
   const catalog = context?.stateDefinitions ?? [];
   const definitionId = typeof config.definitionId === 'string' ? config.definitionId : '';

@@ -13,6 +13,13 @@ import {
   SUMMARIZE_PRESET_ID,
   SUMMARIZE_WORKFLOW_ID,
 } from './examples/rolling-summaries.js';
+import {
+  PLOT_DEFINITION_ID,
+  SCENARIST_NARRATOR_PRESET_ID,
+  SCENARIST_NARRATOR_WORKFLOW_ID,
+  SCENARIST_PRESET_ID,
+  SCENARIST_WORKFLOW_ID,
+} from './examples/scenarist.js';
 import { LEDGER_FILE } from './seed-ledger.js';
 import { SCENE_DEFINITION_ID } from './seed-state.js';
 import { nodeResources } from './services/node-resources.js';
@@ -48,19 +55,23 @@ describe('a fresh data directory', () => {
     expect(await names(context)).toEqual([
       'Default Assistant',
       'Fresh texture (example)',
+      'Narrator with a scenarist (example)',
       'Parallel demo',
       'Rolling summaries (example)',
+      'Scenarist (example)',
       'Summarize history (example)',
     ]);
     expect((await context.collections.list()).map((item) => item.name)).toEqual(['Forest textures (example)']);
     expect((await context.presets.list()).map((item) => item.name).sort()).toEqual([
       'Default',
       'Fresh texture narrator (example)',
+      'Narrator with a scenarist (example)',
       'Narrator with summaries (example)',
+      'Scenarist (example)',
       'Summarize (example)',
     ]);
     expect((await context.stateDefinitions.list()).map((item) => item.id).sort()).toEqual(
-      [MEMORY_DEFINITION_ID, SCENE_DEFINITION_ID].sort(),
+      [MEMORY_DEFINITION_ID, PLOT_DEFINITION_ID, SCENE_DEFINITION_ID].sort(),
     );
     // Every seeded workflow, the defaults and the example, keeps validating.
     for (const workflow of await context.workflows.list()) expect(await issues(context, workflow.id)).toEqual([]);
@@ -75,10 +86,16 @@ describe('a fresh data directory', () => {
         `rolling-summaries/stateDefinition:${MEMORY_DEFINITION_ID}`,
         `rolling-summaries/workflow:${ROLLING_SUMMARIES_WORKFLOW_ID}`,
         `rolling-summaries/workflow:${SUMMARIZE_WORKFLOW_ID}`,
+        `scenarist/preset:${SCENARIST_NARRATOR_PRESET_ID}`,
+        `scenarist/preset:${SCENARIST_PRESET_ID}`,
+        `scenarist/stateDefinition:${PLOT_DEFINITION_ID}`,
+        `scenarist/workflow:${SCENARIST_NARRATOR_WORKFLOW_ID}`,
+        `scenarist/workflow:${SCENARIST_WORKFLOW_ID}`,
       ].sort(),
     );
     expect(info).toHaveBeenCalledWith('Added the example "Fresh texture (example)".');
     expect(info).toHaveBeenCalledWith('Added the example "Rolling summaries (example)".');
+    expect(info).toHaveBeenCalledWith('Added the example "Scenarist with tools (example)".');
   });
 
   it('adds nothing unless asked to, so the other tests keep their seeds', async () => {
@@ -97,7 +114,7 @@ describe('a fresh data directory', () => {
     const again = await open();
     expect(JSON.stringify(await again.workflows.get(FRESH_TEXTURE_WORKFLOW_ID))).toBe(before.workflow);
     expect(await readFile(join(directory, LEDGER_FILE), 'utf8')).toBe(before.ledger);
-    expect(await again.workflows.list()).toHaveLength(5);
+    expect(await again.workflows.list()).toHaveLength(7);
     expect(await again.collections.list()).toHaveLength(1);
     expect(info).not.toHaveBeenCalled();
   });
@@ -120,8 +137,10 @@ describe('a fresh data directory', () => {
     const again = await open();
     expect(await names(again)).toEqual([
       'Default Assistant',
+      'Narrator with a scenarist (example)',
       'Parallel demo',
       'Rolling summaries (example)',
+      'Scenarist (example)',
       'Summarize history (example)',
     ]);
     expect(await again.collections.list()).toEqual([]);
@@ -151,17 +170,22 @@ describe('a user who already has data', () => {
     expect(await names(context)).toEqual([
       'Fresh texture (example)',
       'Mine',
+      'Narrator with a scenarist (example)',
       'Rolling summaries (example)',
+      'Scenarist (example)',
       'Summarize history (example)',
     ]);
     expect((await context.stateDefinitions.list()).map((item) => item.name).sort()).toEqual([
       'inventory',
       'memory',
+      'plot',
       'scene',
     ]);
     expect(await issues(context)).toEqual([]);
     expect(await issues(context, ROLLING_SUMMARIES_WORKFLOW_ID)).toEqual([]);
     expect(await issues(context, SUMMARIZE_WORKFLOW_ID)).toEqual([]);
+    expect(await issues(context, SCENARIST_NARRATOR_WORKFLOW_ID)).toEqual([]);
+    expect(await issues(context, SCENARIST_WORKFLOW_ID)).toEqual([]);
   });
 
   it('uses their own scene definition when it has the keys the workflow needs', async () => {
@@ -178,6 +202,7 @@ describe('a user who already has data', () => {
       'Scene',
       'inventory',
       'memory',
+      'plot',
     ]);
     const workflow = (await again.workflows.get(FRESH_TEXTURE_WORKFLOW_ID))!;
     expect(
@@ -211,7 +236,13 @@ describe('a user who already has data', () => {
     await context.stateDefinitions.save(userDefinition('scene', keys as unknown as StateDefinition['keys']));
     const again = await open();
     // The other example does not need `scene` and is added.
-    expect(await names(again)).toEqual(['Mine', 'Rolling summaries (example)', 'Summarize history (example)']);
+    expect(await names(again)).toEqual([
+      'Mine',
+      'Narrator with a scenarist (example)',
+      'Rolling summaries (example)',
+      'Scenarist (example)',
+      'Summarize history (example)',
+    ]);
     expect(await again.collections.list()).toEqual([]);
     expect((await again.presets.list()).map((item) => item.id)).not.toContain(NARRATOR_PRESET_ID);
     expect(warn).toHaveBeenCalledWith(
@@ -227,9 +258,37 @@ describe('a user who already has data', () => {
     expect(await names(await open())).toEqual([
       'Fresh texture (example)',
       'Mine',
+      'Narrator with a scenarist (example)',
       'Rolling summaries (example)',
+      'Scenarist (example)',
       'Summarize history (example)',
     ]);
+  });
+
+  it('points the scenarist at their own plot definition when it has the keys', async () => {
+    const context = await existingUser();
+    const plot = userDefinition('Plot', {
+      tension: { type: 'number' },
+      beat: { type: 'enum', options: ['calm'] },
+      threads: { type: 'collection' },
+      notes: { type: 'thread' },
+    });
+    await context.stateDefinitions.save(plot);
+    const again = await open();
+    const scenarist = (await again.workflows.get(SCENARIST_WORKFLOW_ID))!;
+    expect(scenarist.nodes.find((item) => item.id === 'keep')?.config.definitionId).toBe(plot.id);
+    expect(await issues(again, SCENARIST_WORKFLOW_ID)).toEqual([]);
+  });
+
+  it('skips the scenarist when their plot definition lacks one of its keys', async () => {
+    const context = await existingUser();
+    await context.stateDefinitions.save(userDefinition('plot', { tension: { type: 'number' } }));
+    const again = await open();
+    expect(await names(again)).not.toContain('Scenarist (example)');
+    expect(await names(again)).not.toContain('Narrator with a scenarist (example)');
+    expect(warn).toHaveBeenCalledWith(
+      'Example "Scenarist with tools (example)" not added: the state definition "plot" exists but it has no key "beat".',
+    );
   });
 
   it('records the scene definition they got from the old seed, so deleting it later is final', async () => {
@@ -271,8 +330,10 @@ describe('the ledger', () => {
     const context = await open();
     expect(await names(context)).toEqual([
       'Default Assistant',
+      'Narrator with a scenarist (example)',
       'Parallel demo',
       'Rolling summaries (example)',
+      'Scenarist (example)',
       'Summarize history (example)',
     ]);
     expect(await context.collections.list()).toEqual([]);
@@ -286,6 +347,6 @@ describe('the ledger', () => {
     await first.workflows.delete(FRESH_TEXTURE_WORKFLOW_ID);
     const again = await open();
     expect(await names(again)).toContain('Fresh texture (example)');
-    expect((await ledger()).seeded).toHaveLength(9);
+    expect((await ledger()).seeded).toHaveLength(14);
   });
 });

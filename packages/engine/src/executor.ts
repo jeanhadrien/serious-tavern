@@ -66,8 +66,15 @@ export async function executeWorkflow(
     // The story state the turn starts from (`foldStoryState` + `stateSnapshot`): what `ctx.state` reads and
     // `trigger.turn` reports. Writes nodes ask for are returned as `writes`, never visible during the run.
     state?: StateSnapshot;
+    // Folds the story state again with extra writes of this run (the caller's own `state` arguments plus `pending`:
+    // `FoldInput.pending`). Lets a node read its own buffered writes (`ctx.pendingState`) without the engine knowing
+    // how the caller folds. Without it a node reads the same snapshot as `ctx.state`.
+    foldWith?: (pending: StateWrite[]) => StateSnapshot;
     // The replies the runs above this one saved in this turn, in chat order: Chat Input's `replies` (`[]` by default).
     replies?: ChatMessage[];
+    // The id of the turn this run belongs to (the first run's execution id): `ctx.trigger.turnId`, stamped on the
+    // items State Write adds to a thread key. A run outside a turn is its own turn.
+    turnId?: string;
   },
 ): Promise<{ replies: ChatReply[]; execution: ExecutionLog; writes: StateWrite[] }> {
   // NB: Workflow is a passthrough (loose) object for forward compatibility, so `in`
@@ -113,7 +120,7 @@ export async function executeWorkflow(
       return next();
     };
   };
-  const stateRun = new StateRun(options.state, execution, workflow.id);
+  const stateRun = new StateRun(options.state, execution, workflow.id, options.foldWith, options.turnId);
   let wave = 0;
   const resolved = new Map<string, { output: Record<string, unknown>; skipped: boolean }>();
   const replies = new Map<string, ChatReply>();
@@ -147,6 +154,8 @@ export async function executeWorkflow(
           let signal: AbortSignal | undefined;
           let task: Promise<Record<string, unknown>> | undefined;
           let callbacksActive = true;
+          // Set by `ctx.beginWire`: the next recorded exchange is a new call, not an update of the last one.
+          let newWireCall = false;
           let abortListener: (() => void) | undefined;
           try {
             const edges: Edge[] = incoming.get(node.id)!;
@@ -214,8 +223,19 @@ export async function executeWorkflow(
                 },
                 random: createNodeRandom(`${seed}:${node.id}`),
                 ...stateRun.context(node.id, () => callbacksActive),
+                beginWire: () => {
+                  newWireCall = true;
+                },
                 recordWire: (wire) => {
-                  if (callbacksActive) execution.nodes[node.id] = { ...execution.nodes[node.id]!, wire };
+                  if (!callbacksActive) return;
+                  const entry = execution.nodes[node.id]!;
+                  const wires = entry.wires ?? [];
+                  const replacesLast = wires.length > 0 && !newWireCall;
+                  newWireCall = false;
+                  execution.nodes[node.id] = {
+                    ...entry,
+                    wires: [...(replacesLast ? wires.slice(0, -1) : wires), wire],
+                  };
                 },
                 emit: (event) => {
                   if (callbacksActive) emit(event);

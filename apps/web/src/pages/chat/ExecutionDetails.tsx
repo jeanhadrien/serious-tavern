@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ExecutionLog } from '@st/shared';
 import { executionsApi } from '../../api.js';
 import { POST_NO_LOG } from './story/postRunText.js';
-import { LegacyRequestDetails, WireDetails } from './WireDetails.js';
+import { LegacyRequestDetails, WireDetails, WireList } from './WireDetails.js';
 
 /**
  * A run's log in a disclosure. `optional` is for a run that may have no log (a run after the reply cut short by a
@@ -13,11 +13,14 @@ export function ExecutionDetails({
   cached,
   label = 'Execution details',
   optional = false,
+  defaultOpen = false,
 }: {
   id: string;
   cached?: ExecutionLog;
   label?: string;
   optional?: boolean;
+  /** Starts expanded, for a log the user just asked for. */
+  defaultOpen?: boolean;
 }) {
   const [execution, setExecution] = useState(cached);
   const [missing, setMissing] = useState(false);
@@ -29,7 +32,7 @@ export function ExecutionDetails({
         .catch(() => setMissing(optional));
   }, [id]);
   return (
-    <details className="execution">
+    <details className="execution" open={defaultOpen || undefined}>
       <summary>{label}</summary>
       {missing && <p className="hint">{POST_NO_LOG}</p>}
       {execution && (
@@ -57,7 +60,9 @@ export function ExecutionDetails({
               {node.logs?.map((line, index) => (
                 <pre key={index}>{line}</pre>
               ))}
-              {node.wire ? (
+              {node.wires?.length ? (
+                <WireList wires={node.wires} />
+              ) : node.wire ? (
                 <WireDetails wire={node.wire} />
               ) : (
                 node.request !== undefined && <LegacyRequestDetails request={node.request} />

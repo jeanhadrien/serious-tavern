@@ -1,3 +1,5 @@
+import { isThreadSummaryField } from './threadItems.js';
+
 /** Collapses runs of whitespace to single spaces and cuts the text to `max` characters, ending with an ellipsis. */
 export function shortText(text: string, max: number): string {
   const flat = text.replace(/\s+/g, ' ').trim();
@@ -44,8 +46,11 @@ const ITEM_BOOKKEEPING: ReadonlySet<string> = new Set(['id', 'text', 'entryKey',
 export const itemText = (item: Record<string, unknown>): string =>
   typeof item.text === 'string' ? item.text : formatValue(item.text);
 
-/** The fields an item declares (everything but its bookkeeping) as name and value in words. */
+/**
+ * The fields an item declares (everything but its bookkeeping) as name and value in words. A thread item's summary
+ * (steps, tool calls, the turn and run ids) is not a field: the rows show it as a note (`threadItems.ts`).
+ */
 export const itemFields = (item: Record<string, unknown>): { name: string; value: string }[] =>
   Object.entries(item)
-    .filter(([name]) => !ITEM_BOOKKEEPING.has(name))
+    .filter(([name]) => !ITEM_BOOKKEEPING.has(name) && !isThreadSummaryField(item, name))
     .map(([name, value]) => ({ name, value: formatValue(value) }));

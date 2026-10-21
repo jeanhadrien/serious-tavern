@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  isListKeyType,
   linkedInChatOrder,
   stateKeyPortType,
   stateReads,
@@ -59,7 +60,7 @@ function outputsFor({ def }: LocatedKey, read: StateRead): PortDef[] {
       optional: true,
       description: 'The turn that last wrote the key; absent when it was never written',
     },
-    ...(def.type === 'collection'
+    ...(isListKeyType(def.type)
       ? [{ name: 'count', label: 'Count', dataType: 'number' as const, description: 'How many items the key holds' }]
       : []),
   ];
@@ -110,7 +111,7 @@ export const stateRead: NodeDefinition = {
       written,
       turnsSinceWrite,
       ...(writtenAtTurn !== null && { writtenAtTurn }),
-      ...(found.def.type === 'collection' && { count: count ?? 0 }),
+      ...(isListKeyType(found.def.type) && { count: count ?? 0 }),
     };
   },
 };

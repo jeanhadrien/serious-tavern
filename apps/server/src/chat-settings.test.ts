@@ -6,7 +6,7 @@ import type { ChatRequest } from '@st/engine';
 import { apiContract, errorEnvelopeSchema, turnEventSchema, type Session } from '@st/shared';
 import { createApp } from './app.js';
 import { mergeSettings } from './services/sessions.js';
-import { restoreAdapter, useAdapter } from './test-support/adapter.js';
+import { chatResponse, restoreAdapter, useAdapter } from './test-support/adapter.js';
 import { parseEventStream } from './test-support/event-stream.js';
 
 type App = Awaited<ReturnType<typeof createApp>>;
@@ -241,7 +241,7 @@ describe('settings while a turn streams', () => {
         entered();
         await gate;
         onToken('done');
-        return { text: 'done', raw: {} };
+        return chatResponse('done');
       },
     });
     const directory = join(process.cwd(), '.test-data', `chat-settings-${randomUUID()}`);

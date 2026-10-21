@@ -1,6 +1,7 @@
 import {
   clampToKey,
   collectionItem,
+  exchangeSummary,
   incrementedValue,
   itemFieldNeeds,
   isPlainObject,
@@ -11,6 +12,7 @@ import {
   type NumberKeyDef,
   type ScalarKeyDef,
   type StateNodeOp,
+  threadItem,
 } from '@st/shared';
 import { describeValue } from '../../text.js';
 import type { StateWriteRequest } from '../../types.js';
@@ -99,6 +101,9 @@ type Inputs = {
   current: unknown;
   /** The link a connected `messages` input stands for (an `add` only); parsed by the caller. */
   link?: ItemLink;
+  /** A thread `add`: the connected `input` (text or a message), and whether the exchange keeps its reasoning. */
+  input?: unknown;
+  keepReasoning?: boolean;
 };
 
 /** The item an `add` stores (see `collectionItem`), or an error that says what is wrong with the value. */
@@ -127,6 +132,12 @@ function planCollection(found: LocatedKey & { def: CollectionKeyDef }, op: State
       ],
     };
   }
+  return planRemove(found, ctx);
+}
+
+// Removing an item by id: what a list key (collection or thread) does for `remove`.
+function planRemove(found: LocatedKey, ctx: Inputs): WritePlan {
+  const { label } = found;
   const id = ctx.value;
   if (typeof id !== 'string' || !id.trim())
     throw new Error(`${label} needs the id of the item to remove, got ${describeValue(id)}`);
@@ -140,6 +151,25 @@ function planCollection(found: LocatedKey & { def: CollectionKeyDef }, op: State
   };
 }
 
+/** A thread key stores whole exchanges: `add` takes an LLM node's `exchange` (see `threadItem`), the rest is as for a collection. */
+function planThread(found: LocatedKey, op: StateNodeOp, ctx: Inputs): WritePlan {
+  const { label } = found;
+  if (op === 'delete') return planDelete(found, ctx);
+  if (op !== 'add') return planRemove(found, ctx);
+  const fit = threadItem(ctx.value, ctx.input, { keepReasoning: ctx.keepReasoning });
+  if (fit.problem !== undefined)
+    throw new Error(
+      `${label} needs ${fit.problem}${Array.isArray(ctx.value) ? '' : `, got ${describeValue(ctx.value)}`}`,
+    );
+  const { steps, toolCalls } = exchangeSummary(fit.item.exchange);
+  return {
+    request: { target: keyOf(found), op: 'add', item: fit.item },
+    logs: [
+      `${label}: adding an exchange of ${steps} ${steps === 1 ? 'step' : 'steps'}${toolCalls.length ? ` and ${toolCalls.length} tool ${toolCalls.length === 1 ? 'call' : 'calls'}` : ''}: ${shown(fit.item.text, 80)}`,
+    ],
+  };
+}
+
 /**
  * Decides what a State Write does with its input, from the key's definition and the value it had when the
  * turn started. Pure. Throws plain errors that name the key and what was received.
@@ -147,6 +177,7 @@ function planCollection(found: LocatedKey & { def: CollectionKeyDef }, op: State
 export function planWrite(found: LocatedKey, op: StateNodeOp, inputs: Inputs): WritePlan {
   checkOp(found.def, op);
   if (found.def.type === 'collection') return planCollection({ ...found, def: found.def }, op, inputs);
+  if (found.def.type === 'thread') return planThread(found, op, inputs);
   if (found.def.type === 'number') return planNumber({ ...found, def: found.def }, op, inputs);
   return op === 'delete' ? planDelete(found, inputs) : planScalar({ ...found, def: found.def }, inputs);
 }

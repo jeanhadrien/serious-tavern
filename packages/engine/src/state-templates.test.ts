@@ -14,7 +14,7 @@ import { executeWorkflow } from './executor.js';
 import { renderPreset } from './preset.js';
 import { registry } from './registry.js';
 import { renderTemplate, type TemplateContext } from './template.js';
-import { providerRecord, providerResources, restoreAdapter, useAdapter } from './test-providers.js';
+import { chatResponse, providerRecord, providerResources, restoreAdapter, useAdapter } from './test-providers.js';
 
 const DEF = '11111111-1111-4111-8111-111111111111';
 const scene: StateDefinition = {
@@ -207,7 +207,7 @@ describe('state in a run', () => {
   });
 
   it('gives an LLM node’s preset the state and the turn, and renders defaults without a snapshot', async () => {
-    const chat = vi.fn().mockResolvedValue({ text: 'ok', raw: {} });
+    const chat = vi.fn().mockResolvedValue(chatResponse('ok'));
     useAdapter({ chat });
     const preset = presetSchema.parse({
       id: '2b041793-416b-4c94-a541-99ab866230b7',

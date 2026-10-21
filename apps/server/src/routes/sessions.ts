@@ -3,6 +3,7 @@ import { activeMessages, apiContract } from '@st/shared';
 import type { AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
 import { setAlternative } from '../services/alternatives.js';
+import { forkSession } from '../services/fork.js';
 import { sessionStateView } from '../services/session-state.js';
 import { createSession, updateSession } from '../services/sessions.js';
 import type { ApiRoute } from './types.js';
@@ -32,6 +33,11 @@ export function registerSessions(app: FastifyInstance, context: AppContext) {
   app.patch<ApiRoute<'setAlternative'>>('/api/sessions/:id/alternative', async (request) => {
     const { id } = apiContract.setAlternative.params.parse(request.params);
     return setAlternative(context, id, apiContract.setAlternative.body.parse(request.body).executionId);
+  });
+  app.post<ApiRoute<'forkSession'>>('/api/sessions/:id/fork', async (request, reply) => {
+    const { id } = apiContract.forkSession.params.parse(request.params);
+    const { messageId } = apiContract.forkSession.body.parse(request.body);
+    return reply.code(201).send(await forkSession(context, id, messageId));
   });
   app.delete<ApiRoute<'deleteSession'>>('/api/sessions/:id', async (request, reply) => {
     const { id } = apiContract.deleteSession.params.parse(request.params);

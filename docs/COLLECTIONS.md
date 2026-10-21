@@ -137,7 +137,7 @@ Draw picks entries at random among those that pass its filters.
   absent, and the reason says `no eligible entry among 3 (2 recent excluded)`. An entry is recognised by its
   text, not its position, so moving an entry within the collection changes nothing, while **editing its text
   makes it a new entry** that is eligible again. Entries left out because they were recent are counted in the
-  reason: `drew 1 of 2 eligible (1 recent excluded)`. See the README's Story state.
+  reason: `drew 1 of 2 eligible (1 recent excluded)`. See [story state](STATE-AND-LORE.md#story-state).
 
 ## Wiring examples
 

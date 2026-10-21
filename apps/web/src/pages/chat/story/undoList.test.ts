@@ -9,6 +9,7 @@ import {
   reply,
   scene,
   setWrite,
+  threadWrite,
   userMessage,
 } from './test-fixtures.js';
 import { undoneByDelete } from './undoList.js';
@@ -171,6 +172,23 @@ describe('collections', () => {
       [capped],
     );
     expect(undo('m-e2')).toEqual(["scene.injected (forgets 'c'; brings back 'a')"]);
+  });
+});
+
+describe('threads', () => {
+  it('forgets the exchange the reply stored, with what it did', () => {
+    const { undo } = chat([
+      [threadWrite('log', 'a', 'The lamp is lit.', { calls: ['read_state', 'write_scene_mood'] })],
+    ]);
+    expect(undo('m-e1')).toEqual(["scene.log (forgets 'The lamp is lit.' (exchange: 2 tool calls · 3 steps))"]);
+  });
+
+  it('says a plain answer made no tool calls, and brings an exchange back after a removal', () => {
+    const { undo } = chat([[threadWrite('log', 'a', 'Hello')], [removeWrite('log', 'a')]]);
+    expect(undo('m-e2')).toEqual(["scene.log (brings back 'Hello' (exchange: no tool calls))"]);
+    expect(chat([[threadWrite('log', 'a', 'Hello')]]).undo('m-e1')).toEqual([
+      "scene.log (forgets 'Hello' (exchange: no tool calls))",
+    ]);
   });
 });
 

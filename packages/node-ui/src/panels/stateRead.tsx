@@ -35,8 +35,8 @@ export function StateReadPanel({ descriptor, config, onChange, context }: NodeCo
       <p className="hint">
         Its value is what the chat held when the turn started (the key's default when nothing was written); this turn's
         writes are not visible yet. When it was written gives Written, Turns since write and Written at turn, and a
-        Count for a list. Linked items (lists only) gives the items that link to chat messages and are still intact,
-        oldest message first: summaries, for instance.
+        Count for a list. Linked items (collections only) gives the items that link to chat messages and are still
+        intact, oldest message first: summaries, for instance.
       </p>
     </div>
   );

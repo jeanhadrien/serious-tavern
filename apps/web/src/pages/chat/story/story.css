@@ -106,6 +106,15 @@
   margin-top: 4px;
   font-size: 0.75rem;
 }
+/* A thread item: what the exchange did, and the way to the run log that holds it. */
+.story-thread-note {
+  display: block;
+  color: #8a91a3;
+  font-size: 0.75rem;
+}
+.story-thread-log {
+  font-size: 0.75rem;
+}
 .story-warning {
   display: flex;
   align-items: flex-start;

@@ -10,19 +10,21 @@ parts of the app that help with that, and how they fit together:
 - **Workflows after the reply:** workflows listed below the one that replies, which run once the reply is on screen, such as writing a summary.
 - **Message links and summaries:** a summary is a remembered text that knows which messages it stands for.
 - **The Trigger:** decides *whether* to inject something this turn and *how strongly*.
-- **Two ready-made examples** that put all of it together: "Fresh texture (example)" and "Rolling summaries (example)".
+- **Three ready-made examples** that put all of it together: "Fresh texture (example)", "Rolling summaries (example)"
+  and "Scenarist (example)".
 
 You don't need to read it in order. If you want to see it work first, start with [Try the examples](#try-the-examples).
 
 - [Try the examples](#try-the-examples)
 - [Chat settings](#chat-settings)
 - [Collections: Recall and Draw](#collections-recall-and-draw)
-- [Story state](#story-state)
+- [Story state](#story-state) (including [thread keys](#thread-keys))
 - [Workflows after the reply](#workflows-after-the-reply)
 - [Message links and summaries](#message-links-and-summaries)
 - [The Trigger](#the-trigger)
 - [Example 1: Fresh texture](#example-1-fresh-texture)
 - [Example 2: Rolling summaries](#example-2-rolling-summaries)
+- [Example 3: A scenarist with tools](#example-3-a-scenarist-with-tools)
 - [Seeing what happened](#seeing-what-happened)
 - [Known limitations](#known-limitations)
 
@@ -32,13 +34,15 @@ Related guides: [docs/COLLECTIONS.md](COLLECTIONS.md) (the file format, Recall a
 
 ## Try the examples
 
-Two example workflows are added to your data the first time the server starts after an upgrade, whether or not you
+Three examples are added to your data the first time the server starts after an upgrade, whether or not you
 already have workflows of your own:
 
 - **Fresh texture (example):** now and then a small detail from a deck of forest textures is put into the prompt,
   worded as an offer. The story gets variety without you writing it.
 - **Rolling summaries (example):** older messages are condensed into summaries, so a long chat keeps its memory
   without sending every message every time.
+- **Scenarist (example):** after each reply, a second model steers the plot (tension, story beat, open threads)
+  through tools, and the narrator reads its decisions from story state.
 
 Each example comes with the records it needs: a collection, state definitions and presets. They are named
 "... (example)" and each record is created once:
@@ -65,8 +69,10 @@ example in the workflow editor, click each **LLM** node, pick your own provider 
 [docs/PROVIDERS.md](PROVIDERS.md)). Rolling summaries has two LLM nodes: the one that answers and the one that
 summarizes.
 
-Then start a **New chat**, pick the example in the workflow dropdown in the chat header, and read the walkthroughs
-below: [Fresh texture](#example-1-fresh-texture), [Rolling summaries](#example-2-rolling-summaries).
+Then start a new chat (**+ New** in the chat list), open the chat panel (sliders icon in the chat header) and, under
+**On reply**, add the example's workflows and remove the others. The walkthroughs below say which:
+[Fresh texture](#example-1-fresh-texture), [Rolling summaries](#example-2-rolling-summaries),
+[Scenarist](#example-3-a-scenarist-with-tools).
 
 ## Chat settings
 
@@ -91,8 +97,11 @@ control per setting: a slider plus a number box, a checkbox, a dropdown, or a te
 at once, typed values after a short pause. The reset arrow (only shown when you stored a value) goes back to the
 default.
 
-If a stored value stops fitting (you lowered the workflow's max below it), the chat uses the default and the panel
-says why ("Stored value 0.8 is above max 0.5; using default 0.3"). The stored value is kept, never rewritten.
+A setting you never changed follows the workflow's default, so changing the default in the workflow reaches every chat
+that hasn't set its own value. If a stored value stops fitting (you lowered the workflow's max below it), the chat uses
+the default and the panel says why ("Stored value 0.8 is above max 0.5; using default 0.3"). The stored value is
+kept, never rewritten, and so are the values of settings a workflow no longer declares: switch the chat back to it and
+they return.
 
 ## Collections: Recall and Draw
 
@@ -139,7 +148,8 @@ Providers and Settings in the left column header; on a phone **Open menu**, **Se
 - **Name:** letters, digits and `_`, not starting with a digit. Templates read it as `{{state.<name>.<key>}}`.
 - **Keys:** **+ Add key**, then a name and a type: **number** (Default, Min, Max), **boolean**, **enum** (options one
   per line), **text**, **object** (a JSON object) or **collection** (a list; an optional **Cap** keeps only the newest
-  items, and **Item fields** declares extra fields per item as `name:type`; `id` and `text` always exist).
+  items, and **Item fields** declares extra fields per item as `name:type`; `id` and `text` always exist) or
+  **thread** (a list of whole LLM exchanges; an optional **Cap**, see [Thread keys](#thread-keys)).
 - Problems show as you type and **Save** stays disabled until the form is valid.
 
 On a fresh data directory (or through the examples) you get `scene`: `tension` (0 to 10, default 3), `mood` (calm,
@@ -165,6 +175,7 @@ operation the key allows:
 | number | set to a value, add to the number (the **Amount**, blank adds 1; the result stays between min and max), reset to the default |
 | boolean, enum, text, object | set to a value, reset |
 | collection | add an item (text, or an object with a `text` field and the declared item fields), remove an item by id, empty the list |
+| thread | add an exchange (from an LLM node's **Exchange** output), remove one by id, empty the thread |
 
 The panel shows one control that fits the key and operation, and what you type keeps its real type. A value connected
 to the node's input always wins over the typed one. State Write runs every turn, even when no reply depends on it,
@@ -180,6 +191,43 @@ See [docs/TEMPLATING.md](TEMPLATING.md).
 
 **A turn reads the state as it started.** What a turn writes is visible from the next turn on, never inside the same
 turn. To use a value in the same turn, connect the State Write node's output where you need it.
+
+### Thread keys
+
+A **thread** key remembers what an LLM node did, tool calls included. Its items are **exchanges**: everything one LLM
+node run produced (each step's assistant message, the results of its tool calls, and the final answer). Connect the
+LLM node's **Exchange** output to the **Exchange** input of a State Write on a thread key and pick **Add**. Optional:
+
+- **Input** (State Write): what the exchange answers, stored with it. Text is kept as a user message; a message is
+  kept with its role, content and name.
+- **Keep reasoning** (State Write setting, off by default): by default the stored exchange leaves out the model's
+  reasoning and the provider data a backend needs to continue a reasoning chain. Prior-turn reasoning is rarely needed
+  and can be large. The run's execution log keeps everything either way. The tool calls and results always stay.
+
+An item has `text` (the exchange's final answer), the `exchange`, the optional `input`, and the `turnId` and `runId` of
+the turn and run that wrote it (the app stamps them). `{{#each state.<definition>.<key>}}{{text}}{{/each}}` lists the
+answers, newest first, like any list; State Read reads the items and their count.
+
+**Reading a thread back.** Use a **Thread** node (category History) to hand the stored exchanges to a model: pick the
+definition and the thread key, and connect its **Messages** output to a messages input of an LLM node's preset (a
+history slot). Without a history connected it gives the thread on its own, oldest first, each exchange after its
+question (**With inputs**, on by default). Connect the chat's **History** (Chat Input's) to weave the exchanges into the
+chat instead: each exchange's tool calls and results land right before the reply they led to, and the final answer is
+not repeated, since the chat already shows it (an edited reply stays as edited). Exchanges whose answer is not in the
+chat (a templated reply, a run that did not reply) come after the last message of their turn. **Last N** keeps only the
+newest N exchanges. The model should have the same tools declared in the LLM node, or the preset turns tool calls it
+cannot call into plain text.
+
+A thread follows the same rules as all story state: delete the reply of the turn that wrote an exchange and it goes;
+regenerate and swipes, forks and workflows after the reply behave like for any item. **Cap** keeps the newest
+exchanges when read.
+
+Not everything fits a thread, on purpose: the LLM node's state tools never offer thread keys (a model does not write
+exchanges by hand), and the Story state section and the state view show an exchange only as its answer with a count of
+steps and tool calls. The whole exchange is in the run's execution log.
+
+Exchanges are stored inline in the chat for now, so a long chat with many tool calls makes a large chat file. Keeping
+only a reference is planned.
 
 ### The rewind rule
 
@@ -418,6 +466,35 @@ chat then summarizes messages 1 to 4 after turn 3 and the next four after turn 5
 
 One caveat: summaries and raw messages are separate prompt inputs. When a summary in the middle is broken, its raw
 messages appear after later summaries until the next turn redoes it.
+
+## Example 3: A scenarist with tools
+
+**What it does.** Two models share the work. The narrator writes the replies. After each reply, a **scenarist**
+model reads the chat and steers the plot: it raises or lowers the tension, moves the story to its next beat, and opens
+or closes plot threads, through [tools](WORKFLOWS.md#llm) that write story state. The narrator's preset reads those
+values, so the scenarist's decisions reach the story without ever appearing in the chat.
+
+**The pieces.**
+
+- The `plot` definition: `tension` (0 to 10), `beat` (setup, rising, twist, crisis, climax, aftermath), `threads`
+  (a list of open plot threads, at most 10) and `notes` (a [thread key](#thread-keys), at most 20). Each key has a
+  description the scenarist sees in its tool list.
+- The narrator workflow, **Narrator with a scenarist (example)**: Chat Input → LLM → Chat Output. Its preset is the
+  Default preset plus a system entry that reads `{{state.plot.beat}}`, `{{state.plot.tension}}` and the open
+  `{{state.plot.threads}}`.
+- The **Scenarist (example)** workflow, with no Chat Output, listed **below** the narrator so it runs after the reply:
+  Chat Input → **Thread** (`plot.notes`, woven into Chat Input's history) → **LLM** with the Scenarist preset (it may
+  read and write `tension`, `beat` and `threads`, at most 6 steps) → **State Write** that adds the LLM's
+  `Exchange` to `plot.notes`.
+- The thread is the scenarist's memory: the next turn's Thread node puts its earlier tool calls and their results back
+  into the chat, after the reply they belong to, so it remembers what it already changed. The model never writes the
+  thread itself; the State Write does.
+
+**Try it.** In a new chat, list **Narrator with a scenarist (example)** first and **Scenarist (example)** below it
+under **On reply**, then send a message. The scenarist's run shows as a quiet row above the composer; afterwards the
+turn's chip lists what it stored, and its log shows every tool call. The chat panel's **Story state** shows `plot`.
+Delete the reply and `plot` reads as it did before that turn. Without the scenarist in the list, the narrator just
+sees the default `plot` values.
 
 ## Seeing what happened
 

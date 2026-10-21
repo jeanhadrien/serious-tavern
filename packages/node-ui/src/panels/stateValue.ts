@@ -7,6 +7,7 @@ import {
   keyValueProblem,
   parseDecimal,
   type CollectionKeyDef,
+  type ScalarKeyDef,
   type StateKeyDef,
   type StateNodeOp,
 } from '@st/shared';
@@ -21,6 +22,10 @@ export function valueKind(def: StateKeyDef, op: StateNodeOp): ValueKind {
       return op === 'set' ? 'number' : op === 'increment' ? 'amount' : 'none';
     case 'collection':
       return op === 'add' ? 'item' : op === 'remove' ? 'itemId' : 'none';
+    case 'thread':
+      // The node has no fixed value for a thread (an exchange comes from an LLM node's output, an item id to
+      // remove from a connected one): the engine ignores a stored `value`.
+      return 'none';
     default:
       return op === 'set' ? def.type : 'none';
   }
@@ -108,7 +113,7 @@ export function fixedValueProblem(def: StateKeyDef, op: StateNodeOp, value: unkn
     case 'itemId':
       return typeof value === 'string' && value.trim() ? undefined : 'The fixed item id must be text';
     default: {
-      const problem = keyValueProblem(def as Exclude<StateKeyDef, CollectionKeyDef>, value);
+      const problem = keyValueProblem(def as ScalarKeyDef, value);
       return problem ? `The fixed value ${problem}` : undefined;
     }
   }

@@ -13,6 +13,9 @@ const FIRST = [
   'headers',
   'messageName',
   'reasoningFields',
+  'replayFields',
+  'reasoningReplayField',
+  'mergeAssistantMessages',
   'extraBody',
   'overrides',
 ];

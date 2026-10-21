@@ -9,9 +9,11 @@ import {
 import { formatValue, itemFields, itemText } from './format.js';
 import { groupLinked, itemLinkOf, type LinkGroups } from './linkedGroups.js';
 import { sparklinePoints, type Sparkline } from './sparklinePoints.js';
+import { threadSummaryOf, type ThreadSummary } from './threadItems.js';
 
 // The view model of the Story state section: pure functions over the `GET /api/sessions/:id/state` answer. The
-// view has no key types (nothing in this phase needed them), so a key's kind is read off its value.
+// view has no key types (nothing in this phase needed them), so a key's kind is read off its value, and a thread's
+// items are recognized by their summary shape (`threadItems.ts`).
 
 export type KeyKind = 'number' | 'boolean' | 'text' | 'object' | 'list';
 
@@ -19,7 +21,14 @@ export type KeyKind = 'number' | 'boolean' | 'text' | 'object' | 'list';
  * One item of a collection: its text and the declared extra fields (never the bookkeeping `id`, `entryKey`, `messages`
  * and `link`), and the link to chat messages the server computed for it when it has one.
  */
-export type Item = { id: string; text: string; extras: { name: string; value: string }[]; link?: ItemLinkView };
+export type Item = {
+  id: string;
+  text: string;
+  extras: { name: string; value: string }[];
+  link?: ItemLinkView;
+  /** A thread's exchange: what the view says about it (its tool calls, the run whose log holds it). */
+  thread?: ThreadSummary;
+};
 export type LinkedItem = Item & { link: ItemLinkView };
 
 export type KeyRow = {
@@ -36,6 +45,8 @@ export type KeyRow = {
   linked?: LinkGroups<LinkedItem>;
   /** Lists only: the items without a link, newest first. */
   plain: Item[];
+  /** A thread key: it has items and all of them are exchanges. */
+  exchanges: boolean;
   /** Lists only: items the definition's cap cut off. */
   dropped: number;
   /** Numeric keys with at least two numeric history points. */
@@ -70,11 +81,13 @@ export function kindOf(value: unknown): KeyKind {
 function itemOf(raw: unknown, index: number): Item {
   if (!isPlainObject(raw)) return { id: String(index), text: formatValue(raw), extras: [] };
   const link = itemLinkOf(raw);
+  const thread = threadSummaryOf(raw);
   return {
     id: typeof raw.id === 'string' ? raw.id : String(index),
     text: itemText(raw),
     extras: itemFields(raw),
     ...(link && { link }),
+    ...(thread && { thread }),
   };
 }
 
@@ -110,6 +123,7 @@ function keyRows({ values, meta, history }: KeyViews, replied: ReadonlySet<numbe
       jumpable: writtenAtTurn !== null && replied.has(writtenAtTurn),
       items,
       plain: items.filter((item) => !isLinked(item)),
+      exchanges: items.length > 0 && items.every((item) => item.thread !== undefined),
       ...(linkedItems.length > 0 && { linked: groupLinked(linkedItems) }),
       dropped: facts?.droppedByCap ?? 0,
       ...(spark && { spark }),

@@ -12,7 +12,7 @@ export interface EscapeSituation {
 
 export type EscapeStep = 'none' | 'layer' | 'leaveField' | 'area';
 
-/** The one thing an Escape press does (docs/FRONTEND-UX.md, Escape): the first step that applies. */
+/** The one thing an Escape press does (docs/dev/design/FRONTEND-UX.md, Escape): the first step that applies. */
 export function escapeStep({ handled, inDialog, layers, inField }: EscapeSituation): EscapeStep {
   if (handled || inDialog) return 'none';
   if (layers > 0) return 'layer';

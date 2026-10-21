@@ -5,6 +5,7 @@ import {
   postOfEntry,
   fingerprintMessages,
   foldStoryState,
+  isPlainObject,
   oldestFirst,
   previewWrite,
   type ChatMessage,
@@ -16,6 +17,7 @@ import {
   type StateDefinition,
   type StateWrite,
   type TurnEntry,
+  viewThreadItem,
 } from '@st/shared';
 import { definition } from '../../stateDefinitions/test-fixtures.js';
 
@@ -40,6 +42,31 @@ export const addWrite = (key: string, id: string, text: string, extra: Record<st
   nodeId: 'note',
   item: { id, text, ...extra },
 });
+/**
+ * An add to a thread key as State Write stores it: the item holds the whole exchange (the view later shows only its
+ * summary). One step per tool call, then the final answer, so `calls` names also give the steps.
+ */
+export const threadWrite = (
+  key: string,
+  id: string,
+  text: string,
+  { calls = [], runId = `run-${id}` }: { calls?: string[]; runId?: string } = {},
+): StateWrite =>
+  addWrite(key, id, text, {
+    exchange: [
+      ...calls.flatMap((name, index) => [
+        {
+          role: 'assistant',
+          content: '',
+          tool_calls: [{ id: `c${index}`, type: 'function', function: { name, arguments: '{}' } }],
+        },
+        { role: 'tool', tool_call_id: `c${index}`, content: 'ok' },
+      ]),
+      { role: 'assistant', content: text },
+    ],
+    turnId: runId,
+    runId,
+  });
 /** An add that links the item to chat messages (State Write's `messages` input, fingerprint filled in at commit). */
 export const linkedWrite = (key: string, id: string, text: string, link: ItemLink): StateWrite =>
   addWrite(key, id, text, { messages: link });
@@ -117,10 +144,16 @@ function withViewLinks(value: unknown, history: readonly ChatMessage[]): unknown
   });
 }
 
+/** The items of a list as the server's view shows them: a thread's exchange becomes its summary. */
+const withThreadSummaries = (value: unknown): unknown =>
+  Array.isArray(value) ? value.map((item) => (isPlainObject(item) ? viewThreadItem(item) : item)) : value;
+
 const keyViews = (keys: Record<string, FoldedKey>, history: readonly ChatMessage[] = []) => {
   const entries = Object.entries(keys);
   return {
-    values: Object.fromEntries(entries.map(([key, folded]) => [key, withViewLinks(folded.value, history)])),
+    values: Object.fromEntries(
+      entries.map(([key, folded]) => [key, withViewLinks(withThreadSummaries(folded.value), history)]),
+    ),
     meta: Object.fromEntries(entries.map(([key, folded]) => [key, folded.meta])),
     history: Object.fromEntries(entries.map(([key, folded]) => [key, folded.history])),
   };

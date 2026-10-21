@@ -6,6 +6,7 @@ import { PresetRepository } from './storage/preset-repository.js';
 import { ProviderRepository } from './storage/provider-repository.js';
 import { CollectionRepository } from './storage/collection-repository.js';
 import { StateDefinitionRepository } from './storage/state-definition-repository.js';
+import { AppSettingsStore } from './storage/app-settings-store.js';
 import { migrateJsonPresets } from './storage/preset-migration.js';
 import { SecretStore } from './secrets/store.js';
 import { seed } from './seed.js';
@@ -36,6 +37,8 @@ export interface AppContext {
   secrets: SecretStore;
   /** The models each provider serves, fetched on demand and cached in memory. */
   modelCatalog: ModelCatalog;
+  /** App-wide preferences (`data/app-settings.json`), see `AppSettingsStore`. */
+  appSettings: AppSettingsStore;
   turns: TurnRegistry;
   /** Fan-out of resource change events (preset files edited on disk, writes to records) to the open event streams. */
   changes: ChangeHub;
@@ -78,6 +81,7 @@ export async function createContext(
     personaAvatars: join(dataDir, 'avatars', 'personas'),
     secrets,
     modelCatalog: new ModelCatalog(secrets),
+    appSettings: new AppSettingsStore(join(dataDir, 'app-settings.json')),
     turns: new TurnRegistry(),
     changes,
   };

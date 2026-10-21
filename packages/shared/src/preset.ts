@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { findMacro, macroInputKey, templateMacros } from './macros.js';
+import { conversationMessageSchema } from './conversation/index.js';
 import { importAppSchema } from './imports.js';
 import { analyzeTemplate } from './template-analysis.js';
 
@@ -172,11 +173,8 @@ export const presetSchema = presetFieldsSchema
 export type Preset = z.infer<typeof presetSchema>;
 export type PresetInput = z.infer<typeof presetInputSchema>;
 export type PresetEntry = z.infer<typeof presetEntrySchema>;
-export const promptMessageSchema = z.object({
-  role: presetRoleSchema,
-  content: z.string(),
-  name: z.string().optional(),
-});
+// The prompt message is the canonical conversation message (tool role and tool fields are additive).
+export const promptMessageSchema = conversationMessageSchema;
 export const presetWarningSchema = z.object({
   path: z.array(z.union([z.string(), z.number()])),
   message: z.string(),

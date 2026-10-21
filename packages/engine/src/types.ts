@@ -23,9 +23,12 @@ export type EngineEvent = {
     | 'node:error'
     | 'execution:complete';
   nodeId?: string;
-  // `node:delta` carries `{ textDelta?, reasoningDelta? }`.
+  // `node:delta` carries a `NodeDelta`.
   detail?: unknown;
 };
+// What an LLM node streams. `stepStart` marks the start of every step of a tool loop after the first: the text so
+// far belonged to a step that is not the answer, so the chat clears it (reasoning is kept, see TurnStream).
+export type NodeDelta = { textDelta?: string; reasoningDelta?: string; stepStart?: boolean };
 export type NodeResources = {
   presets: { get(id: string): Promise<Preset | undefined> };
   characters?: { get(id: string): Promise<Character | undefined> };
@@ -44,6 +47,7 @@ export type StateWriteTarget =
 // `increment` becomes a `set` with the post-value, and `add` gets the item id the buffer mints for it.
 export type StateWriteRequest =
   | { target: StateWriteTarget; op: 'set'; value: unknown }
+  // A thread key's item is `text`, `exchange` and maybe `input` (`ThreadItemBody`); the buffer adds `turnId` and `runId`.
   | { target: StateWriteTarget; op: 'add'; item: { text: string } & Record<string, unknown> }
   | { target: StateWriteTarget; op: 'remove'; itemId: string }
   | { target: StateWriteTarget; op: 'delete' }
@@ -53,6 +57,8 @@ export type StateWriteRequest =
 export type StateAccess = {
   // The turn being run (1-based; 1 when the run has no state snapshot).
   readonly turn: number;
+  // The ids of the present turns, oldest first (`StateSnapshot.turnIds`); the order a thread is woven into the chat by.
+  readonly turnIds: readonly string[];
   // The `state` namespace of templates: `{ <definition name>: { <key>: value } }`. Frozen. It is a plain
   // property (no methods) because nodes pass the whole context to `renderTemplate`.
   readonly values: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
@@ -68,8 +74,9 @@ export type ExecutionContext = {
   nodeId: string;
   inputs: Record<string, unknown>;
   config: Record<string, unknown>;
-  // `turn` is the turn being run; present only when the run was given a state snapshot.
-  trigger: { message: string; sessionId: string; turn?: number };
+  // `turn` is the turn being run; present only when the run was given a state snapshot. `turnId` is the turn's id (the
+  // first run's execution id), when the caller gave one.
+  trigger: { message: string; sessionId: string; turn?: number; turnId?: string };
   history: ChatMessage[];
   character?: Character;
   persona?: Persona;
@@ -88,12 +95,22 @@ export type ExecutionContext = {
   random(): number;
   // Story state as it was when the turn started: read-only, never shows this run's writes.
   state: StateAccess;
+  // The same read access with THIS node's own writes so far applied (read-your-own-writes), as the caller's fold reads
+  // them (`executeWorkflow`'s `foldWith`). Only the writing node sees them: `state`, templates and other nodes keep the
+  // turn-start snapshot. Equal to `state` until the node writes, and always when the caller gave no `foldWith`.
+  // Computed on demand and cached until the node's next write; every call after a write may cost a fold, so call it
+  // when a read needs it, not up front.
+  pendingState(): StateAccess;
   // Asks to store story state. Buffered: nothing is stored unless this node completes, and the run's
   // stored writes are returned with its result (and with `ExecutionFailure`). `add` returns the item with
   // the id it will be stored under.
   writeState(request: StateWriteRequest): { item?: CollectionItem };
-  // Stores the node's HTTP exchange in the execution log (`wire`); each call replaces the previous one.
+  // Stores the node's HTTP exchange in the execution log (`wires`). Each call updates the current entry (a request
+  // is reported before it leaves and again with its response); `beginWire` starts the next entry.
   recordWire(exchange: WireExchange): void;
+  // Marks the start of another HTTP call: the next `recordWire` appends a new entry. Nodes making several calls
+  // (a tool loop) call it before each one; the first call needs no mark.
+  beginWire(): void;
   emit(event: EngineEvent): void;
 };
 export type NodeDefinition = {
@@ -112,7 +129,12 @@ export type NodeDefinition = {
   defaultConfig: Record<string, unknown>;
   timeoutMs?: number;
   // A sink always runs (once its inputs are ready), and so does everything it depends on, even when no Chat
-  // Output needs it: nodes that write somewhere. Chat Output is a sink.
-  sink?: boolean;
+  // Output needs it: nodes that write somewhere. Chat Output is a sink. A function decides from the node's config
+  // (an LLM node is a sink when its tools can write state); read it only through `isSink`.
+  sink?: boolean | ((config: Record<string, unknown>) => boolean);
   execute(ctx: ExecutionContext): Promise<Record<string, unknown>>;
 };
+
+/** Whether a node of this type, with this config, is a sink. */
+export const isSink = (definition: NodeDefinition, config: Record<string, unknown>): boolean =>
+  typeof definition.sink === 'function' ? definition.sink(config) : !!definition.sink;

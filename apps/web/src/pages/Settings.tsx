@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import type { SecretSummary } from '@st/shared';
 import { secretsApi } from '../api.js';
 import { alerts } from '../alerts/index.js';
+import { ChatsSection } from './settings/ChatsSection.js';
 import { ImportContent } from './settings/ImportContent.js';
 import './settings/settings.css';
 
-/** The settings form shown in L: API secrets and content import. */
+/** The settings form shown in L: API secrets, chat preferences and content import. */
 export function Settings() {
   const [secrets, setSecrets] = useState<SecretSummary[]>([]);
   const [name, setName] = useState('openrouter');
@@ -60,6 +61,7 @@ export function Settings() {
           Save secret
         </button>
       </div>
+      <ChatsSection />
       <ImportContent />
     </div>
   );

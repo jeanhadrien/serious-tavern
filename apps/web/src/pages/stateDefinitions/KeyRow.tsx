@@ -39,6 +39,15 @@ export function KeyRow({ keyDraft: key, position, problems, onChange, onRemove }
         </select>
         <IconButton icon={X} label={`Remove key ${position}`} onClick={() => onRemove(key.uid)} />
       </div>
+      <label>
+        Description
+        <input
+          aria-label={`Description of key ${position}`}
+          value={key.description}
+          placeholder="Optional. What the key is for; the model sees it when it reads or writes this key"
+          onChange={(event) => onChange(key.uid, { ...key, description: event.target.value })}
+        />
+      </label>
       <KeyTypeFields keyDraft={key} position={position} onChange={(patch) => onChange(key.uid, { ...key, ...patch })} />
       {problems.length > 0 && (
         <ul className="error state-key-problems" role="alert">

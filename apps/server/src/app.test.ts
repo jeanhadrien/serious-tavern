@@ -8,14 +8,15 @@ import { placeholderPng, writePngCard } from './card.js';
 import {
   apiContract,
   errorEnvelopeSchema,
+  forkPoints,
   type ApiEndpoint,
   type ApiResponse,
   type Character,
   type Persona,
 } from '@st/shared';
 import type { InjectOptions } from 'fastify';
-import { registry } from '@st/engine';
-import { restoreAdapter, useAdapter } from './test-support/adapter.js';
+import { isSink, registry } from '@st/engine';
+import { chatResponse, restoreAdapter, useAdapter } from './test-support/adapter.js';
 import { parseEventStream } from './test-support/event-stream.js';
 
 const directories: string[] = [];
@@ -52,8 +53,11 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     ).toEqual(['character', 'llm', 'next-chunk', 'parse-json', 'random', 'state-read', 'state-write', 'trigger']);
     for (const descriptor of nodeTypes) {
       expect(descriptor.dynamicPorts).toBe(!!registry.get(descriptor.type)?.resolvePorts);
-      expect(descriptor.sink).toBe(!!registry.get(descriptor.type)?.sink);
+      // A sink that depends on its config is described with the node's default config.
+      const definition = registry.get(descriptor.type)!;
+      expect(descriptor.sink).toBe(isSink(definition, definition.defaultConfig));
     }
+    expect(nodeTypes.find((descriptor) => descriptor.type === 'llm')?.sink).toBe(false);
     expect(nodeTypes.find((descriptor) => descriptor.type === 'chat-output')?.sink).toBe(true);
     expect(nodeTypes.find((descriptor) => descriptor.type === 'state-write')?.sink).toBe(true);
     const builtIn = await request('listProviders', { method: 'GET', url: '/api/providers' });
@@ -68,7 +72,7 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     });
     await request('getProvider', { method: 'GET', url: `/api/providers/${provider.id}` });
     useAdapter({
-      chat: async () => ({ text: '', raw: {} }),
+      chat: async () => chatResponse(''),
       listModels: async () => [{ id: 'model-a', contextLength: 8192 }],
     });
     const catalog = await request('listProviderModels', { method: 'GET', url: `/api/providers/${provider.id}/models` });
@@ -244,6 +248,21 @@ it('returns payloads conforming to every shared endpoint response contract', asy
       payload: { executionId: regenerated.execution!.id },
     });
     expect(swiped.messages.filter((item) => item.inactive).length).toBe(2);
+    // A fork after the shown reply, and the app-wide preference that decides whether it keeps the alternatives.
+    const forkPoint = forkPoints(swiped.messages).at(-1)!;
+    const forked = await request('forkSession', {
+      method: 'POST',
+      url: `/api/sessions/${session.id}/fork`,
+      payload: { messageId: forkPoint },
+    });
+    expect(forked.forkedFrom).toEqual({ sessionId: session.id, messageId: forkPoint });
+    await request('getAppSettings', { method: 'GET', url: '/api/app-settings' });
+    const settings = await request('updateAppSettings', {
+      method: 'PATCH',
+      url: '/api/app-settings',
+      payload: { forkKeepsAlternatives: false },
+    });
+    expect(settings.forkKeepsAlternatives).toBe(false);
     await request('stopTurn', { method: 'POST', url: `/api/sessions/${session.id}/stop` });
     await request('updateMessage', {
       method: 'PATCH',
@@ -263,6 +282,7 @@ it('returns payloads conforming to every shared endpoint response contract', asy
     await request('listSecrets', { method: 'GET', url: '/api/secrets' });
     await request('deleteSecret', { method: 'DELETE', url: '/api/secrets/contract' });
     await request('deleteSession', { method: 'DELETE', url: `/api/sessions/${session.id}` });
+    await request('deleteSession', { method: 'DELETE', url: `/api/sessions/${forked.id}` });
     await request('deleteWorkflow', { method: 'DELETE', url: `/api/workflows/${workflow.id}` });
     await request('deletePreset', { method: 'DELETE', url: `/api/presets/${preset.id}` });
     await request('deleteCharacter', { method: 'DELETE', url: `/api/characters/${character.id}` });

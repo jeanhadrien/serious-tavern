@@ -119,6 +119,18 @@ describe('typed fields', () => {
     ]);
   });
 
+  it('checks a thread cap like a collection cap, and a thread has no item fields to check', () => {
+    expect(only(key('t', 'thread', { cap: '0' }))).toEqual(['Cap must be a whole number, 1 or more']);
+    expect(only(key('t', 'thread', { cap: 'x' }))).toEqual(['Cap must be a number']);
+    expect(only(key('t', 'thread', { cap: '3' }))).toBeUndefined();
+    // Text left in the item fields box (the key was a collection) is not parsed, and not sent.
+    expect(only(key('t', 'thread', { fields: 'a:blob' }))).toBeUndefined();
+    expect(compile(draft([key('t', 'thread', { cap: '3', fields: 'a:text' })])).body?.keys.t).toEqual({
+      type: 'thread',
+      cap: 3,
+    });
+  });
+
   it('reports the item fields every item already has', () => {
     const messages = only(key('c', 'collection', { fields: 'id:text\ntext:number\nlevel:number' }));
     expect(messages?.[0]).toMatch(/"id" is part of every item already/);

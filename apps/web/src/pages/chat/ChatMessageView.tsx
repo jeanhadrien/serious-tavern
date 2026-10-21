@@ -26,6 +26,10 @@ interface ChatMessageViewProps {
   undoOnDelete?: () => readonly string[] | undefined;
   /** Regenerate and swipe controls: given only to the last reply of the last turn. */
   alternatives?: AlternativeControlsProps;
+  /** Forks the chat after this reply: given only to fork points (see `forkPoints`). */
+  onFork?: (id: string) => void;
+  /** The Fork button waits for a run after the reply, which the server would refuse to fork under. */
+  forkDisabled?: boolean;
   disabled?: boolean;
   onEdit?: (id: string, content: string) => Promise<boolean>;
   onDelete?: (id: string) => Promise<boolean>;
@@ -50,6 +54,8 @@ export function ChatMessageView({
   links,
   undoOnDelete,
   alternatives,
+  onFork,
+  forkDisabled,
   disabled = false,
   onEdit,
   onDelete,
@@ -104,10 +110,12 @@ export function ChatMessageView({
           <small>{user ? 'User' : 'Assistant'}</small>
           {!editing && marker.button}
         </div>
-        {(copyable || (onEdit && onDelete)) && (
+        {(copyable || onFork || (onEdit && onDelete)) && (
           <MessageActions
             disabled={disabled || editing}
             copyText={copyable ? message.content : undefined}
+            onFork={onFork && (() => onFork(message.id))}
+            forkDisabled={forkDisabled}
             onEdit={onEdit && onDelete ? () => setEditing(true) : undefined}
             onDelete={onEdit && onDelete ? () => onDelete(message.id) : undefined}
             undoOnDelete={undoOnDelete}

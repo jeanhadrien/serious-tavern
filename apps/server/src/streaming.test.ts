@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
-import type { ChatRequest, StreamOptions } from '@st/engine';
+import type { ChatRequest, ChatResponse, StreamOptions } from '@st/engine';
 import {
   apiContract,
   turnEventSchema,
@@ -15,10 +15,10 @@ import {
 } from '@st/shared';
 import { createApp } from './app.js';
 import { historyMessages, settleTurn } from './services/settle-turn.js';
-import { restoreAdapter, useAdapter } from './test-support/adapter.js';
+import { chatResponse, restoreAdapter, useAdapter } from './test-support/adapter.js';
 import { parseEventStream } from './test-support/event-stream.js';
 
-type Script = (request: ChatRequest, options: StreamOptions) => Promise<{ text: string; raw: unknown }>;
+type Script = (request: ChatRequest, options: StreamOptions) => Promise<ChatResponse>;
 type Frame = ReturnType<typeof parseEventStream>[number];
 
 const directories: string[] = [];
@@ -154,7 +154,7 @@ describe('streamed turns', () => {
       await gate;
       onToken('lo');
       await finished;
-      return { text: 'Hello', raw: {} };
+      return chatResponse('Hello');
     });
     const { app, session } = await setup((presetId) => ({
       nodes: [node('input', 'chat-input'), llmNode('llm', presetId, provider), node('output', 'chat-output')],
@@ -166,7 +166,7 @@ describe('streamed turns', () => {
         const current = await readSession(app, session.id);
         return assistantRows(current).find((message) => message.content === 'Hel');
       });
-      expect(row).toMatchObject({ status: 'streaming', nodeId: 'output', reasoning: 'think' });
+      expect(row).toMatchObject({ status: 'streaming', nodeId: 'output', sourceNodeId: 'llm', reasoning: 'think' });
       const updatedAt = (await readSession(app, session.id)).updatedAt;
       // Flushes write message text only; the session's updatedAt keeps the send time.
       vi.setSystemTime(new Date('2030-01-01T00:05:00.000Z'));
@@ -198,6 +198,7 @@ describe('streamed turns', () => {
             content: 'Hello',
             status: 'final',
             nodeId: 'output',
+            sourceNodeId: 'llm',
             reasoning: 'think',
             executionId: (start as unknown as { executionId: string }).executionId,
           },
@@ -214,8 +215,45 @@ describe('streamed turns', () => {
     }
   });
 
+  it('stores the LLM node on the replies of passthrough outputs, streamed or not, and on no other reply', async () => {
+    useAdapter({
+      chat: async () => chatResponse('B'),
+      stream: async (_request, { onToken }) => {
+        onToken('A');
+        return chatResponse('A');
+      },
+    });
+    const { app, session } = await setup((presetId) => ({
+      nodes: [
+        node('input', 'chat-input'),
+        llmNode('llmA', presetId, 'openrouter'),
+        node('outA', 'chat-output'),
+        node('llmB', 'llm', { presetId, provider: 'openrouter', model: 'm', streaming: false }),
+        node('outB', 'chat-output'),
+        llmNode('llmC', presetId, 'openrouter'),
+        node('outC', 'chat-output', { template: '[{{input.value}}]' }),
+      ],
+      edges: [
+        edge('llmA', 'text', 'outA', 'value'),
+        edge('llmB', 'text', 'outB', 'value'),
+        edge('llmC', 'text', 'outC', 'value'),
+      ],
+    }));
+    try {
+      expect((await app.inject(streamRequest(session.id, 'hi'))).statusCode).toBe(200);
+      const replies = assistantRows(await readSession(app, session.id));
+      const sourceOf = (content: string) => replies.find((message) => message.content === content)?.sourceNodeId;
+      expect(replies.map((message) => message.content).sort()).toEqual(['A', 'B', '[A]']);
+      expect(sourceOf('A')).toBe('llmA');
+      expect(sourceOf('B')).toBe('llmB');
+      expect(replies.find((message) => message.content === '[A]')).not.toHaveProperty('sourceNodeId');
+    } finally {
+      await app.close();
+    }
+  });
+
   it('stores the reasoning of a non-streamed LLM call on its reply, like streamed reasoning', async () => {
-    useAdapter({ chat: async () => ({ text: 'Hello', reasoning: 'think', raw: {} }) });
+    useAdapter({ chat: async () => chatResponse('Hello', { reasoning: 'think' }) });
     const { app, session } = await setup((presetId) => ({
       nodes: [
         node('input', 'chat-input'),
@@ -248,7 +286,7 @@ describe('streamed turns', () => {
     const provider = useProvider(async (_request, { onToken }) => {
       onToken('Hi');
       await gate;
-      return { text: 'Hi', raw: {} };
+      return chatResponse('Hi');
     });
     const { app, session } = await setup((presetId) => ({
       nodes: [
@@ -284,11 +322,11 @@ describe('streamed turns', () => {
       if (request.model === 'fast') {
         onToken('first');
         await fastGate;
-        return { text: 'first', raw: {} };
+        return chatResponse('first');
       }
       await slowGate;
       onToken('second');
-      return { text: 'second', raw: {} };
+      return chatResponse('second');
     });
     const { app, session } = await setup((presetId) => ({
       nodes: [
@@ -454,7 +492,7 @@ describe('streamed turns', () => {
     const provider = useProvider(async (_request, { onToken, signal }) => {
       if (mode === 'done') {
         onToken('Done');
-        return { text: 'Done', raw: {} };
+        return chatResponse('Done');
       }
       onToken('PARTIAL-TOKENS');
       await new Promise<never>((_resolve, reject) =>
@@ -614,6 +652,32 @@ describe('finalizing a turn', () => {
     expect(settled.assistantMessages.map(({ id, content, status }) => [id, content, status])).toEqual([
       ['row-1', 'Hello', 'final'],
       ['row-2', 'Still going', 'partial'],
+    ]);
+  });
+
+  it('stores the source LLM node on promoted and partial rows of passthrough outputs only', () => {
+    const current = session([structuredClone(user)]);
+    const other = { ...streamed, id: 'row-2', outputId: 'other', content: 'Still going', reasoning: '' };
+    const settled = settleTurn(current, {
+      executionId: 'execution',
+      userMessage: structuredClone(user),
+      replies: [
+        { nodeId: 'output', content: 'Hello' },
+        { nodeId: 'templated', content: 'Templated' },
+      ],
+      streamed: [streamed, other],
+      sources: new Map([
+        ['output', 'llm-1'],
+        ['other', 'llm-2'],
+      ]),
+      run: { executionId: 'execution', workflowId: 'workflow', status: 'stopped' },
+    });
+    expect(
+      settled.assistantMessages.map(({ content, status, sourceNodeId }) => [content, status, sourceNodeId]),
+    ).toEqual([
+      ['Hello', 'final', 'llm-1'],
+      ['Templated', undefined, undefined],
+      ['Still going', 'partial', 'llm-2'],
     ]);
   });
 

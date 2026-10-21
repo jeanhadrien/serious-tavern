@@ -13,6 +13,8 @@ export interface KeyDraft {
   uid: string;
   name: string;
   type: StateKeyType;
+  /** What the key is for; shown to the model by the LLM node's state tools. */
+  description: string;
   /** Number text, `true`/`false`/'' for a boolean, an option for an enum, text, or object JSON. */
   default: string;
   min: string;
@@ -38,12 +40,13 @@ export interface DefinitionDraft {
 
 /** The properties the form edits for each key type; everything else of a stored key goes to `rest`. */
 const KNOWN: Record<StateKeyType, readonly string[]> = {
-  number: ['type', 'default', 'min', 'max'],
-  boolean: ['type', 'default'],
-  enum: ['type', 'options', 'default'],
-  text: ['type', 'default'],
-  object: ['type', 'default'],
-  collection: ['type', 'cap', 'fields'],
+  number: ['type', 'description', 'default', 'min', 'max'],
+  boolean: ['type', 'description', 'default'],
+  enum: ['type', 'description', 'options', 'default'],
+  text: ['type', 'description', 'default'],
+  object: ['type', 'description', 'default'],
+  collection: ['type', 'description', 'cap', 'fields'],
+  thread: ['type', 'description', 'cap'],
 };
 
 const withoutKnown = (type: StateKeyType, properties: Record<string, unknown>) =>
@@ -53,6 +56,7 @@ const blankKey = (uid: string, type: StateKeyType, name = ''): KeyDraft => ({
   uid,
   name,
   type,
+  description: '',
   default: '',
   min: '',
   max: '',
@@ -63,7 +67,11 @@ const blankKey = (uid: string, type: StateKeyType, name = ''): KeyDraft => ({
 });
 
 function keyDraft(uid: string, name: string, def: StateKeyDef): KeyDraft {
-  const key: KeyDraft = { ...blankKey(uid, def.type, name), rest: withoutKnown(def.type, def) };
+  const key: KeyDraft = {
+    ...blankKey(uid, def.type, name),
+    description: def.description ?? '',
+    rest: withoutKnown(def.type, def),
+  };
   switch (def.type) {
     case 'number':
       return { ...key, default: numberText(def.default), min: numberText(def.min), max: numberText(def.max) };
@@ -77,6 +85,8 @@ function keyDraft(uid: string, name: string, def: StateKeyDef): KeyDraft {
       return { ...key, default: objectText(def.default) };
     case 'collection':
       return { ...key, cap: numberText(def.cap), fields: fieldsText(def.fields) };
+    case 'thread':
+      return { ...key, cap: numberText(def.cap) };
   }
 }
 
@@ -92,9 +102,10 @@ let created = 0;
 /** A blank row for a number key (the most common). */
 export const newKeyDraft = (): KeyDraft => blankKey(`n${++created}`, 'number');
 
-/** Switches a key's type: what belonged to the old type is cleared, the name and unknown properties stay. */
+/** Switches a key's type: what belonged to the old type is cleared, the name, description and unknown properties stay. */
 export const changeKeyType = (key: KeyDraft, type: StateKeyType): KeyDraft => ({
   ...blankKey(key.uid, type, key.name),
+  description: key.description,
   rest: withoutKnown(type, key.rest),
 });
 

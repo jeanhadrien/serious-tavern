@@ -13,11 +13,25 @@ export type Option = { value: string; label: string };
 
 /**
  * What the picker is for: a State Read or State Write (any key), or a node that works on a list (`collection`:
- * Next Chunk, Unlinked Messages), which only offers collection keys and leaves `read`/`op` alone.
+ * Next Chunk, Unlinked Messages), which only offers collection keys and leaves `read`/`op` alone. `thread` is the same
+ * for the Thread node and thread keys. `target` picks any key and nothing else (the LLM node's tool lists).
  */
-export type PickerKind = 'read' | 'write' | 'collection';
+export type PickerKind = 'read' | 'write' | 'collection' | 'thread' | 'target';
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
+
+/** The key type a list or thread picker is for. */
+const onlyType = (kind: PickerKind | undefined): StateKeyType | undefined =>
+  kind === 'collection' || kind === 'thread' ? kind : undefined;
+
+/**
+ * Whether the picker offers a key of this type: a list picker only collections, the Thread picker only threads; the
+ * tools picker (`target`) everything but threads (an exchange is not something a model reads or writes by hand).
+ */
+const offers = (kind: PickerKind | undefined, type: StateKeyType): boolean => {
+  const only = onlyType(kind);
+  return only ? type === only : kind !== 'target' || type !== 'thread';
+};
 
 /**
  * What the picker tells the user to do next: create a definition when there is none, else pick the definition,
@@ -32,8 +46,11 @@ export function pickerHint(
   if (!catalog.length) return 'Create a state definition in the State definitions list first.';
   if (!text(config.definitionId)) return 'Select a state definition.';
   const definition = catalog.find((item) => item.id === text(config.definitionId));
-  if (kind === 'collection' && definition && !Object.values(definition.keys).some((key) => key.type === 'collection'))
-    return 'This definition has no list (collection) key. Add one in the definitions editor.';
+  const only = onlyType(kind);
+  if (only && definition && !Object.values(definition.keys).some((key) => key.type === only))
+    return only === 'thread'
+      ? 'This definition has no thread key. Add one in the definitions editor.'
+      : 'This definition has no list (collection) key. Add one in the definitions editor.';
   if (!text(config.key)) return 'Select a key.';
   return undefined;
 }
@@ -49,7 +66,7 @@ export function definitionOptions(current: unknown, catalog: readonly StateDefin
 /** The keys of a definition (`name (type)`); a configured key it does not have comes first as an unknown entry. */
 export function keyOptions(definition: StateDefinition | undefined, current: unknown, kind?: PickerKind): Option[] {
   const options = Object.entries(definition?.keys ?? {})
-    .filter(([, def]) => kind !== 'collection' || def.type === 'collection')
+    .filter(([, def]) => offers(kind, def.type))
     .map(([name, def]) => ({
       value: name,
       label: `${name} (${def.type})`,
@@ -57,8 +74,10 @@ export function keyOptions(definition: StateDefinition | undefined, current: unk
   const key = text(current);
   if (!key || options.some((option) => option.value === key)) return options;
   const other = definition && Object.hasOwn(definition.keys, key) ? definition.keys[key] : undefined;
-  // A key that exists but is not a list (the picker is for lists): said as what it is, not as unknown.
-  const label = other ? `${key} (${other.type}: not a list)` : `Unknown key (${key})`;
+  // A key that exists but is not offered (not a list for a list picker, not a thread for the Thread picker; a thread
+  // for tools): said as what it is, not as unknown.
+  const why = kind === 'target' ? 'not available to tools' : kind === 'thread' ? 'not a thread' : 'not a list';
+  const label = other ? `${key} (${other.type}: ${why})` : `Unknown key (${key})`;
   return [{ value: key, label }, ...options];
 }
 
@@ -75,7 +94,8 @@ export function readOptions(type: StateKeyType | undefined, current: string): St
 
 /**
  * The config after the user picks a definition and key. A State Read (`read`) goes back to `value` when its read
- * does not fit the new key's type (`linked` is for collections). A State Write (`write`) also fits `op` to the
+ * does not fit the new key's type (`linked` is for collections). `collection`, `thread` and `target` only set the target. A
+ * State Write (`write`) also fits `op` to the
  * key's type (the first operation it allows when the current one is not allowed) and drops its fixed `value` when
  * the definition or key changed, because that value was typed for another key.
  */
@@ -86,7 +106,7 @@ export function retarget(
   kind: PickerKind,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...config, definitionId: next.definitionId, key: next.key };
-  if (kind === 'collection') return result;
+  if (kind === 'collection' || kind === 'thread' || kind === 'target') return result;
   const def = catalog.find((definition) => definition.id === next.definitionId)?.keys[next.key];
   if (kind === 'read') {
     const read = text(config.read) || 'value';
@@ -94,6 +114,8 @@ export function retarget(
     return result;
   }
   if (config.definitionId !== next.definitionId || config.key !== next.key) delete result.value;
+  // The option belongs to thread keys; another key does not carry it along (a missing key keeps what it had).
+  if (def && def.type !== 'thread') delete result.keepReasoning;
   if (def) {
     const allowed = stateOpsFor(def.type);
     const op = text(config.op) || 'set';
@@ -111,10 +133,8 @@ export function pickDefinition(
 ): Record<string, unknown> {
   const definition = catalog.find((item) => item.id === definitionId);
   const key = text(config.key);
-  const fits =
-    definition &&
-    Object.hasOwn(definition.keys, key) &&
-    (kind !== 'collection' || definition.keys[key]?.type === 'collection');
+  const type = definition && Object.hasOwn(definition.keys, key) ? definition.keys[key]?.type : undefined;
+  const fits = type !== undefined && offers(kind, type);
   return retarget(config, { definitionId, key: fits ? key : '' }, catalog, kind);
 }
 
@@ -124,3 +144,12 @@ export const pickKey = (
   catalog: readonly StateDefinition[],
   kind: PickerKind,
 ): Record<string, unknown> => retarget(config, { definitionId: text(config.definitionId), key }, catalog, kind);
+
+/**
+ * The config with State Write's `keepReasoning` option set. Off removes the setting: it is only ever stored as
+ * `true`, so a node that never used it keeps a config without it.
+ */
+export function withKeepReasoning(config: Record<string, unknown>, keep: boolean): Record<string, unknown> {
+  const { keepReasoning: _previous, ...rest } = config;
+  return keep ? { ...rest, keepReasoning: true } : rest;
+}

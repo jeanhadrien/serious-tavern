@@ -58,6 +58,10 @@ export const messageSchema = z
     // Stored for display only; reasoning never enters prompt content.
     reasoning: z.string().optional(),
     nodeId: z.string().optional(),
+    // An assistant message only: the LLM node whose text this reply is, set for the replies of passthrough Chat Outputs
+    // (no template, fed by exactly one LLM's text). Absent on every other reply and in older messages. `weaveThread`
+    // uses it with `runId` to find the reply that carries a thread exchange's answer.
+    sourceNodeId: z.string().optional(),
     // Set when the content was edited after it was stored (display only: stored state is never recomputed).
     editedAt: z.string().optional(),
     // Regenerate and swipes (alternatives.ts): on the replies of a regenerated alternative, the `executionId` of the
@@ -87,6 +91,9 @@ export const sessionSchema = z
     // What the chat's settled turns stored (see state/). Absent in older files, and stored records are not
     // parsed on read: read the entries through `readTurnEntries`, never as `session.state.turns`.
     state: sessionStateSchema.optional(),
+    // Set on a chat forked from another (fork.ts): the source chat and the reply the fork was cut after. Provenance
+    // only, nothing reads it yet. Absent on every other chat.
+    forkedFrom: z.object({ sessionId: z.string(), messageId: z.string() }).optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -122,7 +129,9 @@ export const nodeExecutionSchema = z
     logs: z.array(z.string()).optional(),
     /** The canonical LLM request; only in logs written before the wire log existed. */
     request: z.unknown().optional(),
-    /** What an LLM node actually sent and received. */
+    /** What an LLM node actually sent and received, one entry per HTTP call, in order. */
+    wires: z.array(wireExchangeSchema).optional(),
+    /** The single exchange that older logs wrote before `wires`; still read, no longer written. */
     wire: wireExchangeSchema.optional(),
   })
   .passthrough();
@@ -163,7 +172,10 @@ export const nodeTypeDescriptorSchema = z.object({
   description: z.string(),
   category: z.string(),
   dynamicPorts: z.boolean(),
-  /** Runs, with its upstream, even when no Chat Output needs it. Always sent by the server. */
+  /**
+   * Runs, with its upstream, even when no Chat Output needs it. Always sent by the server. Static: for a node whose
+   * sink-ness depends on its config (the LLM node, when its tools can write) it describes the default config.
+   */
   sink: z.boolean().optional(),
   inputs: z.array(portSchema),
   outputs: z.array(portSchema),

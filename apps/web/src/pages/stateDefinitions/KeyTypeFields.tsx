@@ -147,5 +147,25 @@ export function KeyTypeFields({ keyDraft: key, position, onChange }: KeyTypeFiel
           </label>
         </>
       );
+    case 'thread':
+      // A thread holds one LLM exchange per item (State Write adds an LLM node's Exchange output); only a cap to set.
+      return (
+        <label>
+          Cap
+          <input
+            aria-label={of('Cap')}
+            inputMode="numeric"
+            spellCheck={false}
+            value={key.cap}
+            placeholder="no limit"
+            onChange={(event) => onChange({ cap: event.target.value })}
+          />
+          <small>Only this many of the newest exchanges are kept when read.</small>
+          <small className="state-info">
+            Each item is one LLM exchange, tool calls included, added with State Write from an LLM node's Exchange
+            output.
+          </small>
+        </label>
+      );
   }
 }

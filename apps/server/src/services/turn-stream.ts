@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { ApiResponse, Character, ChatMessage, Session } from '@st/shared';
-import type { EngineEvent, PreparedWorkflow } from '@st/engine';
+import type { EngineEvent, NodeDelta, PreparedWorkflow } from '@st/engine';
 import type { Repository } from '../storage/repository.js';
 import { now } from '../context.js';
 import { passthroughSources, replyRanks } from './stream-bindings.js';
@@ -38,6 +38,10 @@ type StreamState = {
   reasoning: string;
   unsentText: string;
   unsentReasoning: string;
+  // A step of a tool loop ended: the next frame tells the client to clear the text it holds first.
+  resetPending: boolean;
+  // The next reasoning starts a new step's: it is separated from what came before by a blank line.
+  reasoningBreak: boolean;
 };
 
 /**
@@ -86,6 +90,8 @@ export class TurnStream {
         reasoning: '',
         unsentText: '',
         unsentReasoning: '',
+        resetPending: false,
+        reasoningBreak: false,
       };
       this.streams.push(stream);
       this.byLlm.set(llmId, [...(this.byLlm.get(llmId) ?? []), stream]);
@@ -111,7 +117,7 @@ export class TurnStream {
         this.enqueue(() => this.pump(false));
         break;
       case 'node:delta':
-        this.absorb(nodeId, event.detail as { textDelta?: string; reasoningDelta?: string });
+        this.absorb(nodeId, event.detail as NodeDelta | undefined);
         break;
     }
   };
@@ -126,21 +132,40 @@ export class TurnStream {
     return this.streams.filter((stream) => stream.started).map((stream) => this.row(stream));
   }
 
-  private absorb(llmId: string, detail: { textDelta?: string; reasoningDelta?: string } | undefined) {
-    const textDelta = detail?.textDelta ?? '';
-    const reasoningDelta = detail?.reasoningDelta ?? '';
+  private absorb(llmId: string, detail: NodeDelta | undefined) {
     const targets = this.byLlm.get(llmId) ?? [];
-    if (!targets.length || (!textDelta && !reasoningDelta)) return;
-    for (const stream of targets) {
-      stream.started = true;
-      stream.dirty = true;
-      stream.content += textDelta;
-      stream.reasoning += reasoningDelta;
-      stream.unsentText += textDelta;
-      stream.unsentReasoning += reasoningDelta;
+    if (!targets.length) return;
+    if (detail?.stepStart) {
+      for (const stream of targets) this.startStep(stream);
+    } else {
+      const textDelta = detail?.textDelta ?? '';
+      const reasoningDelta = detail?.reasoningDelta ?? '';
+      if (!textDelta && !reasoningDelta) return;
+      for (const stream of targets) {
+        stream.started = true;
+        stream.dirty = true;
+        // The first reasoning of a later step is set apart from the earlier steps' reasoning.
+        const reasoning = stream.reasoningBreak && reasoningDelta ? `\n\n${reasoningDelta}` : reasoningDelta;
+        if (reasoningDelta) stream.reasoningBreak = false;
+        stream.content += textDelta;
+        stream.reasoning += reasoning;
+        stream.unsentText += textDelta;
+        stream.unsentReasoning += reasoning;
+      }
     }
     this.enqueue(() => this.pump(false));
     this.scheduleFlush();
+  }
+
+  // A tool loop moved on to its next step. Only the last step's text is the answer, so the text so far is dropped
+  // (stored rows then hold the last step's text only, a partial one included); reasoning is kept, step by step.
+  private startStep(stream: StreamState) {
+    if (stream.reasoning) stream.reasoningBreak = true;
+    if (!stream.content) return;
+    stream.content = '';
+    stream.unsentText = '';
+    stream.resetPending = true;
+    stream.dirty = true;
   }
 
   private scheduleFlush() {
@@ -160,14 +185,16 @@ export class TurnStream {
         if (!stamp) continue;
         await this.mint(stream, stamp);
       }
-      if (!stream.unsentText && !stream.unsentReasoning) continue;
+      if (!stream.unsentText && !stream.unsentReasoning && !stream.resetPending) continue;
       const frame = {
         type: 'node.delta' as const,
         nodeId: stream.outputId,
         runId: this.options.runId,
+        ...(stream.resetPending ? { reset: true } : {}),
         ...(stream.unsentText ? { textDelta: stream.unsentText } : {}),
         ...(stream.unsentReasoning ? { reasoningDelta: stream.unsentReasoning } : {}),
       };
+      stream.resetPending = false;
       stream.unsentText = '';
       stream.unsentReasoning = '';
       this.options.emit(frame);
@@ -197,6 +224,7 @@ export class TurnStream {
         content: stream.content,
         status: 'streaming',
         nodeId: stream.outputId,
+        sourceNodeId: stream.llmId,
         executionId: this.options.executionId,
         runId: this.options.runId,
         ...(this.options.alternativeOf ? { alternativeOf: this.options.alternativeOf } : {}),

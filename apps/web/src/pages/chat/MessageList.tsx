@@ -34,6 +34,10 @@ interface MessageListProps {
   onRegenerate: () => void;
   /** Shows another alternative of the last turn (by its `executionId`); true when it was saved. */
   onSwipe: (executionId: string) => Promise<boolean>;
+  /** The ids of the replies a fork may start from (`forkPoints` over `messages`); only these get the Fork button. */
+  forkable?: ReadonlySet<string>;
+  /** Forks the chat after the reply with this id. */
+  onFork?: (messageId: string) => void;
   /** "Show in Story state" on a message's marker: the id of the state item to show. */
   onShowLinked?: (itemId: string) => void;
 }
@@ -54,6 +58,8 @@ export function MessageList({
   lastTurn: last = null,
   onRegenerate,
   onSwipe,
+  forkable,
+  onFork,
   onShowLinked,
 }: MessageListProps) {
   const { viewport, content, onScroll } = useStickToBottom(sessionId, messages);
@@ -117,6 +123,8 @@ export function MessageList({
                   }
                 : undefined
             }
+            onFork={forkable?.has(message.id) ? onFork : undefined}
+            forkDisabled={queued}
             disabled={disabled}
             onEdit={onEdit}
             onDelete={onDelete}

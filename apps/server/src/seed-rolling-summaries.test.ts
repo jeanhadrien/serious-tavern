@@ -6,7 +6,7 @@ import type { ChatRequest } from '@st/engine';
 import { apiContract, type SessionStateView } from '@st/shared';
 import { createApp } from './app.js';
 import { ROLLING_SUMMARIES_WORKFLOW_ID, SUMMARIZE_WORKFLOW_ID } from './examples/rolling-summaries.js';
-import { restoreAdapter, useAdapter } from './test-support/adapter.js';
+import { chatResponse, restoreAdapter, useAdapter } from './test-support/adapter.js';
 import { readSession, turn, type App } from './test-support/story.js';
 import { makeListSession } from './test-support/triggers.js';
 
@@ -44,10 +44,10 @@ it('summarizes the oldest chunk in the workflow below the narrator, uses the sum
     chat: async (request) => {
       if (isSummarizer(request)) {
         summarizer.push(request);
-        return { text: `SUMMARY ${summarizer.length}`, raw: {} };
+        return chatResponse(`SUMMARY ${summarizer.length}`);
       }
       narrator.push(request);
-      return { text: `reply ${narrator.length}`, raw: {} };
+      return chatResponse(`reply ${narrator.length}`);
     },
   });
   app = await createApp(directory, { seed: true, examples: true });

@@ -12,6 +12,7 @@ import {
   type FoldedKey,
   type StateWrite,
   type TurnEntry,
+  viewThreadItem,
   type Workflow,
 } from '@st/shared';
 import type { AppContext } from '../context.js';
@@ -24,12 +25,16 @@ type View = ApiResponse<'getSessionState'>;
 
 /**
  * The folded keys as the three parallel records of the API. With `history`, the items of a collection key that link to
- * messages carry their `link` (see `itemLinkViewSchema`).
+ * messages carry their `link` (see `itemLinkViewSchema`). The items of a thread key are their summaries
+ * (`viewThreadItem`): the view never carries an exchange.
  */
 function keyViews(keys: Record<string, FoldedKey>, history?: readonly ChatMessage[]) {
   const entries = Object.entries(keys);
-  const viewOf = ({ value, meta }: FoldedKey) =>
-    history && meta.count !== undefined && Array.isArray(value) ? withLinkViews(value, history) : value;
+  const viewOf = ({ value, meta }: FoldedKey) => {
+    if (meta.count === undefined || !Array.isArray(value)) return value;
+    const items = value.map(viewThreadItem);
+    return history ? withLinkViews(items, history) : items;
+  };
   return {
     values: Object.fromEntries(entries.map(([key, folded]) => [key, viewOf(folded)])),
     meta: Object.fromEntries(entries.map(([key, folded]) => [key, folded.meta])),

@@ -10,6 +10,7 @@ import {
   reply,
   scene,
   setWrite,
+  threadWrite,
   userMessage,
 } from './test-fixtures.js';
 import type { StoryPanelData } from './useStoryState.js';
@@ -54,6 +55,29 @@ it('shows each key with its value and when it was written', () => {
   );
   expect(html).toContain('written at <button type="button" class="story-turn-link">turn 3</button>');
   expect(html).toContain('written at <button type="button" class="story-turn-link">turn 2</button>');
+});
+
+it('shows a thread as exchanges: the text, what the exchange did, and a way to its run log', () => {
+  const view = buildView({
+    messages: [userMessage(), reply('e1'), userMessage('u2'), reply('e2')],
+    entries: [
+      entry('e1', [threadWrite('log', 'l1', 'The lamp is lit.', { calls: ['read_state', 'write_scene_mood'] })]),
+      entry('e2', [threadWrite('log', 'l2', 'Plain answer', { runId: 'run-2' })]),
+    ],
+  });
+  const html = render({ failed: false, view });
+  expect(html).toContain('<summary>2 exchanges</summary>');
+  expect(html).toContain('The lamp is lit.');
+  expect(html).toContain(
+    '<small class="story-thread-note" title="read_state, write_scene_mood">2 tool calls · 3 steps</small>',
+  );
+  expect(html).toContain('<small class="story-thread-note">no tool calls</small>');
+  // The log is asked for, never loaded with the row; the summary fields are not listed as item fields.
+  expect(html.match(/>Run log<\/button>/g)).toHaveLength(2);
+  expect(html).not.toContain('Execution details');
+  expect(html).not.toContain('Run details');
+  expect(html).not.toContain('story-item-fields');
+  expect(html).not.toContain('run-2');
 });
 
 it('says "never written" for keys no turn wrote', () => {
@@ -225,7 +249,8 @@ it.each([
     ],
   });
   const html = render({ failed: false, view });
-  expect(html.includes('<details class="story-list" open="">')).toBe(open);
+  // The scene's empty thread is open too, so look at the list that holds the items.
+  expect(html.includes(`<details class="story-list" open=""><summary>${count} items`)).toBe(open);
 });
 
 it('gives an object value its full pretty-printed JSON as the tooltip', () => {

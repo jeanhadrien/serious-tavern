@@ -15,6 +15,9 @@ export const providerOverrideSchema = z
     match: z.string().min(1),
     messageName: wireName.nullable().optional(),
     reasoningFields: z.array(wireName).optional(),
+    replayFields: z.array(wireName).optional(),
+    reasoningReplayField: wireName.nullable().optional(),
+    mergeAssistantMessages: z.boolean().optional(),
     headers: z.record(z.string(), z.string()).optional(),
     extraBody: z.record(z.string(), z.unknown()).optional(),
   })
@@ -40,6 +43,13 @@ export const providerFieldsSchema = z
     messageName: wireName.nullable().default('name'),
     // Fields read from a stream delta / response message for the reasoning trace; the first non-empty one wins.
     reasoningFields: z.array(wireName).default(['reasoning', 'reasoning_content']),
+    // Message-level fields of a response that the backend needs back on later requests (OpenRouter's
+    // `reasoning_details`). Kept in the message's `provider_data` and sent back as they are.
+    replayFields: z.array(wireName).default([]),
+    // Wire field a message's `reasoning` is sent back under; null means reasoning is never sent.
+    reasoningReplayField: wireName.nullable().default(null),
+    // Join consecutive assistant messages (without tool calls) into one before sending, for backends that refuse them.
+    mergeAssistantMessages: z.boolean().default(false),
     // Merged into the request body last.
     extraBody: z.record(z.string(), z.unknown()).default({}),
     overrides: z.array(providerOverrideSchema).default([]),
@@ -74,6 +84,9 @@ export const builtInProviders: readonly Provider[] = [
     headers: { 'HTTP-Referer': 'https://github.com/serious-tavern', 'X-Title': 'Serious Tavern' },
     messageName: 'name',
     reasoningFields: ['reasoning', 'reasoning_content'],
+    replayFields: ['reasoning_details'],
+    reasoningReplayField: 'reasoning',
+    mergeAssistantMessages: false,
     extraBody: {},
     overrides: [],
     createdAt: builtInDate,
@@ -90,6 +103,9 @@ export const builtInProviders: readonly Provider[] = [
     headers: {},
     messageName: 'name',
     reasoningFields: ['reasoning_content', 'reasoning'],
+    replayFields: [],
+    reasoningReplayField: null,
+    mergeAssistantMessages: false,
     extraBody: {},
     overrides: [],
     createdAt: builtInDate,

@@ -37,7 +37,7 @@ export async function runReplySection(
   const results: RunResult[] = [];
   let history = started.history;
   let userMessage = started.userMessage;
-  let start = { state: started.state, issues: started.stateIssues };
+  let start = { state: started.state, issues: started.stateIssues, foldWith: started.foldWith };
   let replies: ChatMessage[] = [];
   let stopped = false;
   let announced = false;
@@ -51,7 +51,7 @@ export async function runReplySection(
       const session = await context.sessions.silent.get(sessionId);
       if (!session) throw notFound('Session');
       const story = foldRun(started, session, planned, history);
-      start = { state: story.snapshot, issues: story.issues };
+      start = { state: story.snapshot, issues: story.issues, foldWith: story.foldWith };
     }
     emit?.({
       type: 'run.start',

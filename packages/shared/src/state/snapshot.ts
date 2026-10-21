@@ -21,6 +21,14 @@ export type StateKeyView = {
 export type StateSnapshot = {
   /** The turn being run. */
   turn: number;
+  /**
+   * The ids (`TurnEntry.executionId`, the same as a chat message's `executionId` and a thread item's `turnId`) of the
+   * present turns, oldest first: the order `weaveThread` places turns by. It is exactly the fold's present turns, so the
+   * running turn is in it only for the later runs of a turn (a fold given `including`), last; a turn's first run does not
+   * have it. `weaveThread` therefore takes the running turn's id on its own (`ctx.trigger.turnId`) and never reads it
+   * from here.
+   */
+  turnIds: string[];
   definitions: StateDefinition[];
   keys: Record<string, Record<string, StateKeyView>>;
   nodes: Record<string, Record<string, StateKeyView>>;
@@ -50,6 +58,7 @@ export function stateSnapshot(
 ): StateSnapshot {
   return {
     turn: story.turn,
+    turnIds: story.turns.flatMap(({ entry, turn }) => (turn === null ? [] : [entry.executionId])),
     definitions: structuredClone([...definitions]),
     keys: Object.fromEntries(story.definitions.map((folded) => [folded.definitionId, views(folded.keys, history)])),
     // Only the entries a run of one workflow reads: a fold scoped to it (`FoldInput.workflowId`) has no workflow ids; an
@@ -127,6 +136,8 @@ function describeKey(def: StateKeyDef): string {
       return 'Object';
     case 'collection':
       return `List of items, newest first${def.cap === undefined ? '' : ` (up to ${def.cap})`}`;
+    case 'thread':
+      return `List of exchanges (their final text), newest first${def.cap === undefined ? '' : ` (up to ${def.cap})`}`;
   }
 }
 

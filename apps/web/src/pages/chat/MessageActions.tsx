@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Copy, Pencil, Trash2, X } from 'lucide-react';
+import { Check, Copy, GitBranch, Pencil, Trash2, X } from 'lucide-react';
 import { IconButton } from '../../components/IconButton.js';
 import { copyMessageText } from './copyText.js';
 import { deleteClick } from './story/deleteConfirm.js';
@@ -8,6 +8,10 @@ interface MessageActionsProps {
   disabled: boolean;
   /** The message's raw text (Markdown): shows the Copy button. */
   copyText?: string;
+  /** Forks the chat from this reply: shows the Fork button (given only to fork points). */
+  onFork?: () => void;
+  /** Locks the Fork button beyond `disabled` (the server refuses a fork while a run after the reply works). */
+  forkDisabled?: boolean;
   /** Edit and Delete are shown together, only when both are given. */
   onEdit?: () => void;
   onDelete?: () => Promise<boolean>;
@@ -25,6 +29,8 @@ interface MessageActionsProps {
 export function MessageActions({
   disabled,
   copyText,
+  onFork,
+  forkDisabled = false,
   onEdit,
   onDelete,
   undoOnDelete,
@@ -56,6 +62,14 @@ export function MessageActions({
         <>
           {copyText !== undefined && (
             <IconButton icon={Copy} label="Copy message" onClick={() => void copyMessageText(copyText)} />
+          )}
+          {onFork && (
+            <IconButton
+              icon={GitBranch}
+              label="Fork chat from here"
+              disabled={disabled || forkDisabled}
+              onClick={onFork}
+            />
           )}
           {editable && (
             <>

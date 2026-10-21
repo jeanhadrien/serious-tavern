@@ -42,6 +42,7 @@ describe('stateDefinitionSchema', () => {
       d: { type: 'text', default: 'hi' },
       e: { type: 'object', default: { n: 1 }, schema: { type: 'object' } },
       f: { type: 'collection' },
+      g: { type: 'thread', cap: 4, description: 'What the scenarist did' },
     };
     expect(stateDefinitionSchema.safeParse({ ...stored, name: 'all', keys }).success).toBe(true);
     expect([...stateKeyTypes].sort()).toEqual(
@@ -196,6 +197,7 @@ describe('keyDefault', () => {
     ['an object without default', { type: 'object' }, {}],
     ['an object with default', { type: 'object', default: { a: { b: 1 } } }, { a: { b: 1 } }],
     ['a collection', { type: 'collection', cap: 3 }, []],
+    ['a thread', { type: 'thread', cap: 3 }, []],
   ])('gives %s', (_, def, expected) => {
     expect(keyDefault(def)).toEqual(expected);
   });
@@ -238,7 +240,7 @@ describe('keyValueProblem', () => {
     ['null for an object', { type: 'object' }, null, 'is not an object'],
     ['text for an object', { type: 'object' }, 'x', 'is not an object'],
   ])('%s', (_, def, value, problem) => {
-    if (def.type === 'collection') throw new Error('scalar keys only');
+    if (def.type === 'collection' || def.type === 'thread') throw new Error('scalar keys only');
     expect(keyValueProblem(def, value)).toBe(problem);
   });
 });
@@ -285,6 +287,7 @@ describe('type tables', () => {
     ['text', ['set', 'delete']],
     ['object', ['set', 'delete']],
     ['collection', ['add', 'remove', 'delete']],
+    ['thread', ['add', 'remove', 'delete']],
   ] as const)('%s allows %j', (type, ops) => {
     expect(stateOpsFor(type)).toEqual(ops);
   });
@@ -296,6 +299,7 @@ describe('type tables', () => {
     ['text', 'text'],
     ['object', 'object'],
     ['collection', 'array'],
+    ['thread', 'array'],
   ] as const)('%s travels as %s', (type, port) => {
     expect(stateKeyPortType(type)).toBe(port);
   });

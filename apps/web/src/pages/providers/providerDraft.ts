@@ -5,8 +5,8 @@ import type { DiskChange } from '../fileLiveSync.js';
 
 /**
  * What the provider editor edits: the common fields as form values, and the structured fields (`headers`,
- * `extraBody`, `overrides`) as one raw YAML document. Bookkeeping and unknown fields are not part of it; the
- * server keeps unknown fields on update.
+ * `extraBody`, `overrides`, `replayFields`, `reasoningReplayField`, `mergeAssistantMessages`) as one raw YAML document. Bookkeeping and
+ * unknown fields are not part of it; the server keeps unknown fields on update.
  */
 export interface ProviderDraft {
   name: string;
@@ -17,11 +17,19 @@ export interface ProviderDraft {
   messageName: string | null;
   /** Read in this order, first non-empty wins. */
   reasoningFields: string[];
-  /** YAML mapping with `headers`, `extraBody` and `overrides`. */
+  /** YAML mapping with the keys of `ADVANCED_KEYS`. */
   advanced: string;
 }
 
-const ADVANCED_KEYS = ['headers', 'extraBody', 'overrides'] as const;
+const ADVANCED_KEYS = [
+  'replayFields',
+  'reasoningReplayField',
+  'mergeAssistantMessages',
+  'headers',
+  'extraBody',
+  'overrides',
+] as const;
+const KEY_LIST = 'replayFields, reasoningReplayField, mergeAssistantMessages, headers, extraBody and overrides';
 
 export function toDraft(provider: ProviderView): ProviderDraft {
   return {
@@ -31,7 +39,14 @@ export function toDraft(provider: ProviderView): ProviderDraft {
     messageName: provider.messageName === undefined ? 'name' : provider.messageName,
     reasoningFields: [...(provider.reasoningFields ?? [])],
     advanced: stringify(
-      { headers: provider.headers ?? {}, extraBody: provider.extraBody ?? {}, overrides: provider.overrides ?? [] },
+      {
+        replayFields: provider.replayFields ?? [],
+        reasoningReplayField: provider.reasoningReplayField ?? null,
+        mergeAssistantMessages: provider.mergeAssistantMessages ?? false,
+        headers: provider.headers ?? {},
+        extraBody: provider.extraBody ?? {},
+        overrides: provider.overrides ?? [],
+      },
       { lineWidth: 0, indent: 2 },
     ),
   };
@@ -50,7 +65,7 @@ const FIELD_LABELS: Record<string, string> = {
   reasoningFields: 'Reasoning fields',
 };
 
-/** Reads the YAML part; returns the three fields, or the problems as plain-language messages. */
+/** Reads the YAML part; returns its fields, or the problems as plain-language messages. */
 function parseAdvanced(text: string): { ok: true; value: Record<string, unknown> } | { ok: false; errors: string[] } {
   let raw: unknown;
   try {
@@ -60,12 +75,12 @@ function parseAdvanced(text: string): { ok: true; value: Record<string, unknown>
   }
   raw ??= {};
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw))
-    return { ok: false, errors: ['YAML: must be a mapping with headers, extraBody and overrides'] };
+    return { ok: false, errors: [`YAML: must be a mapping with ${KEY_LIST}`] };
   const unknown = Object.keys(raw).filter((key) => !(ADVANCED_KEYS as readonly string[]).includes(key));
   if (unknown.length)
     return {
       ok: false,
-      errors: unknown.map((key) => `YAML: unknown key "${key}" (only headers, extraBody and overrides go here)`),
+      errors: unknown.map((key) => `YAML: unknown key "${key}" (only ${KEY_LIST} go here)`),
     };
   return { ok: true, value: raw as Record<string, unknown> };
 }

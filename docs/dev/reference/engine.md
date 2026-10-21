@@ -1,0 +1,202 @@
+# Engine reference
+
+`packages/engine`: workflow preparation, the executor, templating, preset rendering, node types and LLM adapters
+(adapters: [providers.md](providers.md)). The user-facing node reference is [docs/WORKFLOWS.md](../../WORKFLOWS.md).
+
+## Preparing a workflow
+
+`prepareWorkflow(workflow, resources?)` returns `{ errors, prepared? }`. On success the `PreparedWorkflow` holds a
+cloned workflow with parsed and defaulted configs, the node definitions, resolved ports, incoming and upstream
+dependencies, sink reachability, and execution-scoped resources.
+
+- Every node is validated, disconnected ones included. Each dynamic port resolver runs once.
+- Resource lookups (presets, characters, providers, collections, state definitions) cache their promises, missing
+  results included, and clone what they fetch, so preparation and execution see the same snapshot. Loading a
+  resource belongs in a node's port resolver, not in the executor.
+- `validateWorkflow` is a thin wrapper returning the errors. `executeWorkflow(workflowOrPrepared, options)` prepares a
+  raw workflow itself; callers that must validate before side effects prepare once and pass the result. A prepared
+  workflow is valid for one turn only.
+- Issues are `ValidationIssue { message, edgeId?, nodeIds? }`. Messages name nodes as `Label #k (type)`
+  (`nodeDisplayName`); the web links a `WORKFLOW_INVALID` toast to `/?wide=workflow:<id>&edge=<id>`, which opens the
+  workflow with the offending edge in red.
+- `pruneInvalidEdges` drops edges into ports that no longer exist; the server runs it on preset update, state
+  definition update and workflow save. It only trusts ports that resolved: unknown types and failing resolvers keep
+  their edges.
+
+## Executing
+
+- **Reachability.** The nodes backward-reachable from any **sink** run; the others are logged `skipped` (`not needed
+  by any output`). A sink is a definition with `sink: true` (Chat Output, State Write) or whose `sink(config)` says
+  so (an LLM with write tools), read through `isSink`.
+- **Waves.** Ready nodes run concurrently. A Condition's untaken branch is skipped, and skipping propagates: a node
+  whose connections are all inactive is skipped, a `required` input fed by a skipped node skips its node, and a
+  `requiredIfConnected` input does the same once connected. `neverSkips` inputs never count toward skipping (Recall's
+  extra `text`, the Trigger's signals, Thread's `history`). Merge only sees the inputs that ran.
+- **Outputs.** A connected output port a node doesn't return is an error unless the port is `optional`.
+- **Replies.** Each Chat Output that completes appends one reply. Order: Y before X when Y's transitive upstream set is
+  a strict subset of X's (this covers "Y feeds X" and outputs fed by a shared upstream node), then smaller `order`,
+  then node id. Streamed rows use the same ranking. Finish times and canvas positions never matter. The speaker name
+  is the connected character's, else the `name` config, else none; a reply stores a snapshot of `name` and
+  `characterId`.
+- **Result.** `{ replies: { nodeId, content, name?, characterId? }[], execution, writes }`. On failure the engine
+  throws `ExecutionFailure` with `.execution`, the ordered `.replies` of the outputs that completed, `.writes` of the
+  nodes that completed, and `.nodeId`/`.nodeType` for a node failure (undefined for an execution-wide abort). Callers
+  use those fields, never the message.
+- **Cancellation.** When a node fails, the other nodes of its wave are aborted and awaited only until their own
+  deadline (`definition.timeoutMs`, else `nodeTimeoutMs`, else 30 s). One that ignores the abort is recorded
+  `cancelled` (distinct from `skipped`) and left running detached: its results, wire reports and events are ignored.
+  After that the log and the replies never change. Per-node setup errors are recorded as failures, not lost.
+- **Timeouts.** Network nodes own their real timeout (the LLM's idle timeout between chunks, HTTP Request's
+  `timeoutMs`) and declare a 10-minute backstop.
+- **Events.** `onEvent` feeds the server's `TurnStream` and any other observer. It is synchronous best effort: an
+  observer that throws never changes the outcome, `execution:complete` included.
+
+### What a run receives
+
+| Option | Reaches nodes as | Reaches templates as |
+| --- | --- | --- |
+| `message`, `sessionId`, `history` | `ctx.trigger.message`, `ctx.trigger.sessionId`, `ctx.history` | `{{trigger.message}}`, `{{trigger.sessionId}}`, `{{history}}` |
+| `character`, `persona` | `ctx.character`, `ctx.persona` | `{{character.*}}`, `{{persona.*}}` |
+| `replies` (default `[]`) | Chat Input's `replies` output: what the workflows above saved this turn | |
+| `settings` (resolved by the caller) | frozen `ctx.settings` | `{{settings.*}}` |
+| `state` (a `StateSnapshot`) | read-only `ctx.state` | `{{state.*}}` (only `ctx.state.values`), `{{trigger.turn}}` |
+| `foldWith` | behind `ctx.pendingState()` (read-your-own-writes) | |
+| `turnId` | `ctx.trigger.turnId`, stamped on thread items | |
+| (the state snapshot's turn) | `ctx.trigger.turn` | `{{trigger.turn}}` |
+| `seed` (else a random UUID) | `ctx.random()` | |
+
+`ctx.writeState(request)` only buffers; see [story-state.md](story-state.md#what-a-run-sees-and-writes).
+
+### Randomness
+
+Every run has a seed, recorded as `execution.seed`. `ctx.random()` draws from an sfc32 stream seeded by the cyrb128
+hash of `${seed}:${nodeId}`, so a run's rolls reproduce from its log. A golden test pins the algorithm.
+
+### Execution logs
+
+A log holds every node's status, timing, outputs, errors and `logs` (lines from `ctx.log`, absent when none), the
+LLM wire exchanges, `warnings`, the `seed` and the resolved chat `settings`. A run of the after section adds
+`part: 'post'` and `turnExecutionId` (the turn's id). Older logs lack `seed`, `settings` and `warnings` (read as
+empty), and keep a single `wire` or a canonical `request` instead of `wires`; all of them still display.
+
+## Node types
+
+A node is a `NodeDefinition` in `src/nodes/<type>/index.ts`, registered in `registry.ts`: typed ports (`dataType`,
+`description`, flags), a zod `configSchema`, `defaultConfig`, `execute(ctx)`, and optionally:
+
+- `resolvePorts(config, resources)` for ports that depend on the config or on resources (presets, cards,
+  definitions), read-only and without server code. The descriptor then gets `dynamicPorts: true`, and the editor asks
+  `POST /api/node-types/:type/ports` on canvas load, config changes and resource changes.
+- `templateFields`: config fields that accept `{{...}}`, so the editor shows variable hints.
+- `sink`, `timeoutMs`.
+
+The registry derives every descriptor (`dynamicPorts`, `sink`), so the editor needs no per-type list.
+
+### Internals worth knowing
+
+- **Parse JSON** looks, in order: the whole trimmed text; else the content of the first Markdown fence only (an
+  unterminated fence runs to the end; an empty first fence, as in a reply to a prefilled ```` ```json ````, falls back
+  to the text before it); then the first **top-level** `{…}` or `[…]` that parses and has the expected type (brackets
+  inside strings are ignored, at most 100 starts are tried). Nested brackets are never tried alone, so a malformed or
+  cut-off outer value fails instead of yielding a fragment. A bracket that never closes ends the search when the rest
+  of the text is the start of a cut-off JSON value; otherwise it is prose and skipped. Numbers and booleans must be the
+  whole candidate; `text` must be a JSON string. It logs the raw input, cut to 500 characters.
+- **Random** draws exactly once (`roll`, stored in the log). Pick weights: a number in `weightField`; anything else
+  weighs 1; non-positive or non-finite weights are never picked. Config errors (`min > max`, non-whole integer bounds,
+  a probability outside 0..1) are reported before the run. Ports a mode lacks are pruned when the mode changes; `value`
+  exists in every mode.
+- **Pick Fields** keeps own fields only, logs the names it didn't find; a blank `fields` is a validation issue.
+- **Recall** scans the last `scanMessages` history messages (default 4), the current message and its `text` input,
+  each text on its own. Keywords are literal and trimmed. With `wholeWords`, an edge needs a word boundary only when
+  the keyword's edge character is a letter, mark, digit or `_` of any script; letters of scripts written without
+  spaces (Han, Hiragana, Katakana, Thai, Lao, Khmer, Myanmar) and Hangul never count as word characters. Matches keep
+  collection order; `maxEntries` and `maxChars` cut at the first entry that doesn't fit. Rules: `nodes/recall/match.ts`.
+- **Draw** draws `count` entries without replacement, one `ctx.random()` each, through the pure `drawEntries`. Its
+  `reason` reads `drew 1 of 14 eligible (tags: forest; level ≤ 2)`, with `N recent excluded` when `avoidRecent`
+  removed some. Recent draws are node state under `draws`, keyed by collection and a fingerprint of the trimmed text.
+- **Trigger** state is node state under `fires`, one `{ text, level }` item per firing; cooldowns and growth come from
+  the folded item turns. Its panel is custom (`panels/trigger.tsx`).
+- Entries read from collections are `{ collectionId, entryId, text, keywords, tags, title?, level? }`; `entryId` is
+  the position (`entry-<n>`).
+
+## Templates
+
+Templates are Handlebars with stock semantics and `noEscape`. The `handlebars` runtime lives in `@st/engine` and
+renders presets and template fields; `@st/shared` only depends on `@handlebars/parser`, so validation walks the AST
+and the web bundle carries no compiler. The macro registry in shared defines every known path, and the helpers
+(`eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `and`, `or`, `not`, `linked`) are listed in `templateHelperNames` and defined
+in `template-helpers.ts`; Handlebars' `log` helper is removed. Character and persona fields are expanded recursively,
+cycles rendering empty. A template that doesn't parse renders verbatim and never throws. In presets `{{history}}` and
+messages inputs render as transcripts and objects as pretty JSON; in node templates they render compact JSON
+(`text.ts` centralizes both). User reference: [docs/TEMPLATING.md](../../TEMPLATING.md).
+
+## Presets
+
+A preset is the final, ordered message list sent to an LLM: declared **inputs** (each becomes an LLM input port named
+by its key) and ordered **entries** (`message` or `slot`). User guide: [docs/PRESETS.md](../../PRESETS.md).
+
+- Fixed messages that render to whitespace are dropped, as are empty text slots. A message entry's `name` template is
+  rendered, trimmed and sent only when non-empty. Unknown `{{input.x}}` is an error; syntax problems, unknown macros
+  and unused inputs are warnings. An input referenced only by a name counts as used.
+- **Messages slots** validate each message with the canonical schema (an invalid one is an error naming the input) and
+  keep only the canonical keys, so tool messages and calls pass while stored bookkeeping (`id`, `executionId`,
+  `status`, ...) never does. **Slots render from the raw inputs**; templates and text conversion see a copy without
+  `reasoning`, `provider_data` and `provenance`.
+- **Depth placement** targets an enabled slot backed by a messages input: depth 0 after its last message, depth 1
+  before it, clamped to its start; depth counts blocks (a tool call and its results are one).
+- The `character` input key is reserved for the LLM node's own Character port; a preset declaring it fails port
+  resolution.
+- Preview and execution use the same renderer. The preview shows tool calls and results and a collapsed reasoning
+  view; it never flattens undeclared tool blocks (that happens at call time).
+
+## The LLM node
+
+Config: provider, model, preset, temperature (0.7), max tokens (1024), optional top-p, penalties and stop sequences,
+reasoning options (sent as OpenRouter's `reasoning` object to every record), `mergeSystemMessages`, `streaming`
+(default on) and the tool settings. History reaches the prompt only through a preset slot. Outputs: `text`, `raw`,
+`exchange`.
+
+**Prompt pipeline**, applied to the rendered prompt only (never to stored data): render the preset, merge consecutive
+unnamed system messages when asked, apply the replay policy, flatten tool blocks of undeclared tools, repair the tool
+sequence, then run the loop. The preset preview shows the unmerged, unflattened output.
+
+- **Replay reasoning** (`never` by default, `sinceLastUser`, `always`): an earlier message keeps its `reasoning` and
+  `provider_data` only when the policy allows AND its `provenance` names this provider record and model. The running
+  loop's own messages always keep theirs.
+- **Undeclared tool blocks** (a block with any call to a tool this node doesn't declare; every block for a node
+  without tools) are sent as text: the assistant message keeps its content plus `assistant -> name(arguments)` lines,
+  and its tool messages become one user message of `tool name: result` lines. The node logs the count.
+- **Repair** drops tool messages and calls without a counterpart, and logs a non-zero count.
+
+**Tools.** `tools.read` lists keys the model may read through one `read_state` tool (key names as an enum);
+`tools.write` gets one `write_<definition>_<key>` tool per key (cut at 64 characters, repeats numbered). Schemas are
+generated from the definitions:
+
+| Key type | Write tool arguments |
+| --- | --- |
+| number | `{ op: set \| increment \| reset, value }`, bounds in the description, clamped |
+| boolean, text, object | `{ op?: set \| reset, value }` |
+| enum | the same, options as a JSON Schema `enum` |
+| collection | `{ op: add \| remove \| reset, text, handle, ...declared fields }` |
+
+`reset` is State Write's `delete`. A write tool goes through State Write's own rules, so a refused value comes back in
+State Write's words; it is buffered like any write and answers with the key's value after it. Collection items are
+shown as `{ handle, text, ...fields }` with handles `#1`, `#2`... per loop; `remove` takes a handle. Thread keys are
+never offered.
+
+**The loop.** Calls run one after another in the order sent; each answer goes back as a `tool` message, and every
+failure becomes `{ "error": ... }` there while the loop goes on. After `maxSteps` (default 5) rounds that still used
+tools, one last call is made with `tool_choice: 'none'` and the limit is logged. `toolChoice: required` applies to the
+first call only; `parallelToolCalls` is sent only when set. Every call is one wire entry and every tool call one log
+line. Every step streams, but only the last step's text is the answer (each later step starts with a `stepStart`
+delta that resets the rows the LLM feeds); reasoning accumulates across steps. **Reading your own writes:** a read
+after a write in the same loop sees it, through `ctx.pendingState()`; without `foldWith` (tests, the preview) reads see
+the turn-start snapshot. Known difference: if another node of the same run writes the same key, the stored value may
+differ from what this node read, because the final resolve orders every node.
+
+**Reasoning in the chat.** Streamed reasoning arrives per chunk; a non-stream call emits the whole trace as one
+`reasoningDelta` afterwards. It reaches the chat only through the streaming endpoint and only for passthrough Chat
+Outputs (LLM `text` straight into `value`).
+
+**Names.** Chat Input, Memory (messages format), slots and depth insertion keep each message's `name`; the adapter
+sends it only when present, under the record's `messageName` field. No speaker prefix is ever added to content.

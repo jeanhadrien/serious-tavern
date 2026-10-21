@@ -3,7 +3,7 @@ import { canConnect } from '@st/shared/ports';
 import type { Edge, PortDef, ValidationIssue, Workflow } from '@st/shared';
 import { upstreamOf } from './replies.js';
 import { registry } from './registry.js';
-import type { NodeDefinition, NodeResources } from './types.js';
+import { isSink, type NodeDefinition, type NodeResources } from './types.js';
 
 export type PreparedWorkflow = {
   workflow: Workflow;
@@ -94,16 +94,21 @@ export async function prepareWorkflow(
       });
     }
   }
+  // Judged on the parsed config, so a sink that depends on its config sees the defaults filled in.
+  const isSinkNode = (id: string, config: Record<string, unknown>) => {
+    const definition = definitions.get(id);
+    return !!definition && isSink(definition, config);
+  };
   const chatInputs = workflow.nodes.filter((node) => node.type === 'chat-input');
   if (chatInputs.length !== 1)
     errors.push({
       message: 'A workflow must contain exactly one chat-input node.',
       nodeIds: chatInputs.map((node) => node.id),
     });
-  if (!workflow.nodes.some((node) => definitions.get(node.id)?.sink))
+  if (!workflow.nodes.some((node) => isSinkNode(node.id, node.config)))
     errors.push({
       message:
-        'A workflow must contain at least one node that writes something, such as a Chat Output or a State Write.',
+        'A workflow must contain at least one node that writes something, such as a Chat Output, a State Write or an LLM with write tools.',
     });
   const edgeIds = new Set<string>();
   const inbound = new Map<string, number>(workflow.nodes.map((node) => [node.id, 0]));
@@ -211,7 +216,7 @@ export async function prepareWorkflow(
   // Sinks (Chat Output, State Write) decide what runs: they and their upstream nodes.
   const reachable = new Set<string>();
   for (const node of workflow.nodes) {
-    if (!definitions.get(node.id)?.sink) continue;
+    if (!isSinkNode(node.id, node.config)) continue;
     reachable.add(node.id);
     for (const id of upstreamOf(upstream, node.id)) reachable.add(id);
   }

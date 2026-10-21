@@ -2,18 +2,21 @@ import type { StateDefinition } from './definition.js';
 import { foldDefinitionKey, foldNodeKey, removedKeyProblem, type SlotWrite } from './fold-slots.js';
 import { byText } from './helpers.js';
 import type { FoldedDefinition, FoldedKey, FoldedNode, StateWarning, StoryState } from './fold-types.js';
-import { turnPresence, type PresenceMessage, type TurnPresence } from './turns.js';
-import { readTurnEntries } from './writes.js';
+import { turnPresence, type PresenceMessage } from './turns.js';
+import { readTurnEntries, type StateWrite } from './writes.js';
 
 type Slots = Map<string, SlotWrite[]>;
 
-// The writes of present turns grouped by definition id and by node id, then by key, in stored order.
-function collectWrites(turns: readonly TurnPresence[], workflowId: string | undefined) {
+// The writes of present turns (each group is one turn's, with its number) grouped by definition id and by node id,
+// then by key, in the order given.
+function collectWrites(
+  turns: readonly { turn: number; writes: readonly StateWrite[] }[],
+  workflowId: string | undefined,
+) {
   const byDefinition = new Map<string, Slots>();
   const byNode = new Map<string, { nodeId: string; workflowId?: string; slots: Slots }>();
-  for (const { entry, turn } of turns) {
-    if (turn === null) continue;
-    for (const write of entry.writes) {
+  for (const { turn, writes: turnWrites } of turns) {
+    for (const write of turnWrites) {
       const { target } = write;
       let slots: Slots;
       if (target.kind === 'definition') {
@@ -81,6 +84,13 @@ export type FoldInput = {
    * `turn` says otherwise the state is read as of that turn, so `trigger.turn` is the same for every run of the turn.
    */
   including?: string;
+  /**
+   * Writes the running turn has asked for but not stored yet (a node reading its own writes, see the engine's
+   * `pendingView`): folded after everything stored, as if the turn's entry already held them at the end. The turn
+   * counts as present for them and keeps the number the run already reads: the next turn when `including` is absent (a
+   * run before its turn's entry exists), else the including turn's. Nothing is added to `turns`.
+   */
+  pending?: readonly StateWrite[];
 };
 
 /**
@@ -95,11 +105,22 @@ export type FoldInput = {
  *   a key the definition no longer has, or for another key type, are ignored (and reported); writes for a
  *   definition that no longer exists are ignored silently. Restoring the definition brings them back.
  */
-export function foldStoryState({ definitions, messages, state, workflowId, including }: FoldInput): StoryState {
+export function foldStoryState({
+  definitions,
+  messages,
+  state,
+  workflowId,
+  including,
+  pending,
+}: FoldInput): StoryState {
   const turns = turnPresence(messages, readTurnEntries(state), including);
   const own = including === undefined ? undefined : turns.find(({ entry }) => entry.executionId === including)?.turn;
   const turn = own ?? turns.filter((presence) => presence.turn !== null).length + 1;
-  const { byDefinition, byNode } = collectWrites(turns, workflowId);
+  const stored = turns.flatMap(({ entry, turn: at }) => (at === null ? [] : [{ turn: at, writes: entry.writes }]));
+  const { byDefinition, byNode } = collectWrites(
+    pending?.length ? [...stored, { turn, writes: pending }] : stored,
+    workflowId,
+  );
   return {
     turn,
     turns,

@@ -21,6 +21,7 @@ function compileKey(key: KeyDraft): { def?: Record<string, unknown>; problems: s
   const set = (name: string, value: unknown) => {
     if (value !== undefined) typed[name] = value;
   };
+  set('description', key.description.trim() || undefined);
   switch (key.type) {
     case 'number':
       set('default', number('Default', key.default));
@@ -43,14 +44,18 @@ function compileKey(key: KeyDraft): { def?: Record<string, unknown>; problems: s
       else problems.push(`Default: ${parsed.error}`);
       break;
     }
-    case 'collection': {
+    case 'collection':
+    case 'thread': {
       const cap = number('Cap', key.cap);
       if (cap !== undefined && !(Number.isInteger(cap) && cap >= 1))
         problems.push('Cap must be a whole number, 1 or more');
       set('cap', cap);
-      const fields = parseFields(key.fields);
-      if (fields.ok) set('fields', fields.fields);
-      else problems.push(...fields.errors);
+      // A thread's items are exchanges, not declared records: it has a cap and no item fields.
+      if (key.type === 'collection') {
+        const fields = parseFields(key.fields);
+        if (fields.ok) set('fields', fields.fields);
+        else problems.push(...fields.errors);
+      }
       break;
     }
   }

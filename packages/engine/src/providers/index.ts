@@ -1,4 +1,12 @@
-import type { PromptMessage, Provider, ProviderModel, ReasoningEffort, WireExchange } from '@st/shared';
+import type {
+  ConversationMessage,
+  PromptMessage,
+  Provider,
+  ProviderModel,
+  ReasoningEffort,
+  ToolDefinition,
+  WireExchange,
+} from '@st/shared';
 
 export type ChatRequest = {
   messages: PromptMessage[];
@@ -14,21 +22,34 @@ export type ChatRequest = {
   reasoningMaxTokens?: number;
   // Keep reasoning internal: the model still thinks (and bills for it) but returns no trace.
   reasoningExclude?: boolean;
+  // Function tools the model may call, sent as `tools`; none are sent when the list is empty.
+  tools?: ToolDefinition[];
+  toolChoice?: 'auto' | 'none' | 'required';
+  parallelToolCalls?: boolean;
 };
 export type ChatResponse = {
   text: string;
   // The reasoning trace, read from the record's `reasoningFields`; absent when the model returned none.
   reasoning?: string;
+  // The assistant message in canonical form: content, tool calls, reasoning, the record's replay fields in
+  // `provider_data`, and provenance (this record, the request's model, `ChatOptions.nodeId`).
+  message: ConversationMessage;
+  // Why the model stopped (`stop`, `tool_calls`, `length`, ...), as the backend reported it.
+  finishReason?: string;
   raw: unknown;
   usage?: unknown;
 };
 export type ChatOptions = {
   // The resolved provider record the call is made against.
   provider: Provider;
+  // The LLM node making the call; the adapter stamps it into the reply's provenance.
+  nodeId: string;
   // The record's secret, when it names one.
   apiKey?: string;
   signal: AbortSignal;
-  // Receives what actually goes over the wire, credentials redacted: first the request, then again with the response.
+  // Receives what actually goes over the wire for this one call, credentials redacted: first the request, then
+  // again with the response, each report replacing the last. A caller making several calls starts a new log entry
+  // between them (`ctx.beginWire`).
   onWire?(exchange: WireExchange): void;
 };
 export type StreamOptions = ChatOptions & {

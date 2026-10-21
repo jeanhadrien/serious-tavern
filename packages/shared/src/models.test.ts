@@ -91,6 +91,14 @@ it('preserves unknown fields on stored records for forward compatibility', () =>
   expect((execution.nodes.n! as Record<string, unknown>).futureNodeField).toBe(1);
 });
 
+it('reads a session with and without forkedFrom', () => {
+  const base = { id: 's', title: 'T', workflowId: 'w', messages: [], createdAt: '', updatedAt: '' };
+  expect(sessionSchema.parse(base).forkedFrom).toBeUndefined();
+  const forkedFrom = { sessionId: 'src', messageId: 'm1' };
+  expect(sessionSchema.parse({ ...base, forkedFrom }).forkedFrom).toEqual(forkedFrom);
+  expect(sessionSchema.safeParse({ ...base, forkedFrom: { sessionId: 'src' } }).success).toBe(false);
+});
+
 it('preserves unknown preset fields and defaults old placement/role', () => {
   const preset = presetSchema.parse({
     id: 'e305f530-421a-492b-9d25-fbb054f28c04',
@@ -110,4 +118,18 @@ it('preserves unknown preset fields and defaults old placement/role', () => {
   expect((preset.entries[1]! as Record<string, unknown>).futureSlotField).toBe(2);
   expect(preset.entries[0]!.kind === 'message' && preset.entries[0]!.placement).toEqual({ mode: 'ordered' });
   expect(preset.entries[1]!.kind === 'slot' && preset.entries[1]!.role).toBe('user');
+});
+
+it('loads the wire log as a list of calls', () => {
+  const call = (url: string) => ({ url, method: 'POST', headers: {}, body: {}, status: 200 });
+  const execution = executionLogSchema.parse({
+    id: 'execution',
+    workflowId: 'workflow',
+    sessionId: 'session',
+    status: 'completed',
+    startedAt: '',
+    nodes: { llm: { status: 'completed', wires: [call('a'), call('b')] } },
+  });
+  expect(execution.nodes.llm?.wires).toEqual([call('a'), call('b')]);
+  expect(execution.nodes.llm).not.toHaveProperty('wire');
 });

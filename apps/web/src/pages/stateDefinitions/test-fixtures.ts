@@ -13,6 +13,7 @@ export const definition = (extra: Partial<StateDefinition> = {}): StateDefinitio
     place: { type: 'text', default: 'a tavern' },
     flags: { type: 'object', default: { a: 1 }, schema: { a: 'number' }, 'x-note': 'keep me' },
     injected: { type: 'collection', cap: 30, fields: { level: 'number' } },
+    log: { type: 'thread', cap: 12 },
   },
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',

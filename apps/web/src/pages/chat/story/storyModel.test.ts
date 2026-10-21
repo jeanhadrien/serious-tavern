@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { addWrite, buildView, drawWrite, entry, reply, scene, setWrite, userMessage } from './test-fixtures.js';
+import {
+  addWrite,
+  buildView,
+  drawWrite,
+  entry,
+  reply,
+  scene,
+  setWrite,
+  threadWrite,
+  userMessage,
+} from './test-fixtures.js';
 import {
   definitionBlocks,
   hasStoredState,
@@ -43,6 +53,29 @@ it('builds a block per definition with its keys in definition order', () => {
   expect(tension).toMatchObject({ kind: 'number', value: 7, written: true, writtenAtTurn: 2 });
   expect(tension?.spark?.points.split(' ')).toHaveLength(2);
   expect(tension?.spark).toMatchObject({ min: 5, max: 7 });
+});
+
+it('recognizes a thread by the summary shape of its items, with no extra fields to list', () => {
+  const view = buildView({
+    messages: [reply('e1'), reply('e2')],
+    entries: [
+      entry('e1', [threadWrite('log', 'l1', 'The lamp is lit.', { calls: ['read_state'], runId: 'run-1' })]),
+      entry('e2', [threadWrite('log', 'l2', 'Plain answer', { runId: 'run-2' }), addWrite('injected', 'i1', 'a bell')]),
+    ],
+  });
+  const keys = definitionBlocks(view)[0]?.keys;
+  const log = keys?.find((key) => key.key === 'log');
+  expect(log).toMatchObject({ kind: 'list', exchanges: true, written: true, writtenAtTurn: 2 });
+  // Newest first, like every list.
+  expect(log?.items.map((item) => item.text)).toEqual(['Plain answer', 'The lamp is lit.']);
+  expect(log?.items[0]).toMatchObject({ extras: [], thread: { steps: 1, toolCalls: [], runId: 'run-2' } });
+  expect(log?.items[1]?.thread).toEqual({ steps: 2, toolCalls: ['read_state'], runId: 'run-1' });
+  expect(log?.plain).toHaveLength(2);
+  // A collection is not a thread, and an empty thread has nothing to call exchanges.
+  expect(keys?.find((key) => key.key === 'injected')).toMatchObject({ exchanges: false });
+  expect(keys?.find((key) => key.key === 'injected')?.items[0]?.thread).toBeUndefined();
+  const empty = definitionBlocks(buildView({ messages: [reply('e1')], entries: [entry('e1')] }))[0]?.keys;
+  expect(empty?.find((key) => key.key === 'log')).toMatchObject({ kind: 'list', exchanges: false, items: [] });
 });
 
 it('draws no sparkline for a number written in only one turn', () => {
