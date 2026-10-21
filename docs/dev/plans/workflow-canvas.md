@@ -1,8 +1,8 @@
 # Workflow canvas: plan
 
-Nine improvements to the workflow editor (`apps/web/src/pages/workflows/`, React Flow 12.12) are left. Phase A (the
-canvas basics: required dot, touch, palette groups, quick add, Tidy) is built and lives in `docs/dev/reference/web.md`
-and the `AGENTS.md` files. When an item lands, move what it decided there and strike it from this plan. Delete the file
+Six improvements to the workflow editor (`apps/web/src/pages/workflows/`, React Flow 12.12) are left. Phases A (canvas
+basics) and B (validation: draft endpoint, issues on the canvas, template warnings in panels) are built; they live in
+`docs/dev/reference/web.md` and the `AGENTS.md` files. When an item lands, move what it decided there and strike it from this plan. Delete the file
 once it is empty.
 
 Out of scope: MiniMap, alignment guides, subflows, cmdk, performance work.
@@ -15,10 +15,6 @@ Read first: the root `AGENTS.md`, `apps/web/AGENTS.md`, `apps/web/src/pages/work
 
 The brief came from an earlier review. These points differ from it and shape the plan:
 
-- **Item 10's check is not in the engine.** The template check is shared: `analyzeTemplate` in
-  `shared/src/template-analysis.ts`, and `presetWarnings` in `shared/src/preset.ts` on top of it. The engine's
-  `renderTemplate` swallows template failures, and `prepareWorkflow` never looks at node template fields. Only three
-  node types have template fields today: Chat Output, Condition and HTTP Request (whose `headers` are key/value rows).
 - **Item 8: the server emits node events, but the web drops them.** `TurnStream.onEvent`
   (`apps/server/src/services/turn-stream.ts`) emits `node.start` and `node.complete`. It emits nothing for
   skipped, cancelled or failed nodes. `api/turnStream.ts` ignores both node events in its `default` branch.
@@ -29,9 +25,6 @@ The brief came from an earlier review. These points differ from it and shape the
   (one file per run) is not an option.
   - `coerceValue` and `stringify` live in `engine/src/text.ts`. The web does not depend on `@st/engine`.
   - The execution log does not record which version of the workflow ran.
-- **Item 3:** confirmed. `notifyError` joins the issues into one toast. The editor's `validate` saves first, then
-  highlights only the first issue's `edgeId`. Some issues carry no ids at all: the cycle, the missing sink, the
-  settings declarations, and a missing Chat Input (`nodeIds: []`).
 - **Item 5:** confirmed. Executor line ~131 (not needed) and line ~194 write `skipped` with no reason. Line ~194
   covers two causes: every gating connection is inactive, or a required input's source was skipped.
 - **Item 6:** the editor store's `focus` is a single string, used only for an edge id (`url.ts`, `routes.ts`,
@@ -40,18 +33,11 @@ The brief came from an earlier review. These points differ from it and shape the
   `nodeTypeDescriptorSchema` is a plain `z.object`, which strips unknown keys.
 - **Item 13 is the largest item.** See its section.
 
-## A rule for every overlay
+## Overlays
 
-Issue badges (3), live run status (8) and config summaries (7) are **not part of the draft**. Never store them in
-node `data`. The history's `snapshotOf` copies `data`, so an undo would bring back stale badges.
-
-Derive them at render instead, as `visibleEdges` already does for edges. Provide them to `WorkflowNode` through one
-React context (call it `CanvasOverlayContext`) holding:
-- issues by node id;
-- run status by node id;
-- the catalogs that summaries need.
-
-Record this rule in `pages/workflows/AGENTS.md` with the first item that adds an overlay.
+The rule is recorded in `pages/workflows/AGENTS.md` (overlays are never part of the draft). `CanvasOverlayContext`
+exists and holds the issues by node id. Live run status (8b) adds run status by node id to it, and node summaries (7)
+the catalogs they need.
 
 ## Order
 
@@ -60,96 +46,11 @@ independent.
 
 | Phase | Commits |
 | --- | --- |
-| B. Validation | 10a shared template check · 4 draft validation endpoint · 3 issues on the canvas · 10b template checks in panels |
 | C. Runs | 5 skip reasons · 6 node focus · 8a stream contract · 8b live status · 9a move coercion to shared · 9b last run in the panel |
 | D. Larger additions | 7 node summaries · 13 sticky notes |
 
 Phase C builds the cross-view store in 8b, and 9b reuses it. 13 comes last because it touches every reader of the
 canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
-
----
-
-## Phase B: validation
-
-### 10a. One template check in shared
-
-- **Goal:** pull the per-template part of `presetWarnings` into a shared helper, for example
-  `templateWarnings(template, { inputKeys? })`. It runs `analyzeTemplate` and `findMacro`, and checks `input.<key>`
-  against `inputKeys` when given. `presetWarnings` calls it, so preset behaviour is unchanged.
-- **Touches:** `shared/src/preset.ts`, a new export next to `template-analysis.ts`, table tests.
-- **Rules:** the template check has one home in shared. Presets pass no `inputKeys` (their inputs are checked
-  separately); nodes pass their input port names.
-
-### 4. Validate the draft
-
-- **Goal:** the editor validates the canvas as it is, without saving, debounced while editing. The rules stay in
-  `prepareWorkflow`.
-- **Contract (`shared/src/api/workflows.ts`):**
-  - a new `validateWorkflowDraft` endpoint, `POST /api/workflows/validate`;
-  - its body is `workflowSchema.pick({ nodes, edges, settings })` (and `notes` once item 13 lands);
-  - it answers **200** `{ issues: ValidationIssue[] }`. Issues are the expected answer here, not a failure, and a 422
-    would be toasted by the client.
-  - The existing `POST /api/workflows/:id/validate` stays as it is: the contract keeps it, and `app.test.ts` keeps
-    exercising it.
-- **Server:** a thin handler in `routes/workflows.ts` calling `validateWorkflow`. It writes nothing and needs no lock.
-  The body has no `id`, `name` or timestamps, while `validateWorkflow` takes a whole `Workflow`.
-  - Narrow its parameter to the fields `prepareWorkflow` reads: `Pick<Workflow, 'nodes' | 'edges' | 'settings'>`, plus
-    `id` if `prepared.workflow.id` is used later.
-  - Placeholders would also work, but they would leak into issue details sooner or later. The contract entry, the route and the `app.test.ts` coverage land in one commit.
-- **Web:**
-  - `workflowsApi.validateDraft`, called with `{ silent: true }`;
-  - a `useDraftValidation` hook: about 600 ms after the last change to nodes, edges or settings, and once on load;
-  - one request in flight, stale answers dropped (the dynamic ports hook has the pattern).
-- **Gotchas:**
-  - The draft keeps chat settings declarations that don't parse (`withDraftSettings`), so the body parse would answer
-    400 on every debounce. Send only the declarations that parse; the settings panel already shows the rest
-    (`unsavableSettings`).
-  - The YAML repositories rescan their directory on every `get`, and dynamic ports resolve again on each call. Keep the
-    debounce; never validate per keystroke.
-  - Issue messages name nodes with `nodeDisplayName` over the draft's node order. That is the same rule as the canvas
-    (`withDisplayNames`), so names match.
-- **The Validate button:** it no longer saves first. See the open questions on whether it stays.
-- **Docs:**
-  - `reference/api.md` (the new endpoint);
-  - `docs/WORKFLOWS.md`: the "Validate in the toolbar" text changes, and issues show while editing;
-  - `reference/web.md`;
-  - `pages/workflows/AGENTS.md`: validation runs on the draft, debounced and silent; settings that don't parse are
-    left out.
-
-### 3. Issues on the canvas
-
-- **Goal:**
-  - Every node named in an issue's `nodeIds` gets a badge (count, with the messages as tooltip).
-  - Every edge named in an `edgeId` gets the red outline, not only the first.
-  - A clickable issue list: a toolbar toggle with a count, like Chat settings, opening a list over the canvas.
-    Clicking an issue selects its nodes (and edge) and fits the view to them (`fitView({ nodes })`).
-- **Source:** item 4's answer. Without item 4, the same list would come from the old endpoint's 422 details.
-- **Touches:**
-  - `useWorkflowCanvas`: `highlightedEdge` becomes a set of issue edges, plus the one-shot URL edge;
-  - `visibleEdges` styling;
-  - `WorkflowNode` reads the badge from the overlay context;
-  - a new `IssueList.tsx`, through `useEscapeLayer`;
-  - `WorkflowToolbar.tsx`.
-- **Issues with no ids** (a cycle, no sink, a missing Chat Input) appear in the list, not on the canvas; clicking
-  them does nothing. Settings issues already show in the settings panel and its toolbar count, so leave them out of
-  this list. An issue does not say where it comes from, so this means matching messages against
-  `workflowSettingIssues(settings)` on the client. See the open questions.
-- **Risks:** the chat's `WORKFLOW_INVALID` toast with its `edge=` link stays. Once the editor validates on open, the
-  link's highlight is redundant but harmless. Keep the param: it is also a legacy alias.
-- **Docs:** `docs/WORKFLOWS.md`, `reference/web.md`, `pages/workflows/AGENTS.md` (overlays, the overlay context).
-
-### 10b. Template checks in node panels
-
-- **Goal:** under each template field of the generic form (`descriptor.templateFields`), show warnings from
-  `templateWarnings(value, { inputKeys: descriptor.inputs.map(p => p.name) })`, the way the preset editor does. For
-  HTTP Request's key/value `headers`, check each row's value.
-- **Touches:** `node-ui/src/index.tsx` (`GenericPanel`'s `hints`) and node-ui tests. Condition has a custom panel, but
-  it renders `GenericPanel` under a hint, so it is covered. A future custom panel that draws its own template field
-  must call the same helper.
-- **Decision to confirm:** warnings stay in the panel only and never become validation issues. See the open
-  questions.
-- **Docs:** `docs/TEMPLATING.md` (where warnings appear), `node-ui/AGENTS.md` (template warnings come only from the
-  shared helper).
 
 ---
 
@@ -324,20 +225,13 @@ canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
 1. **Categories (palette, built in phase A).** The palette keeps the engine's categories and only changes how a lone category renders. Do
    you also want Random moved to Creativity in the engine? That is a real regrouping, and it changes node headers and
    the `docs/WORKFLOWS.md` headings.
-2. **The Validate button (items 3, 4).** Once issues are live, does the button stay as "validate now", or is the issue
-   count its replacement?
-3. **Settings issues in the issue list (item 3).** Show them there too, or only in the settings panel? Filtering them
-   out means matching messages, because an issue does not say where it comes from. An optional `source` field on
-   `ValidationIssue` would be cleaner, and it is additive.
-4. **Template problems (item 10).** Panel-only warnings, or engine validation issues as well (so they badge the node
-   and appear in item 3's list)? A syntax error renders the template verbatim at run time, which arguably is an error.
-5. **Which "last run" (item 9):** the open chat's last run of the workflow (proposed), or any chat's? Any chat needs a
+2. **Which "last run" (item 9):** the open chat's last run of the workflow (proposed), or any chat's? Any chat needs a
    per-workflow index of executions on the server, which does not exist.
-6. **Rebuild or record inputs (item 9).** Rebuilding (proposed) is approximate even with the version stamp. Recording
+3. **Rebuild or record inputs (item 9).** Rebuilding (proposed) is approximate even with the version stamp. Recording
    each node's inputs in the log is exact, but it bloats every log: every LLM node's `history` would be stored again.
-7. **Live status after the reply (item 8).** Is reply-section-only acceptable, or should after-section runs publish
+4. **Live status after the reply (item 8).** Is reply-section-only acceptable, or should after-section runs publish
    too? That would mean another channel, such as `/api/events` or a per-chat SSE.
-8. **Notes (item 13):** separate state (a, proposed) or a second node type (b)? Should Tidy (14) move notes, and
+5. **Notes (item 13):** separate state (a, proposed) or a second node type (b)? Should Tidy (14) move notes, and
    should copy and paste carry them? The proposal: Tidy leaves notes where they are, and copy and paste come later.
    Undo and the dirty check are required either way.
-9. **Skip reason granularity (item 5):** is `by` (the upstream node) worth storing, or is the code enough?
+6. **Skip reason granularity (item 5):** is `by` (the upstream node) worth storing, or is the code enough?
