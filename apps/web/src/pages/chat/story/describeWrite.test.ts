@@ -65,6 +65,13 @@ it('names a removed item by the text it was added with, or "an item"', () => {
   expect(describeWrite(named(remove), texts)).toBe('scene.injected: removed an item');
 });
 
+it('words an item update by what it changed', () => {
+  const update = { ...addWrite('injected', 'i1', ''), op: 'update' as const, itemId: 'i1', text: 'a gong' };
+  expect(describeWrite(named(update), texts)).toBe("scene.injected: updated an item to 'a gong'");
+  const fields = { ...update, text: undefined, fields: { level: 3 } };
+  expect(describeWrite(named(fields), texts)).toBe('scene.injected: updated an item (level 3)');
+});
+
 it('says "(deleted definition)" when the definition is gone', () => {
   expect(describeWrite({ write: setWrite('tension', 6) }, texts)).toBe('(deleted definition).tension → 6');
 });
@@ -98,17 +105,21 @@ it('names a node that no longer exists', () => {
   expect(describeWrite({ write: drawWrite('d1', 'resin smell') }, texts)).toBe("A removed node: drew 'resin smell'");
 });
 
-it('collects the text of every added item of the view, for naming removals', () => {
+it('collects the latest text of every item of the view, for naming removals', () => {
   const view = buildView({
     messages: [reply('e1'), reply('e2')],
     entries: [
       entry('e1', [addWrite('injected', 'i1', 'a bell'), drawWrite('d1', 'resin')]),
-      entry('e2', [addWrite('injected', 'i2', 'a cart'), setWrite('tension', 4)]),
+      entry('e2', [
+        addWrite('injected', 'i2', 'a cart'),
+        setWrite('tension', 4),
+        { ...addWrite('injected', 'i1', ''), op: 'update', itemId: 'i1', text: 'a gong' },
+      ]),
     ],
   });
   expect(itemTexts(view)).toEqual(
     new Map([
-      ['i1', 'a bell'],
+      ['i1', 'a gong'],
       ['d1', 'resin'],
       ['i2', 'a cart'],
     ]),

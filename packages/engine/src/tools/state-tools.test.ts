@@ -36,9 +36,13 @@ describe('which tools exist', () => {
       'write_scene_tension',
       'write_scene_mood',
     ]);
-    expect((await toolsFor([], [target('tension')])).tools.map((tool) => tool.definition.function.name)).toEqual([
-      'write_scene_tension',
-    ]);
+    expect(parametersOf(tools[0]).properties.keys.items.enum).toEqual(['scene.tension', 'scene.mood']);
+  });
+
+  it('makes a writable key readable, even when the read list leaves it out', async () => {
+    const { tools, call } = await toolsFor([], [target('tension')]);
+    expect(tools.map((tool) => tool.definition.function.name)).toEqual(['read_state', 'write_scene_tension']);
+    expect(await call('read_state', { keys: ['scene.tension'] })).toEqual({ 'scene.tension': 3 });
   });
 
   it('lists a key once, and leaves out unknown definitions and keys with a log line', async () => {
@@ -85,7 +89,7 @@ describe('which tools exist', () => {
     const context = toolContext();
     const run = { ...context.ctx, state: { ...context.ctx.state, definition: () => wide } };
     const tools = await buildStateTools(run, { read: [], write: Object.keys(keys).map((key) => target(key)) });
-    const names = tools.map((tool) => tool.definition.function.name);
+    const names = tools.map((tool) => tool.definition.function.name).filter((name) => name !== 'read_state');
     expect(new Set(names).size).toBe(2);
     expect(names.every((name) => name.length <= 64)).toBe(true);
   });
@@ -122,7 +126,6 @@ describe('the schemas', () => {
 
   it.each([
     ['alarm', { type: 'boolean' }],
-    ['note', { type: 'string' }],
     ['data', { type: 'object' }],
   ])('writes %s as a flat value', async (key, value) => {
     const tool = (await toolsFor([], [target(key)])).byName.get(`write_scene_${key}`);
@@ -130,12 +133,22 @@ describe('the schemas', () => {
     expect(parametersOf(tool).properties.op.enum).toEqual(['set', 'reset']);
   });
 
+  it('writes text with set and reset, plus the replace and append edits', async () => {
+    const tool = (await toolsFor([], [target('note')])).byName.get('write_scene_note');
+    expect(parametersOf(tool).properties).toMatchObject({
+      op: { enum: ['set', 'reset', 'replace', 'append'] },
+      value: { type: 'string' },
+      old: { type: 'string' },
+    });
+    expect(parametersOf(tool).required).toBeUndefined();
+  });
+
   it('writes a collection with add, remove and reset, the declared fields flat', async () => {
     const tool = (await toolsFor([], [target('log')])).byName.get('write_scene_log');
     expect(parametersOf(tool)).toMatchObject({
       type: 'object',
       properties: {
-        op: { enum: ['add', 'remove', 'reset'] },
+        op: { enum: ['add', 'remove', 'reset', 'update'] },
         text: { type: 'string' },
         handle: { type: 'string' },
         level: { type: 'number' },
@@ -187,9 +200,12 @@ describe('write tools follow State Write', () => {
     const { call } = await toolsFor([], everyKey);
     await expect(call('write_scene_tension', {})).rejects.toThrow('"op" must be one of: set, increment, reset');
     await expect(call('write_scene_note', { op: 'increment', value: 1 })).rejects.toThrow(
+      '"op" must be one of: set, reset, replace, append',
+    );
+    await expect(call('write_scene_data', { op: 'append', value: 'x' })).rejects.toThrow(
       '"op" must be one of: set, reset',
     );
-    await expect(call('write_scene_log', { op: 'set', value: 'x' })).rejects.toThrow('add, remove, reset');
+    await expect(call('write_scene_log', { op: 'set', value: 'x' })).rejects.toThrow('add, remove, reset, update');
   });
 
   it('adds an item with its declared fields and logs the fields it leaves out', async () => {
@@ -224,6 +240,122 @@ describe('write tools follow State Write', () => {
     ]);
     expect(writes[0]).toMatchObject({ value: 5, nodeId: 'llm' });
     expect(writes[2]).toMatchObject({ item: { text: 'A storm', level: 2 } });
+  });
+});
+
+describe('text edits', () => {
+  it('replaces the one place old appears, keeping the rest of the text', async () => {
+    const { call, logs } = await toolsFor([], [target('note')]);
+    await call('write_scene_note', { value: 'The door is shut. The lamp is lit.' });
+    expect(await call('write_scene_note', { op: 'replace', old: 'shut', value: 'open' })).toBe(
+      'The door is open. The lamp is lit.',
+    );
+    // Edits build on each other within the loop, and an empty value deletes the text.
+    expect(await call('write_scene_note', { op: 'replace', old: ' The lamp is lit.', value: '' })).toBe(
+      'The door is open.',
+    );
+    expect(logs.at(-1)).toContain('scene.note:');
+  });
+
+  it('refuses a replace that matches nowhere or more than once', async () => {
+    const { call } = await toolsFor([], [target('note')]);
+    await call('write_scene_note', { value: 'a cat and a cat' });
+    await expect(call('write_scene_note', { op: 'replace', old: 'dog', value: 'x' })).rejects.toThrow(
+      '"old" does not appear in the text',
+    );
+    await expect(call('write_scene_note', { op: 'replace', old: 'cat', value: 'x' })).rejects.toThrow(
+      '"old" appears 2 times',
+    );
+    await expect(call('write_scene_note', { op: 'replace', old: '', value: 'x' })).rejects.toThrow('"old" must be');
+    await expect(call('write_scene_note', { op: 'replace', old: 'and' })).rejects.toThrow('"value" must be');
+  });
+
+  it('takes a replacement literally', async () => {
+    const { call } = await toolsFor([], [target('note')]);
+    expect(await call('write_scene_note', { op: 'replace', old: 'none', value: '$& $1' })).toBe('$& $1');
+  });
+
+  it('appends on a new line, to the default text too', async () => {
+    const { call } = await toolsFor([], [target('note')]);
+    expect(await call('write_scene_note', { op: 'append', value: 'Day 1' })).toBe('none\nDay 1');
+    await call('write_scene_note', { value: '' });
+    expect(await call('write_scene_note', { op: 'append', value: 'Day 2' })).toBe('Day 2');
+    await expect(call('write_scene_note', { op: 'append' })).rejects.toThrow('"value" must be the text to append');
+  });
+
+  it('stores an edit as a set of the whole new text', async () => {
+    const { call, run } = await toolsFor([], [target('note')]);
+    await call('write_scene_note', { op: 'append', value: 'Day 1' });
+    run.commit('llm', 1);
+    expect(run.finish()).toMatchObject([{ op: 'set', value: 'none\nDay 1' }]);
+  });
+});
+
+describe('item updates', () => {
+  it('gives an item new text in place, keeping its id, fields and place', async () => {
+    const { call, logs } = await toolsFor([], [target('log')]);
+    await call('write_scene_log', { op: 'add', text: 'A storm', level: 2 });
+    await call('write_scene_log', { op: 'add', text: 'A calm' });
+    const items = (await call('write_scene_log', { op: 'update', handle: '#1', text: 'A great storm' })) as any[];
+    expect(items).toEqual([
+      { handle: '#2', text: 'A calm' },
+      { handle: '#1', text: 'A great storm', level: 2 },
+    ]);
+    expect(logs.at(-1)).toBe('scene.log: updating A storm: text A great storm');
+  });
+
+  it('changes a field value alone, or with the text', async () => {
+    const { call } = await toolsFor([], [target('log')]);
+    await call('write_scene_log', { op: 'add', text: 'A storm', level: 2 });
+    expect(await call('write_scene_log', { op: 'update', handle: '#1', level: 3 })).toEqual([
+      { handle: '#1', text: 'A storm', level: 3 },
+    ]);
+    expect(await call('write_scene_log', { op: 'update', handle: '#1', text: 'A calm', level: 1 })).toEqual([
+      { handle: '#1', text: 'A calm', level: 1 },
+    ]);
+  });
+
+  it('refuses an undeclared field, a value of the wrong type, nothing to change and a bad handle', async () => {
+    const { call } = await toolsFor([], [target('log')]);
+    await call('write_scene_log', { op: 'add', text: 'A storm', level: 2 });
+    await expect(call('write_scene_log', { op: 'update', handle: '#1', mood: 'grim' })).rejects.toThrow(
+      'scene.log has no field "mood"; its fields are level',
+    );
+    await expect(call('write_scene_log', { op: 'update', handle: '#1', messages: { ids: ['m'] } })).rejects.toThrow(
+      'has no field "messages"',
+    );
+    await expect(call('write_scene_log', { op: 'update', handle: '#1', level: 'high' })).rejects.toThrow(
+      'field "level" must be a number',
+    );
+    await expect(call('write_scene_log', { op: 'update', handle: '#1', text: 4 })).rejects.toThrow('needs text');
+    await expect(call('write_scene_log', { op: 'update', handle: '#1' })).rejects.toThrow(
+      'needs the new text or new field values',
+    );
+    await expect(call('write_scene_log', { op: 'update', handle: '#9', text: 'x' })).rejects.toThrow(
+      'No item has the handle "#9"',
+    );
+    await expect(call('write_scene_log', { op: 'update', text: 'x' })).rejects.toThrow(
+      '"handle" must be the handle of the item to update',
+    );
+    await call('write_scene_log', { op: 'remove', handle: '#1' });
+    await expect(call('write_scene_log', { op: 'update', handle: '#1', text: 'x' })).rejects.toThrow(
+      'scene.log no longer holds that item',
+    );
+  });
+
+  it('stores an update of the item id with only what changed', async () => {
+    const { call, run } = await toolsFor([], [target('log')]);
+    await call('write_scene_log', { op: 'add', text: 'A storm' });
+    await call('write_scene_log', { op: 'update', handle: '#1', text: 'A great storm' });
+    await call('write_scene_log', { op: 'update', handle: '#1', level: 3 });
+    run.commit('llm', 1);
+    const [added, ...updates] = run.finish();
+    const itemId = added?.op === 'add' ? added.item.id : '';
+    const to = { kind: 'definition', definitionId: scene.id, key: 'log' };
+    expect(updates).toEqual([
+      { op: 'update', target: to, nodeId: 'llm', itemId, text: 'A great storm' },
+      { op: 'update', target: to, nodeId: 'llm', itemId, fields: { level: 3 } },
+    ]);
   });
 });
 

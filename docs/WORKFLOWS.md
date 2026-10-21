@@ -122,8 +122,13 @@ included, for a [thread key](STATE-AND-LORE.md#thread-keys)).
 
 **Tools.** The **Tools** section lets the model read and change story state itself, in a loop, during its answer:
 
-- **Readable keys:** state keys the model may read. **Writable keys:** keys it may change. Nothing is offered unless
-  you list it. A key whose definition or key was deleted shows as unknown and is left out.
+- **Readable keys:** state keys the model may read. **Writable keys:** keys it may change, and always read too, so it
+  never changes a value it cannot see. Nothing is offered unless you list it. A key whose definition or key was
+  deleted shows as unknown and is left out.
+- A text key can also be edited in place: the model replaces one passage (it must appear exactly once) or appends a
+  line, without rewriting the whole text. An item of a collection can be updated in place, its text and the values of
+  its declared fields: it keeps its place in the list and its link to messages, so a corrected summary still points
+  at what it summarizes. It cannot get a field the key doesn't declare.
 - A write follows the same rules as a State Write node (bounds, enum options, declared fields), and counts only if the
   node finishes, like all story state. The model sees its own writes when it reads again; other nodes and templates see
   them from the next turn.

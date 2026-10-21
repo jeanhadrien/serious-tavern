@@ -171,6 +171,53 @@ function planThread(found: LocatedKey, op: StateNodeOp, ctx: Inputs): WritePlan 
 }
 
 /**
+ * A collection item's new text and/or new values of its declared fields: what the LLM node's write tools do for
+ * `update` (State Write has no such op). `changes` holds `text` and field values by name; each must fit the key as
+ * `collectionItem` says, and a name the key doesn't declare is refused. The item keeps its id, other fields and link.
+ * Pure; throws plain errors like `planWrite`.
+ */
+export function planUpdate(
+  found: LocatedKey,
+  itemId: string,
+  changes: Record<string, unknown>,
+  current: unknown,
+): WritePlan {
+  const { label, def } = found;
+  if (def.type !== 'collection') throw new Error(`${label} is not a collection; only items can be updated`);
+  const { text, ...given } = changes;
+  if (text === undefined && Object.keys(given).length === 0)
+    throw new Error(`${label} needs the new text or new field values of the item`);
+  if (text !== undefined && typeof text !== 'string')
+    throw new Error(`${label} needs text for the item, got ${describeValue(text)}`);
+  const { item: fit, ignored } = itemOf({ ...found, def }, { ...given, text: text ?? '' });
+  if (ignored.length) {
+    const declared = Object.keys(def.fields ?? {});
+    throw new Error(
+      `${label} has no field ${ignored.map((name) => `"${name}"`).join(', ')}; ${declared.length ? `its fields are ${declared.join(', ')}` : 'it declares no fields'}`,
+    );
+  }
+  const { text: _text, ...fields } = fit;
+  const held = Array.isArray(current) ? current : [];
+  const item = held.find((candidate) => isPlainObject(candidate) && candidate.id === itemId);
+  if (!item) throw new Error(`${label} no longer holds that item`);
+  const changed = [
+    ...(text === undefined ? [] : [`text ${shown(text, 80)}`]),
+    ...Object.entries(fields).map(([name, value]) => `${name} ${shown(value)}`),
+  ];
+  return {
+    request: {
+      target: keyOf(found),
+      op: 'update',
+      itemId,
+      ...(text === undefined ? {} : { text }),
+      ...(Object.keys(fields).length ? { fields } : {}),
+    },
+    output: { ...structuredClone(item), ...fields, ...(text === undefined ? {} : { text }) },
+    logs: [`${label}: updating ${shown(item.text, 80)}: ${changed.join(', ')}`],
+  };
+}
+
+/**
  * Decides what a State Write does with its input, from the key's definition and the value it had when the
  * turn started. Pure. Throws plain errors that name the key and what was received.
  */

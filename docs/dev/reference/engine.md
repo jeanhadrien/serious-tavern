@@ -169,17 +169,25 @@ sequence, then run the loop. The preset preview shows the unmerged, unflattened 
 - **Repair** drops tool messages and calls without a counterpart, and logs a non-zero count.
 
 **Tools.** `tools.read` lists keys the model may read through one `read_state` tool (key names as an enum);
-`tools.write` gets one `write_<definition>_<key>` tool per key (cut at 64 characters, repeats numbered). Schemas are
+`tools.write` gets one `write_<definition>_<key>` tool per key (cut at 64 characters, repeats numbered). A writable key
+is always readable too: `read_state` offers the union of both lists. Schemas are
 generated from the definitions:
 
 | Key type | Write tool arguments |
 | --- | --- |
 | number | `{ op: set \| increment \| reset, value }`, bounds in the description, clamped |
-| boolean, text, object | `{ op?: set \| reset, value }` |
+| boolean, object | `{ op?: set \| reset, value }` |
 | enum | the same, options as a JSON Schema `enum` |
-| collection | `{ op: add \| remove \| reset, text, handle, ...declared fields }` |
+| text | `{ op?: set \| reset \| replace \| append, value, old }` |
+| collection | `{ op: add \| remove \| reset \| update, text, handle, ...declared fields }` |
 
-`reset` is State Write's `delete`. A write tool goes through State Write's own rules, so a refused value comes back in
+`reset` is State Write's `delete`. `update` changes the item at `handle`: a new `text`, new values of its declared
+fields, or both (each value checked like an `add`'s; an undeclared field, `messages` included, is refused, and the link
+stays). `planUpdate` plans it and it is stored as the fold's `update` write, holding only what changed. `replace` and `append`
+exist only as tools too: `replace` changes `old` (it must appear
+exactly once, else the call fails and says how often it matched) into `value`, and `append` adds `value` on a new line.
+The tool computes the whole new text from the pending value and plans it as a `set`, so the stored write is an ordinary
+post-value. A write tool goes through State Write's own rules, so a refused value comes back in
 State Write's words; it is buffered like any write and answers with the key's value after it. Collection items are
 shown as `{ handle, text, ...fields }` with handles `#1`, `#2`... per loop; `remove` takes a handle. Thread keys are
 never offered.
@@ -192,7 +200,8 @@ line. Every step streams, but only the last step's text is the answer (each late
 delta that resets the rows the LLM feeds); reasoning accumulates across steps. **Reading your own writes:** a read
 after a write in the same loop sees it, through `ctx.pendingState()`; without `foldWith` (tests, the preview) reads see
 the turn-start snapshot. Known difference: if another node of the same run writes the same key, the stored value may
-differ from what this node read, because the final resolve orders every node.
+differ from what this node read, because the final resolve orders every node. A `replace` or `append` is stored as
+the whole new text, so it can also overwrite another node's write to that key in the same run.
 
 **Open questions.**
 - *Models without tool support:* the backend's error surfaces as a node error. A per-model `tools: false` override

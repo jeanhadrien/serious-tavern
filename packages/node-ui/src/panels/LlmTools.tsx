@@ -86,8 +86,9 @@ export function LlmTools({ config, onChange, context }: LlmToolsProps) {
     <>
       <h4>Tools</h4>
       <p className="hint">
-        Lets the model read and change story state while it answers. Nothing is offered unless listed. Writes follow the
-        same rules as State Write. A node that can write state runs even when no Chat Output needs it.
+        Lets the model read and change story state while it answers. Nothing is offered unless listed. A key the model
+        may write can always be read too. Writes follow the same rules as State Write. A node that can write state runs
+        even when no Chat Output needs it.
       </p>
       <ToolKeys title="Keys the model may read" list="read" config={config} onChange={onChange} context={context} />
       <ToolKeys title="Keys the model may write" list="write" config={config} onChange={onChange} context={context} />

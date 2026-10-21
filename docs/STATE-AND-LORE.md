@@ -177,6 +177,9 @@ operation the key allows:
 | collection | add an item (text, or an object with a `text` field and the declared item fields), remove an item by id, empty the list |
 | thread | add an exchange (from an LLM node's **Exchange** output), remove one by id, empty the thread |
 
+An LLM node's write tools can do a little more: edit a text in place (replace a passage, append a line) and update an
+item's text or field values. See **Tools** under [the LLM node](WORKFLOWS.md#llm).
+
 The panel shows one control that fits the key and operation, and what you type keeps its real type. A value connected
 to the node's input always wins over the typed one. State Write runs every turn, even when no reply depends on it,
 unless you gate it: connect a Condition branch (or a Random chance output) to its **Run when** input and it writes only

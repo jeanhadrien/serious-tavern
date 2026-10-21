@@ -48,6 +48,13 @@ export function previewWrite(write: StateWrite): { write: StateWrite; truncated:
     const value = shorten(write.value);
     return { write: truncated ? { ...write, value } : write, truncated };
   }
+  if (write.op === 'update') {
+    const text = write.text === undefined ? {} : { text: shorten(write.text) as string };
+    const fields = write.fields && {
+      fields: Object.fromEntries(Object.entries(write.fields).map(([name, value]) => [name, shorten(value)])),
+    };
+    return { write: truncated ? { ...write, ...text, ...fields } : write, truncated };
+  }
   // A thread item shows its summary, with the text cut like any text: the exchange never leaves the stored turn.
   if (write.op === 'add' && hasExchange(write.item)) {
     const view = viewThreadItem(write.item);

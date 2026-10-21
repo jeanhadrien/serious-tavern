@@ -13,7 +13,9 @@ const toolKeysSchema = z
     write: z
       .array(stateTarget)
       .default([])
-      .describe('State keys the model may change, one write tool each; they follow the same rules as State Write'),
+      .describe(
+        'State keys the model may change, one write tool each; they follow the same rules as State Write and can always be read too',
+      ),
   })
   .default({ read: [], write: [] });
 

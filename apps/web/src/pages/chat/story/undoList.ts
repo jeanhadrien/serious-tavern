@@ -28,7 +28,8 @@ const TEXT_MAX = 40;
 const ITEM_MAX = 30;
 const ITEMS_LISTED = 3;
 
-type Item = { id: string; text: string; linked?: number; exchange?: string };
+// `stored` is the whole stored item as JSON: an undone update keeps the id and changes only text or fields.
+type Item = { id: string; text: string; stored: string; linked?: number; exchange?: string };
 type Turn = SessionStateView['turns'][number];
 
 // A node's own state belongs to its workflow (node ids repeat across the workflows of a chat); a target without a
@@ -90,7 +91,15 @@ const itemsOf = (value: unknown): Item[] =>
   Array.isArray(value)
     ? value.flatMap((raw): Item[] =>
         isPlainObject(raw) && typeof raw.id === 'string'
-          ? [{ id: raw.id, text: itemText(raw), ...linkedCount(raw), ...exchangeNote(raw) }]
+          ? [
+              {
+                id: raw.id,
+                text: itemText(raw),
+                stored: JSON.stringify(raw),
+                ...linkedCount(raw),
+                ...exchangeNote(raw),
+              },
+            ]
           : [],
       )
     : [];
@@ -106,20 +115,26 @@ const describeItem = ({ text, linked, exchange }: Item) =>
       ? `${quote(text, ITEM_MAX)} (exchange: ${exchange})`
       : quote(text, ITEM_MAX);
 
-/** What an item list change reads as: the items it forgets and the ones it brings back, at most three in all. */
+/**
+ * What an item list change reads as: the items it forgets, the ones it brings back and the ones whose earlier version
+ * it puts back (an item update undone: other text or field values), at most three in all.
+ */
 function itemChange(before: unknown, after: unknown): string {
   const ids = (items: Item[]) => new Set(items.map((item) => item.id));
   const was = itemsOf(before);
   const now = itemsOf(after);
   const gone = was.filter((item) => !ids(now).has(item.id));
   const back = now.filter((item) => !ids(was).has(item.id));
+  const rewritten = now.filter((item) => was.some((old) => old.id === item.id && old.stored !== item.stored));
   const forgotten = gone.slice(0, ITEMS_LISTED);
   const restored = back.slice(0, ITEMS_LISTED - forgotten.length);
-  const more = gone.length - forgotten.length + (back.length - restored.length);
+  const reverted = rewritten.slice(0, ITEMS_LISTED - forgotten.length - restored.length);
+  const more = gone.length - forgotten.length + (back.length - restored.length) + (rewritten.length - reverted.length);
   const list = (items: Item[]) => items.map(describeItem).join(', ');
   return [
     forgotten.length && `forgets ${list(forgotten)}`,
     restored.length && `brings back ${list(restored)}`,
+    reverted.length && `puts back the earlier version of ${list(reverted)}`,
     more && `and ${more} more`,
   ]
     .filter(Boolean)

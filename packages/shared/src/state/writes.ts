@@ -49,11 +49,21 @@ export const stateTargetSchema = z.discriminatedUnion('kind', [
 export type StateTarget = z.infer<typeof stateTargetSchema>;
 
 // `nodeId` is the node that wrote it. Scalars always store the value AFTER the write (an increment is
-// computed into a `set`); collections store item-level `add` and `remove`; `delete` resets a key.
+// computed into a `set`); collections store item-level `add`, `update` (an item's new text and/or new values of its
+// declared fields; only the LLM node's tools write it, never to a thread) and `remove`; `delete` resets a key.
 const writer = { target: stateTargetSchema, nodeId: z.string() };
 export const stateWriteSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('set'), ...writer, value: z.unknown() }).passthrough(),
   z.object({ op: z.literal('add'), ...writer, item: collectionItemSchema }).passthrough(),
+  z
+    .object({
+      op: z.literal('update'),
+      ...writer,
+      itemId: z.string(),
+      text: z.string().optional(),
+      fields: z.record(z.string(), z.unknown()).optional(),
+    })
+    .passthrough(),
   z.object({ op: z.literal('remove'), ...writer, itemId: z.string() }).passthrough(),
   z.object({ op: z.literal('delete'), ...writer }).passthrough(),
 ]);

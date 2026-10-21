@@ -11,6 +11,7 @@ Per-chat state that workflow turns write. It lives exactly as long as the replie
 ## The fold
 - `foldStoryState` is the only interpreter: pure, never throws. The web reuses it and never re-implements it. Pass definitions oldest first (`oldestFirst`).
 - Scalars are **post-values** (`increment` becomes a `set`).
+- Collections store item-level `add`, `update` and `remove`. An `update` (`{ itemId, text?, fields? }`) changes an item's `text` and/or field values; **the fold never lets it change `id` or `messages`** whatever the write holds, and place and turn stay; only the LLM node's write tools store it, and **a thread never takes one** (`suits` refuses it: a thread item's text is its exchange's). A new write op needs a case in the fold, `test-oracle.ts`, the random test's generator, `previewWrite` and the web's `describeWrite`.
 - A stored value that doesn't fit the CURRENT definition reads as the default plus a warning, and stored data is never rewritten. That is why definition edits are always allowed.
 - Node-private state (`target.kind: 'node'`) is scoped by workflow: node targets carry `workflowId`, and a node reads its own workflow's writes plus legacy ones without `workflowId`.
 - The state view stays small: history keeps values only for number/boolean/enum keys (text and object points are `{ turn }`), `previewWrite` cuts long write values (`WRITE_PREVIEW_LIMIT`, `truncated`) except items with a link, and an uncapped node collection sends only its newest `NODE_ITEMS_LIMIT` items (`omitted` counts the rest). The fold itself stays uncapped for node keys: Draw's window needs every item.
@@ -31,7 +32,7 @@ Per-chat state that workflow turns write. It lives exactly as long as the replie
 
 ## Thread keys
 Key type `thread` (`{ cap?, description? }`): a list key whose items are LLM exchanges, `{ id, text, exchange: ConversationMessage[], input?, turnId, runId }`.
-- The fold treats it as a collection (`isListKeyType`, `cap` included; items unchecked, no link check, ops add/remove/delete). Every new switch on the key type gets a `thread` case, and code that means "a list key" uses `isListKeyType`.
+- The fold treats it as a collection (`isListKeyType`, `cap` included; items unchecked, no link check, ops add/remove/delete; never `update`). Every new switch on the key type gets a `thread` case, and code that means "a list key" uses `isListKeyType`.
 - **The field is `exchange`, never `messages`:** `messages` is the built-in link to chat messages on collection items.
 - `threadItem(value, input?, { keepReasoning })` is the one rule for what is stored: a non-empty list of canonical messages that parses, `reasoning` and `provider_data` stripped unless `keepReasoning` (`provenance` always stays); `input` text becomes a user message, or one message (only role, content and name kept; blank text is none).
 - An item's `text` is `exchangeText` of its exchange.

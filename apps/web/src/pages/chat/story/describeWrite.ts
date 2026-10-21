@@ -6,11 +6,14 @@ export type TurnWrite = SessionStateView['turns'][number]['writes'][number];
 
 const TEXT_MAX = 60;
 
-/** Every item text the view shows, by item id, so a removal can say what it removed. */
+/** Every item text the view shows, by item id (the last update's), so a removal or an update can say what it changed. */
 export function itemTexts(view: SessionStateView): Map<string, string> {
   const texts = new Map<string, string>();
   for (const turn of view.turns)
-    for (const { write } of turn.writes) if (write.op === 'add') texts.set(write.item.id, write.item.text);
+    for (const { write } of turn.writes) {
+      if (write.op === 'add') texts.set(write.item.id, write.item.text);
+      if (write.op === 'update' && write.text !== undefined) texts.set(write.itemId, write.text);
+    }
   return texts;
 }
 
@@ -25,9 +28,14 @@ function extras(item: Record<string, unknown>): string {
   return fields.length ? ` (${fields.join(', ')})` : '';
 }
 
+/** An item update in words: `updated an item to 'a gong' (level 3)`, the text only when it changed. */
+const updated = (write: Extract<TurnWrite['write'], { op: 'update' }>) =>
+  `updated an item${write.text === undefined ? '' : ` to ${quote(write.text, TEXT_MAX)}`}${extras(write.fields ?? {})}`;
+
 /**
  * One stored write in plain words, as the "What this turn stored" card lists it:
- * `scene.tension → 6`, `scene.injected + 'a bell' (level 2)`, `scene.injected: removed 'a bell'`,
+ * `scene.tension → 6`, `scene.injected + 'a bell' (level 2)`, `scene.injected: updated an item to 'a gong'`,
+ * `scene.injected: removed 'a bell'`,
  * `scene.tension reset to its default`, `Draw #1 (draw): drew 'resin smell'`. Long text is cut (the view already
  * cut very long values, see `truncated`).
  */
@@ -42,6 +50,8 @@ export function describeWrite({ write, definitionName, nodeLabel }: TurnWrite, i
           : `${who}: remembered ${quote(write.item.text, TEXT_MAX)} (${target.key})`;
       case 'set':
         return `${who}: ${target.key} → ${valueText(write.value)}`;
+      case 'update':
+        return `${who}: ${updated(write)} (${target.key})`;
       case 'remove':
         return `${who}: forgot ${itemText.has(write.itemId) ? quote(itemText.get(write.itemId) ?? '', TEXT_MAX) : 'an item'} (${target.key})`;
       case 'delete':
@@ -56,6 +66,8 @@ export function describeWrite({ write, definitionName, nodeLabel }: TurnWrite, i
       return `${subject} reset to its default`;
     case 'add':
       return `${subject} + ${quote(write.item.text, TEXT_MAX)}${extras(write.item)}`;
+    case 'update':
+      return `${subject}: ${updated(write)}`;
     case 'remove': {
       const text = itemText.get(write.itemId);
       return `${subject}: removed ${text === undefined ? 'an item' : quote(text, TEXT_MAX)}`;
