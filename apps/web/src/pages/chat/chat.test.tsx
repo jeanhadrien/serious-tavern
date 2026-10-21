@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
 import { composerShouldSend, editorKeyAction } from './keyboard.js';
 import { isNearBottom, shouldStickToBottom } from './useStickToBottom.js';
 import { MessageContent } from './MessageContent.js';
@@ -167,20 +168,25 @@ it('shows reasoning, a stopped note, and no pending indicator once a reply row i
 
 it("shows a node's log lines in the execution details", () => {
   const html = renderToStaticMarkup(
-    <ExecutionDetails
-      id="x"
-      cached={{
-        id: 'x',
-        workflowId: 'w',
-        sessionId: 's',
-        status: 'error',
-        startedAt: '',
-        warnings: [],
-        nodes: { parse: { status: 'error', error: 'No JSON value found in the text', logs: ['Input: <nope>'] } },
-      }}
-    />,
+    <MemoryRouter>
+      <ExecutionDetails
+        id="x"
+        cached={{
+          id: 'x',
+          workflowId: 'w',
+          sessionId: 's',
+          status: 'error',
+          startedAt: '',
+          warnings: [],
+          nodes: { parse: { status: 'error', error: 'No JSON value found in the text', logs: ['Input: <nope>'] } },
+        }}
+      />
+    </MemoryRouter>,
   );
   expect(html).toContain('<p class="error">No JSON value found in the text</p>');
+  // Each node row links to its node on the canvas of the run's workflow.
+  expect(html).toContain('href="/?wide=workflow:w&amp;node=parse"');
+  expect(html).toContain('>Show on canvas</a>');
   expect(html).toContain('<pre>Input: &lt;nope&gt;</pre>');
 });
 

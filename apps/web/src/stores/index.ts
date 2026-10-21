@@ -82,7 +82,12 @@ export function useList<T>(store: ListStore<T>): T[] {
 }
 
 // What each list shares with its editor: the open item, its dirty flag and the list's requests.
-export const workflowEditorStore = createEditorStore<Workflow>();
+/** Where to look in a workflow that a link opens: a connection to highlight, a node to select and show. Both one-shot. */
+export interface WorkflowFocus {
+  edge?: string;
+  node?: string;
+}
+export const workflowEditorStore = createEditorStore<Workflow, WorkflowFocus>();
 export const presetEditorStore = createEditorStore<Preset>();
 export const characterEditorStore = createEditorStore<Character>();
 export const personaEditorStore = createEditorStore<Persona>();

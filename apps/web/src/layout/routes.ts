@@ -9,7 +9,12 @@ const PATH_LAYOUTS: Record<string, (params: URLSearchParams) => Partial<LayoutUr
     const wideId = params.get('workflow') || undefined;
     return {
       left: 'workflows',
-      ...(wideId && { wide: 'workflows', wideId, edge: params.get('edge') || undefined }),
+      ...(wideId && {
+        wide: 'workflows',
+        wideId,
+        edge: params.get('edge') || undefined,
+        node: params.get('node') || undefined,
+      }),
     };
   },
   '/presets': (params) => {

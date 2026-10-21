@@ -160,6 +160,13 @@ it('tells content changes from tab switches', () => {
 it('builds links for other parts of the app', () => {
   expect(layoutHref({ wide: 'workflows', wideId: 'w1', edge: 'e1' })).toBe('/?wide=workflow:w1&edge=e1');
   expect(layoutHref({ left: 'workflows' })).toBe('/');
+  expect(layoutHref({ wide: 'workflows', wideId: 'w1', node: 'n 1' })).toBe('/?wide=workflow:w1&node=n%201');
+});
+
+it('reads the one-shot node and edge focus of a link', () => {
+  expect(parseLayoutUrl('wide=workflow:w1&node=n1&edge=e1')).toMatchObject({ wideId: 'w1', node: 'n1', edge: 'e1' });
+  expect(parseLayoutUrl('wide=workflow:w1').node).toBeUndefined();
+  expect(parseLayoutUrl('wide=workflow:w1&node=').node).toBeUndefined();
 });
 
 const phone = () => initialLayout(DESIGN_KINDS, false, true);

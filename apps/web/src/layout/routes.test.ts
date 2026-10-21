@@ -4,6 +4,7 @@ import { collectionLinkId, legacySearch, panelLinkTarget, stateDefinitionLinkId 
 it('maps legacy item links to a wide editor, edge highlight included', () => {
   expect(legacySearch('/workflows', '?workflow=w1&edge=e1')).toBe('wide=workflow:w1&edge=e1');
   expect(legacySearch('/presets', '?id=p1')).toBe('left=presets&wide=preset:p1');
+  expect(legacySearch('/workflows', '?workflow=w1&node=n1')).toBe('wide=workflow:w1&node=n1');
 });
 
 it('maps legacy list paths to the column that holds them', () => {

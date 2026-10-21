@@ -25,6 +25,15 @@ it('does not reopen the item the editor already shows, so its draft survives', (
   expect(store.getSnapshot()).toMatchObject({ currentId: 'a', dirty: true, command: { open: { id: 'a' } } });
 });
 
+it('carries a focus of the type the editor chose', () => {
+  const store = createEditorStore<{ id: string }, { edge?: string; node?: string }>();
+  store.open(item('a'), { node: 'n1' });
+  expect(store.getSnapshot().command).toMatchObject({ open: { id: 'a' }, focus: { node: 'n1' } });
+  store.report('a', true);
+  store.open(item('a'), { edge: 'e1' });
+  expect(store.getSnapshot()).toMatchObject({ dirty: true, command: { seq: 2, focus: { edge: 'e1' } } });
+});
+
 it('names the requested item at once, so the layout never records the previous one meanwhile', () => {
   const store = createEditorStore<{ id: string }>();
   const listener = vi.fn();

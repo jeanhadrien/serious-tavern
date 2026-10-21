@@ -57,7 +57,10 @@ to defaults) and `useLayoutUrl` syncs both ways. A content change (chat, editor,
 corrections are a `replace`. A URL the hook didn't write (Back/Forward, a link, a pasted URL) is `restore`d: its items
 open through the editor stores once their lists load, then the real state is written back with `replace` (an id that
 no longer exists closes its editor). Back/Forward never replaces an unsaved draft or switches a streaming chat; a
-clicked link does replace a draft, like a click in a list. Old paths (`/workflows?workflow=…&edge=…`, `/presets?id=…`,
+clicked link does replace a draft, like a click in a list. A workflow link may carry the one-shot `edge=<id>` (highlight a
+connection) and `node=<id>` (select the node and fit the view to it once the canvas has measured it; Execution details'
+"Show on canvas" builds it from the run's `workflowId`). Opening the workflow that is already open only moves the focus
+and keeps the draft; a node that is gone toasts "This node is no longer in the workflow" and the workflow still opens. Old paths (`/workflows?workflow=…&edge=…`, `/presets?id=…`,
 `/collections?id=…`, `/state-definitions?id=…`, `/characters`, `/personas`, `/settings`) are inbound aliases
 (`layout/routes.ts`), because node-ui's "Edit ↗" links emit them; unknown paths become `/`.
 

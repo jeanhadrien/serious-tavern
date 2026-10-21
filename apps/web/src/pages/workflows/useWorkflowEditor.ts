@@ -77,14 +77,21 @@ export function useWorkflowEditor() {
   const openId = workflow?.id;
   useEffect(() => workflowEditorStore.report(openId, dirty), [openId, dirty]);
 
-  // The store's `focus` is an edge to highlight (validation links). Opening the workflow that is already
-  // showing only moves the highlight, so unsaved canvas edits survive.
+  // The store's `focus` is an edge to highlight (validation links) and a node to show (Execution details). Opening
+  // the workflow that is already showing only moves the focus, so unsaved canvas edits survive.
   useEditorCommands(
     workflowEditorStore,
     {
-      open: (next, edgeId) => {
-        if (workflow?.id !== next.id) load(next);
-        if (edgeId) canvas.setHighlightedEdge(edgeId);
+      open: (next, focus) => {
+        const loading = workflow?.id !== next.id;
+        if (loading) load(next);
+        if (focus?.edge) canvas.setHighlightedEdge(focus.edge);
+        if (focus?.node) {
+          // The draft's nodes when the workflow was already open; the node may be gone since the run that links here.
+          const nodeIds = loading ? next.nodes.map((node) => node.id) : canvas.nodes.map((node) => node.id);
+          if (nodeIds.includes(focus.node)) canvas.showNode(focus.node);
+          else alerts.info('This node is no longer in the workflow');
+        }
       },
       close: (id) => {
         if (workflow?.id === id) close();

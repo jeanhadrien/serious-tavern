@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { skipReasonText, type ExecutionLog } from '@st/shared';
 import { executionsApi } from '../../api.js';
+import { layoutHref } from '../../layout/url.js';
 import { POST_NO_LOG } from './story/postRunText.js';
 import { LegacyRequestDetails, WireDetails, WireList } from './WireDetails.js';
 
@@ -55,7 +57,10 @@ export function ExecutionDetails({
           ))}
           {Object.entries(execution.nodes).map(([nodeId, node]) => (
             <div className="execution-node" key={nodeId}>
-              <strong>{node.name ?? nodeId}</strong> · {node.status} · {node.durationMs ?? 0}ms
+              <strong>{node.name ?? nodeId}</strong> · {node.status} · {node.durationMs ?? 0}ms ·{' '}
+              <Link to={layoutHref({ wide: 'workflows', wideId: execution.workflowId, node: nodeId })}>
+                Show on canvas
+              </Link>
               {node.skip && (
                 <p className="hint">{skipReasonText(node.skip, (id) => execution.nodes[id]?.name ?? id)}</p>
               )}

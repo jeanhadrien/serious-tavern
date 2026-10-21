@@ -30,6 +30,8 @@ export function useWorkflowCanvas(
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selected, setSelected] = useState<string>();
   const [highlightedEdge, setHighlightedEdge] = useState<string>();
+  // A node a link asked to show: selected and fitted once the canvas has measured it (`ShowNode`), then forgotten.
+  const [nodeToShow, setNodeToShow] = useState<string>();
   const [canvasVersion, setCanvasVersion] = useState(0);
   // Ports depend on what the node reads from presets, characters and state definitions: they are resolved
   // again when any of those lists changes.
@@ -267,6 +269,8 @@ export function useWorkflowCanvas(
     hasSelection,
     deselect,
     focusIssue,
+    nodeToShow,
+    showNode: setNodeToShow,
     deleteSelection,
     deleteNode,
     copy: clipboard.copy,

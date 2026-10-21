@@ -10,6 +10,7 @@
 //   right=character:<id>|persona:<id>|collection:<id>  a narrow editor open in R
 //   view=<list>|chat|editor   phones only: what is on screen, when it is not what the rest opens
 //   edge=<id>                 one-shot: highlight this edge of the opened workflow
+//   node=<id>                 one-shot: select this node of the opened workflow and show it
 import { mobileView } from './derive.js';
 import {
   RESOURCE_IDS,
@@ -29,6 +30,7 @@ export interface LayoutUrl extends Omit<LayoutTarget, 'leftEditorOpen' | 'rightE
   /** The item open in R's narrow editor (R's tab is then that resource). */
   rightId?: string;
   edge?: string;
+  node?: string;
 }
 
 const LEFT_TABS: readonly ListId[] = ['workflows', 'presets', 'providers', 'stateDefinitions', 'settings'];
@@ -89,6 +91,7 @@ export function parseLayoutUrl(search: string): LayoutUrl {
     rightId: RIGHT_TABS.includes(rightTab) ? rightColumn.id : undefined,
     view: MOBILE_VIEWS.includes(view) ? view : undefined,
     edge: params.get('edge') || undefined,
+    node: params.get('node') || undefined,
   };
 }
 
@@ -106,6 +109,7 @@ export function formatLayoutUrl(url: LayoutUrl): string {
   else if (url.right !== defaultRight(url.wide)) parts.push(`right=${url.right}`);
   if (url.view) parts.push(`view=${url.view}`);
   if (url.edge) parts.push(`edge=${encodeURIComponent(url.edge)}`);
+  if (url.node) parts.push(`node=${encodeURIComponent(url.node)}`);
   return parts.join('&');
 }
 

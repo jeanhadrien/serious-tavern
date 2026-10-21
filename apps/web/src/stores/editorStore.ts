@@ -2,15 +2,15 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { dialogs } from '../components/dialog/dialogStore.js';
 
 /** A request from a list to its editor. `seq` makes every request distinct so each is handled once. */
-type EditorCommand<T> = { seq: number; open: T; focus?: string } | { seq: number; close: string };
+type EditorCommand<T, F> = { seq: number; open: T; focus?: F } | { seq: number; close: string };
 
-export interface EditorState<T> {
+export interface EditorState<T, F = string> {
   /** The item the editor has open. */
   currentId?: string;
   /** Whether the open draft has unsaved changes. */
   dirty: boolean;
   /** The latest request from the list; the editor applies it when it sees a new `seq`. */
-  command?: EditorCommand<T>;
+  command?: EditorCommand<T, F>;
 }
 
 /** What the unsaved-work dialog offers. `label` names the open item; `save` resolves true once saved. */
@@ -21,15 +21,16 @@ export interface EditorSaver {
 
 type Ask = typeof dialogs.ask;
 
-export interface EditorStore<T> {
-  getSnapshot(): EditorState<T>;
+export interface EditorStore<T, F = string> {
+  getSnapshot(): EditorState<T, F>;
   subscribe(listener: () => void): () => void;
   /**
    * List side: ask the editor to open an item. Does nothing when it is already the open one (keeps its draft),
-   * unless a `focus` is given: a hint about where to look inside the item (e.g. an edge id to highlight).
+   * unless a `focus` is given: a hint about where to look inside the item. Its type `F` is the editor's own (the
+   * workflow editor takes the edge to highlight and the node to show); the others take no hint.
    * `currentId` names the requested item at once (clean), before the editor has applied the request.
    */
-  open(item: T, focus?: string): void;
+  open(item: T, focus?: F): void;
   /** List side: tell the editor an item was deleted, so it drops that draft. */
   discard(id: string): void;
   /** Editor side: publish which item is open and whether it is dirty. */
@@ -54,16 +55,18 @@ export interface EditorStore<T> {
  * component, which is always mounted; the store only carries what the list needs to show (selection, dirty marker)
  * and the list's requests to the editor.
  */
-export function createEditorStore<T extends { id: string }>(ask: Ask = dialogs.ask.bind(dialogs)): EditorStore<T> {
-  let state: EditorState<T> = { dirty: false };
+export function createEditorStore<T extends { id: string }, F = string>(
+  ask: Ask = dialogs.ask.bind(dialogs),
+): EditorStore<T, F> {
+  let state: EditorState<T, F> = { dirty: false };
   let saver: EditorSaver | undefined;
   const listeners = new Set<() => void>();
-  const set = (next: EditorState<T>) => {
+  const set = (next: EditorState<T, F>) => {
     state = next;
     for (const listener of [...listeners]) listener();
   };
-  const send = (command: Omit<EditorCommand<T>, 'seq'>, next: Partial<EditorState<T>> = {}) =>
-    set({ ...state, ...next, command: { ...command, seq: (state.command?.seq ?? 0) + 1 } as EditorCommand<T> });
+  const send = (command: Omit<EditorCommand<T, F>, 'seq'>, next: Partial<EditorState<T, F>> = {}) =>
+    set({ ...state, ...next, command: { ...command, seq: (state.command?.seq ?? 0) + 1 } as EditorCommand<T, F> });
   return {
     getSnapshot: () => state,
     subscribe: (listener) => {
@@ -108,7 +111,7 @@ export function createEditorStore<T extends { id: string }>(ask: Ask = dialogs.a
 }
 
 /** Reads an editor store; the component re-renders when it changes. */
-export function useEditorState<T>(store: EditorStore<T>): EditorState<T> {
+export function useEditorState<T, F = string>(store: EditorStore<T, F>): EditorState<T, F> {
   return useSyncExternalStore(store.subscribe, store.getSnapshot);
 }
 
@@ -116,9 +119,9 @@ export function useEditorState<T>(store: EditorStore<T>): EditorState<T> {
  * Editor side: applies each request from the list once. While `ready` is false an open request waits
  * (e.g. until the node types are loaded). Handlers may change every render.
  */
-export function useEditorCommands<T>(
-  store: EditorStore<T>,
-  handlers: { open(item: T, focus?: string): void; close(id: string): void },
+export function useEditorCommands<T, F = string>(
+  store: EditorStore<T, F>,
+  handlers: { open(item: T, focus?: F): void; close(id: string): void },
   ready = true,
 ) {
   const command = useSyncExternalStore(store.subscribe, () => store.getSnapshot().command);
@@ -139,7 +142,7 @@ export function useEditorCommands<T>(
 }
 
 /** Editor side: registers the latest saver for the unsaved-work dialog; a new function each render doesn't re-register. */
-export function useEditorSaver<T>(store: EditorStore<T>, saver: EditorSaver) {
+export function useEditorSaver<T, F = string>(store: EditorStore<T, F>, saver: EditorSaver) {
   const latest = useRef(saver);
   latest.current = saver;
   useEffect(() => {

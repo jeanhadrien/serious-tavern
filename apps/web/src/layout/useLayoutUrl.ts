@@ -10,6 +10,7 @@ import {
   sessionsStore,
   stateDefinitionEditorStore,
   workflowEditorStore,
+  type WorkflowFocus,
 } from '../stores/index.js';
 import type { EditorStore } from '../stores/editorStore.js';
 import { ITEM_SOURCES, type Item } from './itemSources.js';
@@ -36,7 +37,7 @@ interface ChatControls {
 const EDITOR_TIMEOUT_MS = 4000;
 
 /** Resolves once the editor reports `id` as open (or after a timeout, so a stuck editor cannot block the URL). */
-function whenOpen(editor: EditorStore<Item>, id: string): Promise<void> {
+function whenOpen(editor: EditorStore<Item, unknown>, id: string): Promise<void> {
   return new Promise((resolve) => {
     let stop = () => {};
     const done = () => {
@@ -50,7 +51,7 @@ function whenOpen(editor: EditorStore<Item>, id: string): Promise<void> {
   });
 }
 
-const useOpenId = (editor: EditorStore<Item>) =>
+const useOpenId = (editor: EditorStore<Item, unknown>) =>
   useSyncExternalStore(editor.subscribe, () => editor.getSnapshot().currentId);
 
 /** The layout state that comes from a URL's query; used to build the shell's initial state. */
@@ -88,11 +89,11 @@ export function useLayoutUrl(layout: LayoutState, dispatch: Dispatch<LayoutActio
     const current = ++generation.current;
     applying.current = true;
     const isCurrent = () => generation.current === current;
-    const openItem = async (resource: ResourceId, id: string, edge?: string) => {
+    const openItem = async (resource: ResourceId, id: string, focus?: WorkflowFocus) => {
       const source = ITEM_SOURCES[resource];
       if (!source) return;
       const open = source.editor.getSnapshot();
-      if (open.currentId === id && !edge) return;
+      if (open.currentId === id && !focus) return;
       // Back/Forward never discards an unsaved draft (the URL then follows what is shown); a clicked link,
       // like a click in a list, asks Save / Discard / Cancel first. Cancel leaves the editor alone and the URL is
       // then written back to what is shown.
@@ -102,7 +103,7 @@ export function useLayoutUrl(layout: LayoutState, dispatch: Dispatch<LayoutActio
       const item = items.find((candidate) => candidate.id === id);
       if (!item) return dispatch({ type: 'closeEditor', id: resource }); // deleted since the link was made
       if (!(await source.editor.confirmSwitch(id)) || !isCurrent()) return;
-      source.editor.open(structuredClone(item), edge);
+      source.editor.open(structuredClone(item), focus);
       await whenOpen(source.editor, id);
     };
     const openSession = async (id: string | undefined) => {
@@ -113,7 +114,9 @@ export function useLayoutUrl(layout: LayoutState, dispatch: Dispatch<LayoutActio
       if (sessions?.some((session) => session.id === id) && isCurrent()) await chatRef.current.open(id);
     };
     await Promise.all([
-      url.wide && url.wideId ? openItem(url.wide, url.wideId, url.edge) : undefined,
+      url.wide && url.wideId
+        ? openItem(url.wide, url.wideId, url.edge || url.node ? { edge: url.edge, node: url.node } : undefined)
+        : undefined,
       url.leftId ? openItem(url.left as ResourceId, url.leftId) : undefined,
       url.rightId ? openItem(url.right as ResourceId, url.rightId) : undefined,
       openSession(url.session),

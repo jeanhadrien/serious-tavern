@@ -33,6 +33,17 @@ function FitWhenMeasured() {
   return null;
 }
 
+// Selects and fits the node a link asked to show, once the canvas has measured its nodes.
+function ShowNode({ id, onShown, show }: { id?: string; onShown: () => void; show: (ids: string[]) => void }) {
+  const measured = useNodesInitialized();
+  useEffect(() => {
+    if (!id || !measured) return;
+    show([id]);
+    onShown();
+  }, [id, measured, show, onShown]);
+  return null;
+}
+
 export function WorkflowCanvas({
   canvas,
   issues,
@@ -93,6 +104,11 @@ export function WorkflowCanvas({
           connectionRadius={touch ? TOUCH_CONNECTION_RADIUS : undefined}
         >
           <FitWhenMeasured />
+          <ShowNode
+            id={canvas.nodeToShow}
+            show={(ids) => canvas.focusIssue(ids)}
+            onShown={() => canvas.showNode(undefined)}
+          />
           <Background color="#414652" gap={20} />
           <Controls />
           <Panel position="top-right" className="canvas-actions">

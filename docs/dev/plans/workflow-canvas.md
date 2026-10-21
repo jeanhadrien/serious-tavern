@@ -46,7 +46,7 @@ independent.
 
 | Phase | Commits |
 | --- | --- |
-| C. Runs | 6 node focus · 8a stream contract · 8b live status · 9a move coercion to shared · 9b last run in the panel |
+| C. Runs | 8a stream contract · 8b live status · 9a move coercion to shared · 9b last run in the panel |
 | D. Larger additions | 7 node summaries · 13 sticky notes |
 
 Phase C builds the cross-view store in 8b, and 9b reuses it. 13 comes last because it touches every reader of the
@@ -55,26 +55,6 @@ canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
 ---
 
 ## Phase C: runs
-
-### 6. "Show on canvas" from Execution details
-
-- **Goal:** each node row in Execution details gets a "Show on canvas" link. It opens the run's workflow (`workflowId`
-  from the log) and selects and fits that node. It is one-shot, like `edge=`.
-- **Touches:**
-  - `layout/url.ts`: a new `node=<id>` param, one-shot like `edge`;
-  - `layout/routes.ts`, `useLayoutUrl.openItem`;
-  - `stores/editorStore.ts`: the store is generic, shared by every editor. Give it a focus type parameter, defaulting
-    to `string`, so the workflow store takes `{ edge?: string; node?: string }` and the other editors are untouched.
-    This is better than a prefixed string (`node:<id>`), which every reader would have to parse. Update its tests;
-  - `useWorkflowEditor` applies the focus;
-  - `ExecutionDetails.tsx` builds the link with `layoutHref`.
-- **Rules:** a clicked link goes through `confirmSwitch` (existing `openItem` behaviour). Opening the workflow that is
-  already open only moves the focus and keeps the draft.
-- **Gotchas:**
-  - The node may no longer exist: the workflow was edited after the run, or the log belongs to a fork's source. Show
-    an info toast ("This node is no longer in the workflow") and open the workflow anyway.
-  - A deleted workflow: `openItem` already closes the editor.
-- **Docs:** `apps/web/AGENTS.md` (the URL params list), `reference/web.md` (shell and URL).
 
 ### 8a. Stream contract for node outcomes
 

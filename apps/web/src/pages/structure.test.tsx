@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
 import { apiContract, characterSchema, type Persona } from '@st/shared';
 import { WorkflowConfigPanel } from './workflows/WorkflowConfigPanel.js';
 import { workflowToCanvas } from './workflows/model.js';
@@ -147,27 +148,29 @@ it('renders speaker snapshots, optional avatars, and execution warnings/errors',
     updatedAt: '',
   });
   const html = renderToStaticMarkup(
-    <ChatMessageView
-      message={{
-        id: 'message',
-        role: 'assistant',
-        name: 'Original speaker',
-        characterId: 'card',
-        content: 'Kept reply',
-        createdAt: '',
-        executionId: 'execution',
-      }}
-      character={card}
-      execution={{
-        id: 'execution',
-        workflowId: 'workflow',
-        sessionId: 'session',
-        status: 'error',
-        startedAt: '',
-        warnings: ['No outputs ran'],
-        nodes: { failure: { status: 'error', error: 'Later failure' } },
-      }}
-    />,
+    <MemoryRouter>
+      <ChatMessageView
+        message={{
+          id: 'message',
+          role: 'assistant',
+          name: 'Original speaker',
+          characterId: 'card',
+          content: 'Kept reply',
+          createdAt: '',
+          executionId: 'execution',
+        }}
+        character={card}
+        execution={{
+          id: 'execution',
+          workflowId: 'workflow',
+          sessionId: 'session',
+          status: 'error',
+          startedAt: '',
+          warnings: ['No outputs ran'],
+          nodes: { failure: { status: 'error', error: 'Later failure' } },
+        }}
+      />
+    </MemoryRouter>,
   );
   expect(html).toContain('Original speaker');
   expect(html).not.toContain('Renamed card');

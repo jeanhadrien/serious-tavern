@@ -25,6 +25,7 @@ React 19 + Vite, a thin client over the API. Layout design: `docs/dev/design/FRO
 - `useChat` lives in the shell and re-renders it on every streamed token. Views that take no props are module-level constants (`STATIC_VIEWS`, with `DIRTY_SOURCES`) so React skips them; keep new views stable the same way, or memoize them.
 - Providers and state definitions are narrow editors with their list in **L**; characters, personas and collections have theirs in **R**.
 - **The layout lives in the URL** (`/?session=…&left=…&wide=preset:<id>&right=character:<id>`, defaults omitted; a narrow editor in L is `left=<name>:<id>`). The pure (de)serializers are in `layout/url.ts`, and `useLayoutUrl` syncs both directions. Content changes `push`; tab switches and corrections `replace`. Build in-app links with `layoutHref`.
+  - Two one-shot params ride on a workflow link: `edge=<id>` (highlight a connection) and `node=<id>` (select a node and fit the view to it). They are never written back to the URL. The editor store's hint is typed per editor (`EditorStore<T, F = string>`): the workflow store takes a `WorkflowFocus` `{ edge?, node? }`, the others no hint, so never encode a hint as a prefixed string.
 - Legacy paths (`/presets?id=…`, `/workflows?workflow=…&edge=…`, `/collections?id=…`, `/state-definitions?id=…`, …) stay as inbound aliases in `layout/routes.ts`, because node-ui's "Edit …" links emit them.
 - History navigation never discards a dirty draft or switches a streaming chat.
 
