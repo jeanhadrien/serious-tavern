@@ -1,3 +1,5 @@
+import { messagesToText } from './conversation/transcript.js';
+
 export const portDataTypes = ['text', 'number', 'boolean', 'object', 'array', 'messages', 'character', 'any'] as const;
 export type PortDataType = (typeof portDataTypes)[number];
 export type PortDef = {
@@ -44,4 +46,22 @@ export function canConnect(from: PortDataType | PortDef, to: PortDataType | Port
     ok: false,
     reason: `Cannot connect ${source} to ${target}; add a conversion node or choose a compatible port`,
   };
+}
+
+/** A value as text for a template or a reply: strings as they are, nothing as '', anything else as compact JSON. */
+export const stringify = (value: unknown): string =>
+  typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value);
+
+/**
+ * Converts a value for a connection `canConnect` marked as coercing. Node templates and replies use compact JSON
+ * (`stringify`); port text coercion uses pretty JSON, and a message list becomes a `role: content` transcript. The one
+ * home of the conversion: the executor applies it at run time, and the editor can show what an input received.
+ */
+export function coerceValue(value: unknown, kind: CoercionKind): string {
+  if (kind === 'messages-to-text') {
+    if (!Array.isArray(value)) return stringify(value);
+    return messagesToText(value);
+  }
+  if (value != null && typeof value === 'object') return JSON.stringify(value, null, 2);
+  return value == null ? '' : String(value);
 }

@@ -15,7 +15,7 @@ import type {
 import { labelOf, prepareWorkflow, type PreparedWorkflow } from './prepare.js';
 export { validateWorkflow } from './prepare.js';
 import type { ChatReply, EngineEvent, ExecutionContext, NodeResources } from './types.js';
-import { stringify, coerceValue } from './text.js';
+import { stringify, coerceValue } from '@st/shared/ports';
 import { orderReplies } from './replies.js';
 import { createRandom } from './seeded-random.js';
 import { StateRun } from './state-writes.js';

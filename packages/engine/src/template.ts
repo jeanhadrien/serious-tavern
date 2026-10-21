@@ -1,7 +1,7 @@
 import { macroRegistry, type Character, type Persona } from '@st/shared';
 import { createTemplateEnvironment } from './template-helpers.js';
-import { stringify, toText } from './text.js';
-export { stringify } from './text.js';
+import { stringify } from '@st/shared/ports';
+import { toText } from './text.js';
 
 export type TemplateContext = {
   inputs: Record<string, unknown>;

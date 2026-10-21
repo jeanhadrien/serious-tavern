@@ -1,18 +1,4 @@
-import { canConnect, type CoercionKind, type PortDataType } from '@st/shared/ports';
-import { messagesToText } from '@st/shared';
-
-// Node templates/replies use compact JSON; port and preset text coercion uses pretty JSON.
-export const stringify = (value: unknown): string =>
-  typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value);
-
-export function coerceValue(value: unknown, kind: CoercionKind): string {
-  if (kind === 'messages-to-text') {
-    if (!Array.isArray(value)) return stringify(value);
-    return messagesToText(value);
-  }
-  if (value != null && typeof value === 'object') return JSON.stringify(value, null, 2);
-  return value == null ? '' : String(value);
-}
+import { canConnect, coerceValue, type PortDataType } from '@st/shared/ports';
 
 function sourceType(value: unknown): PortDataType {
   if (

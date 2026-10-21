@@ -15,20 +15,10 @@ Read first: the root `AGENTS.md`, `apps/web/AGENTS.md`, `apps/web/src/pages/work
 
 The brief came from an earlier review. These points differ from it and shape the plan:
 
-- **Item 8: the server emits node events, but the web drops them.** `TurnStream.onEvent`
-  (`apps/server/src/services/turn-stream.ts`) emits `node.start` and `node.complete`. It emits nothing for
-  skipped, cancelled or failed nodes. `api/turnStream.ts` ignores both node events in its `default` branch.
-  - Only the **reply section** streams. `after-section.ts` calls `executeWorkflow` without `onEvent`, and the stream
-    has ended by then anyway. A workflow that runs after the reply can never light up live.
-  - The stream belongs to the chat view's request (`useChat`). The editor has no access to it today.
 - **Item 9 has no data source.** No endpoint lists the executions of a workflow, and scanning `data/executions`
   (one file per run) is not an option.
-  - `coerceValue` and `stringify` live in `engine/src/text.ts`. The web does not depend on `@st/engine`.
+  - `coerceValue` and `stringify` now live in shared, beside `canConnect`, so the web can use them.
   - The execution log does not record which version of the workflow ran.
-- **Item 5:** confirmed. Executor line ~131 (not needed) and line ~194 write `skipped` with no reason. Line ~194
-  covers two causes: every gating connection is inactive, or a required input's source was skipped.
-- **Item 6:** the editor store's `focus` is a single string, used only for an edge id (`url.ts`, `routes.ts`,
-  `useLayoutUrl.openItem`, `editorStore`, `useWorkflowEditor`).
 - **Item 7:** descriptors are JSON, sent through `/api/node-types`, so a formatter function can't live there. Also,
   `nodeTypeDescriptorSchema` is a plain `z.object`, which strips unknown keys.
 - **Item 13 is the largest item.** See its section.
@@ -45,7 +35,7 @@ independent.
 
 | Phase | Commits |
 | --- | --- |
-| C. Runs | 9a move coercion to shared · 9b last run in the panel |
+| C. Runs | 9b last run in the panel |
 | D. Larger additions | 7 node summaries · 13 sticky notes |
 
 13 comes last because it touches every reader of the
@@ -55,21 +45,13 @@ canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
 
 ## Phase C: runs
 
-### 9a. Move port coercion to shared
-
-- **Goal:** `coerceValue` and `stringify` move from `engine/src/text.ts` to shared, next to `canConnect`. They are
-  pure and belong with the coercion kinds `canConnect` returns. The engine imports them from there. No behaviour
-  change; the engine's tests stay.
-- **Why its own commit:** it makes "one home" true before the web needs the rule.
-- **Docs:** `shared/AGENTS.md`, the root `AGENTS.md` "ports are typed" line (coercion lives with `canConnect`).
-
 ### 9b. Last run in the config panel
 
 - **Goal:** the config panel shows the selected node's inputs and output from the last run of this workflow, collapsed
   by default.
   - The output is the log's `nodes[id].output`.
   - The inputs are rebuilt from the upstream outputs in the log, the draft's edges, and `canConnect` plus `coerceValue`
-    (9a).
+    (shared `coerceValue`).
   - Skipped nodes show the item 5 reason.
 - **Which run:** see the open questions. The default proposal is the open chat's most recent run of this workflow,
   from the session's turn entries (`readTurnEntries`, `runs[]` holds `workflowId` and `executionId`). The live store

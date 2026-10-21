@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { NodeDefinition } from '../../types.js';
-import { stringify } from '../../text.js';
+import { stringify } from '@st/shared/ports';
 import { checkType, expectedLabel, extractJson, type JsonExpect, jsonExpectTypes } from './extract.js';
 
 const LOGGED_CHARACTERS = 500;

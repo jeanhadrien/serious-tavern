@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { characterSchema } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
 import { renderTemplate } from '../../template.js';
-import { stringify } from '../../text.js';
+import { stringify } from '@st/shared/ports';
 export const chatOutput: NodeDefinition = {
   type: 'chat-output',
   label: 'Chat Output',

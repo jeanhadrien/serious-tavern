@@ -14,6 +14,9 @@ Preset content and template-taking node configs are rendered with the `handlebar
 - Macros also resolve inside character and persona fields, with protection against cycles.
 - **Prompt behaviour is chosen by the user:** never apply automatic SillyTavern rules (card system prompt overriding the main prompt, splitting examples at `<START>`, ...). Users reference fields in their presets themselves.
 
+## Port coercion
+- `canConnect`, `coerceValue` and `stringify` live together in `ports.ts` (the `@st/shared/ports` subpath): the coercion kinds `canConnect` returns are converted only by `coerceValue`. The engine's executor applies it at run time and the web may show what an input received; never copy the conversion (pretty JSON for ports, compact JSON for node templates and replies, a `role: content` transcript for messages).
+
 ## Presets (schema side)
 - Every entry's editor label is the required `displayName`. A message entry's optional `name` is a template rendered like `content`; slots have no `name`. Name templates are validated like content: use `entryTemplates`/`entryUsesInput` instead of reading `content` alone.
 - **Legacy rule:** an entry with `name` and no `displayName` is a pre-`displayName` entry: its `name` is the label and it has no message name. `upgradeLegacyPreset` applies this to **raw** data before validation, in the YAML loader and the JSON migration only. Never put it in the zod schema (`z.preprocess` erases the input type the web client relies on) and never apply it to API write bodies.

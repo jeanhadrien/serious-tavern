@@ -128,7 +128,7 @@ and the web bundle carries no compiler. The macro registry in shared defines eve
 in `template-helpers.ts`; Handlebars' `log` helper is removed. Character and persona fields are expanded recursively,
 cycles rendering empty. A template that doesn't parse renders verbatim and never throws. In presets `{{history}}` and
 messages inputs render as transcripts and objects as pretty JSON; in node templates they render compact JSON
-(`text.ts` centralizes both). User reference: [docs/TEMPLATING.md](../../TEMPLATING.md).
+(shared's `coerceValue` and `stringify` in `ports.ts` centralize both; the engine's `text.ts` adds the preset-only `toText`). User reference: [docs/TEMPLATING.md](../../TEMPLATING.md).
 
 ## Presets
 

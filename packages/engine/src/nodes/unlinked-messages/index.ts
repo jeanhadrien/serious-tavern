@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { analyzeLinks } from '@st/shared';
 import type { NodeDefinition } from '../../types.js';
-import { coerceValue } from '../../text.js';
+import { coerceValue } from '@st/shared/ports';
 import { itemsOf, locateCollection } from '../state-key.js';
 
 /**

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { NodeDefinition } from '../../types.js';
 import { renderTemplate } from '../../template.js';
-import { stringify } from '../../text.js';
+import { stringify } from '@st/shared/ports';
 export const condition: NodeDefinition = {
   type: 'condition',
   label: 'Condition',
