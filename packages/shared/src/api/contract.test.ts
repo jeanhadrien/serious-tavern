@@ -384,3 +384,14 @@ it('gives every endpoint its own method and path, whose :params are the keys of 
     expect(pathParams.sort(), key).toEqual(schemaParams.sort());
   }
 });
+
+it('workflow write bodies make a node position optional and keep unknown node and workflow fields', () => {
+  const node = { id: 'n', type: 'chat-input', config: {}, futureNodeField: 1 };
+  const body = { name: 'W', nodes: [node], edges: [], futureField: 2 };
+  expect(apiContract.updateWorkflow.body.parse(body)).toEqual(body);
+  expect(apiContract.createWorkflow.body.parse(body)).toMatchObject({ nodes: [node] });
+  const positioned = { ...node, position: { x: 1, y: 2 } };
+  expect(apiContract.updateWorkflow.body.parse({ ...body, nodes: [positioned] }).nodes).toEqual([positioned]);
+  // The stored schema still requires one.
+  expect(apiContract.updateWorkflow.response.shape.nodes.safeParse([node]).success).toBe(false);
+});
