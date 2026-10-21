@@ -46,7 +46,7 @@ git config blame.ignoreRevsFile .git-blame-ignore-revs
 
 ## knip
 
-`knip.json` lists the entry points explicitly: server startup, the web entry and Vite config, the package entry points
+`knip.json` lists the entry points explicitly: server and MCP server startup, the web entry and Vite config, the package entry points
 (including shared's `./ports` subpath) and the test files. Project patterns cover source and config files only, so
 live data and build output are never scanned. Package entry exports are workspace APIs on purpose, and tests and
 configs are roots of their own. There is no ignore list. knip may print redundancy hints about entry points its
