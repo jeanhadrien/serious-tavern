@@ -252,6 +252,18 @@ pre {
 .config-field .error {
   text-transform: none;
 }
+.template-warnings {
+  padding: 6px 8px;
+  border: 1px solid #8b6d3f;
+  border-radius: 6px;
+  background: #392f22;
+  color: #f2d39b;
+  font-size: 0.78rem;
+  text-transform: none;
+}
+.template-warnings p {
+  margin: 3px 0;
+}
 .template-hints {
   display: flex;
   flex-wrap: wrap;

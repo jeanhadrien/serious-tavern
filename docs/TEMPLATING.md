@@ -40,6 +40,9 @@ The editor lists what is available under **Variables (click to insert)**.
   SillyTavern's scripting macros.
 - Warnings: an unknown variable in an enabled preset entry is a warning (it renders empty), except under
   `settings.*` and `state.*`, which never warn. An `{{input.x}}` the preset doesn't declare is an error.
+- Nodes with template fields (Chat Output, Condition, HTTP Request) show the same warnings, plus unknown
+  `{{input.x}}`, under the field in the node's settings panel (for HTTP Request's headers, under each value). They are
+  only hints: they never block saving and are not listed under Problems.
 
 ## Syntax
 

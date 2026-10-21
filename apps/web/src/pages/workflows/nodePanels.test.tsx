@@ -109,6 +109,41 @@ it('hints the chat settings the host passes in template fields', () => {
   expect(html).toContain('{{settings.volatility}}');
 });
 
+it('warns under a template field about unknown macros and inputs the node does not have', () => {
+  const panel = (template: string, headers = [{ key: 'X', value: '' }]) =>
+    renderToStaticMarkup(
+      <NodeConfigPanel
+        descriptor={{
+          ...descriptor,
+          type: 'custom-template',
+          templateFields: ['template', 'headers'],
+          inputs: [{ name: 'message', label: 'Message', dataType: 'text' }],
+          configSchema: {
+            properties: {
+              template: { type: 'string' },
+              headers: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: { key: { type: 'string' }, value: { type: 'string' } },
+                  required: ['key', 'value'],
+                },
+              },
+            },
+          },
+        }}
+        config={{ template, headers }}
+        onChange={() => {}}
+      />,
+    );
+  expect(panel('{{input.message}} {{character.name}}')).not.toContain('template-warnings');
+  const warned = panel('{{nope}} {{input.other}}');
+  expect(warned).toContain('<p>Unknown macro: {{nope}}</p>');
+  expect(warned).toContain('<p>Unknown input: other</p>');
+  const header = panel('', [{ key: 'X', value: '{{typo}}' }]);
+  expect(header).toContain('<p>Unknown macro: {{typo}}</p>');
+});
+
 it('renders only key/value arrays as editable rows, preserving unsupported shapes as read-only JSON', () => {
   const html = renderToStaticMarkup(
     <NodeConfigPanel

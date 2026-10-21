@@ -10,6 +10,7 @@ import { StateKeyPicker } from './panels/StateKeyPicker.js';
 import { StateReadPanel } from './panels/stateRead.js';
 import { StateWritePanel } from './panels/stateWrite.js';
 import { supportsKeyValueArray, isKeyValueRows, numberFieldValue, type Field } from './fields.js';
+import { templateFieldWarnings } from './templateFieldWarnings.js';
 export type { NodePanelContext, NodeConfigPanelProps } from './panels/types.js';
 
 /** `lead` is shown first; `hidden` fields are left to it (Next Chunk's key picker replaces the two id fields). */
@@ -64,23 +65,36 @@ function GenericPanel({
       update(field, `${String(configRef.current[field] ?? '')}${expression}`);
     }
   };
-  const hints = (key: string) =>
-    descriptor.templateFields?.includes(key) && (
-      <div className="template-hints">
-        <small>Variables (click to insert):</small>
-        {variables.map((variable) => (
-          <button
-            type="button"
-            key={variable.expression}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={() => insert(key, variable.expression)}
-            title={`${variable.description} (${variable.type})`}
-          >
-            {variable.expression} <em>{variable.type}</em>
-          </button>
-        ))}
-      </div>
+  const inputKeys = descriptor.inputs.map((port) => port.name);
+  const hints = (key: string) => {
+    if (!descriptor.templateFields?.includes(key)) return null;
+    const warnings = templateFieldWarnings(config[key] ?? fields[key]?.default, inputKeys);
+    return (
+      <>
+        {warnings.length > 0 && (
+          <div className="template-warnings">
+            {warnings.map((warning) => (
+              <p key={warning}>{warning}</p>
+            ))}
+          </div>
+        )}
+        <div className="template-hints">
+          <small>Variables (click to insert):</small>
+          {variables.map((variable) => (
+            <button
+              type="button"
+              key={variable.expression}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => insert(key, variable.expression)}
+              title={`${variable.description} (${variable.type})`}
+            >
+              {variable.expression} <em>{variable.type}</em>
+            </button>
+          ))}
+        </div>
+      </>
     );
+  };
   return (
     <div className="config-fields">
       {lead}

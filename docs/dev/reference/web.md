@@ -141,6 +141,7 @@ conversion model (unknown node types become read-only placeholders).
   `POST /api/workflows/validate`: at once for a newly opened workflow, then 600 ms after the last change, silently, with
   one request in flight (a newer draft aborts the older request, so a stale answer never shows). The toolbar's Validate
   asks at once, toasts the count and reports failures, and no longer saves first.
+- **Template warnings in node panels** are node-ui's (`templateFieldWarnings` over shared's `templateWarnings`), shown under each template field of the generic form. They are panel-only: never validation issues, never badges.
 - **Issues on the canvas.** The engine's issues (`useWorkflowEditor().issues`) are overlays derived at render, never part
   of the draft: `CanvasOverlayContext` gives `WorkflowNode` the messages per node (a red count badge, messages as its
   tooltip), `styleEdges` (`edgeStyle.ts`) reds every edge an issue names (the one-shot `edge=` link stays thick and
