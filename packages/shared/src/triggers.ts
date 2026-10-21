@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { usableSettings, workflowSettings, type WorkflowSetting } from './chat-settings.js';
 
 /**
- * Triggers (docs/explorations/TRIGGERS-PROPOSAL-1.md): what starts workflows in a chat. Only the reply trigger exists:
+ * Triggers (docs/dev/explorations/TRIGGERS-PROPOSAL-1.md): what starts workflows in a chat. Only the reply trigger exists:
  * an ordered, toggleable list of workflows that run, one after another, on each reply. This file must not import
  * `models.ts` (the session schema imports it).
  */

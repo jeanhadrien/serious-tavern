@@ -1,6 +1,6 @@
 # Triggers, step 1: an ordered list of workflows per reply (run one after another)
 
-Design: [docs/explorations/TRIGGERS-PROPOSAL-1.md](../../explorations/TRIGGERS-PROPOSAL-1.md) (phase 1). This step
+Design: [docs/dev/explorations/TRIGGERS-PROPOSAL-1.md](../../explorations/TRIGGERS-PROPOSAL-1.md) (phase 1). This step
 replaces "a chat runs one workflow" with "a chat runs an ordered, toggleable list of workflows on each reply". The
 workflows run **strictly one after another**; running independent ones at the same time is step 2, retiring After
 Reply is step 3. Stored data rules of `AGENTS.md` apply in full: additive, backward compatible, stored sessions are
@@ -118,4 +118,4 @@ and running exactly as before. Contract coverage (`app.test.ts`) and response-sc
 - **Turn chip**: lists the turn's runs (workflow name, part, status, its log through `ExecutionDetails`); the
   after-reply status row keeps working from the derived post fields, and says which workflow is running when there
   are runs.
-- Docs: README (user-facing "On reply"), `docs/FRONTEND-UX.md` where behaviour is new.
+- Docs: README (user-facing "On reply"), `docs/dev/design/FRONTEND-UX.md` where behaviour is new.

@@ -24,7 +24,7 @@ export interface DialogRequest extends DialogOptions<string> {
 }
 
 /**
- * Modal questions (see docs/FRONTEND-UX.md, Confirmations). `ask` works outside React too, like `alerts`; the one
+ * Modal questions (see docs/dev/design/FRONTEND-UX.md, Confirmations). `ask` works outside React too, like `alerts`; the one
  * `<DialogHost/>` shows the oldest pending request, so questions asked together are answered one at a time.
  */
 export class DialogStore {

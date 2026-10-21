@@ -152,7 +152,7 @@ Checked live against OpenRouter (462 models) and abliteration.ai (3 models). The
 - Character cards (V2/V3 spec, embedded in PNG): name, description, personality, scenario, first message, example dialogue, system prompt, post-history instructions, alternate greetings, embedded lorebook.
 - Persona: `{ name, description, position, depth }`.
 - Lorebook / world info: keyword-triggered entries scanned over the last N messages, inserted at a set position or depth, with their own token budget.
-- **For us:** add a **Lorebook node** (keyword scan → injections). (V2/V3 card import and field exposure are done.) *Done as authored collections read by Recall (keywords) and Draw (weighted random); collections attached to a chat or character and World Info import are follow-ups (`docs/explorations/state-impl/FOLLOW-UPS.md`).*
+- **For us:** add a **Lorebook node** (keyword scan → injections). (V2/V3 card import and field exposure are done.) *Done as authored collections read by Recall (keywords) and Draw (weighted random); collections attached to a chat or character and World Info import are follow-ups (`docs/dev/explorations/state-impl/FOLLOW-UPS.md`).*
 
 ### Chat storage *(unverified)*
 - One JSONL file per chat: a header line (metadata, chat variables), then one message per line with `swipes[]`, `swipe_id` and `extra` (reasoning, model, token count, tool invocations).

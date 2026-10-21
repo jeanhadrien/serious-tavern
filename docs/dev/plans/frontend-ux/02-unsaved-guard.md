@@ -1,6 +1,6 @@
 # Step 2: unsaved-work guard
 
-Spec: `docs/FRONTEND-UX.md`, Unsaved work. **Depends on step 1** (`dialogs.ask` in `components/dialog/dialogStore.ts`).
+Spec: `docs/dev/design/FRONTEND-UX.md`, Unsaved work. **Depends on step 1** (`dialogs.ask` in `components/dialog/dialogStore.ts`).
 
 Today a list replaces a dirty draft without asking: `editorStore.open` names the new item clean, and the editor's `open` handler loads it (for example `useEntityEditor`'s `choose`). The tab also closes without warning.
 
@@ -80,7 +80,7 @@ If the same item is clicked again (`nextId === currentId`), nothing is asked, as
 
 - `AGENTS.md`, the editor store bullet under `layout/`: callers ask `confirmSwitch(id)` before `open`; editors register a saver with `useEditorSaver`; Cancel must leave everything untouched (ask before any write or layout change).
 - `README.md`: one sentence where the web editors are described.
-- `docs/FRONTEND-UX.md` build order: mark step 2 done.
+- `docs/dev/design/FRONTEND-UX.md` build order: mark step 2 done.
 
 ## Done when
 

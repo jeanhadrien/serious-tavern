@@ -1,6 +1,6 @@
 # Step 7e: regenerate and swipes (spec and plan)
 
-Spec: `docs/FRONTEND-UX.md`, Features in this round ("Swipes and regenerate... get their own short spec"). This file is that spec and its plan. It changes stored messages, so the data rules of `AGENTS.md` apply in full: additive, backward compatible, stored sessions never rewritten on read.
+Spec: `docs/dev/design/FRONTEND-UX.md`, Features in this round ("Swipes and regenerate... get their own short spec"). This file is that spec and its plan. It changes stored messages, so the data rules of `AGENTS.md` apply in full: additive, backward compatible, stored sessions never rewritten on read.
 
 ## What the user gets
 

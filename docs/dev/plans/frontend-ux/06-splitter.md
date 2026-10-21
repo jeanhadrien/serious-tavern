@@ -1,6 +1,6 @@
 # Step 6: splitter
 
-Spec: `docs/FRONTEND-UX.md`, Resizing. One generic splitter, with remembered sizes, used inside editors and the chat.
+Spec: `docs/dev/design/FRONTEND-UX.md`, Resizing. One generic splitter, with remembered sizes, used inside editors and the chat.
 
 ## Decision: scope
 
@@ -47,7 +47,7 @@ Spec: `docs/FRONTEND-UX.md`, Resizing. One generic splitter, with remembered siz
 ## 4. Docs
 
 - `AGENTS.md`, `apps/web` → `components/`: a **Resizing** bullet. Splits use `components/splitter` (`Splitter`, `useStoredSize`); a stored size is applied as a CSS custom property that only side-by-side rules read; there are no splitters in stacked or overlay layouts.
-- `docs/FRONTEND-UX.md`:
+- `docs/dev/design/FRONTEND-UX.md`:
   - the Resizing section: list the three splits and the "out" items above;
   - the build order: mark step 6 done.
 

@@ -1,6 +1,6 @@
 # Step 7a: composer draft per chat, and copy a message
 
-Spec: `docs/FRONTEND-UX.md`, Features in this round.
+Spec: `docs/dev/design/FRONTEND-UX.md`, Features in this round.
 
 ## 1. Composer draft per chat
 
@@ -28,7 +28,7 @@ Today the composer's text lives in the chat view's state. Find where `content`/`
 
 - `README.md`: one sentence each in the chat section.
 - `AGENTS.md`: under the `useChat` / chat notes, "the composer draft is per chat in `localStorage` (`composerDraft.ts`), never in the token path".
-- `docs/FRONTEND-UX.md` build order: mark 7a done.
+- `docs/dev/design/FRONTEND-UX.md` build order: mark 7a done.
 
 ## Done when
 

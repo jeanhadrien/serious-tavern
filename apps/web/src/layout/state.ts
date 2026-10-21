@@ -1,4 +1,4 @@
-// Pure layout model for the three-column shell (see docs/FRONTEND-LAYOUT.md).
+// Pure layout model for the three-column shell (see docs/dev/design/FRONTEND-LAYOUT.md).
 // Nothing here knows about React, the DOM or the URL: the shell renders whatever
 // `viewSlots`/`columnIcons` derive from this state, and `url.ts` serializes it.
 

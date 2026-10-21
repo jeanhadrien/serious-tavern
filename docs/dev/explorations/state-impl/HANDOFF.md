@@ -3,7 +3,7 @@
 First written 2026-10-16 (after phase 3), updated 2026-10-19 after phase 7 (the plan is complete). It is everything a fresh
 orchestrator needs to finish the plan in [STATE-DESIGN-PROPOSAL-3.md](../STATE-DESIGN-PROPOSAL-3.md).
 All phases are done. Next work is chosen from [FOLLOW-UPS.md](FOLLOW-UPS.md); a new session can be told:
-*"Read docs/explorations/state-impl/HANDOFF.md and FOLLOW-UPS.md, then do <item>."*
+*"Read docs/dev/explorations/state-impl/HANDOFF.md and FOLLOW-UPS.md, then do <item>."*
 
 ## The mandate
 
@@ -65,7 +65,7 @@ story state and post-turn runs.
 | 6b. Message links; summaries as story state | Per [amendment 1](../STATE-DESIGN-AMENDMENT-1.md): the phase 6 store removed; collection items may carry `messages: { ids, fingerprint }` (only through State Write's new `messages` input on `add`: a link, a message or a list of messages); link status `intact/changed/partial/gone` computed on read (`packages/shared/src/links/`), with the shared `replaced` and chat-order (`repeated`) rules; commit-time link check in `settleTurn`/`settlePostRun` (`linkWarnings` on the turn entry and chip); snapshot items carry a read-only `link`; generic **Next Chunk** (collection key) and new **Unlinked Messages**; the `linked` template helper and State Read's `linked` mode; Memory restored plus `all`; Save Summary dropped; linked items, message markers ("Show in Story state"), edit/delete notes and the cap note in the web; checkbox hints in the generic form | 2881 |
 | 7. Trigger, examples, guide | **Trigger** (score `clamp01((baseChance + growthPerTurn × turnsSinceLastFiring + Σ weight × signal) × (0.5 + volatility))`, per-level cooldowns and weights, implicit node state `fires`, dynamic `neverSkips` signal ports, a custom panel); **Pick Fields** (generic: keep named fields of an object); **example packs** for existing users too (`seed-examples.ts`, ledger `data/.seeded.json` with `<pack>/<kind>:<id>` lines: never overwrite, deleted stays deleted, fit rules for name clashes, all or nothing, never blocks startup): "Fresh texture" (Chat Settings → Trigger → Draw → Pick Fields → State Write, leveled preset) and "Rolling summaries" (`memory` definition, amendment 1 wiring); example presets = Default + extras; user guide `docs/STATE-AND-LORE.md`; readable edge labels on the dark canvas | 3012 |
 
-How to use all of it, written for the user: [docs/STATE-AND-LORE.md](../../STATE-AND-LORE.md) (the per-phase how-to notes were folded into it and removed).
+How to use all of it, written for the user: [docs/STATE-AND-LORE.md](../../../STATE-AND-LORE.md) (the per-phase how-to notes were folded into it and removed).
 
 ## Remaining work
 

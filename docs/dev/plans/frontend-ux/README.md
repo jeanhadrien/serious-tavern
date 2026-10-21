@@ -1,6 +1,6 @@
 # Frontend UX: implementation plans
 
-Plans for building `docs/FRONTEND-UX.md` (the agreed spec). There is one file per step. A step is coded only once its plan is committed and pushed.
+Plans for building `docs/dev/design/FRONTEND-UX.md` (the agreed spec). There is one file per step. A step is coded only once its plan is committed and pushed.
 
 ## Process
 
@@ -8,12 +8,12 @@ Plans for building `docs/FRONTEND-UX.md` (the agreed spec). There is one file pe
 2. A **fresh Sonnet agent** codes the step from the plan alone. One agent per step, never reused.
 3. The orchestrator verifies the work: reads the diff against the plan, runs `npm run check`, and runs a live check when the step changes behaviour on screen. Then it commits and pushes, or sends the work back to a new agent with the gaps listed.
 4. The status table below is updated in the same commit.
-5. While an agent's work is in the tree (a stash apply may have staged files), the orchestrator commits plan files with an explicit pathspec only (`git commit -- docs/plans/...`), never `git commit` on the whole index.
+5. While an agent's work is in the tree (a stash apply may have staged files), the orchestrator commits plan files with an explicit pathspec only (`git commit -- docs/dev/plans/...`), never `git commit` on the whole index.
 6. Live checks run on a temp data dir with a fake OpenAI-compatible backend; never against `apps/server/data`. Agents that run their own throwaway browser checks delete only what they created themselves, never anything else in the scratchpad.
 
 ## Rules every agent follows
 
-- Read `AGENTS.md`, `README.md`, `PLAN.md`, `docs/FRONTEND-UX.md` and the step's plan before changing anything.
+- Read `AGENTS.md`, `README.md`, `PLAN.md`, `docs/dev/design/FRONTEND-UX.md` and the step's plan before changing anything.
 - Do only what the plan says. If the plan is wrong or incomplete, stop and report instead of improvising.
 - Never modify `PLAN.md`. Update `README.md` and `AGENTS.md` where the plan says to.
 - `npm run check` (Biome, typecheck, tests, knip) must pass. Use `npm run fix` for formatting. Run it in the background with a timeout and read the log, because the full run takes a while.

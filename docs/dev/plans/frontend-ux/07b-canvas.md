@@ -1,6 +1,6 @@
 # Step 7b–7d: workflow canvas (drag to empty space, undo/redo, copy/paste)
 
-Spec: `docs/FRONTEND-UX.md`, Features in this round → Workflow canvas. **Depends on step 3** (the keyboard module, `useEscapeLayer`, areas).
+Spec: `docs/dev/design/FRONTEND-UX.md`, Features in this round → Workflow canvas. **Depends on step 3** (the keyboard module, `useEscapeLayer`, areas).
 
 Three parts, each coded by its own agent, in this order. They all touch `pages/workflows/useWorkflowCanvas.ts` (190 lines today). Keep it under ~250 lines by putting each part's logic in its own module and hook.
 
@@ -116,7 +116,7 @@ Not recorded: selection changes, React Flow measurements, `load`/`clear` (they r
   - `load`/`clear` reset the history;
   - pruned edges aren't recorded;
   - copy/paste use the native events, never `navigator.clipboard`.
-- `docs/FRONTEND-UX.md` build order: mark each part done.
+- `docs/dev/design/FRONTEND-UX.md` build order: mark each part done.
 
 ## Done when (each part)
 

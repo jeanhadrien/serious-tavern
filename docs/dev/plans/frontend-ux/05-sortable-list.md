@@ -1,10 +1,10 @@
 # Step 5: SortableList (dnd-kit)
 
-Spec: `docs/FRONTEND-UX.md`, Drag and drop. One reorderable list component, built on dnd-kit, used by every reorderable list in `apps/web`.
+Spec: `docs/dev/design/FRONTEND-UX.md`, Drag and drop. One reorderable list component, built on dnd-kit, used by every reorderable list in `apps/web`.
 
 ## Decision: node-ui's collection picker keeps its buttons
 
-The fifth reorderable list is the Recall/Draw collection picker (`packages/node-ui/src/panels/CollectionPicker.tsx`). node-ui can't import from `apps/web`, and the picked list is short and rarely reordered. It keeps its up/down buttons and gains `Alt+↑/↓` on its rows, but no drag. Record this in `docs/FRONTEND-UX.md`.
+The fifth reorderable list is the Recall/Draw collection picker (`packages/node-ui/src/panels/CollectionPicker.tsx`). node-ui can't import from `apps/web`, and the picked list is short and rarely reordered. It keeps its up/down buttons and gains `Alt+↑/↓` on its rows, but no drag. Record this in `docs/dev/design/FRONTEND-UX.md`.
 
 ## 1. Dependencies
 
@@ -68,7 +68,7 @@ Check the lockfile diff is limited to these. knip must stay green.
 
 - `AGENTS.md`, `apps/web` → `components/`: a **Reordering** bullet. Lists reorder only through `components/sortable/SortableList` (never import dnd-kit elsewhere), keep up/down buttons, and need stable draft ids.
 - `README.md`: where the preset editor's drag reorder is described, say it uses SortableList (handle, keyboard, touch).
-- `docs/FRONTEND-UX.md`:
+- `docs/dev/design/FRONTEND-UX.md`:
   - the Drag and drop section: the node-ui decision above;
   - the build order: mark step 5 done.
 

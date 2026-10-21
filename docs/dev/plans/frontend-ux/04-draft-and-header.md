@@ -1,6 +1,6 @@
 # Step 4: shared draft hook and editor header
 
-Spec: `docs/FRONTEND-UX.md`, Editors. **Depends on steps 2 and 3** (savers, `confirmSwitch`, Escape areas).
+Spec: `docs/dev/design/FRONTEND-UX.md`, Editors. **Depends on steps 2 and 3** (savers, `confirmSwitch`, Escape areas).
 
 Every editor gets the same header, the same unsaved marker and the same actions. The simple editors also share one draft hook. No behaviour changes beyond what is listed here.
 
@@ -67,7 +67,7 @@ One editor at a time, each keeping its tests green:
 ## 4. Docs
 
 - `AGENTS.md`, `apps/web` → `components/`: an **Editors** bullet. Every editor renders `EditorHeader`; simple ones use `useDraft`; the order of actions and the "Unsaved changes" marker are fixed there.
-- `docs/FRONTEND-UX.md`:
+- `docs/dev/design/FRONTEND-UX.md`:
   - the Editors section: record the decision table above (which editors use `useDraft` and why the others don't);
   - the build order: mark step 4 done.
 

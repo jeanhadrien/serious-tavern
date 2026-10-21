@@ -1,6 +1,6 @@
 # Step 1: confirm dialog
 
-Spec: `docs/FRONTEND-UX.md`, Confirmations. Goal: one dialog building block, which replaces every `window.confirm` and adds the missing confirmation on deleting a chat.
+Spec: `docs/dev/design/FRONTEND-UX.md`, Confirmations. Goal: one dialog building block, which replaces every `window.confirm` and adds the missing confirmation on deleting a chat.
 
 A draft of this step may exist in the container as `git stash list` → "step 1 confirm dialog". If it does, `git stash apply` it and check it against this plan instead of starting over. Its known defect is a type error in `ChatSidebar.tsx` (a `.then` callback returning `false | Promise`). If the stash is gone, build from this plan.
 
@@ -76,9 +76,9 @@ Afterwards `grep -rn "window.confirm" apps packages --include=*.ts --include=*.t
 
 ## 6. Docs
 
-- `AGENTS.md`, under `apps/web` → `components/`: add a **Dialogs** bullet. Every question goes through `dialogs.ask` or `confirmDelete`, shown by the one `<DialogHost/>` in `main.tsx` (native modal, Cancel focused, Escape and backdrop cancel, questions queue). Never call `window.confirm`. When to ask is in `docs/FRONTEND-UX.md`.
+- `AGENTS.md`, under `apps/web` → `components/`: add a **Dialogs** bullet. Every question goes through `dialogs.ask` or `confirmDelete`, shown by the one `<DialogHost/>` in `main.tsx` (native modal, Cancel focused, Escape and backdrop cancel, questions queue). Never call `window.confirm`. When to ask is in `docs/dev/design/FRONTEND-UX.md`.
 - `AGENTS.md` and `README.md`: replace every mention of `window.confirm` (the collection 404 recreate, the reply delete) and the renamed files (`collectionActions.tsx`, `deleteConfirm.tsx`).
-- `docs/FRONTEND-UX.md` build order: mark step 1 done (deleting a chat now asks too).
+- `docs/dev/design/FRONTEND-UX.md` build order: mark step 1 done (deleting a chat now asks too).
 
 ## Done when
 

@@ -1,6 +1,6 @@
 # Triggers, step 3: run independent workflows at the same time
 
-Design: [docs/explorations/TRIGGERS-PROPOSAL-1.md](../../explorations/TRIGGERS-PROPOSAL-1.md), "The ordering rule in
+Design: [docs/dev/explorations/TRIGGERS-PROPOSAL-1.md](../../explorations/TRIGGERS-PROPOSAL-1.md), "The ordering rule in
 detail" (its phase 2). Builds on steps 1 and 2 ([01-reply-list.md](01-reply-list.md),
 [02-remove-after-reply.md](02-remove-after-reply.md)).
 
@@ -90,4 +90,4 @@ registered node declares `access` (a registry test).
 ## Docs
 
 README: the ordering rule as users see it ("same result as top to bottom; independent workflows run together; the
-On reply list says which wait"), and the plan endpoint. `docs/FRONTEND-UX.md` for the row hint.
+On reply list says which wait"), and the plan endpoint. `docs/dev/design/FRONTEND-UX.md` for the row hint.

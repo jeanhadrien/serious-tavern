@@ -9,8 +9,8 @@ packages/shared, packages/engine, packages/node-ui, apps/server, apps/web).
 - First read AGENTS.md in full (conventions and key contracts, they are binding). README.md is large
   (~136 KB): do NOT read it whole; read its table of contents (`grep -n '^#' README.md`) and only the
   sections relevant to your task. Never modify PLAN.md (read it only if your task needs the vision).
-  Read only the parts of docs/explorations/STATE-DESIGN-PROPOSAL-3.md the phase spec cites. For web
-  layout work also read docs/FRONTEND-LAYOUT.md.
+  Read only the parts of docs/dev/explorations/STATE-DESIGN-PROPOSAL-3.md the phase spec cites. For web
+  layout work also read docs/dev/design/FRONTEND-LAYOUT.md.
 - Environment: Linux with bash (AGENTS.md mentions Windows/PowerShell; ignore those shell specifics
   here). Dependencies are installed (`npm ci` was run). Chromium + Playwright are available
   (PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers; never run "playwright install"; if needed launch with

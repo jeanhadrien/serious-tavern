@@ -1,6 +1,6 @@
 # Step 3: Escape and shortcuts
 
-Spec: `docs/FRONTEND-UX.md`, Escape and Shortcuts. **Depends on step 2** (`Ctrl+S` uses the savers editors register with `useEditorSaver`).
+Spec: `docs/dev/design/FRONTEND-UX.md`, Escape and Shortcuts. **Depends on step 2** (`Ctrl+S` uses the savers editors register with `useEditorSaver`).
 
 ## 1. The pure decision: `apps/web/src/keyboard/escape.ts`
 
@@ -66,7 +66,7 @@ The native dialogs (`DialogHost`, `MobileMenu`) keep handling Escape themselves;
 
   ```ts
   export const SHORTCUTS = [
-    { keys: 'Escape', scope: 'global', description: 'Close the innermost thing (see docs/FRONTEND-UX.md)' },
+    { keys: 'Escape', scope: 'global', description: 'Close the innermost thing (see docs/dev/design/FRONTEND-UX.md)' },
     { keys: 'Mod+S', scope: 'editor', description: 'Save the editor you are in' },
   ] as const;
   ```
@@ -92,7 +92,7 @@ The native dialogs (`DialogHost`, `MobileMenu`) keep handling Escape themselves;
   - A field that acts on Escape calls `preventDefault()`, and only when it acts.
   - Shortcuts are declared in `SHORTCUTS`.
 - `README.md`: a short Keyboard section listing Escape and `Ctrl/Cmd+S`.
-- `docs/FRONTEND-UX.md` build order: mark step 3 done.
+- `docs/dev/design/FRONTEND-UX.md` build order: mark step 3 done.
 
 ## Done when
 

@@ -1,7 +1,7 @@
 # State design, proposal 3: settings, story state, summaries and authored collections
 
 The state design (October 2026), **built in phases 1–7** (see [state-impl/HANDOFF.md](state-impl/HANDOFF.md);
-user guide: [docs/STATE-AND-LORE.md](../STATE-AND-LORE.md)). It replaced two earlier proposals and the two
+user guide: [docs/STATE-AND-LORE.md](../../STATE-AND-LORE.md)). It replaced two earlier proposals and the two
 reviews of them (one on implementation, one on product fit against [CREATIVITY.md](CREATIVITY.md)); those
 documents were removed from the repository after the build and remain in the git history. This document
 is kept up to date with what was built. [STATE-DESIGN-AMENDMENT-1.md](STATE-DESIGN-AMENDMENT-1.md) records

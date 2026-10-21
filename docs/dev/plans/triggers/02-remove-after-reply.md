@@ -1,6 +1,6 @@
 # Triggers, step 2: remove After Reply; workflows after the replies
 
-Design: [docs/explorations/TRIGGERS-PROPOSAL-1.md](../../explorations/TRIGGERS-PROPOSAL-1.md) (its phase 3, done before
+Design: [docs/dev/explorations/TRIGGERS-PROPOSAL-1.md](../../explorations/TRIGGERS-PROPOSAL-1.md) (its phase 3, done before
 the concurrency phase so the scheduler only has one kind of run). Builds on step 1
 ([01-reply-list.md](01-reply-list.md)).
 
@@ -63,14 +63,14 @@ Everything After Reply did is now done by listing a workflow below the reply wor
 
 - Strings and comments that talk about After Reply or "the after-reply run" say "running after the reply" and name
   the workflow (the status row already does when the view has runs). The node palette updates by itself.
-- `docs/FRONTEND-UX.md`: the Escape rule's mention of after-reply runs becomes "workflows running after the reply".
+- `docs/dev/design/FRONTEND-UX.md`: the Escape rule's mention of after-reply runs becomes "workflows running after the reply".
 
 ## Docs
 
 - `README.md`: replace "After Reply and post-turn runs" with "Workflows after the reply" (the two sections, the rules
   above, the summaries recipe as two workflows); update "Example seeds", the node list, the validation rule, Chat
   Input's outputs. `docs/TEMPLATING.md` if it mentions After Reply.
-- Leave `docs/explorations/` alone: it is the design history.
+- Leave `docs/dev/explorations/` alone: it is the design history.
 
 ## Tests
 
