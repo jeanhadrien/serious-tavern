@@ -1,5 +1,6 @@
 import { portDataTypes } from '@st/shared/ports';
 import type { NodeTypeDescriptor } from '@st/shared';
+import { compareTypes } from './nodeTypeOrder.js';
 import { portColors } from './port-colors.js';
 
 export function NodePalette({
@@ -12,7 +13,7 @@ export function NodePalette({
   return (
     <aside className="palette">
       <h3>Nodes</h3>
-      {types.map((t) => (
+      {[...types].sort(compareTypes).map((t) => (
         <button
           title={t.description}
           key={t.type}

@@ -7,6 +7,9 @@
 - A port resolution that fails toasts once per node (`createPortErrors`); the toast goes away when the node resolves or is deleted. A node that isn't set up yet toasts nothing.
 - Edges to ports that disappear are pruned once the ports resolve successfully without them (the engine's `pruneInvalidEdges` rule). Prune the handle, never the node.
 
+## Node type lists
+- The palette, the connect picker and quick add list node types in one order, `nodeTypeOrder.ts` (category, then label). Never sort types anywhere else.
+
 ## History (undo/redo)
 - Snapshots hold nodes and edges without selection, `dragging`, `resizing` or `measured` (`snapshotOf`). A restore keeps the live nodes' `measured` (`restoreNodes`) so they don't blink out.
 - The canvas calls `history.record(before?, groupKey?)` right BEFORE it changes nodes or edges. Calls in the same tick count once (one user action may change both); a `groupKey` repeated within a second joins the last step (`config:<nodeId>`); a drag records its start snapshot on drag stop, only if a node moved.

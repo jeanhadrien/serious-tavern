@@ -1,5 +1,6 @@
 import { canConnect, type PortDef } from '@st/shared/ports';
 import type { NodeTypeDescriptor } from '@st/shared';
+import { compareTypes } from './nodeTypeOrder.js';
 
 /** The handle a connection drag started from: an output (`source`) or an input (`target`). */
 export interface DragOrigin {
@@ -17,7 +18,7 @@ export interface Candidate {
 
 /**
  * The node types offered when a connection is dropped on empty canvas: those with a port the dragged one can connect
- * to, ordered by category then label like the palette. Per type the first exact fit wins over one that coerces.
+ * to, in the editor's one type order (`compareTypes`). Per type the first exact fit wins over one that coerces.
  *
  * A type with `dynamicPorts` is judged by the ports its descriptor lists (its defaults); one whose defaults don't
  * fit isn't offered, because its real ports are only known once it has a config.
@@ -44,11 +45,7 @@ export function connectCandidates(
     }
     if (best) candidates.push(best);
   }
-  return candidates.sort(
-    (a, b) =>
-      a.descriptor.category.localeCompare(b.descriptor.category) ||
-      a.descriptor.label.localeCompare(b.descriptor.label),
-  );
+  return candidates.sort((a, b) => compareTypes(a.descriptor, b.descriptor));
 }
 
 /** Keeps candidates whose type label, category or port matches every word of the filter (case-insensitive). */
