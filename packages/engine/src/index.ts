@@ -14,5 +14,4 @@ export {
   textStats,
   WINDOW_SIZE,
   type StatsMessage,
-  type TextStats,
 } from './text-stats/index.js';

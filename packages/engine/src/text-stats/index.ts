@@ -1,20 +1,6 @@
+import type { TextStats } from '@st/shared';
 import { countSlop, fourGrams, MIN_SENTENCE_WORDS, mtld } from './metrics.js';
 import { sentences, tokenize } from './tokenize.js';
-
-/**
- * Raw statistics on one assistant reply, uninterpreted. A metric that is undefined for this text is `null`: MTLD on a
- * short text, the overlap with no earlier reply (or no 4-gram in the reply).
- */
-export interface TextStats {
-  words: number;
-  mtld: number | null;
-  /** Words found in the slop word list: a count, not a rate. */
-  slopWords: number;
-  /** Share (0..1) of the reply's 4-grams that also occur in the window. */
-  ngramOverlap: number | null;
-  /** Sentences of the reply (at least 4 words) that match a sentence of the window exactly, ignoring case and punctuation. */
-  recycledSentences: number;
-}
 
 /** How many earlier assistant replies the cross-message metrics compare a reply with. */
 export const WINDOW_SIZE = 5;
