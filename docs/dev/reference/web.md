@@ -145,6 +145,7 @@ conversion model (unknown node types become read-only placeholders).
   one request in flight (a newer draft aborts the older request, so a stale answer never shows). The toolbar's Validate
   asks at once, toasts the count and reports failures, and no longer saves first.
 - **Template warnings in node panels** are node-ui's (`templateFieldWarnings` over shared's `templateWarnings`), shown under each template field of the generic form. They are panel-only: never validation issues, never badges.
+- **Node summaries.** `WorkflowNode` shows node-ui's `nodeSummary(descriptor, config, summaryContext)` under the header (never for an unknown-type placeholder); the catalogs come from `CanvasOverlayContext.summaryContext`, which `Workflows.tsx` builds from the same lists the panels get. The line is cut by CSS (`width: 0; min-width: 100%`) so a long summary never widens the node, and its full text is the tooltip.
 - **Last run in the config panel.** The chat publishes the execution id of its latest settled run of each workflow
   (`stores/chatRuns.ts`, from `latestRunsByWorkflow` over the story state's turn entries, on settle only: never per
   token). `useLastRunLog` fetches that log, `lastRunIO` (pure) reads the node's output from it and REBUILDS its inputs

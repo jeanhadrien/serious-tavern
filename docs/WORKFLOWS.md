@@ -28,6 +28,7 @@ with the chat moved to the right so you can test as you go.
   buttons or the wheel.
 - **Drop a wire on empty canvas** to get a short list of the nodes that can take it (type to filter, arrows and Enter
   to pick, Escape to close). The new node comes already connected.
+- **Summary line:** under a node's name, a muted line says how it is set up: the model and preset of an LLM, the key and operation of a State node, a Condition's operator, the collections of Recall and Draw, and so on. It is cut when long (hover for the whole), and a node that isn't set up yet has none.
 - **Configure:** select a node to open its settings panel. Fields that accept templates (`{{...}}`) list the available
   variables; see [templating](TEMPLATING.md).
 - **Tidy:** the canvas's **Tidy** button lays all the nodes out left to right, following the wires, and fits the view.

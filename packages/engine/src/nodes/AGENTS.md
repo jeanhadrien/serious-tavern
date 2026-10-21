@@ -7,7 +7,7 @@ The LLM node has its own notes in `llm/AGENTS.md`; its tool loop and adapter are
    - Set `sink: true` only for nodes that must run even when no Chat Output depends on them (they write somewhere). A node whose writes depend on its config gives a function of the config.
 2. Register it in `registry.ts`.
 3. Add tests in `nodes.test.ts`.
-4. The UI picks it up through `/api/node-types`. Add a custom panel in node-ui only if the generated form isn't enough.
+4. The UI picks it up through `/api/node-types`. Add a custom panel in node-ui only if the generated form isn't enough, and a one-line entry in node-ui's `nodeSummary` map (`summaries.ts`) if the node's setup is worth reading off the canvas.
    - With `resolvePorts`, the descriptor gets `dynamicPorts: true` and the editor resolves the ports. Never add per-type branches in the web app.
    - A node that is not set up yet (a required text setting still blank, read off the config schema's `minLength`) toasts nothing in the editor: its panel says what to pick.
    - Edges to ports that disappear are pruned once the ports resolve successfully without them; unknown types and failing resolvers keep their edges.

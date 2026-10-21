@@ -1,7 +1,7 @@
 # Workflow canvas: plan
 
-Two improvements to the workflow editor (`apps/web/src/pages/workflows/`, React Flow 12.12) are left. Phases A (canvas
-basics), B (validation) and C (runs: skip reasons, node focus, live status, last run) are built; they live in
+One improvement to the workflow editor (`apps/web/src/pages/workflows/`, React Flow 12.12) are left. Phases A (canvas
+basics), B (validation), C (runs) and node summaries are built; they live in
 `docs/dev/reference/web.md` and the `AGENTS.md` files. When an item lands, move what it decided there and strike it from
 this plan. Delete the file once it is empty.
 
@@ -15,14 +15,12 @@ Read first: the root `AGENTS.md`, `apps/web/AGENTS.md`, `apps/web/src/pages/work
 
 The brief came from an earlier review. These points differ from it and shape the plan:
 
-- **Item 7:** descriptors are JSON, sent through `/api/node-types`, so a formatter function can't live there. Also,
-  `nodeTypeDescriptorSchema` is a plain `z.object`, which strips unknown keys.
 - **Item 13 is the largest item.** See its section.
 
 ## Overlays
 
 The rule is recorded in `pages/workflows/AGENTS.md` (overlays are never part of the draft). `CanvasOverlayContext`
-exists and holds the issues by node id and the live run status by node id. Node summaries (7) add the catalogs they need.
+exists and holds the issues by node id and the live run status by node id. Node summaries use `summaryContext` for the catalogs they name records from.
 
 ## Order
 
@@ -31,7 +29,7 @@ independent.
 
 | Phase | Commits |
 | --- | --- |
-| D. Larger additions | 7 node summaries · 13 sticky notes |
+| D. Larger additions | 13 sticky notes |
 
 13 comes last because it touches every reader of the
 canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
@@ -39,24 +37,6 @@ canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
 ---
 
 ## Phase D: larger additions
-
-### 7. One-line config summary on each node
-
-- **Goal:** a muted line under each node's header: the LLM's model and preset name, State Read/Write's
-  `definition.key` and operation, Condition's operator, Random's mode, and so on.
-- **Where:** node-ui exports `nodeSummary(descriptor, config, context): string | undefined`, backed by a per-type map
-  next to `customPanels`.
-  - Node-ui already holds per-type panels and receives the catalogs (preset id → name, definitions), so a summary can
-    reuse the panels' helpers and their `Unknown … (id)` wording.
-  - The editor calls only `nodeSummary`, with no per-type branch.
-  - A type with no entry shows no line.
-- **Touches:**
-  - `node-ui/src/summaries.ts` and tests;
-  - `WorkflowNode.tsx` reads the catalogs from the overlay context;
-  - `useWorkflowEditor`/`WorkflowCanvas` provide that context.
-- **Risks:** a summary must not widen the node; cut it with an ellipsis and use the full text as the tooltip.
-- **Docs:** `node-ui/AGENTS.md` (summaries live in node-ui, beside panels; a new node type may add one),
-  `engine/src/nodes/AGENTS.md` ("Adding a node type", step 4), `reference/web.md`.
 
 ### 13. Sticky notes
 

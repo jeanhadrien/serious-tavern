@@ -12,6 +12,7 @@ import { StateWritePanel } from './panels/stateWrite.js';
 import { supportsKeyValueArray, isKeyValueRows, numberFieldValue, type Field } from './fields.js';
 import { templateFieldWarnings } from './templateFieldWarnings.js';
 export type { NodePanelContext, NodeConfigPanelProps } from './panels/types.js';
+export { nodeSummary } from './summaries.js';
 
 /** `lead` is shown first; `hidden` fields are left to it (Next Chunk's key picker replaces the two id fields). */
 function GenericPanel({

@@ -50,6 +50,7 @@ export function WorkflowCanvas({
   issuesOpen,
   onCloseIssues,
   runStatus,
+  summaryContext,
 }: {
   canvas: ReturnType<typeof useWorkflowCanvas>;
   /** The engine's problems with the draft; the canvas marks the nodes and connections they name. */
@@ -58,10 +59,15 @@ export function WorkflowCanvas({
   onCloseIssues: () => void;
   /** Where the nodes of the run streaming now stand, when it is a run of this workflow. */
   runStatus: CanvasOverlay['runStatus'];
+  /** The catalogs the nodes' summaries name records from. */
+  summaryContext: CanvasOverlay['summaryContext'];
 }) {
   const touch = useMediaQuery('(pointer: coarse)');
   const { nodes, edges, highlightedEdge } = canvas;
-  const overlay = useMemo(() => ({ issuesByNode: issuesByNode(issues), runStatus }), [issues, runStatus]);
+  const overlay = useMemo(
+    () => ({ issuesByNode: issuesByNode(issues), runStatus, summaryContext }),
+    [issues, runStatus, summaryContext],
+  );
   const drawnEdges = useMemo(
     () => styleEdges(edges, nodes, { focused: highlightedEdge, issues: issueEdgeIds(issues) }),
     [edges, nodes, highlightedEdge, issues],

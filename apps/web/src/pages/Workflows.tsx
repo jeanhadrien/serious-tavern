@@ -76,6 +76,17 @@ function WorkflowEditor() {
         : undefined,
     [lastLog, workflow, canvas.current, canvas.edges, canvas.nodes, dirty],
   );
+  // The catalogs a node's one-line summary names records from (the panels get the same lists).
+  const summaryContext = useMemo(
+    () => ({
+      presets,
+      characters,
+      providers: providersList,
+      collections: collectionsList,
+      stateDefinitions: stateDefinitionsList,
+    }),
+    [presets, characters, providersList, collectionsList, stateDefinitionsList],
+  );
   const problems = useMemo(() => listedIssues(issues ?? []), [issues]);
   // Validate asks the engine at once: all clear is a toast, otherwise the list opens (or the settings panel, when
   // the problems are only the chat settings').
@@ -133,6 +144,7 @@ function WorkflowEditor() {
               issuesOpen={issuesOpen}
               onCloseIssues={() => setIssuesOpen(false)}
               runStatus={runStatus}
+              summaryContext={summaryContext}
             />
             {panelShown && (
               <Splitter

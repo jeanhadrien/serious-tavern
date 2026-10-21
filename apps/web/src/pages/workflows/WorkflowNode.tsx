@@ -1,5 +1,6 @@
 import { useContext, useEffect } from 'react';
 import { Handle, Position, useConnection, useUpdateNodeInternals, type NodeProps } from '@xyflow/react';
+import { nodeSummary } from '@st/node-ui';
 import { canConnect, type PortDef } from '@st/shared/ports';
 import { CanvasOverlayContext } from './CanvasOverlayContext.js';
 import type { CanvasNode } from './model.js';
@@ -14,6 +15,7 @@ export function WorkflowNode({ id, data, selected }: NodeProps<CanvasNode>) {
   const overlay = useContext(CanvasOverlayContext);
   const problems = overlay.issuesByNode.get(id);
   const runStatus = overlay.runStatus[id];
+  const summary = data.unknown ? undefined : nodeSummary(descriptor, data.config, overlay.summaryContext);
   const connection = useConnection<CanvasNode>();
   const incompatible = (port: PortDef, type: 'source' | 'target') => {
     if (!connection.inProgress || !connection.fromHandle || connection.fromHandle.nodeId === id) return false;
@@ -48,6 +50,11 @@ export function WorkflowNode({ id, data, selected }: NodeProps<CanvasNode>) {
         <strong>{data.name}</strong>
         <small>{descriptor.category}</small>
       </div>
+      {summary && (
+        <small className="node-summary" title={summary}>
+          {summary}
+        </small>
+      )}
       {descriptor.inputs.map((port) => {
         const invalid = incompatible(port, 'target');
         return (

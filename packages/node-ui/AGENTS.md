@@ -13,6 +13,9 @@ Node config forms generated from JSON Schema, custom panels (`src/panels/`) and 
 - Array fields in any shape other than `{key,value}[]` are shown as read-only JSON.
 - Lists here reorder with up/down buttons and `Alt+↑/↓` only (no drag: dnd-kit lives in the web app).
 
+## Node summaries
+- `nodeSummary(descriptor, config, context)` (`summaries.ts`, a per-type map beside `customPanels`) is the one-line text under a node's header. The editor calls only it, never a per-type branch. It is plain text and tolerant of any config, uses the panels' `Unknown … (id)` wording for a record that is gone, and gives nothing while a node is not set up; a type with no entry has no line. A new node type may add one.
+
 ## Pickers and panels
 - The provider dropdown takes `{ id, name }` and shows "Unknown provider (id)" when the node's id has no record. The model picker only suggests (through `context.loadModels`); the model field stays a plain string.
 - **State panels** (State Read, State Write, the shared `StateKeyPicker`):

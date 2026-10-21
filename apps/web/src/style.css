@@ -326,6 +326,16 @@ pre {
 .flow-node > small {
   margin-top: 4px;
 }
+.flow-node > .node-summary {
+  /* A summary never widens the node: it takes the width the ports give it and is cut with an ellipsis. */
+  width: 0;
+  min-width: 100%;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #a8b1c4;
+}
 .flow-node.unknown-node {
   border-color: #e8868b;
   background: #392d35;
