@@ -1,8 +1,9 @@
 # Workflow canvas: plan
 
-Fourteen improvements to the workflow editor (`apps/web/src/pages/workflows/`, React Flow 12.12). Nothing here is
-built yet. When an item lands, move what it decided into `docs/dev/reference/` and the `AGENTS.md` files, and strike it
-from this plan. Delete the file once it is empty.
+Nine improvements to the workflow editor (`apps/web/src/pages/workflows/`, React Flow 12.12) are left. Phase A (the
+canvas basics: required dot, touch, palette groups, quick add, Tidy) is built and lives in `docs/dev/reference/web.md`
+and the `AGENTS.md` files. When an item lands, move what it decided there and strike it from this plan. Delete the file
+once it is empty.
 
 Out of scope: MiniMap, alignment guides, subflows, cmdk, performance work.
 
@@ -28,11 +29,6 @@ The brief came from an earlier review. These points differ from it and shape the
   (one file per run) is not an option.
   - `coerceValue` and `stringify` live in `engine/src/text.ts`. The web does not depend on `@st/engine`.
   - The execution log does not record which version of the workflow ran.
-- **Item 1: the palette is not sorted.** It renders the registry order. `connectCandidates` sorts by category then
-  label, and its comment says "like the palette", which is not true today.
-- **Item 2: React Flow 12.12 has no pane double-click callback.** Its `zoomOnDoubleClick` (on by default) uses the
-  gesture. The matching logic already has one home, `filterCandidates` in `connectCandidates.ts`; the real change is
-  a picker with no origin port.
 - **Item 3:** confirmed. `notifyError` joins the issues into one toast. The editor's `validate` saves first, then
   highlights only the first issue's `edgeId`. Some issues carry no ids at all: the cycle, the missing sink, the
   settings declarations, and a missing Chat Input (`nodeIds: []`).
@@ -64,130 +60,12 @@ independent.
 
 | Phase | Commits |
 | --- | --- |
-| A. Canvas basics (web only) | 12 required dot · 11 touch · 1a shared type order · 1b palette groups · 2 quick add · 14 Tidy |
 | B. Validation | 10a shared template check · 4 draft validation endpoint · 3 issues on the canvas · 10b template checks in panels |
 | C. Runs | 5 skip reasons · 6 node focus · 8a stream contract · 8b live status · 9a move coercion to shared · 9b last run in the panel |
 | D. Larger additions | 7 node summaries · 13 sticky notes |
 
 Phase C builds the cross-view store in 8b, and 9b reuses it. 13 comes last because it touches every reader of the
 canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
-
----
-
-## Phase A: canvas basics
-
-### 12. Required-input dot
-
-- **Goal:** a small dot on each input whose port has `required: true`. Not for `requiredIfConnected`, which only
-  matters once the input is connected.
-- **Decision:** a plain dot that never changes colour. An unconnected required input is already an engine issue
-  ("needs a connection"), so item 3's badge reports it. A second, client-side copy of that rule would break "a rule
-  has one home".
-- **Touches:** `WorkflowNode.tsx`, `workflows.css`.
-- **Rules:** `PortDef.required` as resolved. Dynamic ports already carry the flag after resolution.
-- **Docs:** `docs/WORKFLOWS.md` (ports), `reference/web.md`.
-
-### 11. Touch: bigger handles and a connection radius
-
-- **Goal:** larger handle hit areas and `connectionRadius` on `<ReactFlow>` when `(pointer: coarse)`.
-- **Touches:**
-  - `WorkflowCanvas.tsx`: the existing `useMediaQuery('(pointer: coarse)')`, then `connectionRadius` (around 40, against
-    the default 20);
-  - `workflows.css`: an `@media (pointer: coarse)` rule on `.react-flow__handle`, with an invisible `::after` hit area
-    so the drawn handle keeps its size.
-- **Risks:** a larger hit area overlaps the port label row and can steal taps meant for selecting the node. Keep it
-  to the node's edge. On the Windows machine this needs a manual check (DevTools touch emulation).
-- **Docs:** `docs/dev/design/FRONTEND-UX.md` (touch notes).
-
-### 1a. One order for node types
-
-- **Goal:** the palette, the connect picker and quick add list node types in one order.
-- **Touches:** a small pure module in `pages/workflows/` (for example `nodeTypeOrder.ts`, with table tests), holding
-  - `compareTypes`: category, then label (moved out of `connectCandidates`);
-  - `groupByCategory(types)`: returns `{ category, types }[]` in that order.
-- **Rules:** the ordering lives only there; `connectCandidates` calls it.
-
-### 1b. Palette categories
-
-- **Goal:** each category is a native `<details>`/`<summary>`. The open state of each category is remembered per
-  browser through `safeStorage` (one key, `st.palette.open`, a JSON map from category to boolean; every read and write
-  guarded). A category opens by default. No search box. The "Port types" legend and the hint stay below the groups.
-- **Categories with a single node.** Today these are AI (LLM), Creativity (Trigger) and Integration (HTTP Request).
-  **Decision:** the palette renders a category with exactly one type as a plain button at group level, with the
-  category as its small caption (as now), not as a `<details>`. Reasons:
-  - A one-item disclosure costs a click and saves nothing. LLM, the node users add most, would sit behind it.
-  - The rule is generic (a count), so there is no per-category branch, and it holds as new types arrive. The day
-    Creativity gets a second node, it becomes a group on its own.
-  - The categories themselves are the engine's (`definition.category`). They also show on node headers, in the
-    picker and as headings in `docs/WORKFLOWS.md`, so the palette should not rename or merge them.
-
-  Moving Random from Logic into Creativity is a defensible engine change, since both draw with `ctx.random()`. It is
-  not needed here; see the open questions.
-- **Phone (< 560px container):** the palette is a horizontal scrolling strip. `<details>` inside a flex strip needs
-  explicit CSS:
-  - Each `details` is a flex item whose summary is a chip.
-  - An open group's buttons follow the chip in the same row: an inner wrapper with `display: flex`, since
-    `display: flex` on `details` itself is not reliable across browsers.
-  - Lone types are plain chips.
-  - The remembered open state applies in both layouts.
-
-  This needs a manual check on a narrow window. The strip must not grow taller than one row.
-- **Touches:** `NodePalette.tsx`, `workflows.css`.
-- **Docs:** `docs/WORKFLOWS.md` (the editor), `reference/web.md`, `pages/workflows/AGENTS.md` (the singleton rule and
-  the storage key).
-
-### 2. Quick add (double-click, `/`)
-
-- **Goal:** a double-click on empty canvas, or `/` while the canvas area has the keyboard, opens `ConnectPicker`
-  listing every node type (except a second Chat Input). Picking one adds the node, with no edge.
-- **Touches:**
-  - `connectCandidates.ts`:
-    - the origin becomes optional; with none, every type is a candidate and `port` is absent (`coerce` false);
-    - `filterCandidates` stays the one matching rule. It reads `port.label` and `port.name` today, so it needs
-      `port?.` handling, with a test.
-  - `useConnectPicker.ts`:
-    - `PickerState.from` becomes optional;
-    - a second entry point, `openAt(screenPoint)`;
-    - `pick` adds an edge only when `from` is set.
-  - `ConnectPicker.tsx`: with no port, the caption shows the category alone (no port label, no "→ text"), and the
-    aria label and empty-list text differ.
-  - `WorkflowCanvas.tsx`:
-    - `zoomOnDoubleClick={false}`;
-    - `onDoubleClick` on the `.canvas` wrapper, acting only when the target is inside `.react-flow__pane` (never a
-      node, edge, control or panel).
-  - Keyboard: `/` is a new area shortcut: a `matchShortcut` result, an `AreaShortcut` member, a `SHORTCUTS` entry and
-    a `useShortcutArea` handler name (see `apps/web/AGENTS.md`).
-- **Where `/` places the node:** see the open questions. The default proposal is the last pointer position over the
-  canvas, else its centre.
-- **Risks:**
-  - Disabling double-click zoom removes a gesture people use. The Controls' zoom buttons and the wheel remain.
-  - Match `/` on `event.key` with Shift allowed: on AZERTY, `/` is Shift+`:`.
-  - `areaShortcutAllowed` already keeps `/` out of fields.
-  - Firefox's quick find is also bound to `/`; the handler's `preventDefault` covers it.
-  - On a phone a double tap may be eaten by the browser's own zoom. Check it manually.
-- **Docs:** `docs/WORKFLOWS.md`, `FRONTEND-UX.md` (the shortcut table and the canvas section), `reference/web.md`
-  (connect picker), the palette hint text.
-
-### 14. Tidy (auto-layout)
-
-- **Goal:** a "Tidy" button in the canvas `Panel` lays out every node once with `@dagrejs/dagre` (left to right, since
-  inputs are on the left and outputs on the right). It is one undo step, followed by a `fitView`.
-- **Touches:**
-  - a pure `tidyLayout.ts`: (nodes with sizes, edges) → positions, with tests;
-  - `useWorkflowCanvas` calls `recordStep()` once, then `setNodes`;
-  - `apps/web/package.json` gets the dependency.
-- **Rules:**
-  - Sizes come from `node.measured`, with a fallback size for unmeasured nodes.
-  - Unknown-type placeholders are laid out like any node.
-  - Ranks follow edges only; dagre ignores which port an edge uses, so crossings inside a rank are possible.
-- **Risks:**
-  - A new dependency means `package-lock.json` changes and knip must see it used. Check that its types ship with the
-    package; otherwise knip and typecheck need `@types`.
-  - A disconnected node lands in its own column.
-  - Tidy rewrites every position, so an undo is the way back. Don't ask for confirmation: it is a draft edit
-    (`FRONTEND-UX.md`, "inside a draft, no confirmation").
-- **Docs:** `docs/WORKFLOWS.md`, `reference/web.md` (history: what counts as a step), `pages/workflows/AGENTS.md`
-  (Tidy is one `recordStep`).
 
 ---
 
@@ -443,25 +321,23 @@ canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
 
 ## Open questions
 
-1. **Categories (item 1).** The plan keeps the engine's categories and only changes how a lone category renders. Do
+1. **Categories (palette, built in phase A).** The palette keeps the engine's categories and only changes how a lone category renders. Do
    you also want Random moved to Creativity in the engine? That is a real regrouping, and it changes node headers and
    the `docs/WORKFLOWS.md` headings.
-2. **Where `/` places the node (item 2):** the last pointer position over the canvas, the canvas centre, or next to the
-   selected node, connected to it?
-3. **The Validate button (items 3, 4).** Once issues are live, does the button stay as "validate now", or is the issue
+2. **The Validate button (items 3, 4).** Once issues are live, does the button stay as "validate now", or is the issue
    count its replacement?
-4. **Settings issues in the issue list (item 3).** Show them there too, or only in the settings panel? Filtering them
+3. **Settings issues in the issue list (item 3).** Show them there too, or only in the settings panel? Filtering them
    out means matching messages, because an issue does not say where it comes from. An optional `source` field on
    `ValidationIssue` would be cleaner, and it is additive.
-5. **Template problems (item 10).** Panel-only warnings, or engine validation issues as well (so they badge the node
+4. **Template problems (item 10).** Panel-only warnings, or engine validation issues as well (so they badge the node
    and appear in item 3's list)? A syntax error renders the template verbatim at run time, which arguably is an error.
-6. **Which "last run" (item 9):** the open chat's last run of the workflow (proposed), or any chat's? Any chat needs a
+5. **Which "last run" (item 9):** the open chat's last run of the workflow (proposed), or any chat's? Any chat needs a
    per-workflow index of executions on the server, which does not exist.
-7. **Rebuild or record inputs (item 9).** Rebuilding (proposed) is approximate even with the version stamp. Recording
+6. **Rebuild or record inputs (item 9).** Rebuilding (proposed) is approximate even with the version stamp. Recording
    each node's inputs in the log is exact, but it bloats every log: every LLM node's `history` would be stored again.
-8. **Live status after the reply (item 8).** Is reply-section-only acceptable, or should after-section runs publish
+7. **Live status after the reply (item 8).** Is reply-section-only acceptable, or should after-section runs publish
    too? That would mean another channel, such as `/api/events` or a per-chat SSE.
-9. **Notes (item 13):** separate state (a, proposed) or a second node type (b)? Should Tidy (14) move notes, and
+8. **Notes (item 13):** separate state (a, proposed) or a second node type (b)? Should Tidy (14) move notes, and
    should copy and paste carry them? The proposal: Tidy leaves notes where they are, and copy and paste come later.
    Undo and the dirty check are required either way.
-10. **Skip reason granularity (item 5):** is `by` (the upstream node) worth storing, or is the code enough?
+9. **Skip reason granularity (item 5):** is `by` (the upstream node) worth storing, or is the code enough?
