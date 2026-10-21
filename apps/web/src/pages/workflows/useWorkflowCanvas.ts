@@ -10,11 +10,21 @@ import {
   type Edge,
   type ReactFlow,
 } from '@xyflow/react';
-import type { Workflow, NodeTypeDescriptor, NodeInstance, Preset, Character, StateDefinition } from '@st/shared';
+import {
+  workflowNotes,
+  type Workflow,
+  type NodeTypeDescriptor,
+  type NodeInstance,
+  type Preset,
+  type Character,
+  type StateDefinition,
+} from '@st/shared';
 import { alerts } from '../../alerts/index.js';
 import { checkConnection } from '../../connection.js';
+import { noteNodesOf, type NoteNode } from './canvasNotes.js';
 import { withDisplayNames, workflowToCanvas, type CanvasNode } from './model.js';
 import { useCanvasClipboard } from './useCanvasClipboard.js';
+import { useCanvasNotes } from './useCanvasNotes.js';
 import { useCanvasHistory } from './useCanvasHistory.js';
 import { FALLBACK_NODE_SIZE, tidyLayout } from './tidyLayout.js';
 import { useConnectPicker } from './useConnectPicker.js';
@@ -28,6 +38,8 @@ export function useWorkflowCanvas(
 ) {
   const [nodes, setNodes] = useState<CanvasNode[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
+  // Sticky notes: their own state, merged with the nodes only when the canvas renders (see `useCanvasNotes`).
+  const [notes, setNotes] = useState<NoteNode[]>([]);
   const [selected, setSelected] = useState<string>();
   const [highlightedEdge, setHighlightedEdge] = useState<string>();
   // A node a link asked to show: selected and fitted once the canvas has measured it (`ShowNode`), then forgotten.
@@ -40,8 +52,10 @@ export function useWorkflowCanvas(
   const history = useCanvasHistory({
     nodes,
     edges,
+    notes,
     setNodes,
     setEdges,
+    setNotes,
     onRestore: ({ nodes: restored }) =>
       setSelected((prev) => (prev && restored.some((node) => node.id === prev) ? prev : undefined)),
   });
@@ -53,6 +67,7 @@ export function useWorkflowCanvas(
     const canvas = workflowToCanvas(next, types);
     setNodes(canvas.nodes);
     setEdges(canvas.edges);
+    setNotes(noteNodesOf(workflowNotes(next)));
     setSelected(undefined);
     setHighlightedEdge(undefined);
     if (canvas.unknownTypes.length)
@@ -63,13 +78,17 @@ export function useWorkflowCanvas(
     setCanvasVersion((version) => version + 1);
     setNodes([]);
     setEdges([]);
+    setNotes([]);
     setSelected(undefined);
     setHighlightedEdge(undefined);
   };
   // Only removals are steps here: selection, measurements and drags (recorded on drag stop) are not.
   const { record } = history;
-  const onNodesChange: OnNodesChange<CanvasNode> = useCallback(
-    (changes) => {
+  const stickyNotes = useCanvasNotes({ notes, setNotes, record });
+  const applyNoteChanges = stickyNotes.apply;
+  const onNodesChange: OnNodesChange<CanvasNode | NoteNode> = useCallback(
+    (allChanges) => {
+      const changes = applyNoteChanges(allChanges);
       const removed = changes.filter((change) => change.type === 'remove').map((change) => change.id);
       if (removed.length) record();
       setNodes((prev) => applyNodeChanges(changes, prev));
@@ -78,7 +97,7 @@ export function useWorkflowCanvas(
         setSelected((prev) => (prev && removed.includes(prev) ? undefined : prev));
       }
     },
-    [record],
+    [record, applyNoteChanges],
   );
   const onEdgesChange: OnEdgesChange = useCallback(
     (changes) => {
@@ -206,10 +225,17 @@ export function useWorkflowCanvas(
   };
   // The selection as an on-screen action, for touch screens where the Delete key is out of reach. It goes through
   // the same change handlers as the key, so a removed node takes its edges with it.
-  const selectedNodes = nodes.filter((node) => node.selected);
+  const selectedNodes = [...nodes, ...notes].filter((node) => node.selected);
   const selectedEdges = edges.filter((edge) => edge.selected);
   const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
   const deleteSelection = () => void deleteElements({ nodes: selectedNodes, edges: selectedEdges });
+  // A sticky note at the middle of the canvas, selected so it can be typed into at once.
+  const addNoteAtCenter = () => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const position = screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+    stickyNotes.addNote({ x: position.x - 100, y: position.y - 60 });
+  };
   // Selects what an issue names and fits the view to it. Selection is not part of the draft, so this is no step.
   const focusIssue = (nodeIds: readonly string[], edgeId?: string) => {
     const ids = new Set(nodeIds);
@@ -219,6 +245,9 @@ export function useWorkflowCanvas(
     );
     setEdges((prev) =>
       prev.map((edge) => (!!edge.selected === (edge.id === edgeId) ? edge : { ...edge, selected: edge.id === edgeId })),
+    );
+    setNotes((prev) =>
+      prev.some((note) => note.selected) ? prev.map((note) => ({ ...note, selected: false })) : prev,
     );
     if (ids.size)
       requestAnimationFrame(() => void fitView({ nodes: [...ids].map((id) => ({ id })), duration: 300, maxZoom: 1 }));
@@ -232,6 +261,9 @@ export function useWorkflowCanvas(
     setEdges((prev) =>
       prev.some((edge) => edge.selected) ? prev.map((edge) => ({ ...edge, selected: false })) : prev,
     );
+    setNotes((prev) =>
+      prev.some((note) => note.selected) ? prev.map((note) => ({ ...note, selected: false })) : prev,
+    );
   };
   const deleteNode = (id: string) => void deleteElements({ nodes: [{ id }] });
   const current = nodes.find((n) => n.id === selected);
@@ -243,6 +275,9 @@ export function useWorkflowCanvas(
   return {
     nodes,
     edges,
+    notes,
+    setNoteText: stickyNotes.setText,
+    addNoteAtCenter,
     canvasVersion,
     current,
     canvasRef,

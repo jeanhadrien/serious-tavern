@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Edge } from '@xyflow/react';
-import type { Workflow, NodeTypeDescriptor } from '@st/shared';
+import { workflowNotes, type Workflow, type NodeTypeDescriptor } from '@st/shared';
 import { workflowsApi, nodeTypesApi } from '../../api.js';
 import { alerts } from '../../alerts/index.js';
 import {
@@ -15,14 +15,15 @@ import {
   workflowEditorStore,
   workflowsStore,
 } from '../../stores/index.js';
+import { noteNodesOf, type NoteNode } from './canvasNotes.js';
 import { canvasToDraftBody, canvasToWorkflow, workflowToCanvas, type CanvasNode } from './model.js';
 import { unsavableSettings, withDraftSettings } from './settingsDraft.js';
 import { useDraftValidation } from './useDraftValidation.js';
 import { useWorkflowCanvas } from './useWorkflowCanvas.js';
 
-/** Serialization of a workflow as the canvas would save it; the dirty check compares these. */
-const snapshot = (workflow: Workflow, nodes: CanvasNode[], edges: Edge[]) =>
-  JSON.stringify(canvasToWorkflow(workflow, nodes, edges));
+/** Serialization of a workflow as the canvas would save it, sticky notes included; the dirty check compares these. */
+const snapshot = (workflow: Workflow, nodes: CanvasNode[], edges: Edge[], notes: NoteNode[]) =>
+  JSON.stringify(canvasToWorkflow(workflow, nodes, edges, notes));
 
 /**
  * The state of the workflow editor in M: the open workflow, its canvas and node types. Which workflow to open
@@ -61,7 +62,7 @@ export function useWorkflowEditor() {
     setWorkflow(next);
     canvas.load(next);
     const loaded = workflowToCanvas(next, types);
-    setSaved(snapshot(next, loaded.nodes, loaded.edges));
+    setSaved(snapshot(next, loaded.nodes, loaded.edges, noteNodesOf(workflowNotes(next))));
   };
   const close = () => {
     stored.current = undefined;
@@ -71,8 +72,8 @@ export function useWorkflowEditor() {
   };
 
   const dirty = useMemo(
-    () => !!workflow && snapshot(workflow, canvas.nodes, canvas.edges) !== saved,
-    [workflow, canvas.nodes, canvas.edges, saved],
+    () => !!workflow && snapshot(workflow, canvas.nodes, canvas.edges, canvas.notes) !== saved,
+    [workflow, canvas.nodes, canvas.edges, canvas.notes, saved],
   );
   const openId = workflow?.id;
   useEffect(() => workflowEditorStore.report(openId, dirty), [openId, dirty]);
@@ -110,12 +111,12 @@ export function useWorkflowEditor() {
       });
       return false;
     }
-    const current = canvasToWorkflow(workflow, canvas.nodes, canvas.edges);
+    const current = canvasToWorkflow(workflow, canvas.nodes, canvas.edges, canvas.notes);
     try {
       const updated = await workflowsApi.update(workflow.id, current);
       setWorkflow((prev) => (prev?.id === updated.id ? { ...prev, updatedAt: updated.updatedAt } : prev));
       stored.current = { ...current, updatedAt: updated.updatedAt };
-      setSaved(snapshot({ ...workflow, updatedAt: updated.updatedAt }, canvas.nodes, canvas.edges));
+      setSaved(snapshot({ ...workflow, updatedAt: updated.updatedAt }, canvas.nodes, canvas.edges, canvas.notes));
       alerts.success('Workflow saved');
       await workflowsStore.refresh();
       return true;

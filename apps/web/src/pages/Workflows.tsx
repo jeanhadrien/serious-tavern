@@ -132,7 +132,9 @@ function WorkflowEditor() {
             issuesOpen={issuesOpen}
             onToggleIssues={() => setIssuesOpen((open) => !open)}
             onValidate={() => void validateNow()}
-            onDuplicate={() => void duplicateWorkflow(canvasToWorkflow(workflow, canvas.nodes, canvas.edges))}
+            onDuplicate={() =>
+              void duplicateWorkflow(canvasToWorkflow(workflow, canvas.nodes, canvas.edges, canvas.notes))
+            }
             onSave={() => void save()}
             onRevert={revert}
           />

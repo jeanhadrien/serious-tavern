@@ -1,5 +1,6 @@
 import { useCallback, useReducer, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { Edge } from '@xyflow/react';
+import type { NoteNode } from './canvasNotes.js';
 import type { CanvasNode } from './model.js';
 import {
   emptyHistory,
@@ -15,7 +16,7 @@ import {
 
 /**
  * Undo/redo for the canvas draft (pure rules in `canvasHistory.ts`). The canvas calls `record()` right before it
- * changes nodes or edges; `load`/`clear` call `reset()`. Edges pruned by `useDynamicPorts` are not steps: it uses the
+ * changes nodes, edges or notes; `load`/`clear` call `reset()`. Edges pruned by `useDynamicPorts` are not steps: it uses the
  * raw setters, so undo brings them back together with the config that made them go.
  *
  * `record(before?, groupKey?)` is also the way to record a step the canvas hook doesn't know about (a paste): call it
@@ -24,20 +25,24 @@ import {
 export function useCanvasHistory({
   nodes,
   edges,
+  notes,
   setNodes,
   setEdges,
+  setNotes,
   onRestore,
 }: {
   nodes: CanvasNode[];
   edges: Edge[];
+  notes: NoteNode[];
   setNodes: Dispatch<SetStateAction<CanvasNode[]>>;
   setEdges: Dispatch<SetStateAction<Edge[]>>;
+  setNotes: Dispatch<SetStateAction<NoteNode[]>>;
   /** Called with the state that was put back, e.g. to close a config panel whose node is gone. */
   onRestore: (snapshot: CanvasSnapshot) => void;
 }) {
   // A new object for each render: the canvas as the handlers see it.
-  const latest = useRef({ nodes, edges });
-  latest.current = { nodes, edges };
+  const latest = useRef({ nodes, edges, notes });
+  latest.current = { nodes, edges, notes };
   const history = useRef<History>(emptyHistory);
   const [, rerender] = useReducer((count: number) => count + 1, 0);
   const commit = useCallback((next: History) => {
@@ -59,20 +64,21 @@ export function useCanvasHistory({
           inTick.current = false;
         });
       }
-      const start = before ?? snapshotOf(latest.current.nodes, latest.current.edges);
+      const start = before ?? snapshotOf(latest.current.nodes, latest.current.edges, latest.current.notes);
       commit(recordStep(history.current, start, groupKey));
     },
     [commit],
   );
 
   const step = (move: typeof undo): boolean => {
-    const current = snapshotOf(latest.current.nodes, latest.current.edges);
+    const current = snapshotOf(latest.current.nodes, latest.current.edges, latest.current.notes);
     const result = move(history.current, current);
     if (!result.snapshot) return false;
     commit(result.history);
     // Everything comes back unselected (the snapshot has no selection).
     setNodes(restoreNodes(result.snapshot.nodes, latest.current.nodes));
     setEdges(result.snapshot.edges);
+    setNotes(restoreNodes(result.snapshot.notes, latest.current.notes));
     onRestoreRef.current(result.snapshot);
     return true;
   };
@@ -80,7 +86,7 @@ export function useCanvasHistory({
   // A drag is one step: the canvas before it is kept, and recorded when it ends only if a node actually moved.
   const dragStart = useRef<CanvasSnapshot>(undefined);
   const onDragStart = useCallback(() => {
-    dragStart.current = snapshotOf(latest.current.nodes, latest.current.edges);
+    dragStart.current = snapshotOf(latest.current.nodes, latest.current.edges, latest.current.notes);
   }, []);
   const onDragStop = useCallback(
     (dragged: readonly { id: string; position: { x: number; y: number } }[]) => {

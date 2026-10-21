@@ -11,6 +11,10 @@
 - The palette, the connect picker and quick add list node types in one order, `nodeTypeOrder.ts` (category, then label). Never sort types anywhere else.
 - The palette renders a category with exactly one type as a plain button (a count rule, never a per-category branch) and one with several as a `<details>`. Its open state is one `localStorage` key, `st.palette.open` (JSON map category → boolean, absent means open), read and written only through `paletteOpen.ts`, which guards both.
 
+## Sticky notes
+- Notes are separate canvas state (`notes`, `NoteNode`), merged with the nodes only where `WorkflowCanvas` renders; **never** put one in `canvas.nodes`, whose readers all assume `data.descriptor`. They are part of the draft: the history snapshot, `canvasToWorkflow(…, notes)` and the dirty snapshot all carry them, and a change to them calls `record` before applying like any other edit. Always write `notes` (an empty list included) when saving: an omitted `notes` keeps the stored ones on the server.
+- A note's textarea needs React Flow's `nodrag` and `nowheel` classes.
+
 ## Overlays
 - Issue badges, edge marks and anything else derived from a run or a check (live status, config summaries later) are **not part of the draft**. Never put them in node `data`: the history's `snapshotOf` copies `data`, so an undo would bring back stale marks. Derive them at render, as `styleEdges` does for edges, and hand them to `WorkflowNode` through `CanvasOverlayContext`.
 - The run streaming in the open chat (`runActivity`, only when it is a run of the open workflow) reaches `WorkflowNode` as `CanvasOverlayContext.runStatus`: marks, never draft data.

@@ -99,6 +99,17 @@ describe('executor', () => {
     expect(JSON.parse(result.replies[0]!.content)).toEqual({ a: 'done', b: 'done' });
     expect(result.execution.nodes.output?.status).toBe('completed');
   });
+  it('ignores sticky notes: a workflow with notes validates and runs the same', async () => {
+    const plain = workflow(
+      [node('input', 'chat-input'), node('output', 'chat-output')],
+      [edge('input', 'message', 'output', 'value')],
+    );
+    const noted = { ...plain, notes: [{ id: 'note', text: 'A reminder', position: { x: 0, y: 0 } }] };
+    expect(await validateWorkflow(noted)).toEqual([]);
+    const [a, b] = [await executeWorkflow(plain, options), await executeWorkflow(noted, options)];
+    expect(b.replies).toEqual(a.replies);
+    expect(Object.keys(b.execution.nodes)).toEqual(Object.keys(a.execution.nodes));
+  });
   it('stamps the log with the version of the workflow that ran', async () => {
     const versioned = {
       ...workflow(

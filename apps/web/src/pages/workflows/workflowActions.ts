@@ -5,12 +5,12 @@ import { workflowEditorStore, workflowsStore } from '../../stores/index.js';
 import { unsavableSettings } from './settingsDraft.js';
 
 /**
- * Creates "<name> copy" from a workflow's graph and chat settings and opens it in the editor. Shared by the list (saved version)
+ * Creates "<name> copy" from a workflow's graph, sticky notes and chat settings and opens it in the editor. Shared by the list (saved version)
  * and the editor toolbar (current canvas). Resolves with whether it succeeded; API errors are toasted. A dirty open
  * draft asks Save / Discard / Cancel first (Cancel resolves false and writes nothing).
  */
 export async function duplicateWorkflow(
-  source: Pick<Workflow, 'name' | 'nodes' | 'edges' | 'settings'>,
+  source: Pick<Workflow, 'name' | 'nodes' | 'edges' | 'settings' | 'notes'>,
 ): Promise<boolean> {
   // The API would refuse a declaration that doesn't parse (400); say which one instead.
   const blocked = unsavableSettings(source.settings);
@@ -27,6 +27,7 @@ export async function duplicateWorkflow(
       nodes: structuredClone(source.nodes),
       edges: structuredClone(source.edges),
       settings: structuredClone(source.settings ?? []),
+      notes: structuredClone(source.notes ?? []),
     });
     await workflowsStore.refresh();
     workflowEditorStore.open(copy);

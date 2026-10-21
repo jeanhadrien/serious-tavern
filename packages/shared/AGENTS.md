@@ -30,6 +30,9 @@ User-owned per-chat knobs: the workflow declares them (`workflow.settings`), the
 - The preset preview without a session uses each key's default (`settingsCatalog`). Declaration problems are workflow validation issues (`workflowSettingIssues`).
 - Keys must pass `isSettingKey`: an identifier, and not reserved (`__proto__`/`constructor`/`prototype`, the Handlebars literals `this`/`true`/`false`/`null`/`undefined`, and `toString`, which the template data defines on `settings`).
 
+## Sticky notes
+- `workflow.notes` (`noteSchema`: `id`, `text`, `position`, optional `size`; passthrough) is free text for the canvas, kept outside `nodes` so `prepareWorkflow` never reads it. Optional, not defaulted (stored records are not parsed on read): read through `workflowNotes()`, never as `workflow.notes`. A write that omits it keeps the stored ones.
+
 ## Reply list (triggers)
 A chat runs an ordered, toggleable list of workflows on each reply, `session.triggers.reply: { workflowId, enabled }[]`.
 - **`replyWorkflows(session)` is the only reader** (a legacy chat reads as its `workflowId` alone). `session.workflowId` only mirrors the list's first entry for older readers: never read it to decide what runs or which settings exist.

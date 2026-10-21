@@ -31,6 +31,7 @@ with the chat moved to the right so you can test as you go.
 - **Summary line:** under a node's name, a muted line says how it is set up: the model and preset of an LLM, the key and operation of a State node, a Condition's operator, the collections of Recall and Draw, and so on. It is cut when long (hover for the whole), and a node that isn't set up yet has none.
 - **Configure:** select a node to open its settings panel. Fields that accept templates (`{{...}}`) list the available
   variables; see [templating](TEMPLATING.md).
+- **Notes:** the canvas's **Add note** button puts a sticky note in the middle of the view. Type in it, drag it, and drag its corners (it shows handles while selected) to resize. Notes are saved with the workflow, move with undo and redo like nodes (typing in one note is one step), and never affect how the workflow runs. Tidy leaves them where they are, and copy and paste don't carry them. Duplicating a workflow copies its notes.
 - **Tidy:** the canvas's **Tidy** button lays all the nodes out left to right, following the wires, and fits the view.
   Nodes with no wire are stacked in the first column, under the wired ones. It is a single undo step, so Ctrl/Cmd+Z puts everything back.
 - **Undo and redo:** **Ctrl/Cmd+Z** and **Ctrl/Cmd+Shift+Z** (or **Ctrl/Cmd+Y**), or the toolbar buttons, up to 100

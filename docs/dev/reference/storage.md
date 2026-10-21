@@ -16,6 +16,7 @@ deleted: `list()` skips them with a warning, `get()` throws with the file path. 
 Sessions, workflows, characters, personas and execution logs are one JSON file per record. Records are **not parsed
 on read**, so readers go through tolerant helpers and new fields are `.optional()`.
 
+- **The workflow record** holds `nodes`, `edges`, the chat `settings` declarations and the canvas's sticky `notes` (`{ id, text, position, size? }`, passthrough). Notes sit outside `nodes`, so the engine never sees them; read them through `workflowNotes()`, which tolerates a missing field, a non-list and items that aren't notes. A write that omits `settings` or `notes` keeps the stored ones; `notes: []` clears them.
 - Writes are atomic: a temp file, then a rename, retried on transient Windows `EPERM`/`EACCES`/`EBUSY`.
 - **Locks** (`storage/lock.ts`) are keyed, in-process and not re-entrant. Every mutation of an existing record goes
   through `repository.update` (or the entity lock) under its key; plain `save` only creates. PUT on workflows and

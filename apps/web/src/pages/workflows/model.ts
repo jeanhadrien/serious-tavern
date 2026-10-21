@@ -1,4 +1,5 @@
 import type { Edge as FlowEdge, Node as FlowNode } from '@xyflow/react';
+import { notesOf, type NoteNode } from './canvasNotes.js';
 import {
   nodeDisplayName,
   workflowSettings,
@@ -81,9 +82,20 @@ export function withDisplayNames(nodes: CanvasNode[], types: NodeTypeDescriptor[
   return nodes.map((node) => ({ ...node, data: { ...node.data, name: nodeDisplayName(list, labelOf, node.id) } }));
 }
 
-export function canvasToWorkflow(workflow: Workflow, nodes: CanvasNode[], edges: FlowEdge[]): Workflow {
+/**
+ * The workflow as the canvas would save it. With `notes` (the sticky notes on the canvas) they are written whatever the
+ * workflow held before, an empty list included: an omitted `notes` keeps the stored ones on the server, so removing the
+ * last note has to say so. Without it the workflow's own notes stay as they are.
+ */
+export function canvasToWorkflow(
+  workflow: Workflow,
+  nodes: CanvasNode[],
+  edges: FlowEdge[],
+  notes?: NoteNode[],
+): Workflow {
   return {
     ...workflow,
+    ...(notes && { notes: notesOf(notes) }),
     nodes: nodes.map((node) => ({
       id: node.id,
       type: node.data.descriptor.type,

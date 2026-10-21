@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { ReactFlow, Background, Controls, Panel, useNodesInitialized, useReactFlow } from '@xyflow/react';
-import { Network, Redo2, Trash2, Undo2 } from 'lucide-react';
+import { Network, Redo2, StickyNote, Trash2, Undo2 } from 'lucide-react';
 import type { ValidationIssue } from '@st/shared';
 import { IconButton } from '../../components/IconButton.js';
 import { checkConnection } from '../../connection.js';
@@ -10,10 +10,11 @@ import { ConnectPicker } from './ConnectPicker.js';
 import { styleEdges } from './edgeStyle.js';
 import { IssueList } from './IssueList.js';
 import { issueEdgeIds, issuesByNode, issueTargets, listedIssues } from './issueOverlay.js';
+import { NoteActionsContext, NoteNode } from './NoteNode.js';
 import { WorkflowNode } from './WorkflowNode.js';
 import type { useWorkflowCanvas } from './useWorkflowCanvas.js';
 
-const nodeTypes = { workflow: WorkflowNode };
+const nodeTypes = { workflow: WorkflowNode, note: NoteNode };
 
 // How near a handle a dropped connection still snaps to it: a finger is less exact than a mouse (React Flow's own is 20).
 const TOUCH_CONNECTION_RADIUS = 40;
@@ -63,7 +64,10 @@ export function WorkflowCanvas({
   summaryContext: CanvasOverlay['summaryContext'];
 }) {
   const touch = useMediaQuery('(pointer: coarse)');
-  const { nodes, edges, highlightedEdge } = canvas;
+  const { nodes, edges, notes, highlightedEdge } = canvas;
+  // Notes sit behind the nodes. They are not the workflow's nodes: only here are the two lists one.
+  const flowNodes = useMemo(() => [...notes, ...nodes], [notes, nodes]);
+  const noteActions = useMemo(() => ({ setText: canvas.setNoteText }), [canvas.setNoteText]);
   const overlay = useMemo(
     () => ({ issuesByNode: issuesByNode(issues), runStatus, summaryContext }),
     [issues, runStatus, summaryContext],
@@ -91,49 +95,52 @@ export function WorkflowCanvas({
     >
       {/* Remounted for each loaded workflow, so `fitView` fits it into this (possibly narrow) column. */}
       <CanvasOverlayContext value={overlay}>
-        <ReactFlow
-          key={canvas.canvasVersion}
-          nodes={canvas.nodes}
-          edges={drawnEdges}
-          nodeTypes={nodeTypes}
-          onNodesChange={canvas.onNodesChange}
-          onEdgesChange={canvas.onEdgesChange}
-          onConnect={canvas.connect}
-          onConnectEnd={canvas.onConnectEnd}
-          isValidConnection={(connection) => checkConnection(connection, canvas.nodes).ok}
-          onNodeDragStart={canvas.onDragStart}
-          onNodeDragStop={(_event, _node, dragged) => canvas.onDragStop(dragged)}
-          onSelectionDragStart={canvas.onDragStart}
-          onSelectionDragStop={(_event, dragged) => canvas.onDragStop(dragged)}
-          onNodeClick={(_, node) => canvas.setSelected(node.id)}
-          onPaneClick={() => canvas.setSelected(undefined)}
-          deleteKeyCode={['Backspace', 'Delete']}
-          minZoom={0.2}
-          zoomOnDoubleClick={false}
-          connectionRadius={touch ? TOUCH_CONNECTION_RADIUS : undefined}
-        >
-          <FitWhenMeasured />
-          <ShowNode
-            id={canvas.nodeToShow}
-            show={(ids) => canvas.focusIssue(ids)}
-            onShown={() => canvas.showNode(undefined)}
-          />
-          <Background color="#414652" gap={20} />
-          <Controls />
-          <Panel position="top-right" className="canvas-actions">
-            <IconButton icon={Undo2} label="Undo" disabled={!canvas.canUndo} onClick={() => canvas.undo()} />
-            <IconButton icon={Redo2} label="Redo" disabled={!canvas.canRedo} onClick={() => canvas.redo()} />
-            <IconButton icon={Network} label="Tidy" disabled={!canvas.nodes.length} onClick={canvas.tidy} />
-            {canvas.hasSelection && (
-              <IconButton
-                icon={Trash2}
-                label="Delete selection"
-                className="delete-button"
-                onClick={canvas.deleteSelection}
-              />
-            )}
-          </Panel>
-        </ReactFlow>
+        <NoteActionsContext value={noteActions}>
+          <ReactFlow
+            key={canvas.canvasVersion}
+            nodes={flowNodes}
+            edges={drawnEdges}
+            nodeTypes={nodeTypes}
+            onNodesChange={canvas.onNodesChange}
+            onEdgesChange={canvas.onEdgesChange}
+            onConnect={canvas.connect}
+            onConnectEnd={canvas.onConnectEnd}
+            isValidConnection={(connection) => checkConnection(connection, canvas.nodes).ok}
+            onNodeDragStart={canvas.onDragStart}
+            onNodeDragStop={(_event, _node, dragged) => canvas.onDragStop(dragged)}
+            onSelectionDragStart={canvas.onDragStart}
+            onSelectionDragStop={(_event, dragged) => canvas.onDragStop(dragged)}
+            onNodeClick={(_, node) => canvas.setSelected(node.type === 'note' ? undefined : node.id)}
+            onPaneClick={() => canvas.setSelected(undefined)}
+            deleteKeyCode={['Backspace', 'Delete']}
+            minZoom={0.2}
+            zoomOnDoubleClick={false}
+            connectionRadius={touch ? TOUCH_CONNECTION_RADIUS : undefined}
+          >
+            <FitWhenMeasured />
+            <ShowNode
+              id={canvas.nodeToShow}
+              show={(ids) => canvas.focusIssue(ids)}
+              onShown={() => canvas.showNode(undefined)}
+            />
+            <Background color="#414652" gap={20} />
+            <Controls />
+            <Panel position="top-right" className="canvas-actions">
+              <IconButton icon={Undo2} label="Undo" disabled={!canvas.canUndo} onClick={() => canvas.undo()} />
+              <IconButton icon={Redo2} label="Redo" disabled={!canvas.canRedo} onClick={() => canvas.redo()} />
+              <IconButton icon={StickyNote} label="Add note" onClick={canvas.addNoteAtCenter} />
+              <IconButton icon={Network} label="Tidy" disabled={!canvas.nodes.length} onClick={canvas.tidy} />
+              {canvas.hasSelection && (
+                <IconButton
+                  icon={Trash2}
+                  label="Delete selection"
+                  className="delete-button"
+                  onClick={canvas.deleteSelection}
+                />
+              )}
+            </Panel>
+          </ReactFlow>
+        </NoteActionsContext>
       </CanvasOverlayContext>
       {issuesOpen && (
         <IssueList

@@ -19,6 +19,7 @@ export function registerWorkflows(app: FastifyInstance, context: AppContext) {
       nodes: body.nodes ?? [],
       edges: body.edges ?? [],
       ...(body.settings ? { settings: body.settings } : {}),
+      ...(body.notes ? { notes: body.notes } : {}),
       createdAt: date,
       updatedAt: date,
     };

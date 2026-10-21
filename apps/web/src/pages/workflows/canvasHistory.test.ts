@@ -14,6 +14,7 @@ import {
   type CanvasSnapshot,
   type History,
 } from './canvasHistory.js';
+import { newNoteNode } from './canvasNotes.js';
 import { canvasToWorkflow, workflowToCanvas, type CanvasNode } from './model.js';
 
 const descriptor: NodeTypeDescriptor = {
@@ -42,7 +43,7 @@ const edge = (id: string, extra: Partial<Edge> = {}): Edge => ({
   targetHandle: 'in',
   ...extra,
 });
-const snap = (...ids: string[]): CanvasSnapshot => ({ nodes: ids.map((id) => node(id)), edges: [] });
+const snap = (...ids: string[]): CanvasSnapshot => ({ nodes: ids.map((id) => node(id)), edges: [], notes: [] });
 const ids = (snapshots: CanvasSnapshot[]) => snapshots.map((item) => item.nodes.map((n) => n.id).join(''));
 
 describe('snapshotOf', () => {
@@ -56,6 +57,19 @@ describe('snapshotOf', () => {
     expect(result.edges[0]).toEqual(edge('e'));
     expect(result.edges[0]).not.toHaveProperty('selected');
     expect(live.selected).toBe(true); // the live state is not touched
+  });
+
+  it('keeps a note with the size the user gave it, without its selection or measurements', () => {
+    const live = {
+      ...newNoteNode('n', { x: 3, y: 4 }),
+      width: 240,
+      height: 130,
+      selected: true,
+      resizing: true,
+      measured: { width: 240, height: 130 },
+    };
+    const [note] = snapshotOf([], [], [live]).notes;
+    expect(note).toEqual({ ...newNoteNode('n', { x: 3, y: 4 }), width: 240, height: 130 });
   });
 });
 
@@ -142,6 +156,14 @@ describe('undo and redo', () => {
     const back = undo(record(emptyHistory, snap('a')), snap('a', 'b'));
     expect(back.history.future).toHaveLength(1);
     expect(record(back.history, snap('a')).future).toEqual([]);
+  });
+});
+
+describe('nodesMoved for notes', () => {
+  it('counts a note that ended somewhere else', () => {
+    const start = snapshotOf([], [], [newNoteNode('n', { x: 1, y: 1 })]);
+    expect(nodesMoved(start, [{ id: 'n', position: { x: 1, y: 1 } }])).toBe(false);
+    expect(nodesMoved(start, [{ id: 'n', position: { x: 9, y: 1 } }])).toBe(true);
   });
 });
 

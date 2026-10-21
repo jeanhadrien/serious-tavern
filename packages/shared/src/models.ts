@@ -29,6 +29,18 @@ export const edgeSchema = z
     targetHandle: z.string().min(1),
   })
   .passthrough();
+/**
+ * A sticky note on the workflow canvas: free text the engine never sees (it reads `nodes` and `edges` only). `size` is
+ * set once the user resizes it.
+ */
+export const noteSchema = z
+  .object({
+    id: z.string().min(1),
+    text: z.string(),
+    position: z.object({ x: z.number(), y: z.number() }),
+    size: z.object({ width: z.number(), height: z.number() }).optional(),
+  })
+  .passthrough();
 export const workflowSchema = z
   .object({
     id: z.string().min(1),
@@ -38,6 +50,9 @@ export const workflowSchema = z
     // Chat settings the workflow declares. Absent in older files (and stored records are not parsed on
     // read), so read them through `workflowSettings()`, never as `workflow.settings` directly.
     settings: z.array(workflowSettingSchema).optional(),
+    // Sticky notes on the canvas. Absent in older files (and stored records are not parsed on read), so read them
+    // through `workflowNotes()`.
+    notes: z.array(noteSchema).optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -201,6 +216,7 @@ export const nodeTypeDescriptorSchema = z.object({
 export type Workflow = z.infer<typeof workflowSchema>;
 export type ValidationIssue = z.infer<typeof validationIssueSchema>;
 export type NodeSkip = z.infer<typeof nodeSkipSchema>;
+export type Note = z.infer<typeof noteSchema>;
 export type NodeInstance = z.infer<typeof nodeSchema>;
 export type Edge = z.infer<typeof edgeSchema>;
 export type ChatMessage = z.infer<typeof messageSchema>;

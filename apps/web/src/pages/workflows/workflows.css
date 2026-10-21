@@ -194,6 +194,39 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* A sticky note: free text on the canvas, sized by the user (React Flow gives the wrapper its width and height). */
+.note-node {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 180px;
+  min-height: 100px;
+  background: #4a4326;
+  border: 1px solid #8b7d3f;
+  border-radius: 6px;
+  box-shadow: 0 4px 15px #0004;
+}
+.note-node.selected {
+  border-color: #e6d27a;
+}
+.note-node textarea {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 8px 10px;
+  resize: none;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #f5ecc0;
+  font: inherit;
+  font-size: 0.85rem;
+  outline: none;
+}
+.note-node textarea::placeholder {
+  color: #b9ad73;
+}
 /* Links in node config panels ("Edit preset", "Edit" a collection): readable on the dark panel. */
 .config-panel a {
   color: #9fb0ff;

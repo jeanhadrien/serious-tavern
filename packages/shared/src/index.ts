@@ -1,4 +1,5 @@
 export * from './models.js';
+export * from './workflow-notes.js';
 export * from './alternatives.js';
 export * from './app-settings.js';
 export * from './fork.js';

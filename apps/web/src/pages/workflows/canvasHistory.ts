@@ -1,10 +1,13 @@
 import type { Edge } from '@xyflow/react';
+import type { NoteNode } from './canvasNotes.js';
 import type { CanvasNode } from './model.js';
 
 /** The part of the canvas that undo restores: what the draft holds, without selection or React Flow's bookkeeping. */
 export interface CanvasSnapshot {
   nodes: CanvasNode[];
   edges: Edge[];
+  /** The sticky notes; a note keeps its `width` and `height` (a size the user set is part of the draft). */
+  notes: NoteNode[];
 }
 
 export interface History {
@@ -23,11 +26,12 @@ export const GROUP_WINDOW_MS = 1000;
 export const emptyHistory: History = { past: [], future: [] };
 
 /**
- * A snapshot of nodes and edges. Selection, `dragging`, `resizing` and React Flow's measurements belong to the view,
- * not to the draft, so they are left out: undoing never brings back an old selection or a stale size. The rest is
- * shared with the live state, which is never mutated.
+ * A snapshot of nodes, edges and notes. Selection, `dragging`, `resizing` and React Flow's measurements belong to the
+ * view, not to the draft, so they are left out: undoing never brings back an old selection or a stale size (a node's
+ * `width` and `height` too; a note's stay, being the size the user gave it). The rest is shared with the live state,
+ * which is never mutated.
  */
-export function snapshotOf(nodes: CanvasNode[], edges: Edge[]): CanvasSnapshot {
+export function snapshotOf(nodes: CanvasNode[], edges: Edge[], notes: NoteNode[] = []): CanvasSnapshot {
   return {
     nodes: nodes.map((node) => {
       const { selected, dragging, resizing, measured, width, height, ...rest } = node;
@@ -35,6 +39,10 @@ export function snapshotOf(nodes: CanvasNode[], edges: Edge[]): CanvasSnapshot {
     }),
     edges: edges.map((edge) => {
       const { selected, ...rest } = edge;
+      return rest;
+    }),
+    notes: notes.map((note) => {
+      const { selected, dragging, resizing, measured, ...rest } = note;
       return rest;
     }),
   };
@@ -74,22 +82,25 @@ export function redo(history: History, current: CanvasSnapshot): { history: Hist
   };
 }
 
-/** Whether any of the dragged nodes ended somewhere else than where the snapshot had it. */
+/** Whether any of the dragged nodes or notes ended somewhere else than where the snapshot had it. */
 export function nodesMoved(
   start: CanvasSnapshot,
   dragged: readonly { id: string; position: { x: number; y: number } }[],
 ) {
   return dragged.some((node) => {
-    const before = start.nodes.find((item) => item.id === node.id)?.position;
+    const before = [...start.nodes, ...start.notes].find((item) => item.id === node.id)?.position;
     return before !== undefined && (before.x !== node.position.x || before.y !== node.position.y);
   });
 }
 
 /**
- * The nodes of a snapshot for the canvas. They keep the measurements of the live node with the same id, or React
- * Flow would hide them until it measured them again.
+ * The nodes (or notes) of a snapshot for the canvas. They keep the measurements of the live one with the same id, or
+ * React Flow would hide them until it measured them again.
  */
-export function restoreNodes(snapshot: CanvasNode[], live: CanvasNode[]): CanvasNode[] {
+export function restoreNodes<T extends { id: string; measured?: CanvasNode['measured'] }>(
+  snapshot: T[],
+  live: T[],
+): T[] {
   const measured = new Map(live.map((node) => [node.id, node.measured]));
   return snapshot.map((node) => {
     const size = measured.get(node.id);
