@@ -50,6 +50,26 @@
     margin: 0;
     white-space: nowrap;
   }
+  /* A group is a flex item of the strip: its chip and, when open, its buttons share one row. They are laid out
+     inline in the group, because `display: flex` on `details` itself is not reliable across browsers. */
+  .workflow-layout .palette-group {
+    flex-shrink: 0;
+    margin: 0;
+    white-space: nowrap;
+  }
+  .workflow-layout .palette-group > summary {
+    display: inline-block;
+    vertical-align: middle;
+    padding: 6px 10px;
+    border: 1px solid #414757;
+    border-radius: 7px;
+  }
+  .workflow-layout .palette-group-types {
+    display: inline-flex;
+    vertical-align: middle;
+    gap: 6px;
+    margin-left: 6px;
+  }
   .workflow-layout .palette > h3,
   .workflow-layout .palette > .hint,
   .workflow-layout .palette > .port-legend {

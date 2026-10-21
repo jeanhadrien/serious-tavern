@@ -9,6 +9,7 @@
 
 ## Node type lists
 - The palette, the connect picker and quick add list node types in one order, `nodeTypeOrder.ts` (category, then label). Never sort types anywhere else.
+- The palette renders a category with exactly one type as a plain button (a count rule, never a per-category branch) and one with several as a `<details>`. Its open state is one `localStorage` key, `st.palette.open` (JSON map category → boolean, absent means open), read and written only through `paletteOpen.ts`, which guards both.
 
 ## History (undo/redo)
 - Snapshots hold nodes and edges without selection, `dragging`, `resizing` or `measured` (`snapshotOf`). A restore keeps the live nodes' `measured` (`restoreNodes`) so they don't blink out.

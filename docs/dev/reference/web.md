@@ -109,6 +109,12 @@ conversion model (unknown node types become read-only placeholders).
 - **Required inputs.** `WorkflowNode` draws a plain red dot on each input whose resolved `PortDef.required` is true
   (never `requiredIfConnected`). It never changes colour: that an input is unconnected is the engine's validation
   issue, and a client copy of the rule would break "a rule has one home".
+- **Palette.** `NodePalette` renders `groupByCategory` (`nodeTypeOrder.ts`): a category with several types is a native
+  `<details>` (open by default; the folded ones are remembered per browser in `st.palette.open`, `paletteOpen.ts`), a
+  category with exactly one type is a plain button with the category as its caption (a disclosure would cost a click
+  and save nothing; the rule is a count, so it holds as types arrive). The categories are the engine's. On a phone
+  (editor container up to 560px) the palette is a one-row scrolling strip: each group's chip and, when open, its
+  buttons are laid out inline inside the group, since `display: flex` on `details` is not reliable.
 - **Connect picker.** Dropping a connection on empty canvas opens `ConnectPicker` at the drop point. The pure
   `connectCandidates` lists the node types with a port that accepts it (an exact port before one that coerces through
   `canConnect`; no second Chat Input; dynamic types judged by their default ports), in the editor's one type order (`nodeTypeOrder.ts`: category, then label, shared with the palette).

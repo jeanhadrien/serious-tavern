@@ -15,7 +15,9 @@ A chat runs one or more workflows on every message (its **On reply** list, see
 Open the **Workflows** list (left column) and pick a workflow, or **+ New**. The editor opens in the middle column,
 with the chat moved to the right so you can test as you go.
 
-- **Add a node:** drag it from the palette onto the canvas, or click it.
+- **Add a node:** drag it from the palette onto the canvas, or click it. The palette groups nodes by category; click a
+  category's name to fold or unfold it (the browser remembers which). A category with a single node shows that node
+  directly.
 - **Connect:** drag from an output (right side of a node) to an input (left side). An input takes one wire; a new one
   replaces the old. Hover a port to see its type and description. A small red dot after an input's name means the
   node can't run without it. A connection that converts the data (a number into

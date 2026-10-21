@@ -160,6 +160,32 @@ pre {
   margin: 8px 0;
   text-align: left;
 }
+/* One category of node types: a native disclosure whose open state is remembered (`paletteOpen.ts`). */
+.palette-group {
+  margin: 8px 0;
+}
+.palette-group > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 4px 0;
+  font-size: 0.78rem;
+  color: #a8b1c4;
+  user-select: none;
+}
+.palette-group > summary::-webkit-details-marker {
+  display: none;
+}
+.palette-group > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1.2em;
+}
+.palette-group[open] > summary::before {
+  content: "▾";
+}
+.palette-group-types button {
+  margin: 6px 0;
+}
 .config-panel {
   /* Set on .editor-body from the remembered size; the container queries (workflows.css) decide where it applies. */
   width: var(--config-panel-width, 300px);
