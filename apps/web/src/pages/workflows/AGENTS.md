@@ -17,7 +17,7 @@
 ## History (undo/redo)
 - Snapshots hold nodes and edges without selection, `dragging`, `resizing` or `measured` (`snapshotOf`). A restore keeps the live nodes' `measured` (`restoreNodes`) so they don't blink out.
 - The canvas calls `history.record(before?, groupKey?)` right BEFORE it changes nodes or edges. Calls in the same tick count once (one user action may change both); a `groupKey` repeated within a second joins the last step (`config:<nodeId>`); a drag records its start snapshot on drag stop, only if a node moved.
-- Anything new that edits the draft calls `recordStep()` once before applying.
+- Anything new that edits the draft calls `recordStep()` once before applying. Tidy is one `record()`, then `setNodes` with every new position: never one step per node.
 - `load`/`clear` reset the history (so Revert does); saving doesn't.
 - Edges pruned by dynamic ports are not recorded: that code uses the raw setters, never `record`. Undo and redo set nodes and edges directly, never through `onNodesChange`/`onEdgesChange` (that would record).
 

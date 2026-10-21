@@ -123,8 +123,12 @@ conversion model (unknown node types become read-only placeholders).
   second Chat Input; `filterCandidates` is still the one matching rule): `useConnectPicker.openAt(screenPoint)` is
   opened by a double-click on the pane itself (`zoomOnDoubleClick` is off) and by the `/` area shortcut, and `pick` then
   adds the node with no edge.
+- **Tidy.** The canvas panel's button runs the pure `tidyLayout` (`@dagrejs/dagre`, left to right, ranks from the edges
+  only: dagre ignores which port an edge uses, so crossings inside a rank are possible) over every node, with sizes from
+  `node.measured` (a fallback for unmeasured ones; unknown-type placeholders are laid out like any node), then calls
+  `fitView`. One `recordStep`, no confirmation: it is a draft edit and undo is the way back.
 - **History** (`canvasHistory.ts` pure, `useCanvasHistory`): up to 100 snapshots of nodes and edges (without
-  selection or measurements). A step is an add, a removal, a connection, a drag that moved something, or a config
+  selection or measurements). A step is an add, a removal, a connection, a drag that moved something, a Tidy, or a config
   change (changes to one node's config less than a second apart are one step). Selection, name, chat settings and
   pruned edges are not steps. Opening another workflow, Revert and closing reset it; saving doesn't. Dirty is computed
   from the canvas, so undoing back to the saved state reads as clean.

@@ -30,8 +30,10 @@ with the chat moved to the right so you can test as you go.
   to pick, Escape to close). The new node comes already connected.
 - **Configure:** select a node to open its settings panel. Fields that accept templates (`{{...}}`) list the available
   variables; see [templating](TEMPLATING.md).
+- **Tidy:** the canvas's **Tidy** button lays all the nodes out left to right, following the wires, and fits the view.
+  Nodes with no wire are stacked in the first column, under the wired ones. It is a single undo step, so Ctrl/Cmd+Z puts everything back.
 - **Undo and redo:** **Ctrl/Cmd+Z** and **Ctrl/Cmd+Shift+Z** (or **Ctrl/Cmd+Y**), or the toolbar buttons, up to 100
-  steps: adding, removing, connecting, moving and configuring nodes (typing in one field counts as one step). Opening
+  steps: adding, removing, connecting, moving, tidying and configuring nodes (typing in one field counts as one step). Opening
   another workflow or reverting clears the history; saving doesn't.
 - **Copy and paste:** **Ctrl/Cmd+C** copies the selected nodes and the wires between them; **Ctrl/Cmd+V** pastes them,
   also into another workflow or another browser tab. A second Chat Input is not pasted (a workflow has one).

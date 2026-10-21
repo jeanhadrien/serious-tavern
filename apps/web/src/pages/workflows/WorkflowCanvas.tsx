@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { ReactFlow, Background, Controls, Panel, useNodesInitialized, useReactFlow } from '@xyflow/react';
-import { Redo2, Trash2, Undo2 } from 'lucide-react';
+import { Network, Redo2, Trash2, Undo2 } from 'lucide-react';
 import { IconButton } from '../../components/IconButton.js';
 import { checkConnection } from '../../connection.js';
 import { useMediaQuery } from '../../useMediaQuery.js';
@@ -71,6 +71,7 @@ export function WorkflowCanvas({ canvas }: { canvas: ReturnType<typeof useWorkfl
         <Panel position="top-right" className="canvas-actions">
           <IconButton icon={Undo2} label="Undo" disabled={!canvas.canUndo} onClick={() => canvas.undo()} />
           <IconButton icon={Redo2} label="Redo" disabled={!canvas.canRedo} onClick={() => canvas.redo()} />
+          <IconButton icon={Network} label="Tidy" disabled={!canvas.nodes.length} onClick={canvas.tidy} />
           {canvas.hasSelection && (
             <IconButton
               icon={Trash2}

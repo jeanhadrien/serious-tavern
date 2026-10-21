@@ -16,6 +16,7 @@ import { checkConnection } from '../../connection.js';
 import { withDisplayNames, workflowToCanvas, type CanvasNode } from './model.js';
 import { useCanvasClipboard } from './useCanvasClipboard.js';
 import { useCanvasHistory } from './useCanvasHistory.js';
+import { FALLBACK_NODE_SIZE, tidyLayout } from './tidyLayout.js';
 import { useConnectPicker } from './useConnectPicker.js';
 import { useDynamicPorts } from './useDynamicPorts.js';
 
@@ -43,7 +44,7 @@ export function useWorkflowCanvas(
       setSelected((prev) => (prev && restored.some((node) => node.id === prev) ? prev : undefined)),
   });
   const canvasRef = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition, deleteElements } = useReactFlow();
+  const { screenToFlowPosition, deleteElements, fitView } = useReactFlow();
   const visibleEdges = useMemo(
     () =>
       edges.map((edge) => {
@@ -205,6 +206,27 @@ export function useWorkflowCanvas(
     const descriptor = types.find((item) => item.type === type);
     if (descriptor) addNode(descriptor, screenToFlowPosition({ x: event.clientX, y: event.clientY }));
   };
+  // Tidy: every node gets a new position in one undo step, then the view fits the result.
+  const tidy = () => {
+    if (!nodes.length) return;
+    const positions = tidyLayout(
+      nodes.map((node) => ({
+        id: node.id,
+        width: node.measured?.width ?? FALLBACK_NODE_SIZE.width,
+        height: node.measured?.height ?? FALLBACK_NODE_SIZE.height,
+      })),
+      edges,
+    );
+    record();
+    setNodes((prev) =>
+      prev.map((node) => {
+        const position = positions.get(node.id);
+        return position ? { ...node, position } : node;
+      }),
+    );
+    // The fit has to wait until React Flow has the new positions.
+    requestAnimationFrame(() => void fitView({ duration: 200 }));
+  };
   // The selection as an on-screen action, for touch screens where the Delete key is out of reach. It goes through
   // the same change handlers as the key, so a removed node takes its edges with it.
   const selectedNodes = nodes.filter((node) => node.selected);
@@ -252,6 +274,7 @@ export function useWorkflowCanvas(
     trackPointer,
     forgetPointer,
     addAtCenter,
+    tidy,
     onDrop,
     updateConfig,
     hasSelection,
