@@ -3,7 +3,8 @@
 The LLM node that runs the loop has its own notes in `../nodes/llm/AGENTS.md`. Reference: `docs/dev/reference/engine.md` ("The LLM node").
 
 ## Tools
-- Tools are engine code generated from the node's settings (`tools.read`/`tools.write` state targets), never user-written. A tool is `EngineTool { definition, run(args, ctx) }`; `run` checks its own arguments and throws plain messages.
+- Tools are engine code generated from the node's settings (`tools.read`/`tools.write` state targets), never user-written.
+- **A writable key is always readable:** `read_state` offers `tools.read` plus every `tools.write` key, so the model never writes a value it cannot see. Never offer a write tool without its key in `read_state`. A tool is `EngineTool { definition, run(args, ctx) }`; `run` checks its own arguments and throws plain messages.
 - **Write tools go through State Write's `planWrite`**, never a copy of its rules (`reset` is `delete`, mapped before `checkOp`). They plan against `ctx.pendingState()`, buffer through `ctx.writeState`, and answer with the key's value from `ctx.pendingState()`.
 - Tool schemas are hand-built and flat per key type (`state-schemas.ts`); the value rules belong to `planWrite`/`collectionItem` only.
 - Item handles (`#1`, ...) are per loop: a new tool that shows collection items goes through the same `ItemHandles`.

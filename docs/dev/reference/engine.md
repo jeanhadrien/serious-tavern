@@ -169,7 +169,8 @@ sequence, then run the loop. The preset preview shows the unmerged, unflattened 
 - **Repair** drops tool messages and calls without a counterpart, and logs a non-zero count.
 
 **Tools.** `tools.read` lists keys the model may read through one `read_state` tool (key names as an enum);
-`tools.write` gets one `write_<definition>_<key>` tool per key (cut at 64 characters, repeats numbered). Schemas are
+`tools.write` gets one `write_<definition>_<key>` tool per key (cut at 64 characters, repeats numbered). A writable key
+is always readable too: `read_state` offers the union of both lists. Schemas are
 generated from the definitions:
 
 | Key type | Write tool arguments |

@@ -36,9 +36,13 @@ describe('which tools exist', () => {
       'write_scene_tension',
       'write_scene_mood',
     ]);
-    expect((await toolsFor([], [target('tension')])).tools.map((tool) => tool.definition.function.name)).toEqual([
-      'write_scene_tension',
-    ]);
+    expect(parametersOf(tools[0]).properties.keys.items.enum).toEqual(['scene.tension', 'scene.mood']);
+  });
+
+  it('makes a writable key readable, even when the read list leaves it out', async () => {
+    const { tools, call } = await toolsFor([], [target('tension')]);
+    expect(tools.map((tool) => tool.definition.function.name)).toEqual(['read_state', 'write_scene_tension']);
+    expect(await call('read_state', { keys: ['scene.tension'] })).toEqual({ 'scene.tension': 3 });
   });
 
   it('lists a key once, and leaves out unknown definitions and keys with a log line', async () => {
@@ -85,7 +89,7 @@ describe('which tools exist', () => {
     const context = toolContext();
     const run = { ...context.ctx, state: { ...context.ctx.state, definition: () => wide } };
     const tools = await buildStateTools(run, { read: [], write: Object.keys(keys).map((key) => target(key)) });
-    const names = tools.map((tool) => tool.definition.function.name);
+    const names = tools.map((tool) => tool.definition.function.name).filter((name) => name !== 'read_state');
     expect(new Set(names).size).toBe(2);
     expect(names.every((name) => name.length <= 64)).toBe(true);
   });

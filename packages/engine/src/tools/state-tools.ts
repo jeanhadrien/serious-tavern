@@ -128,8 +128,8 @@ async function locateAll(ctx: ExecutionContext, targets: readonly StateTarget[],
 
 /**
  * The state tools of an LLM node, generated from its settings: `read_state` for the keys it may read and one
- * `write_<definition>_<key>` for each key it may write. Handles for collection items are per call of this function,
- * so per tool loop.
+ * `write_<definition>_<key>` for each key it may write. A writable key is always readable too, so the model never
+ * changes a value it cannot see. Handles for collection items are per call of this function, so per tool loop.
  */
 export async function buildStateTools(
   ctx: ExecutionContext,
@@ -138,6 +138,7 @@ export async function buildStateTools(
   const handles = new ItemHandles();
   const readable = await locateAll(ctx, config.read, 'read');
   const writable = await locateAll(ctx, config.write, 'write');
+  for (const found of writable) if (!readable.some((other) => other.label === found.label)) readable.push(found);
   const taken = new Set([READ_TOOL]);
   const writes = writable.map((found) => {
     const name = uniqueToolName(`write_${found.definition.name}_${found.key}`, taken);
