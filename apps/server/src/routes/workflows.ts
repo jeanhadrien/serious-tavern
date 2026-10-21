@@ -33,7 +33,16 @@ export function registerWorkflows(app: FastifyInstance, context: AppContext) {
     const body = apiContract.updateWorkflow.body.parse(request.body);
     const existing = await requireEntity(workflows, id, 'Workflow');
     const pruned = await pruneInvalidEdges({ ...existing, ...body }, nodeResources(context));
-    const workflow = await workflows.update(id, (old) => ({ ...old, ...body, edges: pruned.edges, updatedAt: now() }));
+    // The body is passthrough, so it may carry any key: `id` and `createdAt` are pinned. Spreading `old` first keeps
+    // unknown fields from newer versions (migrate-on-write).
+    const workflow = await workflows.update(id, (old) => ({
+      ...old,
+      ...body,
+      id,
+      createdAt: old.createdAt,
+      edges: pruned.edges,
+      updatedAt: now(),
+    }));
     if (!workflow) throw notFound('Workflow');
     return workflow;
   });
