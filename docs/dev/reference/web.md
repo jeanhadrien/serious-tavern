@@ -106,6 +106,9 @@ conversion model (unknown node types become read-only placeholders).
   changes and when resources change (definitions included), ignores stale answers, refreshes React Flow's handle
   geometry, and prunes edges to ports that disappeared (with the raw setters, so the history doesn't record it). A
   failing resolution toasts once per node and restores the type's static ports; a node not set up yet toasts nothing.
+- **Required inputs.** `WorkflowNode` draws a plain red dot on each input whose resolved `PortDef.required` is true
+  (never `requiredIfConnected`). It never changes colour: that an input is unconnected is the engine's validation
+  issue, and a client copy of the rule would break "a rule has one home".
 - **Connect picker.** Dropping a connection on empty canvas opens `ConnectPicker` at the drop point. The pure
   `connectCandidates` lists the node types with a port that accepts it (an exact port before one that coerces through
   `canConnect`; no second Chat Input; dynamic types judged by their default ports), ordered by category then label.

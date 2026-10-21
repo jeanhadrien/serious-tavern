@@ -320,6 +320,15 @@ pre {
   color: #a8b1c4;
   margin: 0 5px;
 }
+/* An input that must be connected for the node to run (`required`, not `requiredIfConnected`). */
+.required-dot {
+  width: 5px;
+  height: 5px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: #ef8186;
+  flex-shrink: 0;
+}
 .react-flow__handle.invalid-handle {
   opacity: 0.45;
   border: 2px solid #ef8186;

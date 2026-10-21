@@ -17,7 +17,8 @@ with the chat moved to the right so you can test as you go.
 
 - **Add a node:** drag it from the palette onto the canvas, or click it.
 - **Connect:** drag from an output (right side of a node) to an input (left side). An input takes one wire; a new one
-  replaces the old. Hover a port to see its type and description. A connection that converts the data (a number into
+  replaces the old. Hover a port to see its type and description. A small red dot after an input's name means the
+  node can't run without it. A connection that converts the data (a number into
   text) is dashed; one that can't work is refused, and a saved one that no longer fits is drawn red until you fix it.
 - **Drop a wire on empty canvas** to get a short list of the nodes that can take it (type to filter, arrows and Enter
   to pick, Escape to close). The new node comes already connected.

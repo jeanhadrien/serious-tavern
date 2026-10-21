@@ -24,7 +24,7 @@ export function WorkflowNode({ id, data, selected }: NodeProps<CanvasNode>) {
     return !(type === 'target' ? canConnect(startPort, port) : canConnect(port, startPort)).ok;
   };
   const tooltip = (port: PortDef) =>
-    `${port.label} (${port.dataType})${port.description ? ` — ${port.description}` : ''}`;
+    `${port.label} (${port.dataType}${port.required ? ', required' : ''})${port.description ? ` — ${port.description}` : ''}`;
   return (
     <div className={`flow-node ${selected ? 'selected' : ''} ${data.unknown ? 'unknown-node' : ''}`}>
       <div className="flow-header">
@@ -43,6 +43,8 @@ export function WorkflowNode({ id, data, selected }: NodeProps<CanvasNode>) {
               style={{ top: '50%', background: invalid ? '#ef8186' : portColors[port.dataType] }}
             />
             {port.label}
+            {/* A plain marker: whether the input is connected is the validation's business, not the dot's. */}
+            {port.required && <i className="required-dot" aria-hidden="true" />}
             <span className="port-type">{port.dataType}</span>
           </div>
         );
