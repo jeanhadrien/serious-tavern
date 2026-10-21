@@ -67,6 +67,14 @@ describe('previewWrite', () => {
     expect(previewWrite(add({ id: 'e:n:1', text: LONG })).truncated).toBe(true);
   });
 
+  it('cuts the long text of an item update and never its item id', () => {
+    const update: StateWrite = { op: 'update', target, nodeId: 'w', itemId: LONG, text: LONG };
+    expect(previewWrite(update)).toEqual({
+      write: { ...update, text: 'x'.repeat(WRITE_PREVIEW_LIMIT) },
+      truncated: true,
+    });
+  });
+
   it('does not change the stored write', () => {
     const write = set(LONG);
     previewWrite(write);

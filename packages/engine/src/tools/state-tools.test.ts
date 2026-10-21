@@ -148,7 +148,7 @@ describe('the schemas', () => {
     expect(parametersOf(tool)).toMatchObject({
       type: 'object',
       properties: {
-        op: { enum: ['add', 'remove', 'reset'] },
+        op: { enum: ['add', 'remove', 'reset', 'update'] },
         text: { type: 'string' },
         handle: { type: 'string' },
         level: { type: 'number' },
@@ -205,7 +205,7 @@ describe('write tools follow State Write', () => {
     await expect(call('write_scene_data', { op: 'append', value: 'x' })).rejects.toThrow(
       '"op" must be one of: set, reset',
     );
-    await expect(call('write_scene_log', { op: 'set', value: 'x' })).rejects.toThrow('add, remove, reset');
+    await expect(call('write_scene_log', { op: 'set', value: 'x' })).rejects.toThrow('add, remove, reset, update');
   });
 
   it('adds an item with its declared fields and logs the fields it leaves out', async () => {
@@ -288,6 +288,55 @@ describe('text edits', () => {
     await call('write_scene_note', { op: 'append', value: 'Day 1' });
     run.commit('llm', 1);
     expect(run.finish()).toMatchObject([{ op: 'set', value: 'none\nDay 1' }]);
+  });
+});
+
+describe('item updates', () => {
+  it('gives an item new text in place, keeping its id, fields and place', async () => {
+    const { call, logs } = await toolsFor([], [target('log')]);
+    await call('write_scene_log', { op: 'add', text: 'A storm', level: 2 });
+    await call('write_scene_log', { op: 'add', text: 'A calm' });
+    const items = (await call('write_scene_log', { op: 'update', handle: '#1', text: 'A great storm' })) as any[];
+    expect(items).toEqual([
+      { handle: '#2', text: 'A calm' },
+      { handle: '#1', text: 'A great storm', level: 2 },
+    ]);
+    expect(logs.at(-1)).toBe('scene.log: A storm -> A great storm');
+  });
+
+  it('refuses fields, a missing text, an unknown handle and an item removed meanwhile', async () => {
+    const { call } = await toolsFor([], [target('log')]);
+    await call('write_scene_log', { op: 'add', text: 'A storm', level: 2 });
+    await expect(call('write_scene_log', { op: 'update', handle: '#1', text: 'x', level: 3 })).rejects.toThrow(
+      "update changes only an item's text; leave out level",
+    );
+    await expect(call('write_scene_log', { op: 'update', handle: '#1' })).rejects.toThrow('needs the new text');
+    await expect(call('write_scene_log', { op: 'update', handle: '#9', text: 'x' })).rejects.toThrow(
+      'No item has the handle "#9"',
+    );
+    await expect(call('write_scene_log', { op: 'update', text: 'x' })).rejects.toThrow(
+      '"handle" must be the handle of the item to update',
+    );
+    await call('write_scene_log', { op: 'remove', handle: '#1' });
+    await expect(call('write_scene_log', { op: 'update', handle: '#1', text: 'x' })).rejects.toThrow(
+      'scene.log no longer holds that item',
+    );
+  });
+
+  it('stores an update of the item id with the new text', async () => {
+    const { call, run } = await toolsFor([], [target('log')]);
+    await call('write_scene_log', { op: 'add', text: 'A storm' });
+    await call('write_scene_log', { op: 'update', handle: '#1', text: 'A great storm' });
+    run.commit('llm', 1);
+    const [added, updated] = run.finish();
+    expect(added).toMatchObject({ op: 'add', item: { text: 'A storm' } });
+    expect(updated).toEqual({
+      op: 'update',
+      target: { kind: 'definition', definitionId: scene.id, key: 'log' },
+      nodeId: 'llm',
+      itemId: added?.op === 'add' ? added.item.id : '',
+      text: 'A great storm',
+    });
   });
 });
 

@@ -1,6 +1,6 @@
 import { isPlainObject, keyDefault, type ToolDefinition } from '@st/shared';
 import { locateConfigured } from '../nodes/state-key.js';
-import { planWrite } from '../nodes/state-write/plan.js';
+import { planUpdate, planWrite } from '../nodes/state-write/plan.js';
 import type { ExecutionContext, StateAccess } from '../types.js';
 import { ItemHandles } from './handles.js';
 import { uniqueToolName } from './names.js';
@@ -85,6 +85,15 @@ function editedText(op: 'replace' | 'append', args: Record<string, unknown>, cur
   return current.replace(old, () => value);
 }
 
+/** The id of the item a `handle` argument names, for `op` (update or remove). */
+function itemIdOf(handle: unknown, handles: ItemHandles, op: string): string {
+  if (typeof handle !== 'string' || !handle.trim())
+    throw new Error(`"handle" must be the handle of the item to ${op}, like #1, as read_state shows it`);
+  const id = handles.idOf(handle);
+  if (id === undefined) throw new Error(`No item has the handle "${handle}". Read the key to see the handles.`);
+  return id;
+}
+
 /** What the write is about (the value, the new item or the item to remove), ready for `planWrite`. */
 function writeValue(args: Record<string, unknown>, op: string, handles: ItemHandles, current: unknown): unknown {
   if (isTextEdit(op)) return editedText(op, args, typeof current === 'string' ? current : '');
@@ -92,15 +101,20 @@ function writeValue(args: Record<string, unknown>, op: string, handles: ItemHand
     const { op: _op, handle: _handle, ...item } = args;
     return item;
   }
-  if (op !== 'remove') return args.value;
-  if (typeof args.handle !== 'string' || !args.handle.trim())
-    throw new Error('"handle" must be the handle of the item to remove, like #1, as read_state shows it');
-  const id = handles.idOf(args.handle);
-  if (id === undefined) throw new Error(`No item has the handle "${args.handle}". Read the key to see the handles.`);
-  return id;
+  return op === 'remove' ? itemIdOf(args.handle, handles, op) : args.value;
 }
 
-/** One write tool. It plans the write with State Write's own rules (`planWrite`), so the two never disagree. */
+/** An item's `update`: its new text only. Its fields and link are not the model's to change. */
+function updatePlan(found: ToolKey, args: Record<string, unknown>, handles: ItemHandles, current: unknown) {
+  const extra = Object.keys(args).filter((name) => !['op', 'handle', 'text'].includes(name));
+  if (extra.length) throw new Error(`update changes only an item's text; leave out ${extra.join(', ')}`);
+  return planUpdate(found, itemIdOf(args.handle, handles, 'update'), args.text, current);
+}
+
+/**
+ * One write tool. It plans the write with State Write's own rules (`planWrite`, or `planUpdate` beside it), so the two
+ * never disagree.
+ */
 function writeTool(found: ToolKey, name: string, handles: ItemHandles): EngineTool {
   const description = `Changes ${keySummary(found)}`;
   return {
@@ -108,12 +122,15 @@ function writeTool(found: ToolKey, name: string, handles: ItemHandles): EngineTo
     async run(args, ctx) {
       const op = operation(found, args.op);
       const current = ctx.pendingState().read(found.definition.id, found.key)?.value;
-      const plan = planWrite(found, stateOpOf(op), {
-        // An increment without an amount adds 1, like State Write.
-        connected: args.value !== undefined,
-        value: writeValue(args, op, handles, current ?? keyDefault(found.def)),
-        current,
-      });
+      const plan =
+        op === 'update'
+          ? updatePlan(found, args, handles, current)
+          : planWrite(found, stateOpOf(op), {
+              // An increment without an amount adds 1, like State Write.
+              connected: args.value !== undefined,
+              value: writeValue(args, op, handles, current ?? keyDefault(found.def)),
+              current,
+            });
       for (const line of plan.logs) ctx.log(line);
       // Only a removal of an item that is already gone has no request.
       if (!plan.request) throw new Error(plan.logs[0] ?? 'Nothing was changed');

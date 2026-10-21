@@ -28,6 +28,13 @@ export const removeWrite = (key: string, itemId: string, definitionId = DEF): St
   nodeId: 'writer',
   itemId,
 });
+export const updateWrite = (key: string, itemId: string, text: string, definitionId = DEF): StateWrite => ({
+  op: 'update',
+  target: target(key, definitionId),
+  nodeId: 'writer',
+  itemId,
+  text,
+});
 export const deleteWrite = (key: string, definitionId = DEF): StateWrite => ({
   op: 'delete',
   target: target(key, definitionId),

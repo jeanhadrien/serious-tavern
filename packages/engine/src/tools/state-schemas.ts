@@ -9,11 +9,11 @@ const TEXT_EDITS = ['replace', 'append'];
 
 /**
  * The operations a write tool offers for a key type: State Write's, with `delete` called `reset` for the model, plus
- * the tool-only text edits.
+ * the tool-only ones: the text edits, and a collection item's `update` (planned by `planUpdate`).
  */
 export const writeOps = (def: StateKeyDef): string[] => [
   ...stateOpsFor(def.type).map((op) => (op === 'delete' ? 'reset' : op)),
-  ...(def.type === 'text' ? TEXT_EDITS : []),
+  ...(def.type === 'text' ? TEXT_EDITS : def.type === 'collection' ? ['update'] : []),
 ];
 
 /** Whether a tool's `op` word is a text edit, which the tool turns into a whole new text. */
@@ -78,11 +78,13 @@ export function writeParameters({ def }: ToolKey): Record<string, unknown> {
       return {
         type: 'object',
         properties: {
-          op: op(`add stores a new item, remove deletes one by its handle. reset empties the list.`),
-          text: { type: 'string', description: 'The text of the item to add.' },
+          op: op(
+            `add stores a new item, update gives an item new text by its handle (its fields stay), remove deletes one by its handle. reset empties the list.`,
+          ),
+          text: { type: 'string', description: 'The text of the item to add, or the new text of the item to update.' },
           handle: {
             type: 'string',
-            description: 'The handle of the item to remove (like #1), as read_state shows it.',
+            description: 'The handle of the item to update or remove (like #1), as read_state shows it.',
           },
           ...Object.fromEntries(
             fields.map(([name, type]) => [name, { type, description: `Field of the item to add.` }]),

@@ -35,6 +35,10 @@ function replayItems(writes: Accepted[], upTo = Number.POSITIVE_INFINITY): Item[
   for (const { turn, write } of writes) {
     if (turn > upTo) break;
     if (write.op === 'add') items = [...items, { item: write.item, turn }];
+    if (write.op === 'update')
+      items = items.map((entry) =>
+        entry.item.id === write.itemId ? { ...entry, item: { ...entry.item, text: write.text } } : entry,
+      );
     if (write.op === 'remove') items = items.filter((entry) => entry.item.id !== write.itemId);
     if (write.op === 'delete') items = [];
   }
@@ -111,7 +115,8 @@ export function oracleFold(
         (w) => w.target.kind === 'definition' && w.target.definitionId === definition.id && w.target.key === key,
       );
       const isList = def.type === 'collection' || def.type === 'thread';
-      const suits = (w: StateWrite) => (isList ? w.op !== 'set' : w.op === 'set' || w.op === 'delete');
+      const suits = (w: StateWrite) =>
+        isList ? w.op !== 'set' && !(def.type === 'thread' && w.op === 'update') : w.op === 'set' || w.op === 'delete';
       const accepted = mine.filter(({ write }) => suits(write));
       const expected =
         def.type === 'collection' || def.type === 'thread'

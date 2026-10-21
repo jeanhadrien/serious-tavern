@@ -12,6 +12,7 @@ import {
   nodeSetWrite,
   removeWrite,
   turnEntry,
+  updateWrite,
   valueAt,
 } from './test-fixtures.js';
 import type { TurnEntry } from './writes.js';
@@ -230,5 +231,53 @@ describe('linked items', () => {
     ]);
     expect(idsOf(story, 'log')).toEqual(['s3', 's2']);
     expect(keyOf(story, 'log').itemTurns).toEqual([2, 1]);
+  });
+});
+
+describe('item updates', () => {
+  const add = (id: string, extra: Record<string, unknown> = {}) => addWrite('log', item(id, id, extra));
+
+  it('change the text in place, keeping the id, fields, link, place and turn', () => {
+    const messages = { ids: ['m1'], fingerprint: 'f' };
+    const story = foldTurns([
+      turnEntry('a', [add('1', { level: 2, messages }), add('2')]),
+      turnEntry('b', [updateWrite('log', '1', 'one, again')]),
+    ]);
+    expect(valueAt(story, 'log')).toEqual([
+      { id: '2', text: '2' },
+      { id: '1', text: 'one, again', level: 2, messages },
+    ]);
+    expect(keyOf(story, 'log').itemTurns).toEqual([1, 1]);
+    expect(keyOf(story, 'log').meta).toMatchObject({ writtenAtTurn: 2, count: 2 });
+  });
+
+  it('live and die with their turn, and the last present one wins', () => {
+    const turns = [
+      turnEntry('a', [add('1')]),
+      turnEntry('b', [updateWrite('log', '1', 'b')]),
+      turnEntry('c', [updateWrite('log', '1', 'c')]),
+    ];
+    const textOf = (gone: string[]) => (valueAt(foldTurns(turns, { gone }), 'log') as { text: string }[])[0]?.text;
+    expect(textOf([])).toBe('c');
+    expect(textOf(['c'])).toBe('b');
+    expect(textOf(['b', 'c'])).toBe('1');
+    expect(textOf(['a'])).toBeUndefined();
+  });
+
+  it('do nothing to an item that is gone', () => {
+    const story = foldTurns([
+      turnEntry('a', [add('1'), removeWrite('log', '1')]),
+      turnEntry('b', [updateWrite('log', '1', 'back?'), updateWrite('log', 'zz', 'never')]),
+    ]);
+    expect(valueAt(story, 'log')).toEqual([]);
+  });
+
+  it('are ignored on a thread key, whose text is its exchange', () => {
+    const threaded = definition('scene', { log: { type: 'thread' } });
+    const story = foldTurns([turnEntry('a', [add('1'), updateWrite('log', '1', 'rewritten')])], { defs: [threaded] });
+    expect(valueAt(story, 'log')).toEqual([{ id: '1', text: '1' }]);
+    expect(story.definitions[0]!.warnings[0]?.message).toBe(
+      '1 stored write was made for another key type and is ignored',
+    );
   });
 });

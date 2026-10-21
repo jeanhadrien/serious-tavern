@@ -100,7 +100,7 @@ export type FoldInput = {
  * - A value is what the most recent present turn that wrote the key left in it (`delete` leaves the
  *   default); a key no present turn wrote reads as its default.
  * - A collection holds the items added by present turns minus those removed by present turns, newest
- *   first, cut to its `cap`.
+ *   first, cut to its `cap`. An item reads with the text of its last present update (never a thread's item).
  * - A stored value that doesn't fit the current definition reads as the default, with a warning. Writes for
  *   a key the definition no longer has, or for another key type, are ignored (and reported); writes for a
  *   definition that no longer exists are ignored silently. Restoring the definition brings them back.

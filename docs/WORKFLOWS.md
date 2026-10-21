@@ -126,7 +126,8 @@ included, for a [thread key](STATE-AND-LORE.md#thread-keys)).
   never changes a value it cannot see. Nothing is offered unless you list it. A key whose definition or key was
   deleted shows as unknown and is left out.
 - A text key can also be edited in place: the model replaces one passage (it must appear exactly once) or appends a
-  line, without rewriting the whole text.
+  line, without rewriting the whole text. An item of a collection can be rewritten in place: it keeps its fields, its
+  place in the list and its link to messages, so a corrected summary still points at what it summarizes.
 - A write follows the same rules as a State Write node (bounds, enum options, declared fields), and counts only if the
   node finishes, like all story state. The model sees its own writes when it reads again; other nodes and templates see
   them from the next turn.

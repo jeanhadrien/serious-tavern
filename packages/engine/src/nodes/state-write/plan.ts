@@ -171,6 +171,24 @@ function planThread(found: LocatedKey, op: StateNodeOp, ctx: Inputs): WritePlan 
 }
 
 /**
+ * A collection item's new text: what the LLM node's write tools do for `update` (State Write has no such op). The item
+ * keeps its id, fields and link. Pure; throws plain errors like `planWrite`.
+ */
+export function planUpdate(found: LocatedKey, itemId: string, text: unknown, current: unknown): WritePlan {
+  const { label } = found;
+  if (found.def.type !== 'collection') throw new Error(`${label} is not a collection; only items can be updated`);
+  if (typeof text !== 'string') throw new Error(`${label} needs the new text of the item, got ${describeValue(text)}`);
+  const held = Array.isArray(current) ? current : [];
+  const item = held.find((candidate) => isPlainObject(candidate) && candidate.id === itemId);
+  if (!item) throw new Error(`${label} no longer holds that item`);
+  return {
+    request: { target: keyOf(found), op: 'update', itemId, text },
+    output: { ...structuredClone(item), text },
+    logs: [`${label}: ${shown(item.text, 80)} -> ${shown(text, 80)}`],
+  };
+}
+
+/**
  * Decides what a State Write does with its input, from the key's definition and the value it had when the
  * turn started. Pure. Throws plain errors that name the key and what was received.
  */

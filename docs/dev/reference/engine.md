@@ -179,9 +179,11 @@ generated from the definitions:
 | boolean, object | `{ op?: set \| reset, value }` |
 | enum | the same, options as a JSON Schema `enum` |
 | text | `{ op?: set \| reset \| replace \| append, value, old }` |
-| collection | `{ op: add \| remove \| reset, text, handle, ...declared fields }` |
+| collection | `{ op: add \| remove \| reset \| update, text, handle, ...declared fields }` |
 
-`reset` is State Write's `delete`. `replace` and `append` exist only as tools: `replace` changes `old` (it must appear
+`reset` is State Write's `delete`. `update` gives the item at `handle` a new `text` and refuses any other argument
+(fields and link stay); `planUpdate` plans it and it is stored as the fold's `update` write. `replace` and `append`
+exist only as tools too: `replace` changes `old` (it must appear
 exactly once, else the call fails and says how often it matched) into `value`, and `append` adds `value` on a new line.
 The tool computes the whole new text from the pending value and plans it as a `set`, so the stored write is an ordinary
 post-value. A write tool goes through State Write's own rules, so a refused value comes back in

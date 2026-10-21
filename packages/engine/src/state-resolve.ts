@@ -93,6 +93,13 @@ export function resolveWrites(
       case 'add':
         writes.push({ op: 'add', target: to, nodeId, item: request.item });
         break;
+      case 'update':
+        if (def.type !== 'collection') {
+          warnings.push(`A state write to "${label(found)}" was skipped: only a collection's items can be updated.`);
+          break;
+        }
+        writes.push({ op: 'update', target: to, nodeId, itemId: request.itemId, text: request.text });
+        break;
       case 'remove':
         writes.push({ op: 'remove', target: to, nodeId, itemId: request.itemId });
         break;

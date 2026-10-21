@@ -51,7 +51,9 @@ export type StateWriteRequest =
   | { target: StateWriteTarget; op: 'add'; item: { text: string } & Record<string, unknown> }
   | { target: StateWriteTarget; op: 'remove'; itemId: string }
   | { target: StateWriteTarget; op: 'delete' }
-  | { target: Extract<StateWriteTarget, { kind: 'definition' }>; op: 'increment'; by: number };
+  | { target: Extract<StateWriteTarget, { kind: 'definition' }>; op: 'increment'; by: number }
+  // A collection item's new text (the LLM node's write tools only; never a thread's item).
+  | { target: Extract<StateWriteTarget, { kind: 'definition' }>; op: 'update'; itemId: string; text: string };
 // Read access to the story state as it was when the turn started. Writes made during the run are never
 // visible here.
 export type StateAccess = {

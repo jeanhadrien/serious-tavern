@@ -57,12 +57,17 @@ function foldScalar(
   };
 }
 
-// The items a collection holds after replaying add, remove and delete writes in order: the items added by
-// present turns minus the ones removed by present turns. Oldest first.
+// The items a collection holds after replaying add, update, remove and delete writes in order: the items added by
+// present turns minus the ones removed by present turns, with the text of their last update. An update keeps the
+// item's id, fields, link, place and turn. Oldest first.
 function replay(writes: readonly SlotWrite[], cap: number | undefined, history: HistoryPoint[]) {
   let items: { item: CollectionItem; turn: number }[] = [];
   for (const { turn, write } of writes) {
     if (write.op === 'add') items.push({ item: write.item, turn });
+    else if (write.op === 'update')
+      items = items.map((entry) =>
+        entry.item.id === write.itemId ? { ...entry, item: { ...entry.item, text: write.text } } : entry,
+      );
     else if (write.op === 'remove') items = items.filter(({ item }) => item.id !== write.itemId);
     else if (write.op === 'delete') items = [];
     else continue;
@@ -84,8 +89,11 @@ function foldCollection(writes: readonly SlotWrite[], cap: number | undefined, t
   };
 }
 
+// A thread item's text is always its exchange's (`exchangeText`), so a thread never takes an `update`.
 const suits = (def: StateKeyDef, write: StateWrite) =>
-  isListKeyType(def.type) ? write.op !== 'set' : write.op === 'set' || write.op === 'delete';
+  isListKeyType(def.type)
+    ? write.op !== 'set' && !(def.type === 'thread' && write.op === 'update')
+    : write.op === 'set' || write.op === 'delete';
 
 /**
  * One key of a definition, folded against the CURRENT definition. Writes that don't suit the key's type
