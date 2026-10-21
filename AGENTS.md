@@ -1,9 +1,9 @@
-# AGENTS.md — notes for AI agents working on this repo
+# AGENTS.md 
 
-This file holds what applies to every task. Each area of the code has its own `AGENTS.md` with the contracts of that area.
+This file holds what applies to every task. Each area of the code has its own `AGENTS.md` with the contracts of that area. You are responsible to update them when making modifications. 
 
 ## Before you start
-- `PLAN.md` is the vision. `docs/dev/ARCHITECTURE.md` is the overview of the code; `docs/dev/reference/` explains each area in detail (read the file for the area you touch). `README.md` is a short user-facing entry point.
+- `PLAN.md` is the vision. `docs/dev/ARCHITECTURE.md` is the overview of the code; `docs/dev/reference/` explains each area in detail (read the file for the area you touch). `README.md` should remain a short user-facing entry point.
 - **Read the `AGENTS.md` of every area you will touch before you plan**, not only before you edit. An area's file loads on its own only once a file inside it is read, which can be too late for a plan. The areas:
   - `packages/shared/`, with `src/state/` (story state), `src/links/` (message links), `src/conversation/` (prompt messages, threads)
   - `packages/engine/`, with `src/nodes/` (node types), `src/nodes/llm/` (the LLM node), `src/providers/` (LLM adapter), `src/tools/` (tool loop)
@@ -47,6 +47,8 @@ npm workspaces, TypeScript strict, ESM, packages consumed as TS source.
   - knip reports unused files, exports and dependencies. Delete dead code; configure `knip.json` only for real false positives.
   - Tuned lint rules and their reasons are in `docs/dev/TOOLING.md`. Don't disable more rules without a reason.
   - Large mechanical reformats go in their own `style:` commit, which is added to `.git-blame-ignore-revs`.
+
+Note: run tests sparringly as they are slow and long.
 
 ## Contracts that hold everywhere
 - **A rule has one home.** When shared holds a rule (port compatibility, the story state fold, link status, the fork cut, `activeMessages`, settings resolution...), the engine, the server, node-ui and the web all call it. Never copy or re-implement it.
