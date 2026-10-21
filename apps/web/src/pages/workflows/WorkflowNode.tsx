@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useContext, useEffect } from 'react';
 import { Handle, Position, useConnection, useUpdateNodeInternals, type NodeProps } from '@xyflow/react';
 import { canConnect, type PortDef } from '@st/shared/ports';
+import { CanvasOverlayContext } from './CanvasOverlayContext.js';
 import type { CanvasNode } from './model.js';
 import { portColors } from './port-colors.js';
 
@@ -10,6 +11,7 @@ export function WorkflowNode({ id, data, selected }: NodeProps<CanvasNode>) {
   useEffect(() => {
     updateNodeInternals(id);
   }, [id, descriptor.inputs, descriptor.outputs, updateNodeInternals]);
+  const problems = useContext(CanvasOverlayContext).issuesByNode.get(id);
   const connection = useConnection<CanvasNode>();
   const incompatible = (port: PortDef, type: 'source' | 'target') => {
     if (!connection.inProgress || !connection.fromHandle || connection.fromHandle.nodeId === id) return false;
@@ -27,6 +29,16 @@ export function WorkflowNode({ id, data, selected }: NodeProps<CanvasNode>) {
     `${port.label} (${port.dataType}${port.required ? ', required' : ''})${port.description ? ` — ${port.description}` : ''}`;
   return (
     <div className={`flow-node ${selected ? 'selected' : ''} ${data.unknown ? 'unknown-node' : ''}`}>
+      {problems && (
+        <span
+          className="node-issue-badge"
+          role="img"
+          aria-label={`${problems.length} problem(s)`}
+          title={problems.join('\n')}
+        >
+          {problems.length}
+        </span>
+      )}
       <div className="flow-header">
         <strong>{data.name}</strong>
         <small>{descriptor.category}</small>

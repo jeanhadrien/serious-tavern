@@ -13,6 +13,7 @@ import { WorkflowConfigPanel } from './workflows/WorkflowConfigPanel.js';
 import { WorkflowSettingsPanel } from './workflows/WorkflowSettingsPanel.js';
 import { canvasToWorkflow } from './workflows/model.js';
 import { toggleSettingsPanel } from './workflows/settingsDraft.js';
+import { listedIssues } from './workflows/issueOverlay.js';
 import { duplicateWorkflow } from './workflows/workflowActions.js';
 import './workflows/workflows.css';
 
@@ -43,8 +44,10 @@ function WorkflowEditor() {
     save,
     revert,
     validate,
+    issues,
   } = useWorkflowEditor();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [issuesOpen, setIssuesOpen] = useState(false);
   // The draft's raw declarations (items that don't parse included); node panels hint the usable ones.
   const settings = workflow?.settings;
   const hinted = useMemo(() => workflowSettings({ settings }), [settings]);
@@ -52,6 +55,15 @@ function WorkflowEditor() {
   const settingsShown = settingsOpen && !canvas.current;
   const panelShown = canvas.current !== undefined || settingsOpen;
   const panelWidth = useStoredSize('workflow-panel', { ...PANEL_WIDTH, initial: canvas.current ? 300 : 340 });
+  const problems = useMemo(() => listedIssues(issues ?? []), [issues]);
+  // Validate asks the engine at once: all clear is a toast, otherwise the list opens (or the settings panel, when
+  // the problems are only the chat settings').
+  const validateNow = async () => {
+    const found = await validate();
+    if (!found?.length) return;
+    if (listedIssues(found).length) setIssuesOpen(true);
+    else if (!settingsShown) toggleSettings();
+  };
   const toggleSettings = () => {
     const next = toggleSettingsPanel(settingsShown);
     if (next.deselect) canvas.setSelected(undefined);
@@ -84,14 +96,22 @@ function WorkflowEditor() {
             settingsOpen={settingsShown}
             settingsIssues={workflowSettingIssues(settings).length}
             onToggleSettings={toggleSettings}
-            onValidate={() => void validate()}
+            issueCount={problems.length}
+            issuesOpen={issuesOpen}
+            onToggleIssues={() => setIssuesOpen((open) => !open)}
+            onValidate={() => void validateNow()}
             onDuplicate={() => void duplicateWorkflow(canvasToWorkflow(workflow, canvas.nodes, canvas.edges))}
             onSave={() => void save()}
             onRevert={revert}
           />
           <div className="editor-body" style={{ '--config-panel-width': `${panelWidth.size}px` } as CSSProperties}>
             <NodePalette types={types} onAdd={canvas.addAtCenter} />
-            <WorkflowCanvas canvas={canvas} />
+            <WorkflowCanvas
+              canvas={canvas}
+              issues={issues ?? []}
+              issuesOpen={issuesOpen}
+              onCloseIssues={() => setIssuesOpen(false)}
+            />
             {panelShown && (
               <Splitter
                 className="splitter-inline config-panel-splitter"

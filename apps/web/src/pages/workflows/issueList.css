@@ -1,0 +1,59 @@
+/* The problems list floats over the canvas, under the Undo/Tidy panel's corner. */
+.issue-list {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 6;
+  width: min(380px, calc(100% - 20px));
+  max-height: calc(100% - 20px);
+  display: flex;
+  flex-direction: column;
+  background: #22252e;
+  border: 1px solid #4a3a3f;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+.issue-list header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 6px 6px 12px;
+  border-bottom: 1px solid #363b46;
+}
+.issue-list h3 {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.issue-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  display: grid;
+  gap: 4px;
+}
+.issue-list li button,
+.issue-list li span {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.issue-list li button {
+  background: #2a2e39;
+  border-color: #3a404d;
+}
+.issue-list li button:hover {
+  background: #33384a;
+}
+.issue-list li span {
+  color: #c7cede;
+}
+.issue-list .hint {
+  margin: 0;
+  padding: 10px 12px;
+}

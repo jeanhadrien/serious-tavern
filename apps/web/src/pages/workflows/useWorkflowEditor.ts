@@ -127,16 +127,11 @@ export function useWorkflowEditor() {
     [workflow, canvas.nodes, canvas.edges],
   );
   const validation = useDraftValidation(workflow?.id, draftBody);
+  /** Asks the engine at once. All clear is a toast; problems are returned for the caller to show. */
   const validate = async () => {
-    const issues = await validation.validateNow();
-    if (!issues) return;
-    canvas.setHighlightedEdge(issues.find((issue) => issue.edgeId)?.edgeId);
-    if (!issues.length) alerts.success('Workflow is valid');
-    else
-      alerts.warning(`${issues.length} problem(s) found`, {
-        title: 'Workflow is invalid',
-        details: issues.map((issue) => issue.message).join('\n'),
-      });
+    const found = await validation.validateNow();
+    if (found && !found.length) alerts.success('Workflow is valid');
+    return found;
   };
   return {
     types,

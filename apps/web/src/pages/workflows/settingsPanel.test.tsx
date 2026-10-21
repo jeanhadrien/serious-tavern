@@ -60,6 +60,9 @@ it('shows the settings toggle in the toolbar with a problem count', () => {
     name: 'W',
     onNameChange: () => {},
     onToggleSettings: () => {},
+    issueCount: 0,
+    issuesOpen: false,
+    onToggleIssues: () => {},
     onValidate: () => {},
     onDuplicate: () => {},
     onSave: () => {},
@@ -75,4 +78,27 @@ it('shows the settings toggle in the toolbar with a problem count', () => {
   const closed = renderToStaticMarkup(<WorkflowToolbar {...props} settingsOpen={false} settingsIssues={0} />);
   expect(closed).toContain('aria-pressed="false"');
   expect(closed).not.toContain('issue-count');
+});
+
+it('shows the problems toggle in the toolbar with the problem count', () => {
+  const props = {
+    name: 'W',
+    onNameChange: () => {},
+    settingsOpen: false,
+    settingsIssues: 0,
+    onToggleSettings: () => {},
+    onToggleIssues: () => {},
+    onValidate: () => {},
+    onDuplicate: () => {},
+    onSave: () => {},
+    onRevert: () => {},
+    dirty: false,
+  };
+  const some = renderToStaticMarkup(<WorkflowToolbar {...props} issueCount={3} issuesOpen />);
+  expect(some).toContain('aria-label="Problems (3)"');
+  expect(some).toContain('<span class="toolbar-toggle-label">Problems</span>');
+  expect(some).toContain('<span class="issue-count" aria-hidden="true">3</span>');
+  const none = renderToStaticMarkup(<WorkflowToolbar {...props} issueCount={0} issuesOpen={false} />);
+  expect(none).toContain('aria-label="Problems"');
+  expect(none).not.toContain('issue-count');
 });

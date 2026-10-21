@@ -112,6 +112,22 @@
 .delete-button:hover {
   background: #5c3740;
 }
+/* The engine's problems with a node: a count on its corner, the messages as its tooltip. */
+.node-issue-badge {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 9px;
+  background: #b4414c;
+  border: 1px solid #ffb3ba;
+  color: #fff;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  text-align: center;
+  cursor: help;
+}
 /* Links in node config panels ("Edit preset", "Edit" a collection): readable on the dark panel. */
 .config-panel a {
   color: #9fb0ff;

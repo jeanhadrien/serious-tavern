@@ -1,4 +1,4 @@
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, TriangleAlert } from 'lucide-react';
 import { EditorHeader } from '../../components/EditorHeader.js';
 
 export function WorkflowToolbar({
@@ -8,6 +8,9 @@ export function WorkflowToolbar({
   settingsOpen,
   settingsIssues,
   onToggleSettings,
+  issueCount,
+  issuesOpen,
+  onToggleIssues,
   onValidate,
   onDuplicate,
   onSave,
@@ -20,6 +23,10 @@ export function WorkflowToolbar({
   /** Problems in the chat settings declarations, shown as a count on the toggle. */
   settingsIssues: number;
   onToggleSettings: () => void;
+  /** The engine's problems with the draft that the canvas list shows. */
+  issueCount: number;
+  issuesOpen: boolean;
+  onToggleIssues: () => void;
   onValidate: () => void;
   onDuplicate: () => void;
   onSave: () => void;
@@ -45,6 +52,22 @@ export function WorkflowToolbar({
             {settingsIssues > 0 && (
               <span className="issue-count" aria-hidden="true">
                 {settingsIssues}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            className="toolbar-toggle"
+            aria-pressed={issuesOpen}
+            aria-label={issueCount > 0 ? `Problems (${issueCount})` : 'Problems'}
+            title="Problems"
+            onClick={onToggleIssues}
+          >
+            <TriangleAlert size={16} aria-hidden="true" />
+            <span className="toolbar-toggle-label">Problems</span>
+            {issueCount > 0 && (
+              <span className="issue-count" aria-hidden="true">
+                {issueCount}
               </span>
             )}
           </button>

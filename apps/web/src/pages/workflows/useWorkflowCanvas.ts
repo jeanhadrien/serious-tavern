@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   addEdge,
   applyNodeChanges,
@@ -45,31 +45,6 @@ export function useWorkflowCanvas(
   });
   const canvasRef = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, deleteElements, fitView } = useReactFlow();
-  const visibleEdges = useMemo(
-    () =>
-      edges.map((edge) => {
-        const result = checkConnection(edge, nodes);
-        const highlighted = edge.id === highlightedEdge;
-        return {
-          ...edge,
-          label: !result.ok ? 'incompatible' : result.coerce ? '→text' : undefined,
-          labelStyle: { fill: highlighted || !result.ok ? '#ff8b93' : '#efcf9b', fontSize: 11 },
-          // React Flow's label background is white by default, which hid the light label text on the dark canvas.
-          labelBgStyle: { fill: '#21242c', fillOpacity: 0.95 },
-          labelBgPadding: [4, 2] as [number, number],
-          labelBgBorderRadius: 3,
-          animated: highlighted || undefined,
-          style: highlighted
-            ? { stroke: '#ef8186', strokeWidth: 3 }
-            : !result.ok
-              ? { stroke: '#ef8186', strokeWidth: 2 }
-              : result.coerce
-                ? { stroke: '#e6bb77', strokeWidth: 2, strokeDasharray: '6 4' }
-                : undefined,
-        };
-      }),
-    [edges, nodes, highlightedEdge],
-  );
   const load = (next: Workflow) => {
     history.reset();
     setCanvasVersion((version) => version + 1);
@@ -233,6 +208,19 @@ export function useWorkflowCanvas(
   const selectedEdges = edges.filter((edge) => edge.selected);
   const hasSelection = selectedNodes.length > 0 || selectedEdges.length > 0;
   const deleteSelection = () => void deleteElements({ nodes: selectedNodes, edges: selectedEdges });
+  // Selects what an issue names and fits the view to it. Selection is not part of the draft, so this is no step.
+  const focusIssue = (nodeIds: readonly string[], edgeId?: string) => {
+    const ids = new Set(nodeIds);
+    setSelected(undefined);
+    setNodes((prev) =>
+      prev.map((node) => (node.selected === ids.has(node.id) ? node : { ...node, selected: ids.has(node.id) })),
+    );
+    setEdges((prev) =>
+      prev.map((edge) => (!!edge.selected === (edge.id === edgeId) ? edge : { ...edge, selected: edge.id === edgeId })),
+    );
+    if (ids.size)
+      requestAnimationFrame(() => void fitView({ nodes: [...ids].map((id) => ({ id })), duration: 300, maxZoom: 1 }));
+  };
   // Clears the node whose config is open and the canvas selection (the highlight is not part of the draft).
   const deselect = () => {
     setSelected(undefined);
@@ -253,7 +241,6 @@ export function useWorkflowCanvas(
   return {
     nodes,
     edges,
-    visibleEdges,
     canvasVersion,
     current,
     canvasRef,
@@ -279,6 +266,7 @@ export function useWorkflowCanvas(
     updateConfig,
     hasSelection,
     deselect,
+    focusIssue,
     deleteSelection,
     deleteNode,
     copy: clipboard.copy,

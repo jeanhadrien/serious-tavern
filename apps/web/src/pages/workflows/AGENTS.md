@@ -11,6 +11,10 @@
 - The palette, the connect picker and quick add list node types in one order, `nodeTypeOrder.ts` (category, then label). Never sort types anywhere else.
 - The palette renders a category with exactly one type as a plain button (a count rule, never a per-category branch) and one with several as a `<details>`. Its open state is one `localStorage` key, `st.palette.open` (JSON map category → boolean, absent means open), read and written only through `paletteOpen.ts`, which guards both.
 
+## Overlays
+- Issue badges, edge marks and anything else derived from a run or a check (live status, config summaries later) are **not part of the draft**. Never put them in node `data`: the history's `snapshotOf` copies `data`, so an undo would bring back stale marks. Derive them at render, as `styleEdges` does for edges, and hand them to `WorkflowNode` through `CanvasOverlayContext`.
+- Selecting what an issue names is selection only (`focusIssue`): no `recordStep`.
+
 ## Validation
 - It runs on the draft, never on the saved workflow: debounced, silent, one request in flight (`useDraftValidation`). Never validate per keystroke: the server rescans the YAML repositories and resolves dynamic ports on every call.
 - The body leaves out chat settings declarations that don't parse (`canvasToDraftBody`); the settings panel and `unsavableSettings` already report those.

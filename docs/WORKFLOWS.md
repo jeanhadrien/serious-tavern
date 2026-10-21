@@ -39,8 +39,13 @@ with the chat moved to the right so you can test as you go.
   also into another workflow or another browser tab. A second Chat Input is not pasted (a workflow has one).
 - **Chat settings:** the toolbar's **Chat settings** button declares the knobs each chat can turn for this workflow.
   See [chat settings](STATE-AND-LORE.md#chat-settings).
+- **Problems:** the editor checks the workflow as you edit (a moment after your last change) and marks what is wrong. A
+  node with a problem gets a red count on its corner (hover for the messages), and every wire a problem names turns
+  red. The toolbar's **Problems** button, with the count, lists them over the canvas: click one to select the node or
+  wire and zoom to it. Problems about the whole workflow (a loop, no output) are listed but have nothing to click, and
+  problems with the chat settings show in the **Chat settings** panel instead.
 - **Save** when you're done. A workflow with a problem (a required input not connected, a setting missing, a node
-  pointing at a deleted preset) can still be saved. **Validate** in the toolbar checks the workflow as you have it on screen (it doesn't save) and lists the problems, and a chat that
+  pointing at a deleted preset) can still be saved. **Validate** in the toolbar checks right away, without saving, and opens the list of problems, and a chat that
   runs it gets a message naming the node, with a link that opens the workflow and highlights the wire.
 
 A node type the app doesn't know (from a newer or older version) is kept as a read-only placeholder and saved

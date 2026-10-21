@@ -284,6 +284,7 @@ pre {
   touch-action: none;
 }
 .flow-node {
+  position: relative;
   min-width: 175px;
   min-height: 80px;
   background: #303542;

@@ -141,6 +141,13 @@ conversion model (unknown node types become read-only placeholders).
   `POST /api/workflows/validate`: at once for a newly opened workflow, then 600 ms after the last change, silently, with
   one request in flight (a newer draft aborts the older request, so a stale answer never shows). The toolbar's Validate
   asks at once, toasts the count and reports failures, and no longer saves first.
+- **Issues on the canvas.** The engine's issues (`useWorkflowEditor().issues`) are overlays derived at render, never part
+  of the draft: `CanvasOverlayContext` gives `WorkflowNode` the messages per node (a red count badge, messages as its
+  tooltip), `styleEdges` (`edgeStyle.ts`) reds every edge an issue names (the one-shot `edge=` link stays thick and
+  animated), and the toolbar's Problems toggle opens `IssueList` over the canvas. `issueTargets` says what a click
+  selects (the nodes plus the ends of the named connection); `focusIssue` selects them without a history step and fits
+  the view. Issues with `source: 'settings'` are left out of the list and its count (the chat settings panel shows
+  them); issues with no ids are listed as plain text.
 - **Chat settings panel** (`WorkflowSettingsPanel`, toggled from the toolbar, which counts problems): one row per
   declaration with type-specific fields, reorderable. Declarations are part of the draft; one that doesn't parse is a
   read-only row the user can only remove. Problems from `workflowSettingIssues` show next to their field.
