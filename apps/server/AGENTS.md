@@ -24,6 +24,9 @@ Fastify 5 on port 3001. Turns, runs, story state, alternatives and fork are in `
 - **Collections:** `GET /api/collections` returns summaries (`entryCount`, no entries). `DELETE` answers `409 COLLECTION_IN_USE` (details: workflow names) while a Recall or Draw node lists the id. The serializer leaves out `weight: 1` and `enabled: true`.
 - **State definitions:** names unique ignoring case (`409 STATE_DEFINITION_NAME_TAKEN`); a rename or delete is refused with `409 STATE_DEFINITION_IN_USE` while a present turn wrote the definition (a delete also while a node uses it; `state-definition-usage.ts` lists the users). Updating a definition prunes the workflows' edges to vanished ports. `scene` is seeded into an empty directory.
 
+## Workflows
+- **Create and update share `checkWorkflowForSave`** (`services/workflow-save.ts`): prune, then validate, inside the update's lock. Validation only reports (`issues` in the response): a draft may be incomplete, so never refuse a save for it. The response's `droppedEdgeIds`/`issues` are never stored; `withoutSaveReport` strips them from a body.
+
 ## Change events (`GET /api/events`)
 - File-backed resources emit `presets|providers|collections|stateDefinitions.changed` with the currently invalid files. Records emit `workflows|characters|personas|sessions.changed` (`{ type, id? }`). On connect, every event type is sent once (id-less for records) so clients resync.
 - Record events come from `NotifyingRepository`, which wraps those repositories in `context.ts` and announces every successful save, update and delete. A new record resource gets wrapped there too.

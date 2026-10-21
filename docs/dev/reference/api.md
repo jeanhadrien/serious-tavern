@@ -41,12 +41,17 @@ run's on success, the failing run's on failure, absent when no workflow of the c
 | Method and path | Request | Answer |
 | --- | --- | --- |
 | `GET /api/workflows`, `GET /api/workflows/:id` | | `200` |
-| `POST /api/workflows` | the workflow (`settings` included, so a duplicate keeps them) | `201` |
-| `PUT /api/workflows/:id` | the workflow; a body without `settings` keeps the stored ones | `200`. Edges to ports that no longer exist are pruned. Not validated. |
+| `POST /api/workflows` | the workflow (`settings` included, so a duplicate keeps them) | `201` the stored workflow plus the save report (below). |
+| `PUT /api/workflows/:id` | the workflow; a body without `settings` keeps the stored ones | `200` the stored workflow plus the save report (below). |
 | `DELETE /api/workflows/:id` | | `204`; `409 WORKFLOW_IN_USE` while a chat's reply list names it. |
 | `POST /api/workflows/:id/validate` | | `200` when valid; `422 WORKFLOW_INVALID` with the issues. |
 | `GET /api/node-types` | | `200` every node type's descriptor (ports, config schema, defaults, `sink`, `dynamicPorts`). |
 | `POST /api/node-types/:type/ports` | the node's config | `200` its resolved inputs and outputs (for `dynamicPorts` types). |
+
+**The save report.** Create and update run the same step (`checkWorkflowForSave`): edges to ports that no longer exist are
+pruned, then the stored workflow is validated, and the answer carries two extra fields: `droppedEdgeIds` and `issues`
+(`ValidationIssue[]`, the same as `validate`'s). The save is never refused for issues, since a draft may be incomplete.
+Both fields describe that save only; the server drops them from a body, so echoing a response back is harmless.
 
 ## Presets
 

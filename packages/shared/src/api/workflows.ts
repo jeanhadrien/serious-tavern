@@ -9,6 +9,16 @@ export const workflowInvalidDetailsSchema = z.object({
 });
 export type WorkflowInvalidDetails = z.infer<typeof workflowInvalidDetailsSchema>;
 
+/**
+ * The answer to a workflow create or update: the stored workflow plus what the save found. Both fields describe this
+ * save only and are never stored, so a client echoing the record back is harmless (the server drops them).
+ */
+export const savedWorkflowSchema = workflowSchema.extend({
+  droppedEdgeIds: z.array(z.string()),
+  issues: z.array(validationIssueSchema),
+});
+export type SavedWorkflow = z.infer<typeof savedWorkflowSchema>;
+
 export const workflowEndpoints = {
   listWorkflows: endpoint(
     {
@@ -23,9 +33,9 @@ export const workflowEndpoints = {
       method: 'POST',
       path: '/api/workflows',
       description:
-        'Create a workflow. Node and edge ids are chosen by the caller and must be unique within the workflow. The result is not validated: call validateWorkflow.',
+        'Create a workflow. Node and edge ids are chosen by the caller and must be unique within the workflow. Edges to ports that do not exist are not stored: their ids come back in droppedEdgeIds. The workflow is saved even when invalid (a draft may be incomplete); issues lists what still prevents it from running (each may name edgeId and nodeIds).',
     },
-    workflowSchema,
+    savedWorkflowSchema,
     // `nodes`/`edges`/`settings` let a client create a copy of an existing workflow in one write.
     z
       .object({ name: z.string().trim().min(1) })
@@ -42,9 +52,9 @@ export const workflowEndpoints = {
       method: 'PUT',
       path: '/api/workflows/:id',
       description:
-        'Replace a workflow with the given one (settings are kept when omitted). Edges to ports that no longer exist are dropped. Not validated: call validateWorkflow.',
+        'Replace a workflow with the given one (settings are kept when omitted). Edges to ports that do not exist are not stored: their ids come back in droppedEdgeIds. The workflow is saved even when invalid (a draft may be incomplete); issues lists what still prevents it from running (each may name edgeId and nodeIds).',
     },
-    workflowSchema,
+    savedWorkflowSchema,
     // An omitted `settings` keeps the stored declarations.
     workflowSchema.pick({ name: true, nodes: true, edges: true, settings: true }),
     idParamsSchema,
