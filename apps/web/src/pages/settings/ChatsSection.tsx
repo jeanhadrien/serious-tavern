@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AppSettings } from '@st/shared';
+import type { AppSettings, AppSettingsPatch } from '@st/shared';
 import { appSettingsApi } from '../../api.js';
 import './settings.css';
 
@@ -11,7 +11,7 @@ export function ChatsSectionView({
 }: {
   settings?: AppSettings;
   saving: boolean;
-  onChange(forkKeepsAlternatives: boolean): void;
+  onChange(patch: AppSettingsPatch): void;
 }) {
   return (
     <section className="chats-settings">
@@ -21,13 +21,26 @@ export function ChatsSectionView({
           type="checkbox"
           checked={settings?.forkKeepsAlternatives ?? true}
           disabled={!settings || saving}
-          onChange={(event) => onChange(event.target.checked)}
+          onChange={(event) => onChange({ forkKeepsAlternatives: event.target.checked })}
         />
         Forks keep the alternatives of the reply they start from
       </label>
       <small className="hint">
         On, a forked chat can still swipe and regenerate the reply it starts from. Off, it only holds what the chat
         shows.
+      </small>
+      <label className="check settings-check">
+        <input
+          type="checkbox"
+          checked={settings?.showMessageStats ?? false}
+          disabled={!settings || saving}
+          onChange={(event) => onChange({ showMessageStats: event.target.checked })}
+        />
+        Show text statistics under assistant replies
+      </label>
+      <small className="hint">
+        Word count, vocabulary diversity, overused words and repetition of the last replies. Computed on the server,
+        English only.
       </small>
     </section>
   );
@@ -44,10 +57,10 @@ export function ChatsSection() {
       .catch(() => {});
   }, []);
   // One save at a time (the box is locked meanwhile), so answers cannot arrive out of order.
-  const change = async (forkKeepsAlternatives: boolean) => {
+  const change = async (patch: AppSettingsPatch) => {
     setSaving(true);
     try {
-      setSettings(await appSettingsApi.update({ forkKeepsAlternatives }));
+      setSettings(await appSettingsApi.update(patch));
     } catch {
       // The error is toasted; show what the server holds.
       await appSettingsApi
@@ -58,5 +71,5 @@ export function ChatsSection() {
       setSaving(false);
     }
   };
-  return <ChatsSectionView settings={settings} saving={saving} onChange={(value) => void change(value)} />;
+  return <ChatsSectionView settings={settings} saving={saving} onChange={(patch) => void change(patch)} />;
 }

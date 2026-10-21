@@ -57,7 +57,7 @@ function readEvents(response: Response) {
   return { events, comments, done, cancel: () => reader.cancel() };
 }
 // The snapshot every new connection starts with: one event per type.
-const SNAPSHOT_SIZE = 8;
+const SNAPSHOT_SIZE = 9;
 type PresetsChanged = Extract<ChangeEvent, { type: 'presets.changed' }>;
 const last = (events: ChangeEvent[]) =>
   events.filter((event): event is PresetsChanged => event.type === 'presets.changed').at(-1);
@@ -79,6 +79,7 @@ it('streams the current state on connect, then a change event per edit with the 
       'characters.changed',
       'personas.changed',
       'sessions.changed',
+      'appSettings.changed',
     ]);
     expect(stream.events[0]).toEqual({ type: 'presets.changed', invalidFiles: [] });
 
@@ -320,7 +321,14 @@ it('publishes a change for every write to workflows, characters, personas and se
       { type: 'workflows.changed', id: workflow.id },
     );
 
+    await step(
+      { method: 'PATCH', url: '/api/app-settings', payload: { showMessageStats: true } },
+      { type: 'appSettings.changed' },
+    );
+
     // A failed write changes nothing and announces nothing.
+    const refused = await app.inject({ method: 'PATCH', url: '/api/app-settings', payload: { showMessageStats: 'x' } });
+    expect(refused.statusCode).toBe(400);
     const missing = await app.inject({
       method: 'PUT',
       url: '/api/personas/00000000-0000-4000-8000-000000000000',

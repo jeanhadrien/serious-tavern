@@ -27,6 +27,8 @@ export const changeEventSchema = z.discriminatedUnion('type', [
   resourceChanged('characters.changed'),
   resourceChanged('personas.changed'),
   resourceChanged('sessions.changed'),
+  // The app settings changed through `PATCH /api/app-settings` (a single record: no id).
+  z.object({ type: z.literal('appSettings.changed') }),
 ]);
 export type ChangeEvent = z.infer<typeof changeEventSchema>;
 export const changeEventTypes: ChangeEvent['type'][] = changeEventSchema.options.map(

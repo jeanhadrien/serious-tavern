@@ -8,6 +8,8 @@ export const appSettingsSchema = z
   .object({
     /** Whether a forked chat keeps the alternatives (regenerations) of the reply it starts from. */
     forkKeepsAlternatives: z.boolean().catch(true),
+    /** Whether the chat shows the text statistics (word count, MTLD, repetition...) of each assistant reply. */
+    showMessageStats: z.boolean().catch(false),
   })
   .passthrough();
 export type AppSettings = z.infer<typeof appSettingsSchema>;

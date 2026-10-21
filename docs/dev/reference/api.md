@@ -104,5 +104,5 @@ run's on success, the failing run's on failure, absent when no workflow of the c
 | Method and path | Request | Answer |
 | --- | --- | --- |
 | `GET /api/app-settings` | | `200` the settings with defaults filled in. |
-| `PATCH /api/app-settings` | a partial body | `200` the whole settings; `500 APP_SETTINGS_UNREADABLE` when the file is not a JSON object. |
-| `GET /api/events` | | SSE, `changeEventSchema` (event name = `type`): `presets|providers|collections|stateDefinitions.changed` with `invalidFiles: { file, reason }[]`, and `workflows|characters|personas|sessions.changed` with an optional record `id`. Every type is sent once on connect; a `: keepalive` comment every 15 s. Events only say something changed: clients re-fetch. |
+| `PATCH /api/app-settings` | a partial body (`forkKeepsAlternatives`, `showMessageStats`) | `200` the whole settings; `500 APP_SETTINGS_UNREADABLE` when the file is not a JSON object. |
+| `GET /api/events` | | SSE, `changeEventSchema` (event name = `type`): `presets|providers|collections|stateDefinitions.changed` with `invalidFiles: { file, reason }[]`, `workflows|characters|personas|sessions.changed` with an optional record `id`, and `appSettings.changed` (no id; sent by every successful `PATCH /api/app-settings`). Every type is sent once on connect; a `: keepalive` comment every 15 s. Events only say something changed: clients re-fetch. |

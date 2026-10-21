@@ -107,6 +107,7 @@ it('describes the change event stream, one event per resource type', () => {
     'characters.changed',
     'personas.changed',
     'sessions.changed',
+    'appSettings.changed',
   ]);
   for (const event of [{ type: 'sessions.changed' }, { type: 'workflows.changed', id: 'abc' }])
     expect(apiContract.streamChanges.response.parse(event)).toEqual(event);

@@ -36,7 +36,7 @@ Fastify 5 on port 3001. Turns, runs, story state, alternatives and fork are in `
 - One file, `data/app-settings.json`, written atomically under its own lock around read-merge-write. A missing file is the defaults, and nothing is written until the first `PATCH` (a partial body merged into the file; `GET` answers the whole settings).
 - Reads are tolerant: a wrong-typed field reads as its default, unknown keys are kept and survive a PATCH.
 - A file that is not a JSON object is **never overwritten**: `GET` answers the defaults and logs a warning, `PATCH` answers `500 APP_SETTINGS_UNREADABLE` naming the file.
-- No change event yet: readers read it when they need it.
+- A successful `PATCH` publishes `appSettings.changed` (route level, before the response). Readers that cache a setting subscribe to it; others read it when they need it.
 
 ## Characters and personas
 - Card parsing and writing (PNG `tEXt` chunks `ccv3`, which takes precedence, then `chara`; V1/V2/V3 JSON) runs on the server. Export writes both `chara` (V2) and `ccv3` (V3), like SillyTavern.

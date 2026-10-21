@@ -20,7 +20,10 @@ describe('app settings', () => {
     const { app, directory } = await apps.open();
     const response = await get(app);
     expect(response.statusCode).toBe(200);
-    expect(apiContract.getAppSettings.response.parse(response.json())).toEqual({ forkKeepsAlternatives: true });
+    expect(apiContract.getAppSettings.response.parse(response.json())).toEqual({
+      forkKeepsAlternatives: true,
+      showMessageStats: false,
+    });
     await expect(readFile(join(directory, 'app-settings.json'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     await app.close();
   });
@@ -36,6 +39,7 @@ describe('app settings', () => {
     expect(updated.statusCode, updated.body).toBe(200);
     expect(apiContract.updateAppSettings.response.parse(updated.json())).toEqual({
       forkKeepsAlternatives: false,
+      showMessageStats: false,
       futureThing: { a: 1 },
     });
     expect(JSON.parse(await readFile(path, 'utf8'))).toEqual({ forkKeepsAlternatives: false, futureThing: { a: 1 } });
@@ -66,7 +70,7 @@ describe('app settings', () => {
     await writeFile(path, content);
     const response = await get(app);
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ forkKeepsAlternatives: true });
+    expect(response.json()).toEqual({ forkKeepsAlternatives: true, showMessageStats: false });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(path));
     const refused = await patch(app, { forkKeepsAlternatives: false });
     expect(refused.statusCode).toBe(500);

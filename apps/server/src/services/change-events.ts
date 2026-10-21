@@ -95,6 +95,7 @@ export async function currentChangeEvents({
     { type: 'characters.changed' },
     { type: 'personas.changed' },
     { type: 'sessions.changed' },
+    { type: 'appSettings.changed' },
   ];
 }
 

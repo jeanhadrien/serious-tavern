@@ -88,11 +88,11 @@ depend on secrets.
 
 ## App settings
 
-App-wide preferences (not per chat), in `data/app-settings.json`. So far one setting, `forkKeepsAlternatives`
-(default `true`). A missing file is the defaults and nothing is written until the first `PATCH` (a partial body merged
+App-wide preferences (not per chat), in `data/app-settings.json`. Two settings: `forkKeepsAlternatives`
+(default `true`) and `showMessageStats` (default `false`: whether the chat shows text statistics, see the engine reference). A missing file is the defaults and nothing is written until the first `PATCH` (a partial body merged
 under the file's own lock). Unknown keys survive a `PATCH`; a wrong-typed value reads as its default. A file that
 isn't a JSON object is never overwritten: `GET` answers the defaults and logs a warning, `PATCH` answers
-`500 APP_SETTINGS_UNREADABLE`. No change event yet.
+`500 APP_SETTINGS_UNREADABLE`. A successful `PATCH` publishes `appSettings.changed` (no id) before it answers.
 
 ## Seeds and example packs
 
