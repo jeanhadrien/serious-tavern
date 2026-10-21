@@ -301,16 +301,36 @@ describe('item updates', () => {
       { handle: '#2', text: 'A calm' },
       { handle: '#1', text: 'A great storm', level: 2 },
     ]);
-    expect(logs.at(-1)).toBe('scene.log: A storm -> A great storm');
+    expect(logs.at(-1)).toBe('scene.log: updating A storm: text A great storm');
   });
 
-  it('refuses fields, a missing text, an unknown handle and an item removed meanwhile', async () => {
+  it('changes a field value alone, or with the text', async () => {
     const { call } = await toolsFor([], [target('log')]);
     await call('write_scene_log', { op: 'add', text: 'A storm', level: 2 });
-    await expect(call('write_scene_log', { op: 'update', handle: '#1', text: 'x', level: 3 })).rejects.toThrow(
-      "update changes only an item's text; leave out level",
+    expect(await call('write_scene_log', { op: 'update', handle: '#1', level: 3 })).toEqual([
+      { handle: '#1', text: 'A storm', level: 3 },
+    ]);
+    expect(await call('write_scene_log', { op: 'update', handle: '#1', text: 'A calm', level: 1 })).toEqual([
+      { handle: '#1', text: 'A calm', level: 1 },
+    ]);
+  });
+
+  it('refuses an undeclared field, a value of the wrong type, nothing to change and a bad handle', async () => {
+    const { call } = await toolsFor([], [target('log')]);
+    await call('write_scene_log', { op: 'add', text: 'A storm', level: 2 });
+    await expect(call('write_scene_log', { op: 'update', handle: '#1', mood: 'grim' })).rejects.toThrow(
+      'scene.log has no field "mood"; its fields are level',
     );
-    await expect(call('write_scene_log', { op: 'update', handle: '#1' })).rejects.toThrow('needs the new text');
+    await expect(call('write_scene_log', { op: 'update', handle: '#1', messages: { ids: ['m'] } })).rejects.toThrow(
+      'has no field "messages"',
+    );
+    await expect(call('write_scene_log', { op: 'update', handle: '#1', level: 'high' })).rejects.toThrow(
+      'field "level" must be a number',
+    );
+    await expect(call('write_scene_log', { op: 'update', handle: '#1', text: 4 })).rejects.toThrow('needs text');
+    await expect(call('write_scene_log', { op: 'update', handle: '#1' })).rejects.toThrow(
+      'needs the new text or new field values',
+    );
     await expect(call('write_scene_log', { op: 'update', handle: '#9', text: 'x' })).rejects.toThrow(
       'No item has the handle "#9"',
     );
@@ -323,20 +343,19 @@ describe('item updates', () => {
     );
   });
 
-  it('stores an update of the item id with the new text', async () => {
+  it('stores an update of the item id with only what changed', async () => {
     const { call, run } = await toolsFor([], [target('log')]);
     await call('write_scene_log', { op: 'add', text: 'A storm' });
     await call('write_scene_log', { op: 'update', handle: '#1', text: 'A great storm' });
+    await call('write_scene_log', { op: 'update', handle: '#1', level: 3 });
     run.commit('llm', 1);
-    const [added, updated] = run.finish();
-    expect(added).toMatchObject({ op: 'add', item: { text: 'A storm' } });
-    expect(updated).toEqual({
-      op: 'update',
-      target: { kind: 'definition', definitionId: scene.id, key: 'log' },
-      nodeId: 'llm',
-      itemId: added?.op === 'add' ? added.item.id : '',
-      text: 'A great storm',
-    });
+    const [added, ...updates] = run.finish();
+    const itemId = added?.op === 'add' ? added.item.id : '';
+    const to = { kind: 'definition', definitionId: scene.id, key: 'log' };
+    expect(updates).toEqual([
+      { op: 'update', target: to, nodeId: 'llm', itemId, text: 'A great storm' },
+      { op: 'update', target: to, nodeId: 'llm', itemId, fields: { level: 3 } },
+    ]);
   });
 });
 

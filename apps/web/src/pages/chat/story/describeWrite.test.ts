@@ -65,9 +65,11 @@ it('names a removed item by the text it was added with, or "an item"', () => {
   expect(describeWrite(named(remove), texts)).toBe('scene.injected: removed an item');
 });
 
-it('words an item update by its new text', () => {
+it('words an item update by what it changed', () => {
   const update = { ...addWrite('injected', 'i1', ''), op: 'update' as const, itemId: 'i1', text: 'a gong' };
-  expect(describeWrite(named(update), texts)).toBe("scene.injected: rewrote an item as 'a gong'");
+  expect(describeWrite(named(update), texts)).toBe("scene.injected: updated an item to 'a gong'");
+  const fields = { ...update, text: undefined, fields: { level: 3 } };
+  expect(describeWrite(named(fields), texts)).toBe('scene.injected: updated an item (level 3)');
 });
 
 it('says "(deleted definition)" when the definition is gone', () => {

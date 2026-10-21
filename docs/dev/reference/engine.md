@@ -181,8 +181,9 @@ generated from the definitions:
 | text | `{ op?: set \| reset \| replace \| append, value, old }` |
 | collection | `{ op: add \| remove \| reset \| update, text, handle, ...declared fields }` |
 
-`reset` is State Write's `delete`. `update` gives the item at `handle` a new `text` and refuses any other argument
-(fields and link stay); `planUpdate` plans it and it is stored as the fold's `update` write. `replace` and `append`
+`reset` is State Write's `delete`. `update` changes the item at `handle`: a new `text`, new values of its declared
+fields, or both (each value checked like an `add`'s; an undeclared field, `messages` included, is refused, and the link
+stays). `planUpdate` plans it and it is stored as the fold's `update` write, holding only what changed. `replace` and `append`
 exist only as tools too: `replace` changes `old` (it must appear
 exactly once, else the call fails and says how often it matched) into `value`, and `append` adds `value` on a new line.
 The tool computes the whole new text from the pending value and plans it as a `set`, so the stored write is an ordinary

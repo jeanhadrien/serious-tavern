@@ -98,7 +98,11 @@ function randomWrite(rng: Rng, definitions: StateDefinition[], ids: string[], co
       return { op: 'add', target, nodeId, item: { id, text: `t${id}`, level: rng.int(1, 3) } };
     }
     const itemId = ids.length && rng.chance(0.8) ? rng.pick(ids) : 'no-such-item';
-    if (roll <= 7) return { op: 'update', target, nodeId, itemId, text: `u${counter.n++}` };
+    if (roll <= 7) {
+      const text = rng.chance(0.7) ? { text: `u${counter.n++}` } : {};
+      const fields = rng.chance(0.5) ? { fields: rng.pick([{ level: rng.int(1, 3) }, { id: 'x', messages: 1 }]) } : {};
+      return { op: 'update', target, nodeId, itemId, ...text, ...fields };
+    }
     return { op: 'remove', target, nodeId, itemId };
   }
   const value = def?.type === 'enum' && rng.chance(0.7) ? rng.pick(def.options) : junk(rng);

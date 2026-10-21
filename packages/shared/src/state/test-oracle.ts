@@ -37,7 +37,18 @@ function replayItems(writes: Accepted[], upTo = Number.POSITIVE_INFINITY): Item[
     if (write.op === 'add') items = [...items, { item: write.item, turn }];
     if (write.op === 'update')
       items = items.map((entry) =>
-        entry.item.id === write.itemId ? { ...entry, item: { ...entry.item, text: write.text } } : entry,
+        entry.item.id === write.itemId
+          ? {
+              ...entry,
+              item: {
+                ...entry.item,
+                ...Object.fromEntries(
+                  Object.entries(write.fields ?? {}).filter(([name]) => !['id', 'text', 'messages'].includes(name)),
+                ),
+                ...(write.text === undefined ? {} : { text: write.text }),
+              },
+            }
+          : entry,
       );
     if (write.op === 'remove') items = items.filter((entry) => entry.item.id !== write.itemId);
     if (write.op === 'delete') items = [];

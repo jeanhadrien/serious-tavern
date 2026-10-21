@@ -79,7 +79,7 @@ export function writeParameters({ def }: ToolKey): Record<string, unknown> {
         type: 'object',
         properties: {
           op: op(
-            `add stores a new item, update gives an item new text by its handle (its fields stay), remove deletes one by its handle. reset empties the list.`,
+            `add stores a new item, update changes an item by its handle (only the text and fields you send), remove deletes one by its handle. reset empties the list.`,
           ),
           text: { type: 'string', description: 'The text of the item to add, or the new text of the item to update.' },
           handle: {
@@ -87,7 +87,10 @@ export function writeParameters({ def }: ToolKey): Record<string, unknown> {
             description: 'The handle of the item to update or remove (like #1), as read_state shows it.',
           },
           ...Object.fromEntries(
-            fields.map(([name, type]) => [name, { type, description: `Field of the item to add.` }]),
+            fields.map(([name, type]) => [
+              name,
+              { type, description: `Field of the item to add, or its new value for update.` },
+            ]),
           ),
         },
         required: ['op'],

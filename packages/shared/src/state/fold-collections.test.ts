@@ -264,6 +264,14 @@ describe('item updates', () => {
     expect(textOf(['a'])).toBeUndefined();
   });
 
+  it('change field values, alone or with the text, but never the id or the link', () => {
+    const messages = { ids: ['m1'], fingerprint: 'f' };
+    const fieldsOnly = { ...updateWrite('log', '1', ''), text: undefined, fields: { level: 3 } };
+    const sneaky = { ...updateWrite('log', '1', 'new'), fields: { id: 'x', messages: { ids: ['m9'] }, text: 'no' } };
+    const story = foldTurns([turnEntry('a', [add('1', { level: 2, messages })]), turnEntry('b', [fieldsOnly, sneaky])]);
+    expect(valueAt(story, 'log')).toEqual([{ id: '1', text: 'new', level: 3, messages }]);
+  });
+
   it('do nothing to an item that is gone', () => {
     const story = foldTurns([
       turnEntry('a', [add('1'), removeWrite('log', '1')]),

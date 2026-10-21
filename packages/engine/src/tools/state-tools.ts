@@ -104,11 +104,10 @@ function writeValue(args: Record<string, unknown>, op: string, handles: ItemHand
   return op === 'remove' ? itemIdOf(args.handle, handles, op) : args.value;
 }
 
-/** An item's `update`: its new text only. Its fields and link are not the model's to change. */
+/** An item's `update`: its new text and/or declared field values, by handle. Its link is not the model's to change. */
 function updatePlan(found: ToolKey, args: Record<string, unknown>, handles: ItemHandles, current: unknown) {
-  const extra = Object.keys(args).filter((name) => !['op', 'handle', 'text'].includes(name));
-  if (extra.length) throw new Error(`update changes only an item's text; leave out ${extra.join(', ')}`);
-  return planUpdate(found, itemIdOf(args.handle, handles, 'update'), args.text, current);
+  const { op: _op, handle, ...changes } = args;
+  return planUpdate(found, itemIdOf(handle, handles, 'update'), changes, current);
 }
 
 /**

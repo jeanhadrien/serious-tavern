@@ -165,7 +165,7 @@ describe('collections', () => {
     expect(undo('m-e2')).toEqual(["scene.injected (brings back 'first')"]);
   });
 
-  it('puts back the earlier text of an item the reply rewrote, linked or not', () => {
+  it('puts back the earlier version of an item the reply updated, linked or not', () => {
     const messages = { ids: ['m1'], fingerprint: 'f' };
     const rewrite = (itemId: string, text: string): StateWrite => ({
       ...removeWrite('injected', itemId),
@@ -178,8 +178,16 @@ describe('collections', () => {
       [rewrite('i1', 'a gong'), rewrite('i2', 'They argued'), rewrite('gone', 'never')],
     ]);
     expect(undo('m-e2')).toEqual([
-      "scene.injected (puts back the earlier text 'They talked' (linked to 1 message), 'a bell')",
+      "scene.injected (puts back the earlier version of 'They talked' (linked to 1 message), 'a bell')",
     ]);
+  });
+
+  it('puts back an item whose field values alone were updated', () => {
+    const { undo } = chat([
+      [addWrite('injected', 'i1', 'a bell', { level: 2 })],
+      [{ ...removeWrite('injected', 'i1'), op: 'update', itemId: 'i1', fields: { level: 3 } }],
+    ]);
+    expect(undo('m-e2')).toEqual(["scene.injected (puts back the earlier version of 'a bell')"]);
   });
 
   it('reveals the item the cap had cut off', () => {

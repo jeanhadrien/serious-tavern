@@ -98,7 +98,7 @@ export function resolveWrites(
           warnings.push(`A state write to "${label(found)}" was skipped: only a collection's items can be updated.`);
           break;
         }
-        writes.push({ op: 'update', target: to, nodeId, itemId: request.itemId, text: request.text });
+        writes.push({ ...request, target: to, nodeId });
         break;
       case 'remove':
         writes.push({ op: 'remove', target: to, nodeId, itemId: request.itemId });

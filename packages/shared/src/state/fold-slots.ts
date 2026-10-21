@@ -57,16 +57,23 @@ function foldScalar(
   };
 }
 
+// What an `update` leaves of an item: its new text and field values. The id and the link are never an update's to
+// change, whatever a stored write holds.
+function updatedItem(item: CollectionItem, write: Extract<StateWrite, { op: 'update' }>): CollectionItem {
+  const fields = Object.entries(write.fields ?? {}).filter(([name]) => !['id', 'text', 'messages'].includes(name));
+  return { ...item, ...Object.fromEntries(fields), ...(write.text === undefined ? {} : { text: write.text }) };
+}
+
 // The items a collection holds after replaying add, update, remove and delete writes in order: the items added by
-// present turns minus the ones removed by present turns, with the text of their last update. An update keeps the
-// item's id, fields, link, place and turn. Oldest first.
+// present turns minus the ones removed by present turns, as their last update left them. An update keeps the item's
+// id, link, place and turn. Oldest first.
 function replay(writes: readonly SlotWrite[], cap: number | undefined, history: HistoryPoint[]) {
   let items: { item: CollectionItem; turn: number }[] = [];
   for (const { turn, write } of writes) {
     if (write.op === 'add') items.push({ item: write.item, turn });
     else if (write.op === 'update')
       items = items.map((entry) =>
-        entry.item.id === write.itemId ? { ...entry, item: { ...entry.item, text: write.text } } : entry,
+        entry.item.id === write.itemId ? { ...entry, item: updatedItem(entry.item, write) } : entry,
       );
     else if (write.op === 'remove') items = items.filter(({ item }) => item.id !== write.itemId);
     else if (write.op === 'delete') items = [];

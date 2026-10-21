@@ -8,7 +8,7 @@ The LLM node that runs the loop has its own notes in `../nodes/llm/AGENTS.md`. R
 - **Write tools go through State Write's `planWrite`**, never a copy of its rules (`reset` is `delete`, mapped before `checkOp`). They plan against `ctx.pendingState()`, buffer through `ctx.writeState`, and answer with the key's value from `ctx.pendingState()`.
 - **Tool-only ops** (`writeOps` adds them to State Write's; State Write's panel never offers them):
   - a text key's `replace` (`old` must match exactly once) and `append` (on a new line). The tool computes the whole new text and plans it as a `set`, so what is stored is an ordinary post-value.
-  - a collection item's `update` (by handle, new `text` only: any other argument is refused, so the model can never change an item's fields or link). It is planned by `planUpdate`, next to `planWrite` in State Write's `plan.ts`, and stored as the fold's `update` write.
+  - a collection item's `update` (by handle: new `text` and/or values of DECLARED fields, each checked by `collectionItem`; an undeclared name, `messages` included, is refused, so the model can never change an item's shape or link). It is planned by `planUpdate`, next to `planWrite` in State Write's `plan.ts`, and stored as the fold's `update` write with only what changed.
 - Tool schemas are hand-built and flat per key type (`state-schemas.ts`); the value rules belong to `planWrite`/`collectionItem` only.
 - Item handles (`#1`, ...) are per loop: a new tool that shows collection items goes through the same `ItemHandles`.
 - A listed key that no longer exists is left out with a node log line. Thread keys are never offered as tools (`ToolKey` excludes them; `locateAll` logs "Left out ...").

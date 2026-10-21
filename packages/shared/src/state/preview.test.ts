@@ -67,12 +67,22 @@ describe('previewWrite', () => {
     expect(previewWrite(add({ id: 'e:n:1', text: LONG })).truncated).toBe(true);
   });
 
-  it('cuts the long text of an item update and never its item id', () => {
-    const update: StateWrite = { op: 'update', target, nodeId: 'w', itemId: LONG, text: LONG };
+  it('cuts the long text and field values of an item update and never its item id', () => {
+    const update: StateWrite = {
+      op: 'update',
+      target,
+      nodeId: 'w',
+      itemId: LONG,
+      text: LONG,
+      fields: { note: LONG, level: 3 },
+    };
+    const cut = 'x'.repeat(WRITE_PREVIEW_LIMIT);
     expect(previewWrite(update)).toEqual({
-      write: { ...update, text: 'x'.repeat(WRITE_PREVIEW_LIMIT) },
+      write: { ...update, text: cut, fields: { note: cut, level: 3 } },
       truncated: true,
     });
+    const short: StateWrite = { op: 'update', target, nodeId: 'w', itemId: 'i', fields: { level: 3 } };
+    expect(previewWrite(short)).toEqual({ write: short, truncated: false });
   });
 
   it('does not change the stored write', () => {

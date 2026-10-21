@@ -82,7 +82,8 @@ in the same update that saves the replies, whether the turn completed, failed or
   The view derives `postStatus`/`postExecutionId`/`postError` from the post runs; nothing stores them.
 - **Scalars store the value after the write**: an `increment` becomes a `set` computed from the turn-start value plus
   earlier writes of the run, clamped. Collections store `add`, `update` and `remove`; `delete` resets a key. An
-  `update` (`{ itemId, text }`) is an item's new text; only the LLM node's write tools store it, never for a thread.
+  `update` (`{ itemId, text?, fields? }`) is an item's new text and/or field values; only the LLM node's write tools
+  store it, never for a thread.
 - `target.kind: "node"` is a node's own implicit key (Draw's `draws`, the Trigger's `fires`), with the run's
   `workflowId`. Draw stores only the first 80 characters of an entry's text; the `entryKey` fingerprint is what counts.
 - Stored sessions aren't parsed on read: entries are read through `readTurnEntries` (skips what's malformed) and
@@ -102,8 +103,8 @@ replies (how later runs of a turn see the earlier ones); its `workflowId` option
 - **Values.** A scalar is the post-value of the most recent counting write (`delete` makes it the default and still
   counts as a write). A collection is the items added minus those removed by counting turns, newest first (later write
   first within a turn), cut to `cap` at read time (`meta.droppedByCap`; items are never deleted from storage, so a
-  higher cap brings them back). An item reads with the text of its last counting `update`, keeping its id, fields,
-  link, place and turn; an update of an item that is gone does nothing. A thread ignores updates (its text is always
+  higher cap brings them back). An item reads as its counting `update`s left it (text and field values; a stored
+  update can never change its `id` or `messages`), keeping its place and turn; an update of an item that is gone does nothing. A thread ignores updates (its text is always
   its exchange's), with the "another key type" warning.
 - **Validation against the current definition.** A stored value that doesn't fit reads as the default with a warning
   (`State "scene.tension": Stored value 11 is above max 10; using default 3.`, added to the run's warnings). Writes
