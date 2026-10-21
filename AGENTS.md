@@ -9,6 +9,7 @@ This file holds what applies to every task. Each area of the code has its own `A
   - `packages/engine/`, with `src/nodes/` (node types), `src/nodes/llm/` (the LLM node), `src/providers/` (LLM adapter), `src/tools/` (tool loop)
   - `packages/node-ui/`
   - `apps/server/`, with `src/services/` (turns, runs, story state, alternatives, fork)
+  - `apps/mcp/` (the MCP server for external agents)
   - `apps/web/`, with `src/pages/chat/`, `src/pages/chat/story/`, `src/pages/workflows/`, `src/pages/stateDefinitions/`
 - Docs: `docs/*.md` are **user guides**; keep them in sync when user-visible behaviour changes. `docs/dev/` is **technical**: `ARCHITECTURE.md` (the overview), `reference/` (how each area works; update it with the code), `TOOLING.md`, `design/` (the agreed web layout and UX references, `FRONTEND-LAYOUT.md` and `FRONTEND-UX.md`), `plans/` (plans for work not built yet: once built, move what they decided into `reference/` and the `AGENTS.md` files, then delete them) and `explorations/` (research and design proposals).
 
@@ -37,6 +38,7 @@ npm workspaces, TypeScript strict, ESM, packages consumed as TS source.
 - `packages/engine`: graph validation, the wave-based parallel executor, Handlebars templating, node types, LLM adapters.
 - `packages/node-ui`: node config forms generated from JSON Schema, custom panels, template hints.
 - `apps/server`: Fastify 5 on port 3001 (run with `tsx`). File storage under `data/` (gitignored), AES-256-GCM secrets.
+- `apps/mcp`: a stdio MCP server, a generic projection of the API contract that calls the running server over HTTP.
 - `apps/web`: React 19 + Vite on port 5173, proxying `/api` to the server.
 
 ## Commands
@@ -55,6 +57,7 @@ Note: run tests sparringly as they are slow and long.
 - **API contract:** `packages/shared/src/api/` holds the method, path and zod schemas (request and response) of every endpoint. It is the only definition of the API.
   - To add or change an endpoint, update the contract first. The server registers its route from the contract (`route(app, 'key', handler)`: a path is never written twice), parses its input with it and types its response from it; the web client uses the same types.
   - Don't declare request or response types locally, and don't put inline `z.object` schemas in routes.
+  - A new endpoint also needs a decision in `apps/mcp/src/expose.ts` (expose or skip, forced by typecheck); give it a `description` written for an agent if it is exposed.
   - Server tests check responses against the contract schemas, and `app.test.ts` requires every contract endpoint to be exercised: a new contract entry, its route and its test land in the same commit.
 - **API errors** are always `{ error: { code, message, details? } }`, through the global Fastify error handler. No stack traces in responses.
 - **Data travels as data:** errors and validation issues carry ids (`nodeId`, `edgeId`, ...) in fields. Messages are plain language and never contain ids; never parse a message.

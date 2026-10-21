@@ -31,6 +31,7 @@ Open the address shown in the terminal (normally http://127.0.0.1:5173). Save an
 | [LLM providers](docs/PROVIDERS.md) | Connecting OpenRouter, OpenAI, DeepSeek, local servers; models and wire settings |
 | [Collections](docs/COLLECTIONS.md) | Lorebooks and decks: the file format, Recall and Draw |
 | [Story state, lore and summaries](docs/STATE-AND-LORE.md) | Chat settings, story state, workflows after the reply, summaries, the Trigger, the examples |
+| [MCP server](docs/MCP.md) | Letting an AI agent (Claude Desktop, Claude Code, Cursor) create presets, workflows and characters for you |
 
 ## Working on the code
 

@@ -7,7 +7,7 @@ Story state, message links and prompt messages have their own notes: `src/state/
 ## API contract (`src/api/`)
 - Every entry is `endpoint({ method, path, description? }, response, body?, params?, query?)`, collected in `apiContract`. The key is the endpoint's name.
 - `path` is the full Fastify template with the `/api` prefix (`/api/presets/:id`); the `:names` are exactly the keys of the `params` schema (a test checks it), and no two entries share a method and path.
-- `description` is optional, plain language for API consumers (an MCP agent reads it): what the call does and what to watch for, never how the server does it. Keep it true when behaviour changes.
+- `description` is optional, plain language for API consumers (an MCP agent reads it): what the call does and what to watch for, never how the server does it. Keep it true when behaviour changes. Name another endpoint by its key (`getNodeType`): the MCP rewrites keys to its tool names.
 - Server routes register through `route()` from the contract, so nothing here is copied into a route; the web client still writes its own paths until it moves onto these.
 
 ## Workflow nodes

@@ -2,7 +2,7 @@
 
 The contract in `packages/shared/src/api/` is the only definition of each endpoint: its method, path (full, `/api`
 included), optional description and request and response schemas. The server registers every route from it
-(`route(app, 'key', handler)`), so adding an endpoint starts with a contract entry. This page is the map, with the
+(`route(app, 'key', handler)`), so adding an endpoint starts with a contract entry. The MCP server ([mcp.md](mcp.md)) is generated from the same contract. This page is the map, with the
 behaviour the schemas can't show. All JSON. Errors are always
 `{ error: { code, message, details? } }`: `400` for a body or params that don't parse (the standard validation
 envelope), `404 NOT_FOUND` for a missing record, and the specific codes below.
