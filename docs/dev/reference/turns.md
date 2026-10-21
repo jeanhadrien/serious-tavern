@@ -59,7 +59,7 @@ and the turn runs on the history as it is with `trigger.message` set to `''`.
 ## Streaming
 
 `POST .../messages/stream` answers with `turn.start`, `run.start { runId, workflowId, workflowName }` before each
-run, `node.*` events tagged with `runId`, then `turn.complete` (the persisted messages and every run's log) or
+run, `node.*` events tagged with `runId` (`node.start`, `node.delta`, `node.complete`, and the outcomes that are not a completion: `node.skipped` with its `skip`, `node.error` without a message since the log has it, and `node.cancelled`), then `turn.complete` (the persisted messages and every run's log) or
 `turn.error`. Events come from the engine's `onEvent` through `TurnStream`, which also flushes the streaming rows to
 the session file and handles the tool loop's step resets (`node.delta` with `reset: true`). Stop is only
 `POST .../stop`: the stream stays open and ends with `turn.error` `TURN_STOPPED` and the failure details (saved user

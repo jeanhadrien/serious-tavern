@@ -72,8 +72,8 @@ To try the app without any key, make a workflow with just **Chat Input** `messag
   that already appeared in the last five replies; **recycled sentences**, sentences repeated word for word from those
   replies. A `—` means the number can't be computed for that reply (for example no earlier reply to compare with).
   English only.
-- **Execution details** under a message show the run that wrote it: every node with its status (for a skipped one, why) and a **Show on canvas** link that opens the run's workflow on that node, timing, outputs and
-  errors, the chat settings and the random seed it used, and for an LLM node the exact request sent to the provider.
+- **Execution details** under a message show the run that wrote it: every node with its status (for a skipped one, why), timing, outputs and
+  errors, a **Show on canvas** link that opens the run's workflow on that node, the chat settings and the random seed it used, and for an LLM node the exact request sent to the provider.
 - If a turn fails, the replies already written are kept and the error is shown. Sending again starts a new turn.
 
 ## Regenerate and alternatives

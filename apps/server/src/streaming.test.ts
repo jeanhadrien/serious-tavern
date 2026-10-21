@@ -473,6 +473,11 @@ describe('streamed turns', () => {
     try {
       const response = await app.inject(streamRequest(session.id, 'hi'));
       const frames = framesOf(response.body);
+      // The failed node is announced, without its message (the log has it), tagged with its run.
+      const runId = (frames[0]!.data as unknown as { executionId: string }).executionId;
+      expect(frames.map((frame) => frame.data).filter((data) => data.type === 'node.error')).toEqual([
+        { type: 'node.error', nodeId: 'llm', runId },
+      ]);
       expect(frames.at(-1)!.data).toMatchObject({
         type: 'turn.error',
         error: {
@@ -482,6 +487,32 @@ describe('streamed turns', () => {
         },
       });
       expect(assistantRows(await readSession(app, session.id))).toMatchObject([{ content: 'Oops', status: 'partial' }]);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('announces a node that was skipped, with why', async () => {
+    const { app, session } = await setup(() => ({
+      nodes: [
+        node('input', 'chat-input'),
+        node('condition', 'condition', { left: '{{input.value}}', right: 'hi' }),
+        node('yes', 'chat-output'),
+        node('no', 'chat-output'),
+      ],
+      edges: [
+        edge('input', 'message', 'condition', 'value'),
+        edge('condition', 'true', 'yes', 'value'),
+        edge('condition', 'false', 'no', 'value'),
+      ],
+    }));
+    try {
+      const frames = framesOf((await app.inject(streamRequest(session.id, 'hi'))).body).map((frame) => frame.data);
+      const runId = (frames[0] as unknown as { executionId: string }).executionId;
+      expect(frames.filter((data) => data.type === 'node.skipped')).toEqual([
+        { type: 'node.skipped', nodeId: 'no', runId, skip: { reason: 'inactive-inputs' } },
+      ]);
+      expect(frames.at(-1)).toMatchObject({ type: 'turn.complete' });
     } finally {
       await app.close();
     }

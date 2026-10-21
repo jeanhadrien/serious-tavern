@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { ApiResponse, Character, ChatMessage, Session } from '@st/shared';
+import { nodeSkipSchema, type ApiResponse, type Character, type ChatMessage, type Session } from '@st/shared';
 import type { EngineEvent, NodeDelta, PreparedWorkflow } from '@st/engine';
 import type { Repository } from '../storage/repository.js';
 import { now } from '../context.js';
@@ -112,10 +112,18 @@ export class TurnStream {
         break;
       case 'node:skipped':
       case 'node:cancelled':
-      case 'node:error':
+      case 'node:error': {
         this.settled.set(nodeId, {});
+        const { runId } = this.options;
+        const skip = event.type === 'node:skipped' ? nodeSkipSchema.safeParse(event.detail) : undefined;
+        const frame: TurnFrame =
+          event.type === 'node:skipped'
+            ? { type: 'node.skipped', nodeId, runId, ...(skip?.success && { skip: skip.data }) }
+            : { type: event.type === 'node:error' ? 'node.error' : 'node.cancelled', nodeId, runId };
+        this.enqueue(() => this.options.emit(frame));
         this.enqueue(() => this.pump(false));
         break;
+      }
       case 'node:delta':
         this.absorb(nodeId, event.detail as NodeDelta | undefined);
         break;

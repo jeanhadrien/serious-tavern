@@ -56,17 +56,6 @@ canvas `nodes`. Tidy (14) must then learn about notes; see the open questions.
 
 ## Phase C: runs
 
-### 8a. Stream contract for node outcomes
-
-- **Contract (`shared/src/api/sessions.ts`, `turnEventSchema`):** add `node.skipped` (with item 5's `skip`),
-  `node.error` and `node.cancelled`, each `{ nodeId, runId? }`. They are additive union members, and the web's
-  `safeParse` already ignores types it doesn't know.
-  - `node.error` carries no message: the log has it, and stream frames stay small.
-- **Server:** `TurnStream.onEvent` emits them, in the same serial chain as the others.
-- **Tests:** the server stream tests parse every frame with the contract (`app.test.ts` already does), so add a case
-  with a skipped node and a failing one.
-- **Docs:** `reference/turns.md` (streaming), `reference/api.md`.
-
 ### 8b. Live run status on the canvas
 
 - **Goal:** while the open chat streams a run of the workflow open in the editor, its nodes show running, done,

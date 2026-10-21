@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { sessionSchema, messageSchema, executionLogSchema } from '../models.js';
+import { sessionSchema, messageSchema, executionLogSchema, nodeSkipSchema } from '../models.js';
 import { replyEntrySchema } from '../triggers.js';
 import { endpoint, errorEnvelopeSchema, idParamsSchema, noContentSchema } from './common.js';
 
@@ -82,6 +82,15 @@ export const turnEventSchema = z.discriminatedUnion('type', [
     reasoningDelta: z.string().optional(),
   }),
   z.object({ type: z.literal('node.complete'), nodeId: z.string(), runId: z.string().optional() }),
+  // A node that did not run to completion. `node.error` carries no message: the run's log has it, and frames stay small.
+  z.object({
+    type: z.literal('node.skipped'),
+    nodeId: z.string(),
+    runId: z.string().optional(),
+    skip: nodeSkipSchema.optional(),
+  }),
+  z.object({ type: z.literal('node.error'), nodeId: z.string(), runId: z.string().optional() }),
+  z.object({ type: z.literal('node.cancelled'), nodeId: z.string(), runId: z.string().optional() }),
   sendMessageResultSchema.extend({ type: z.literal('turn.complete') }),
   errorEnvelopeSchema.extend({ type: z.literal('turn.error') }),
 ]);
