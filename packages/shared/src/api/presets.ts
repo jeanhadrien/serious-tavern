@@ -7,8 +7,7 @@ export const presetEndpoints = {
     {
       method: 'GET',
       path: '/api/presets',
-      description:
-        'List all prompt presets (full records). A preset is the template of messages an LLM node sends to the model.',
+      description: 'List all prompt presets. A preset is the template of messages an LLM node sends to the model.',
     },
     z.array(presetSchema),
   ),

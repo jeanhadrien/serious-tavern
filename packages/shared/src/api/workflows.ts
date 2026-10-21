@@ -24,7 +24,7 @@ export const workflowEndpoints = {
     {
       method: 'GET',
       path: '/api/workflows',
-      description: 'List all workflows (full records, nodes and edges included).',
+      description: 'List all workflows.',
     },
     z.array(workflowSchema),
   ),

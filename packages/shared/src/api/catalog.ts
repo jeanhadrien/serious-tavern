@@ -10,7 +10,7 @@ export const catalogEndpoints = {
       method: 'GET',
       path: '/api/node-types',
       description:
-        'List every node type with its ports, config schema and defaults. The answer is large (tens of kilobytes): to learn one type, call getNodeType.',
+        'List the node types workflows are built from. To learn one type (its ports, config schema and defaults), call getNodeType: the full catalog is tens of kilobytes.',
     },
     z.array(nodeTypeDescriptorSchema),
   ),
