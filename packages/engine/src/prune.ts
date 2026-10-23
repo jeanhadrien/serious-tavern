@@ -1,8 +1,10 @@
-import type { PortDef, Workflow } from '@st/shared';
+import type { Edge, NodeInstance, PortDef } from '@st/shared';
 import { registry } from './registry.js';
 import type { NodeResources } from './types.js';
 
 type ResolvedPorts = { inputs: PortDef[]; outputs: PortDef[] };
+// What pruning reads: positions and the rest of the record play no part, so a draft without positions qualifies.
+type Graph = { nodes: Pick<NodeInstance, 'id' | 'type' | 'config'>[]; edges: Edge[] };
 
 /**
  * Removes connections whose handle no longer exists on a node, e.g. an edge into
@@ -10,7 +12,7 @@ type ResolvedPorts = { inputs: PortDef[]; outputs: PortDef[] };
  * nodes with unknown types or failing resolvers keep every edge, because their
  * handles can't be verified. Returns a new workflow; the input is not mutated.
  */
-export async function pruneInvalidEdges(workflow: Workflow, resources: NodeResources): Promise<Workflow> {
+export async function pruneInvalidEdges<W extends Graph>(workflow: W, resources: NodeResources): Promise<W> {
   const resolved = new Map<string, ResolvedPorts | undefined>();
   for (const node of workflow.nodes) {
     const definition = registry.get(node.type);

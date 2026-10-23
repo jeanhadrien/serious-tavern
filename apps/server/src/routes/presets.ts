@@ -5,15 +5,15 @@ import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
 import { previewPreset } from '../services/preset-preview.js';
 import { pruneWorkflowsUsingPreset, withoutSource } from '../services/presets.js';
-import type { ApiRoute } from './types.js';
+import { route } from './route.js';
 
 export function registerPresets(app: FastifyInstance, context: AppContext) {
   const { presets, workflows } = context;
-  app.get<ApiRoute<'listPresets'>>('/api/presets', async () => presets.list());
-  app.post<ApiRoute<'previewPreset'>>('/api/presets/preview', async (request) =>
+  route(app, 'listPresets', async () => presets.list());
+  route(app, 'previewPreset', async (request) =>
     previewPreset(context, apiContract.previewPreset.body.parse(request.body)),
   );
-  app.post<ApiRoute<'createPreset'>>('/api/presets', async (request, reply) => {
+  route(app, 'createPreset', async (request, reply) => {
     const date = now();
     const body = withoutSource(apiContract.createPreset.body.parse({ ...(request.body as object) }));
     const preset = presetSchema.parse({ ...body, id: randomUUID(), createdAt: date, updatedAt: date });
@@ -21,10 +21,10 @@ export function registerPresets(app: FastifyInstance, context: AppContext) {
     // Answer with the stored form (ids are re-derived from the file), like PUT and later GETs.
     return reply.code(201).send(await requireEntity(presets, preset.id, 'Preset'));
   });
-  app.get<ApiRoute<'getPreset'>>('/api/presets/:id', async (request) =>
+  route(app, 'getPreset', async (request) =>
     requireEntity(presets, apiContract.getPreset.params.parse(request.params).id, 'Preset'),
   );
-  app.put<ApiRoute<'updatePreset'>>('/api/presets/:id', async (request) => {
+  route(app, 'updatePreset', async (request) => {
     const { id } = apiContract.updatePreset.params.parse(request.params);
     const body = withoutSource(apiContract.updatePreset.body.parse({ ...(request.body as object) }));
     // Spread old first so unknown fields from newer versions survive (migrate-on-write).
@@ -43,7 +43,7 @@ export function registerPresets(app: FastifyInstance, context: AppContext) {
     await pruneWorkflowsUsingPreset(context, id);
     return preset;
   });
-  app.delete<ApiRoute<'deletePreset'>>('/api/presets/:id', async (request, reply) => {
+  route(app, 'deletePreset', async (request, reply) => {
     const { id } = apiContract.deletePreset.params.parse(request.params);
     await requireEntity(presets, id, 'Preset');
     const users = (await workflows.list())

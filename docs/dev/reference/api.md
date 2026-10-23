@@ -1,7 +1,9 @@
 # API reference
 
-The contract in `packages/shared/src/api/` is the only definition of each endpoint's request and response; this page
-is the map, with the behaviour the schemas can't show. All JSON. Errors are always
+The contract in `packages/shared/src/api/` is the only definition of each endpoint: its method, path (full, `/api`
+included), optional description and request and response schemas. The server registers every route from it
+(`route(app, 'key', handler)`), so adding an endpoint starts with a contract entry. The MCP server ([mcp.md](mcp.md)) is generated from the same contract. This page is the map, with the
+behaviour the schemas can't show. All JSON. Errors are always
 `{ error: { code, message, details? } }`: `400` for a body or params that don't parse (the standard validation
 envelope), `404 NOT_FOUND` for a missing record, and the specific codes below.
 
@@ -39,13 +41,23 @@ run's on success, the failing run's on failure, absent when no workflow of the c
 | Method and path | Request | Answer |
 | --- | --- | --- |
 | `GET /api/workflows`, `GET /api/workflows/:id` | | `200` |
-| `POST /api/workflows` | the workflow (`settings` included, so a duplicate keeps them) | `201` |
-| `PUT /api/workflows/:id` | the workflow; a body without `settings` keeps the stored ones | `200`. Edges to ports that no longer exist are pruned. Not validated. |
+| `POST /api/workflows` | the workflow (`settings` included, so a duplicate keeps them) | `201` the stored workflow plus the save report (below). |
+| `PUT /api/workflows/:id` | the workflow; a body without `settings` keeps the stored ones | `200` the stored workflow plus the save report (below). |
 | `DELETE /api/workflows/:id` | | `204`; `409 WORKFLOW_IN_USE` while a chat's reply list names it. |
 | `POST /api/workflows/:id/validate` | | `200` when valid; `422 WORKFLOW_INVALID` with the issues. |
 | `POST /api/workflows/validate` | `{ nodes, edges, settings? }`, a draft the editor holds | `200 { issues }`, empty when valid. Problems are the answer, not an error (a `422` would be toasted by the client). Writes nothing and takes no lock. An issue carries `source: 'settings'` when it belongs to the chat settings declarations. |
 | `GET /api/node-types` | | `200` every node type's descriptor (ports, config schema, defaults, `sink`, `dynamicPorts`). |
+| `GET /api/node-types/:type` | | `200` one node type's descriptor, the same as its entry in the list (the list is tens of kilobytes); `404` for an unknown type. |
 | `POST /api/node-types/:type/ports` | the node's config | `200` its resolved inputs and outputs (for `dynamicPorts` types). |
+
+**Positions.** A node in a create or update body may omit `position`; the stored workflow always has one. On update a node
+keeps the position of the stored node with the same id, and the others are laid out (`layoutNodes` in shared) below
+every positioned node, as a left-to-right graph of their own.
+
+**The save report.** Create and update run the same step (`checkWorkflowForSave`): edges to ports that no longer exist are
+pruned, then the stored workflow is validated, and the answer carries two extra fields: `droppedEdgeIds` and `issues`
+(`ValidationIssue[]`, the same as `validate`'s). The save is never refused for issues, since a draft may be incomplete.
+Both fields describe that save only; the server drops them from a body, so echoing a response back is harmless.
 
 ## Presets
 
@@ -93,11 +105,11 @@ run's on success, the failing run's on failure, absent when no workflow of the c
 
 | Method and path | Purpose |
 | --- | --- |
-| `GET/POST /api/characters`, `GET/PUT/DELETE /api/characters/:id` | CRUD |
+| `GET/POST /api/characters`, `GET/PUT/DELETE /api/characters/:id` | CRUD. `PUT` is a partial update: fields left out keep their stored value (defaults apply on `POST` only) |
 | `POST /api/characters/import` | Multipart JSON or PNG cards; `{ imported, failed }` |
 | `GET/PUT /api/characters/:id/avatar` | The avatar image (20 MB per upload) |
 | `GET /api/characters/:id/export?format=json\|png` | The card, V2 and V3 |
-| `GET/POST /api/personas`, `GET/PUT/DELETE /api/personas/:id` | CRUD |
+| `GET/POST /api/personas`, `GET/PUT/DELETE /api/personas/:id` | CRUD, `PUT` partial like characters |
 | `POST /api/personas/import` | Images (a card inside is used when present); `{ imported, failed }` |
 | `GET/PUT /api/personas/:id/avatar` | The avatar image |
 

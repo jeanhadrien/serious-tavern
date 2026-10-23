@@ -2,10 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import { apiContract } from '@st/shared';
 import type { AppContext } from '../context.js';
 import { requireEntity } from '../errors.js';
-import type { ApiRoute } from './types.js';
+import { route } from './route.js';
 
 export function registerExecutions(app: FastifyInstance, { executions }: AppContext) {
-  app.get<ApiRoute<'getExecution'>>('/api/executions/:id', async (request) =>
+  route(app, 'getExecution', async (request) =>
     requireEntity(executions, apiContract.getExecution.params.parse(request.params).id, 'Execution'),
   );
 }

@@ -5,7 +5,7 @@ import { errorBody } from '../errors.js';
 import { regenerate, runRegenerate, runTurn, sendMessage } from '../services/chat.js';
 import type { TurnFrame } from '../services/turn-stream.js';
 import { updateMessage, deleteMessage } from '../services/messages.js';
-import type { ApiRoute } from './types.js';
+import { route } from './route.js';
 
 type TurnComplete = Extract<TurnFrame, { type: 'turn.complete' }>;
 type EventStream = { send(frame: TurnFrame): void; end(): void };
@@ -68,36 +68,36 @@ async function streamJob(
 }
 
 export function registerMessages(app: FastifyInstance, context: AppContext) {
-  app.post<ApiRoute<'sendMessage'>>('/api/sessions/:id/messages', async (request, reply) => {
+  route(app, 'sendMessage', async (request, reply) => {
     const { id } = apiContract.sendMessage.params.parse(request.params);
     const { content } = apiContract.sendMessage.body.parse(request.body);
     // The plain endpoint only cancels a message that has not started: once it runs, it finishes whoever waits.
     return reply.send(await sendMessage(context, id, content, clientLifetime(reply).signal));
   });
-  app.post<ApiRoute<'streamTurn'>>('/api/sessions/:id/messages/stream', async (request, reply) => {
+  route(app, 'streamTurn', async (request, reply) => {
     const { id } = apiContract.streamTurn.params.parse(request.params);
     const { content } = apiContract.streamTurn.body.parse(request.body);
     await streamJob(reply, (emit, signal) => runTurn(context, id, content, { emit, signal }));
   });
-  app.post<ApiRoute<'regenerate'>>('/api/sessions/:id/regenerate', async (request, reply) => {
+  route(app, 'regenerate', async (request, reply) => {
     const { id } = apiContract.regenerate.params.parse(request.params);
     return reply.send(await regenerate(context, id, clientLifetime(reply).signal));
   });
-  app.post<ApiRoute<'streamRegenerate'>>('/api/sessions/:id/regenerate/stream', async (request, reply) => {
+  route(app, 'streamRegenerate', async (request, reply) => {
     const { id } = apiContract.streamRegenerate.params.parse(request.params);
     await streamJob(reply, (emit, signal) => runRegenerate(context, id, { emit, signal }));
   });
-  app.post<ApiRoute<'stopTurn'>>('/api/sessions/:id/stop', async (request, reply) => {
+  route(app, 'stopTurn', async (request, reply) => {
     const { id } = apiContract.stopTurn.params.parse(request.params);
     context.turns.stop(id);
     return reply.code(204).send();
   });
-  app.patch<ApiRoute<'updateMessage'>>('/api/sessions/:id/messages/:messageId', async (request) => {
+  route(app, 'updateMessage', async (request) => {
     const { id, messageId } = apiContract.updateMessage.params.parse(request.params);
     const body = apiContract.updateMessage.body.parse(request.body);
     return updateMessage(context, id, messageId, body);
   });
-  app.delete<ApiRoute<'deleteMessage'>>('/api/sessions/:id/messages/:messageId', async (request, reply) => {
+  route(app, 'deleteMessage', async (request, reply) => {
     const { id, messageId } = apiContract.deleteMessage.params.parse(request.params);
     await deleteMessage(context, id, messageId);
     return reply.code(204).send();

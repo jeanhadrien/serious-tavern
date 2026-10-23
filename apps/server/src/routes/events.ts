@@ -1,14 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import type { AppContext } from '../context.js';
 import { currentChangeEvents, type ChangeEvent } from '../services/change-events.js';
-import type { ApiRoute } from './types.js';
+import { route } from './route.js';
 
 const HEARTBEAT_MS = 15_000;
 
 /** `GET /api/events`: Server-Sent Events telling the web app that resources changed on disk. */
 export function registerEvents(app: FastifyInstance, context: AppContext, options: { heartbeatMs?: number } = {}) {
   const open = new Set<() => void>();
-  app.get<ApiRoute<'streamChanges'>>('/api/events', async (_request, reply) => {
+  route(app, 'streamChanges', async (_request, reply) => {
     reply.hijack();
     const { raw } = reply;
     raw.writeHead(200, {

@@ -8,6 +8,7 @@ export * from './conversation/index.js';
 export * from './triggers.js';
 export * from './node-names.js';
 export * from './skip-reason.js';
+export * from './node-layout.js';
 export * from './ports.js';
 export * from './reasoning.js';
 export * from './preset.js';

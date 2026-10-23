@@ -7,43 +7,43 @@ import { forkSession } from '../services/fork.js';
 import { sessionStats } from '../services/message-stats.js';
 import { sessionStateView } from '../services/session-state.js';
 import { createSession, updateSession } from '../services/sessions.js';
-import type { ApiRoute } from './types.js';
+import { route } from './route.js';
 
 export function registerSessions(app: FastifyInstance, context: AppContext) {
   const { sessions } = context;
-  app.get<ApiRoute<'listSessions'>>('/api/sessions', async () =>
+  route(app, 'listSessions', async () =>
     // The turn entries are the session's own business: a list carries neither messages nor state.
     (await sessions.list()).map(({ messages, state: _state, ...session }) => ({
       ...session,
       messageCount: activeMessages(messages).length,
     })),
   );
-  app.post<ApiRoute<'createSession'>>('/api/sessions', async (request, reply) =>
+  route(app, 'createSession', async (request, reply) =>
     reply.code(201).send(await createSession(context, apiContract.createSession.body.parse(request.body))),
   );
-  app.get<ApiRoute<'getSession'>>('/api/sessions/:id', async (request) =>
+  route(app, 'getSession', async (request) =>
     requireEntity(sessions, apiContract.getSession.params.parse(request.params).id, 'Session'),
   );
-  app.get<ApiRoute<'getSessionState'>>('/api/sessions/:id/state', async (request) =>
+  route(app, 'getSessionState', async (request) =>
     sessionStateView(context, apiContract.getSessionState.params.parse(request.params).id),
   );
-  app.get<ApiRoute<'getSessionStats'>>('/api/sessions/:id/stats', async (request) =>
+  route(app, 'getSessionStats', async (request) =>
     sessionStats(context, apiContract.getSessionStats.params.parse(request.params).id),
   );
-  app.patch<ApiRoute<'updateSession'>>('/api/sessions/:id', async (request) => {
+  route(app, 'updateSession', async (request) => {
     const { id } = apiContract.updateSession.params.parse(request.params);
     return updateSession(context, id, apiContract.updateSession.body.parse(request.body));
   });
-  app.patch<ApiRoute<'setAlternative'>>('/api/sessions/:id/alternative', async (request) => {
+  route(app, 'setAlternative', async (request) => {
     const { id } = apiContract.setAlternative.params.parse(request.params);
     return setAlternative(context, id, apiContract.setAlternative.body.parse(request.body).executionId);
   });
-  app.post<ApiRoute<'forkSession'>>('/api/sessions/:id/fork', async (request, reply) => {
+  route(app, 'forkSession', async (request, reply) => {
     const { id } = apiContract.forkSession.params.parse(request.params);
     const { messageId } = apiContract.forkSession.body.parse(request.body);
     return reply.code(201).send(await forkSession(context, id, messageId));
   });
-  app.delete<ApiRoute<'deleteSession'>>('/api/sessions/:id', async (request, reply) => {
+  route(app, 'deleteSession', async (request, reply) => {
     const { id } = apiContract.deleteSession.params.parse(request.params);
     // A running turn (or a run after its reply) of the chat would only work for a chat that is gone: stop it first.
     context.turns.stop(id);

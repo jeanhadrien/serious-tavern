@@ -1,3 +1,4 @@
+import type { z } from 'zod';
 import { expect, it } from 'vitest';
 import { executionLogSchema, messageSchema } from '../models.js';
 import {
@@ -8,19 +9,20 @@ import {
   stateDefinitionInUseDetailsSchema,
 } from './index.js';
 
-it('preserves existing entity defaults, including defaults on partial updates', () => {
+it('applies entity defaults on create bodies only; update bodies keep just the sent fields', () => {
   expect(apiContract.createCharacter.body.parse({ name: '  Alice  ' })).toMatchObject({
     name: 'Alice',
     description: '',
     tags: [],
     extensions: {},
   });
-  expect(apiContract.updateCharacter.body.parse({ name: 'Alice' })).toMatchObject({
-    name: 'Alice',
-    description: '',
-    tags: [],
+  expect(apiContract.createPersona.body.parse({ name: 'Bob' })).toEqual({ name: 'Bob', description: '' });
+  expect(apiContract.updateCharacter.body.parse({ name: ' Alice ' })).toEqual({ name: 'Alice' });
+  expect(apiContract.updateCharacter.body.safeParse({ name: '  ' }).success).toBe(false);
+  expect(apiContract.updatePersona.body.parse({})).toEqual({});
+  expect(apiContract.updatePersona.body.parse({ description: 'x', id: 'other', avatar: 'a.png' })).toEqual({
+    description: 'x',
   });
-  expect(apiContract.updatePersona.body.parse({})).toEqual({ description: '' });
 });
 
 it('validates preset writes with the same cross-field rules as complete presets', () => {
@@ -369,4 +371,27 @@ it('describes the reply list of a chat: both ways to create one, a whole-replace
   expect(view([], [{ ...node, workflowId: w1 }, node]).nodes.map((item) => item.workflowId)).toEqual([w1, undefined]);
   // Messages say which run wrote them, and a session keeps its reply list.
   expect(messageSchema.parse({ id: 'm', role: 'assistant', content: '', createdAt: '', runId: 'r1' }).runId).toBe('r1');
+});
+
+it('gives every endpoint its own method and path, whose :params are the keys of its params schema', () => {
+  const seen = new Set<string>();
+  for (const [key, contract] of Object.entries(apiContract)) {
+    const route = `${contract.method} ${contract.path}`;
+    expect(seen.has(route), `${key} repeats ${route}`).toBe(false);
+    seen.add(route);
+    const pathParams = [...contract.path.matchAll(/:(\w+)/g)].map((match) => match[1]);
+    const schemaParams = Object.keys((contract.params as z.ZodObject).shape);
+    expect(pathParams.sort(), key).toEqual(schemaParams.sort());
+  }
+});
+
+it('workflow write bodies make a node position optional and keep unknown node and workflow fields', () => {
+  const node = { id: 'n', type: 'chat-input', config: {}, futureNodeField: 1 };
+  const body = { name: 'W', nodes: [node], edges: [], futureField: 2 };
+  expect(apiContract.updateWorkflow.body.parse(body)).toEqual(body);
+  expect(apiContract.createWorkflow.body.parse(body)).toMatchObject({ nodes: [node] });
+  const positioned = { ...node, position: { x: 1, y: 2 } };
+  expect(apiContract.updateWorkflow.body.parse({ ...body, nodes: [positioned] }).nodes).toEqual([positioned]);
+  // The stored schema still requires one.
+  expect(apiContract.updateWorkflow.response.shape.nodes.safeParse([node]).success).toBe(false);
 });

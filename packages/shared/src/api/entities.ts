@@ -22,6 +22,11 @@ export const personaFieldsSchema = z.object({
   name: personaSchema.shape.name,
   description: personaSchema.shape.description.default(''),
 });
+// Update bodies are built from the stored schema (no `.default()`), so a field the client left out stays out of
+// the parsed body and `updateEntity` keeps the stored value. Defaults belong to the create bodies only.
+const serverOwnedFields = { id: true, avatar: true, createdAt: true, updatedAt: true } as const;
+export const characterUpdateSchema = z.object(characterSchema.omit(serverOwnedFields).shape).partial();
+export const personaUpdateSchema = z.object(personaSchema.omit(serverOwnedFields).shape).partial();
 export const importFailureSchema = z.object({
   filename: z.string(),
   error: z.object({ code: z.string(), message: z.string() }),
@@ -43,26 +48,102 @@ export type EntityImportResult<T> = {
 export const characterCardDataSchema = characterFieldsSchema.omit({ extensions: true }).catchall(z.unknown());
 export const characterExportQuerySchema = z.object({ format: z.enum(['png', 'json']).default('json') });
 export const entityEndpoints = {
-  listCharacters: endpoint(z.array(characterSchema)),
-  createCharacter: endpoint(characterSchema, characterFieldsSchema),
-  getCharacter: endpoint(characterSchema, undefined, idParamsSchema),
-  updateCharacter: endpoint(characterSchema, characterFieldsSchema.partial(), idParamsSchema),
-  deleteCharacter: endpoint(noContentSchema, undefined, idParamsSchema),
-  importCharacters: endpoint(characterImportResultSchema, binarySchema),
-  getCharacterAvatar: endpoint(binarySchema, undefined, idParamsSchema),
-  updateCharacterAvatar: endpoint(characterSchema, binarySchema, idParamsSchema),
+  listCharacters: endpoint(
+    { method: 'GET', path: '/api/characters', description: 'List all characters.' },
+    z.array(characterSchema),
+  ),
+  createCharacter: endpoint(
+    { method: 'POST', path: '/api/characters', description: 'Create a character. Fields left out default to empty.' },
+    characterSchema,
+    characterFieldsSchema,
+  ),
+  getCharacter: endpoint(
+    { method: 'GET', path: '/api/characters/:id', description: 'Get one character card.' },
+    characterSchema,
+    undefined,
+    idParamsSchema,
+  ),
+  updateCharacter: endpoint(
+    {
+      method: 'PUT',
+      path: '/api/characters/:id',
+      description: 'Update a character. Fields left out keep their stored value.',
+    },
+    characterSchema,
+    characterUpdateSchema,
+    idParamsSchema,
+  ),
+  deleteCharacter: endpoint(
+    { method: 'DELETE', path: '/api/characters/:id' },
+    noContentSchema,
+    undefined,
+    idParamsSchema,
+  ),
+  importCharacters: endpoint(
+    { method: 'POST', path: '/api/characters/import' },
+    characterImportResultSchema,
+    binarySchema,
+  ),
+  getCharacterAvatar: endpoint(
+    { method: 'GET', path: '/api/characters/:id/avatar' },
+    binarySchema,
+    undefined,
+    idParamsSchema,
+  ),
+  updateCharacterAvatar: endpoint(
+    { method: 'PUT', path: '/api/characters/:id/avatar' },
+    characterSchema,
+    binarySchema,
+    idParamsSchema,
+  ),
   exportCharacter: endpoint(
+    { method: 'GET', path: '/api/characters/:id/export' },
     z.union([characterCardDataSchema, binarySchema]),
     undefined,
     idParamsSchema,
     characterExportQuerySchema,
   ),
-  listPersonas: endpoint(z.array(personaSchema)),
-  createPersona: endpoint(personaSchema, personaFieldsSchema),
-  getPersona: endpoint(personaSchema, undefined, idParamsSchema),
-  updatePersona: endpoint(personaSchema, personaFieldsSchema.partial(), idParamsSchema),
-  deletePersona: endpoint(noContentSchema, undefined, idParamsSchema),
-  importPersonas: endpoint(personaImportResultSchema, binarySchema),
-  getPersonaAvatar: endpoint(binarySchema, undefined, idParamsSchema),
-  updatePersonaAvatar: endpoint(personaSchema, binarySchema, idParamsSchema),
+  listPersonas: endpoint(
+    { method: 'GET', path: '/api/personas', description: 'List all personas (who the user plays).' },
+    z.array(personaSchema),
+  ),
+  createPersona: endpoint(
+    {
+      method: 'POST',
+      path: '/api/personas',
+      description: 'Create a persona. A missing description defaults to empty.',
+    },
+    personaSchema,
+    personaFieldsSchema,
+  ),
+  getPersona: endpoint(
+    { method: 'GET', path: '/api/personas/:id', description: 'Get one persona.' },
+    personaSchema,
+    undefined,
+    idParamsSchema,
+  ),
+  updatePersona: endpoint(
+    {
+      method: 'PUT',
+      path: '/api/personas/:id',
+      description: 'Update a persona. Fields left out keep their stored value.',
+    },
+    personaSchema,
+    personaUpdateSchema,
+    idParamsSchema,
+  ),
+  deletePersona: endpoint({ method: 'DELETE', path: '/api/personas/:id' }, noContentSchema, undefined, idParamsSchema),
+  importPersonas: endpoint({ method: 'POST', path: '/api/personas/import' }, personaImportResultSchema, binarySchema),
+  getPersonaAvatar: endpoint(
+    { method: 'GET', path: '/api/personas/:id/avatar' },
+    binarySchema,
+    undefined,
+    idParamsSchema,
+  ),
+  updatePersonaAvatar: endpoint(
+    { method: 'PUT', path: '/api/personas/:id/avatar' },
+    personaSchema,
+    binarySchema,
+    idParamsSchema,
+  ),
 };

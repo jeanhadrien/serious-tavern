@@ -9,6 +9,10 @@
       "entry": ["src/main.ts", "src/**/*.test.ts"],
       "project": ["src/**/*.ts"]
     },
+    "apps/mcp": {
+      "entry": ["src/main.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts"]
+    },
     "apps/web": {
       "entry": ["src/main.tsx", "src/**/*.test.{ts,tsx}", "vite.config.ts"],
       "project": ["src/**/*.{ts,tsx}", "*.config.ts"]

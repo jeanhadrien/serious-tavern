@@ -75,7 +75,9 @@ export async function putWorkflow(
 ): Promise<Workflow> {
   const response = await app.inject({ method: 'PUT', url: `/api/workflows/${id}`, payload: { name, nodes, edges } });
   if (response.statusCode !== 200) throw new Error(`workflow save failed: ${response.body}`);
-  return response.json() as Workflow;
+  // The save report (dropped edges, issues) is not part of the stored workflow.
+  const { droppedEdgeIds: _dropped, issues: _issues, ...workflow } = response.json();
+  return workflow as Workflow;
 }
 
 /** input -> output ("n=<n> turn=<turn>"), plus an unconnected State Write that adds 1 to `counter.n`. */

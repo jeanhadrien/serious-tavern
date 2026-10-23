@@ -1,19 +1,25 @@
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { apiContract, replyWorkflows, type ApiResponse, type WorkflowInvalidDetails } from '@st/shared';
-import { pruneInvalidEdges, validateWorkflow } from '@st/engine';
+import { apiContract, replyWorkflows, type WorkflowDraft, type WorkflowInvalidDetails } from '@st/shared';
+import { validateWorkflow } from '@st/engine';
 import { now, type AppContext } from '../context.js';
 import { HttpError, notFound, requireEntity } from '../errors.js';
 import { nodeResources } from '../services/node-resources.js';
-import type { ApiRoute } from './types.js';
+import {
+  checkWorkflowForSave,
+  withStoredPositions,
+  withoutSaveReport,
+  type WorkflowSaveReport,
+} from '../services/workflow-save.js';
+import { route } from './route.js';
 
 export function registerWorkflows(app: FastifyInstance, context: AppContext) {
   const { workflows, sessions } = context;
-  app.get<ApiRoute<'listWorkflows'>>('/api/workflows', async () => workflows.list());
-  app.post<ApiRoute<'createWorkflow'>>('/api/workflows', async (request, reply) => {
+  route(app, 'listWorkflows', async () => workflows.list());
+  route(app, 'createWorkflow', async (request, reply) => {
     const body = apiContract.createWorkflow.body.parse(request.body);
     const date = now();
-    const workflow: ApiResponse<'createWorkflow'> = {
+    const draft: WorkflowDraft = {
       id: randomUUID(),
       name: body.name,
       nodes: body.nodes ?? [],
@@ -23,22 +29,31 @@ export function registerWorkflows(app: FastifyInstance, context: AppContext) {
       createdAt: date,
       updatedAt: date,
     };
+    const { workflow, report } = await checkWorkflowForSave(draft, nodeResources(context));
     await workflows.save(workflow);
-    return reply.code(201).send(workflow);
+    return reply.code(201).send({ ...workflow, ...report });
   });
-  app.get<ApiRoute<'getWorkflow'>>('/api/workflows/:id', async (request) =>
+  route(app, 'getWorkflow', async (request) =>
     requireEntity(workflows, apiContract.getWorkflow.params.parse(request.params).id, 'Workflow'),
   );
-  app.put<ApiRoute<'updateWorkflow'>>('/api/workflows/:id', async (request) => {
+  route(app, 'updateWorkflow', async (request) => {
     const { id } = apiContract.updateWorkflow.params.parse(request.params);
-    const body = apiContract.updateWorkflow.body.parse(request.body);
-    const existing = await requireEntity(workflows, id, 'Workflow');
-    const pruned = await pruneInvalidEdges({ ...existing, ...body }, nodeResources(context));
-    const workflow = await workflows.update(id, (old) => ({ ...old, ...body, edges: pruned.edges, updatedAt: now() }));
-    if (!workflow) throw notFound('Workflow');
-    return workflow;
+    const body = withoutSaveReport(apiContract.updateWorkflow.body.parse(request.body));
+    let report: WorkflowSaveReport | undefined;
+    // The body is passthrough, so it may carry any key: `id` and `createdAt` are pinned. Spreading `old` first keeps
+    // unknown fields from newer versions (migrate-on-write).
+    const workflow = await workflows.update(id, async (old) => {
+      const checked = await checkWorkflowForSave(
+        { ...old, ...body, nodes: withStoredPositions(body.nodes, old.nodes), id, createdAt: old.createdAt },
+        nodeResources(context),
+      );
+      report = checked.report;
+      return { ...checked.workflow, updatedAt: now() };
+    });
+    if (!workflow || !report) throw notFound('Workflow');
+    return { ...workflow, ...report };
   });
-  app.delete<ApiRoute<'deleteWorkflow'>>('/api/workflows/:id', async (request, reply) => {
+  route(app, 'deleteWorkflow', async (request, reply) => {
     const { id } = apiContract.deleteWorkflow.params.parse(request.params);
     // Used by a chat when its reply list names it (`replyWorkflows`: the legacy `workflowId` for a chat without a list).
     if ((await sessions.list()).some((s) => replyWorkflows(s).some((entry) => entry.workflowId === id)))
@@ -46,11 +61,12 @@ export function registerWorkflows(app: FastifyInstance, context: AppContext) {
     await workflows.delete(id);
     return reply.code(204).send();
   });
-  app.post<ApiRoute<'validateWorkflowDraft'>>('/api/workflows/validate', async (request) => {
+  // A draft the editor holds, judged as sent and never stored; its problems are the answer, not an error.
+  route(app, 'validateWorkflowDraft', async (request) => {
     const draft = apiContract.validateWorkflowDraft.body.parse(request.body);
     return { issues: await validateWorkflow(draft, nodeResources(context)) };
   });
-  app.post<ApiRoute<'validateWorkflow'>>('/api/workflows/:id/validate', async (request) => {
+  route(app, 'validateWorkflow', async (request) => {
     const { id } = apiContract.validateWorkflow.params.parse(request.params);
     const workflow = await requireEntity(workflows, id, 'Workflow');
     const errors = await validateWorkflow(workflow, nodeResources(context));
@@ -60,6 +76,6 @@ export function registerWorkflows(app: FastifyInstance, context: AppContext) {
         workflowName: workflow.name,
         issues: errors,
       } satisfies WorkflowInvalidDetails);
-    return { valid: true, errors: [] };
+    return { valid: true as const, errors: [] };
   });
 }

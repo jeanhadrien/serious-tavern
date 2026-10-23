@@ -20,7 +20,7 @@ dependencies, sink reachability, and execution-scoped resources.
   (`nodeDisplayName`); the web links a `WORKFLOW_INVALID` toast to `/?wide=workflow:<id>&edge=<id>`, which opens the
   workflow with the offending edge in red.
 - `pruneInvalidEdges` drops edges into ports that no longer exist; the server runs it on preset update, state
-  definition update and workflow save. It only trusts ports that resolved: unknown types and failing resolvers keep
+  definition update and workflow save (which also reports the dropped edge ids, see `api.md`). It only trusts ports that resolved: unknown types and failing resolvers keep
   their edges.
 
 ## Executing

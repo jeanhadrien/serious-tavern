@@ -36,10 +36,11 @@ flowchart LR
 
 | Package | Role |
 | --- | --- |
-| `packages/shared` | Zod schemas and types for every record, the **API contract** (`src/api/`: request and response of every endpoint), and the pure rules both sides must agree on: port compatibility (`canConnect`), the story state fold, message links, alternatives, the fork cut, chat settings resolution, the macro registry. |
+| `packages/shared` | Zod schemas and types for every record, the **API contract** (`src/api/`: method, path and request and response of every endpoint; the server's routes register from it), and the pure rules both sides must agree on: port compatibility (`canConnect`), the story state fold, message links, alternatives, the fork cut, chat settings resolution, the macro registry. |
 | `packages/engine` | Workflow preparation and validation, the wave-based parallel executor, Handlebars templating, preset rendering, the node types (`src/nodes/<type>/`), the LLM adapter and the tool loop. No I/O of its own besides the LLM and HTTP calls nodes make. |
 | `packages/node-ui` | Node configuration forms generated from each node's JSON Schema, and custom panels for the nodes that need more. Knows nothing of the web app's routing or API clients. |
 | `apps/server` | Fastify routes (thin) over services (logic): chat turns, story state, storage, secrets, imports, change events. Owns all data and secrets. |
+| `apps/mcp` | A stdio MCP server for external agents. A generic projection of the API contract: it turns the exposed endpoints into tools and calls the running server over HTTP, with no data and no per-endpoint code of its own. |
 | `apps/web` | The three-column UI: chat, workflow editor (React Flow), editors for presets, providers, state definitions, characters, personas and collections, and settings. |
 
 The packages are consumed as TypeScript source (npm workspaces, ESM, strict). Nothing is compiled except the web
@@ -167,5 +168,6 @@ Details: [reference/web.md](reference/web.md).
 | [reference/turns.md](reference/turns.md) | The chat queue, streaming, the reply list, the after section, failures, regenerate, swipes, fork, chat settings |
 | [reference/story-state.md](reference/story-state.md) | Definitions, turn entries, the fold, State nodes, message links, threads, the state view |
 | [reference/storage.md](reference/storage.md) | Files, YAML repositories, change events, locks, secrets, app settings, seeds, imports |
+| [reference/mcp.md](reference/mcp.md) | The MCP server: the expose map, how tools are generated from the contract, errors, list trimming, guides |
 | [reference/web.md](reference/web.md) | The shell and URL, stores and editors, the workflow editor, the chat, story state in the chat |
 | [TOOLING.md](TOOLING.md) | Commands, Biome, knip |

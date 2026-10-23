@@ -11,7 +11,11 @@ export type AppSettingsPatch = z.infer<typeof updateAppSettingsSchema>;
 
 export const appSettingsEndpoints = {
   // The app-wide preferences with their defaults filled in (see app-settings.ts).
-  getAppSettings: endpoint(appSettingsSchema),
+  getAppSettings: endpoint({ method: 'GET', path: '/api/app-settings' }, appSettingsSchema),
   // The whole settings after the merge. `500 APP_SETTINGS_UNREADABLE` when the stored file cannot be read (it is never overwritten).
-  updateAppSettings: endpoint(appSettingsSchema, updateAppSettingsSchema),
+  updateAppSettings: endpoint(
+    { method: 'PATCH', path: '/api/app-settings' },
+    appSettingsSchema,
+    updateAppSettingsSchema,
+  ),
 };

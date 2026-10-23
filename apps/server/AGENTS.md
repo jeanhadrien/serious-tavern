@@ -5,6 +5,7 @@ Fastify 5 on `PORT` (default 3001; `npm run dev` picks a free one). Data lives i
 ## Structure
 - `app.ts` only wires things together. `context.ts` sets up the repositories and secrets; `errors.ts` has `HttpError` and the error handler.
 - `routes/<resource>.ts` holds thin handlers; the logic lives in `services/`.
+- **Routes register only through `route(app, 'key', handler, options?)`** (`routes/route.ts`): method and path come from the contract entry, so add the endpoint to the contract first. `options` are Fastify route options (`bodyLimit`, ...). Never call `app.get`/`app.post`/... for an `/api` path: `createApp` makes that throw at startup, and `contract-routes.test.ts` checks every contract entry is served at its method and path. A test-only route lives outside `/api`.
 
 ## Writes and locks
 - **Session writes always go through the per-session lock and `update`**, never `load → await → save`. The same applies to every mutation of an existing record (characters, personas, avatars): use `update` or the entity lock. Plain `save` is only for creation. Secrets use one store-wide lock.
@@ -22,6 +23,10 @@ Fastify 5 on `PORT` (default 3001; `npm run dev` picks a free one). Data lives i
 - **Model lists:** `ModelCatalog` caches in memory only. Its key is the whole record plus `SecretStore.revision`, never `updatedAt` (hand-edited files keep their old timestamp). Any new cache whose data depends on secrets keys on `revision` too.
 - **Collections:** `GET /api/collections` returns summaries (`entryCount`, no entries). `DELETE` answers `409 COLLECTION_IN_USE` (details: workflow names) while a Recall or Draw node lists the id. The serializer leaves out `weight: 1` and `enabled: true`.
 - **State definitions:** names unique ignoring case (`409 STATE_DEFINITION_NAME_TAKEN`); a rename or delete is refused with `409 STATE_DEFINITION_IN_USE` while a present turn wrote the definition (a delete also while a node uses it; `state-definition-usage.ts` lists the users). Updating a definition prunes the workflows' edges to vanished ports. `scene` is seeded into an empty directory.
+
+## Workflows
+- **Create and update share `checkWorkflowForSave`** (`services/workflow-save.ts`): prune, then validate, inside the update's lock. Validation only reports (`issues` in the response): a draft may be incomplete, so never refuse a save for it. The response's `droppedEdgeIds`/`issues` are never stored; `withoutSaveReport` strips them from a body.
+- **Positions:** the body schema (`workflowDraftSchema`) makes `position` optional, the stored `workflowSchema` keeps it required. `checkWorkflowForSave` fills the gaps with `layoutNodes` after pruning (so a dropped edge never shapes the layout); on update a node first keeps the stored position of its id.
 
 ## Change events (`GET /api/events`)
 - File-backed resources emit `presets|providers|collections|stateDefinitions.changed` with the currently invalid files. Records emit `workflows|characters|personas|sessions.changed` (`{ type, id? }`). On connect, every event type is sent once (id-less for records) so clients resync.

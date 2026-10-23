@@ -5,7 +5,7 @@ Docs for people and agents working on the code. User guides live one level up, i
 - [`ARCHITECTURE.md`](ARCHITECTURE.md): the big picture, with diagrams. Start here.
 - [`reference/`](reference/): what the code does, per topic: [api](reference/api.md), [engine](reference/engine.md),
   [providers](reference/providers.md), [turns](reference/turns.md), [story state](reference/story-state.md),
-  [storage](reference/storage.md), [web](reference/web.md).
+  [storage](reference/storage.md), [web](reference/web.md), [MCP server](reference/mcp.md).
 - [`TOOLING.md`](TOOLING.md): commands, Biome, knip, live checks.
 - `design/`: agreed design references for the web app. `FRONTEND-LAYOUT.md` covers where things are, and
   `FRONTEND-UX.md` covers how they behave: keyboard, Escape, unsaved work, confirmations, drag and drop, resizing.

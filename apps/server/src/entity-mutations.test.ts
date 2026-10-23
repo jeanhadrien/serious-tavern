@@ -150,3 +150,24 @@ it.each(
     }
   },
 );
+
+it.each([
+  { resource: 'characters', create: { name: 'Alice', description: 'Kind', tags: ['a'] }, update: { name: 'Alicia' } },
+  { resource: 'personas', create: { name: 'Bob', description: 'Tall' }, update: { name: 'Robert' } },
+] as const)('a partial $resource update keeps the fields it leaves out', async ({ resource, create, update }) => {
+  const directory = join(process.cwd(), '.test-data', `entities-${randomUUID()}`);
+  const context = await createContext(directory, { seed: false });
+  const app = Fastify();
+  registerCharacters(app, context);
+  registerPersonas(app, context);
+  registerErrors(app);
+  try {
+    const created = (await app.inject({ method: 'POST', url: `/api/${resource}`, payload: create })).json();
+    const response = await app.inject({ method: 'PUT', url: `/api/${resource}/${created.id}`, payload: update });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ ...created, ...update, updatedAt: expect.any(String) });
+  } finally {
+    await app.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
