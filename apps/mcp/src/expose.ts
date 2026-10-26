@@ -35,6 +35,7 @@ export const exposeMap: Record<ApiEndpoint, ExposeEntry> = {
   createWorkflow: 'expose',
   updateWorkflow: 'expose',
   validateWorkflow: 'readonly',
+  validateWorkflowDraft: skip('The editor’s live check of an unsaved draft; agents save, then call validateWorkflow.'),
   deleteWorkflow: noDeletes,
   listNodeTypes: 'expose',
   getNodeType: 'expose',
