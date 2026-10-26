@@ -107,10 +107,20 @@ export function renderPreset(
   for (const entry of valid.entries) {
     if (entry.kind !== 'message' || !entry.enabled) continue;
     const content = renderContextTemplate(entry.content, context, 'preset');
-    if (!content.trim()) continue;
+    // Reasoning belongs to assistant messages only; an entry that renders to reasoning alone is still sent.
+    const reasoning =
+      entry.role === 'assistant' && entry.reasoning !== undefined
+        ? renderContextTemplate(entry.reasoning, context, 'preset').trim()
+        : '';
+    if (!content.trim() && !reasoning) continue;
     // The message name is optional: an empty rendering means "no name", never an empty one.
     const name = entry.name === undefined ? '' : renderContextTemplate(entry.name, context, 'preset').trim();
-    renderedMessages.set(entry.id, { role: entry.role, content, ...(name ? { name } : {}) });
+    renderedMessages.set(entry.id, {
+      role: entry.role,
+      content: content.trim() ? content : '',
+      ...(name ? { name } : {}),
+      ...(reasoning ? { reasoning } : {}),
+    });
   }
 
   const result: PromptMessage[] = [];

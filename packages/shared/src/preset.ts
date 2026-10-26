@@ -54,6 +54,7 @@ const depthPlacementSchema = z.discriminatedUnion('mode', [
 
 // `displayName` is the editor label. A message entry's optional `name` is a template rendered like
 // `content` and sent as the prompt message's name; slots have none (their messages carry their own).
+// `reasoning` is a template too, rendered into the message's reasoning, and only on an assistant entry.
 export const presetEntrySchema = z.discriminatedUnion('kind', [
   z
     .object({
@@ -64,6 +65,7 @@ export const presetEntrySchema = z.discriminatedUnion('kind', [
       kind: z.literal('message'),
       role: presetRoleSchema,
       content: z.string(),
+      reasoning: z.string().optional(),
       placement: depthPlacementSchema.default({ mode: 'ordered' }),
     })
     .passthrough(),
@@ -99,11 +101,17 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 type MessageEntry = Extract<z.infer<typeof presetEntrySchema>, { kind: 'message' }>;
 
-/** The templated fields of a message entry, keyed by field name (the last segment of issue paths). */
-export function entryTemplates(entry: MessageEntry): { field: 'content' | 'name'; template: string }[] {
+/**
+ * The templated fields of a message entry that render, keyed by field name (the last segment of issue paths).
+ * `reasoning` counts only on an assistant entry: on any other role it is ignored (`presetWarnings` says so).
+ */
+export function entryTemplates(entry: MessageEntry): { field: 'content' | 'name' | 'reasoning'; template: string }[] {
   return [
     { field: 'content', template: entry.content },
     ...(entry.name === undefined ? [] : [{ field: 'name' as const, template: entry.name }]),
+    ...(entry.reasoning === undefined || entry.role !== 'assistant'
+      ? []
+      : [{ field: 'reasoning' as const, template: entry.reasoning }]),
   ];
 }
 
@@ -207,6 +215,11 @@ export function presetWarnings(preset: Preset): PresetWarning[] {
     for (const { field, template } of entryTemplates(entry)) {
       for (const message of templateWarnings(template)) warnings.push({ path: ['entries', index, field], message });
     }
+    if (entry.reasoning?.trim() && entry.role !== 'assistant')
+      warnings.push({
+        path: ['entries', index, 'reasoning'],
+        message: 'Reasoning is only sent on assistant messages; it is ignored here.',
+      });
   });
   return warnings;
 }

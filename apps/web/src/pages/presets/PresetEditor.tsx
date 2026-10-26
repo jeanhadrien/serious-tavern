@@ -32,6 +32,7 @@ function PresetInputs(props: { preset: Preset; readOnly: boolean; onChange(prese
                 ...entry,
                 content: rename(entry.content),
                 ...(entry.name === undefined ? {} : { name: rename(entry.name) }),
+                ...(entry.reasoning === undefined ? {} : { reasoning: rename(entry.reasoning) }),
               };
             return entry;
           })

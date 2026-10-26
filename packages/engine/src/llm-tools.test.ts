@@ -201,7 +201,6 @@ describe('an LLM node with state tools', () => {
 });
 
 describe('the prompt before the call', () => {
-  const current = { providerId: 'fake', model: 'm' };
   const own = { providerId: 'fake', model: 'm', nodeId: 'x' };
   const thought = (extra: Partial<PromptMessage> = {}): PromptMessage => ({
     role: 'assistant',
@@ -219,40 +218,35 @@ describe('the prompt before the call', () => {
   const kept = (messages: PromptMessage[]) => messages.map((message) => message.reasoning !== undefined);
 
   it('never replays by default', () => {
-    expect(kept(applyReplayPolicy(chat, 'never', current))).toEqual([false, false, false]);
+    expect(kept(applyReplayPolicy(chat, 'never'))).toEqual([false, false, false]);
   });
 
   it('replays what came after the last user message with sinceLastUser', () => {
-    expect(kept(applyReplayPolicy(chat, 'sinceLastUser', current))).toEqual([false, false, true]);
+    expect(kept(applyReplayPolicy(chat, 'sinceLastUser'))).toEqual([false, false, true]);
   });
 
-  it('replays every message of the same provider and model with always', () => {
-    expect(kept(applyReplayPolicy(chat, 'always', current))).toEqual([true, false, true]);
+  it('replays every message with always', () => {
+    expect(kept(applyReplayPolicy(chat, 'always'))).toEqual([true, false, true]);
   });
 
   it('strips provider_data with the reasoning, and only reasoning of messages that have it', () => {
-    const [first] = applyReplayPolicy([thought()], 'never', current);
+    const [first] = applyReplayPolicy([thought()], 'never');
     expect(first).toEqual({ role: 'assistant', content: 'a', provenance: own });
     expect('reasoning' in (first as object)).toBe(false);
     const plain: PromptMessage = { role: 'user', content: 'u' };
-    expect(applyReplayPolicy([plain], 'never', current)[0]).toBe(plain);
+    expect(applyReplayPolicy([plain], 'never')[0]).toBe(plain);
   });
 
   it.each([
-    ['another model', { ...own, model: 'other' }],
-    ['another provider record', { ...own, providerId: 'other' }],
-  ])('never replays reasoning from %s', (_name, provenance) => {
-    expect(kept(applyReplayPolicy([thought({ provenance })], 'always', current))).toEqual([false]);
-  });
-
-  it('never replays a message without provenance', () => {
-    const { provenance: _, ...bare } = thought();
-    expect(kept(applyReplayPolicy([bare], 'always', current))).toEqual([false]);
+    ['another model', { thought: thought({ provenance: { ...own, model: 'other' } }) }],
+    ['no provenance', { thought: { role: 'assistant' as const, content: 'a', reasoning: 'why' } }],
+  ])('replays reasoning whoever wrote it (%s)', (_name, { thought: message }) => {
+    expect(kept(applyReplayPolicy([message], 'always'))).toEqual([true]);
   });
 
   it('never changes the messages it is given', () => {
     const before = structuredClone(chat);
-    applyReplayPolicy(chat, 'never', current);
+    applyReplayPolicy(chat, 'never');
     expect(chat).toEqual(before);
   });
 });

@@ -353,6 +353,38 @@ describe('message names', () => {
   });
 });
 
+describe('message reasoning', () => {
+  const thinking = (reasoning: string, role = 'assistant') => ({
+    ...base(),
+    entries: [
+      ...base().entries,
+      { id: 'thinking', kind: 'message', enabled: true, displayName: 'Thinking', role, content: 'Hi', reasoning },
+    ],
+  });
+
+  it('checks the reasoning of an assistant entry like its content', () => {
+    const result = presetSchema.safeParse(thinking('{{input.missing}}'));
+    expect(result.success).toBe(false);
+    if (!result.success)
+      expect(result.error.issues.map((issue) => [issue.path.join('.'), issue.message])).toEqual([
+        ['entries.3.reasoning', 'Unknown input: missing'],
+      ]);
+    expect(presetWarnings(presetSchema.parse(thinking('{{nope}}')))).toEqual([
+      { path: ['entries', 3, 'reasoning'], message: 'Unknown macro: {{nope}}' },
+    ]);
+  });
+
+  it('ignores the reasoning of another role, with a warning', () => {
+    expect(presetSchema.safeParse(thinking('{{input.missing}}', 'user')).success).toBe(true);
+    expect(presetWarnings(presetSchema.parse(thinking('Why', 'system')))).toEqual([
+      {
+        path: ['entries', 3, 'reasoning'],
+        message: 'Reasoning is only sent on assistant messages; it is ignored here.',
+      },
+    ]);
+  });
+});
+
 describe('upgradeLegacyPreset', () => {
   it('turns a legacy entry name into its displayName and leaves new-shape entries alone', () => {
     const raw = {

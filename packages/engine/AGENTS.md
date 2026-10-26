@@ -32,6 +32,7 @@ Graph validation, the wave-based parallel executor, templating and node types. N
 ## Presets (rendering)
 - Fixed entries that render to empty text are dropped, so an entry holding only one empty variable disappears.
 - A message entry's `name` is rendered, trimmed and sent as the message name only when non-empty. Messages slots carry the history's names.
+- An assistant entry's `reasoning` is rendered and trimmed into the message's `reasoning`, and keeps the entry even when the content renders empty (content `''`). It is never rendered on another role. Whether it is sent is the LLM node's replay policy, like any reasoning.
 - `renderMessagesSlot` validates each message and emits only the canonical keys (`MESSAGE_KEYS`; tool calls verbatim): tool messages, `reasoning`, `provider_data` and `provenance` reach the prompt, the stored bookkeeping (`id`, `executionId`, `status`, ...) never does.
 - **Slots render from the RAW `options.inputs`.** Templates and text coercion read the `forTemplates` copy, which strips `reasoning`, `provider_data` and `provenance`. A slot rendered from the stripped copy would leave the replay policy nothing to act on.
 - **Depth counts blocks** (`depthPosition` over `messageBlocks`): an entry never lands between a tool call and its result.

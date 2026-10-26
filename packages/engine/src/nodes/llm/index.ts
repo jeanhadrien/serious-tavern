@@ -144,7 +144,7 @@ export const llm: NodeDefinition = {
     const settings = toolSettingsSchema.parse(ctx.config);
     const model = String(ctx.config.model);
     const merged = ctx.config.mergeSystemMessages === true ? mergeSystemMessages(rendered) : rendered;
-    const replayed = applyReplayPolicy(merged, settings.replayReasoning, { providerId: provider.id, model });
+    const replayed = applyReplayPolicy(merged, settings.replayReasoning);
     // Built once: the same tools declare what stays native in the prompt and run in the loop.
     const tools = await buildStateTools(ctx, settings.tools);
     const { messages: flat, flattened } = flattenUndeclaredToolBlocks(

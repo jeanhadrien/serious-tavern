@@ -138,8 +138,8 @@ export function LlmTools({ config, onChange, context }: LlmToolsProps) {
         </select>
       </label>
       <p className="hint">
-        Only reasoning written by this same provider and model is sent. The reasoning of the current tool loop is always
-        kept.
+        Which reasoning of the prompt reaches the model: earlier replies and preset messages alike. The reasoning of the
+        current tool loop is always kept.
       </p>
     </>
   );

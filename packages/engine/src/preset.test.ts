@@ -379,4 +379,28 @@ describe('renderPreset', () => {
       { role: 'system', content: 'Plain' },
     ]);
   });
+
+  it('renders reasoning on assistant entries only, and keeps an entry that has nothing else', () => {
+    const thinking = (id: string, content: string, reasoning: string, role: PresetEntry['role'] = 'assistant') => ({
+      ...message(id, content),
+      role,
+      reasoning,
+    });
+    const definition = preset(
+      [input('goal', 'text')],
+      [
+        thinking('both', 'Sure.', '  I want {{input.goal}}. '),
+        thinking('alone', '  ', 'Only thinking'),
+        thinking('blank', 'No thought', '   '),
+        thinking('system', 'Rules', 'Ignored here', 'system'),
+        thinking('empty', ' ', ''),
+      ],
+    );
+    expect(renderPreset(definition, options({ goal: 'tea' }))).toEqual([
+      { role: 'assistant', content: 'Sure.', reasoning: 'I want tea.' },
+      { role: 'assistant', content: '', reasoning: 'Only thinking' },
+      { role: 'assistant', content: 'No thought' },
+      { role: 'system', content: 'Rules' },
+    ]);
+  });
 });

@@ -63,23 +63,22 @@ describe('the prompt before the call', () => {
     expect(kept((await sent({}, chat)).messages)).toEqual([false, false, false]);
   });
 
-  it('replays by the node’s policy, for messages the same provider and model wrote', async () => {
+  it('replays by the node’s policy, whichever model wrote the reasoning', async () => {
     expect(kept((await sent({ replayReasoning: 'always' }, chat)).messages)).toEqual([true, false, true]);
     expect(kept((await sent({ replayReasoning: 'sinceLastUser' }, chat)).messages)).toEqual([false, false, true]);
     expect(kept((await sent({ replayReasoning: 'always', model: 'other' }, chat)).messages)).toEqual([
+      true,
       false,
-      false,
-      false,
+      true,
     ]);
   });
 
-  it('never replays the reasoning of a chat reply, which has no provenance', async () => {
+  it('replays the reasoning of a chat reply, which has no provenance', async () => {
     const reply = { role: 'assistant', content: 'Hello', reasoning: 'old thought' } as PromptMessage;
-    for (const replayReasoning of ['never', 'sinceLastUser', 'always'])
-      expect(kept((await sent({ replayReasoning }, [{ role: 'user', content: 'hi' }, reply])).messages)).toEqual([
-        false,
-        false,
-      ]);
+    const keptBy = async (replayReasoning: string) =>
+      kept((await sent({ replayReasoning }, [{ role: 'user', content: 'hi' }, reply])).messages);
+    expect(await keptBy('never')).toEqual([false, false]);
+    expect(await keptBy('always')).toEqual([false, true]);
   });
 
   it('sends a stored chat history with only the canonical message fields', async () => {

@@ -137,7 +137,9 @@ A preset is the final, ordered message list sent to an LLM: declared **inputs** 
 by its key) and ordered **entries** (`message` or `slot`). User guide: [docs/PRESETS.md](../../PRESETS.md).
 
 - Fixed messages that render to whitespace are dropped, as are empty text slots. A message entry's `name` template is
-  rendered, trimmed and sent only when non-empty. Unknown `{{input.x}}` is an error; syntax problems, unknown macros
+  rendered, trimmed and sent only when non-empty. An assistant entry's `reasoning` template is rendered and trimmed
+  into the message's `reasoning`; an entry with reasoning is kept even with empty content (sent as `''`). On other
+  roles `reasoning` is ignored and warned about. Unknown `{{input.x}}` is an error; syntax problems, unknown macros
   and unused inputs are warnings. An input referenced only by a name counts as used.
 - **Messages slots** validate each message with the canonical schema (an invalid one is an error naming the input) and
   keep only the canonical keys, so tool messages and calls pass while stored bookkeeping (`id`, `executionId`,
@@ -161,9 +163,12 @@ reasoning options (sent as OpenRouter's `reasoning` object to every record), `me
 unnamed system messages when asked, apply the replay policy, flatten tool blocks of undeclared tools, repair the tool
 sequence, then run the loop. The preset preview shows the unmerged, unflattened output.
 
-- **Replay reasoning** (`never` by default, `sinceLastUser`, `always`): an earlier message keeps its `reasoning` and
-  `provider_data` only when the policy allows AND its `provenance` names this provider record and model. The running
-  loop's own messages always keep theirs.
+- **Replay reasoning** (`never` by default, `sinceLastUser`, `always`): a plain filter on the rendered prompt. `never`
+  strips `reasoning` and `provider_data` from every message, `sinceLastUser` keeps them only after the last user
+  message, `always` keeps them all. Where a message comes from (a slot, a preset entry) and its `provenance` don't
+  matter. The running loop's own messages always keep theirs. Both fields go on the wire as they are
+  (`provider_data` spread, `reasoning` under `reasoningReplayField`); neither takes priority. Replaying another
+  model's `provider_data` (signed or encrypted reasoning) may be refused by the backend; the fix is `never`.
 - **Undeclared tool blocks** (a block with any call to a tool this node doesn't declare; every block for a node
   without tools) are sent as text: the assistant message keeps its content plus `assistant -> name(arguments)` lines,
   and its tool messages become one user message of `tool name: result` lines. The node logs the count.
@@ -207,8 +212,8 @@ the whole new text, so it can also overwrite another node's write to that key in
 **Open questions.**
 - *Models without tool support:* the backend's error surfaces as a node error. A per-model `tools: false` override
   on the provider record (so the node refuses before calling) only if users hit it; no text-protocol fallback.
-- *Reasoning on chat replies:* replies keep `reasoning` but carry no provenance, so the replay policy never replays
-  it. Recording the provider and model next to `sourceNodeId` would make it replayable; not needed so far.
+- *Reasoning on chat replies:* replies keep `reasoning` (every step's, joined) but no `provider_data`, so a replayed
+  reply sends the readable text only, never the backend's signed or encrypted form.
 
 **Reasoning in the chat.** Streamed reasoning arrives per chunk; a non-stream call emits the whole trace as one
 `reasoningDelta` afterwards. It reaches the chat only through the streaming endpoint and only for passthrough Chat

@@ -162,8 +162,9 @@ included, for a [thread key](STATE-AND-LORE.md#thread-keys)).
 - **Step limit** (default 5): after that many rounds of tool calls, the model is asked for its answer without tools.
   **Tool choice:** let the model decide, or make it use a tool first. **Parallel tool calls:** backend default,
   allowed, or one at a time.
-- **Replay reasoning:** whether earlier reasoning of the same model is sent back (never, since your last message, or
-  always).
+- **Replay reasoning:** which reasoning in the prompt is sent to the model: none, only on messages after your last
+  message, or all of it. It applies to everything in the prompt alike: earlier replies (whichever model wrote them)
+  and the reasoning of preset messages. The reasoning of the node's own tool rounds is always kept.
 - An LLM node with writable keys counts as writing something: it runs even when no reply needs it.
 - Every round's text streams, but only the last round's text is the reply. The log shows every call.
 

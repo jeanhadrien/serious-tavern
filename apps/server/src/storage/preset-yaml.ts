@@ -10,7 +10,18 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PRESET_FIRST = ['name', 'description', 'inputs', 'entries'];
 const PRESET_LAST = ['id', 'createdAt', 'updatedAt', 'source'];
 const INPUT_FIRST = ['id', 'key', 'dataType'];
-const ENTRY_FIRST = ['id', 'displayName', 'name', 'kind', 'role', 'enabled', 'inputKey', 'placement', 'content'];
+const ENTRY_FIRST = [
+  'id',
+  'displayName',
+  'name',
+  'kind',
+  'role',
+  'enabled',
+  'inputKey',
+  'placement',
+  'reasoning',
+  'content',
+];
 
 /** Readable unique label for a slot that depth placements point at. */
 function slotLabel(displayName: unknown, taken: Set<string>): string {

@@ -26,7 +26,12 @@ switched off. There are two kinds:
 - **Message:** a system, user or assistant message whose content is a template: `{{character.description}}`,
   `{{input.lore}}`, `{{#if ...}}` and so on (see [templating](TEMPLATING.md)). An optional **Name** (also a template)
   is sent as the message's name when it isn't empty. A message whose content renders empty is left out, so an entry
-  holding only `{{character.scenario}}` disappears for a character without a scenario.
+  holding only `{{character.scenario}}` disappears for a character without a scenario. An assistant message can also
+  have **Reasoning** (a template too): the thinking the model is shown for that message. An assistant entry with
+  reasoning is sent even when its content is empty. Whether the reasoning reaches the model depends on the LLM node's
+  **Replay reasoning** setting (see [workflows](WORKFLOWS.md)) and on the provider having a field for it
+  (`reasoningReplayField`, see [providers](PROVIDERS.md#tool-calls-and-replayed-messages)). Some backends ignore
+  reasoning they didn't write, and some refuse an assistant message with empty content.
 - **Slot:** puts an input at that place. A messages input expands to its messages; a text input becomes one message
   with the slot's role (user by default), left out when empty. The same input may be placed by several slots.
 
@@ -83,6 +88,12 @@ entries:
       entryId: chat-history
       depth: 1
     content: "{{character.personality}}"
+  - displayName: Prefill
+    kind: message
+    role: assistant
+    enabled: true
+    reasoning: Stay in character and keep it short.   # optional, assistant messages only (a template)
+    content: ""
   - id: chat-history           # a slot that a depth placement targets carries a readable id
     displayName: Chat history
     kind: slot

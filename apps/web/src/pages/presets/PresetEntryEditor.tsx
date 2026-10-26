@@ -9,6 +9,8 @@ import {
   type WorkflowSetting,
 } from '@st/shared';
 
+type TemplateField = 'content' | 'name' | 'reasoning';
+
 // A read-only editor disables its whole field block through one disabled fieldset.
 export function PresetEntryEditor(props: {
   preset: Preset;
@@ -22,8 +24,9 @@ export function PresetEntryEditor(props: {
 }) {
   const contentRef = useRef<HTMLTextAreaElement | null>(null);
   const nameRef = useRef<HTMLInputElement | null>(null);
+  const reasoningRef = useRef<HTMLTextAreaElement | null>(null);
   // Variable hints insert into whichever template field of this entry was focused last (content by default).
-  const hintTarget = useRef<{ entryId: string; field: 'content' | 'name' } | undefined>(undefined);
+  const hintTarget = useRef<{ entryId: string; field: TemplateField } | undefined>(undefined);
   const { entry, preset } = props;
   if (!entry)
     return (
@@ -49,8 +52,8 @@ export function PresetEntryEditor(props: {
   const insert = (token: string) => {
     if (entry.kind !== 'message') return;
     const field = hintTarget.current?.entryId === entry.id ? hintTarget.current.field : 'content';
-    const element = field === 'name' ? nameRef.current : contentRef.current;
-    const value = (field === 'name' ? entry.name : entry.content) ?? '';
+    const element = { content: contentRef, name: nameRef, reasoning: reasoningRef }[field].current;
+    const value = entry[field] ?? '';
     const start = element?.selectionStart ?? value.length;
     const end = element?.selectionEnd ?? start;
     update({ [field]: value.slice(0, start) + token + value.slice(end) });
@@ -141,6 +144,27 @@ export function PresetEntryEditor(props: {
                 onChange={(event) => update({ content: event.target.value })}
               />
             </label>
+            {entry.role === 'assistant' && (
+              <>
+                <label>
+                  Reasoning{' '}
+                  <textarea
+                    ref={reasoningRef}
+                    rows={5}
+                    value={entry.reasoning ?? ''}
+                    placeholder="Optional"
+                    onFocus={() => {
+                      hintTarget.current = { entryId: entry.id, field: 'reasoning' };
+                    }}
+                    onChange={(event) => update({ reasoning: event.target.value || undefined })}
+                  />
+                </label>
+                <p className="hint">
+                  Sent as this message's reasoning (a template, like the content), when the LLM node's reasoning setting
+                  keeps it and the provider has a field for it. The entry is sent even with empty content.
+                </p>
+              </>
+            )}
             <div className="template-hints">
               <small>Insert variable at cursor</small>
               {macroHints(preset.inputs, props.settings, props.state).map((variable) => (

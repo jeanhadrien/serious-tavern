@@ -48,6 +48,6 @@ export const toolSettingsSchema = z.object({
     .enum(replayPolicies)
     .default('never')
     .describe(
-      'Send earlier reasoning back to the model, when this same provider and model wrote it: never, only after the last user message, or always. The tool loop of a call always keeps its own',
+      'Which reasoning of the prompt is sent to the model: none, only on messages after the last user message, or all of it. The tool loop of a call always keeps its own',
     ),
 });
