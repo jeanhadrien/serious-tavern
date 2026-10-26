@@ -105,7 +105,7 @@ Some backends also need parts of a reply *back* on later requests. Two record fi
 | Field | What it does |
 | --- | --- |
 | `replayFields` | Top-level fields of the response message that are kept with the message and sent back as they are. Default `[]`. The built-in OpenRouter record uses `[reasoning_details]`. While streaming, arrays from each chunk are concatenated and objects merged. |
-| `reasoningReplayField` | The wire field a message's reasoning is sent back under, or `null` (the default) to never send it. The built-in OpenRouter record uses `reasoning`. Whether a given message keeps its reasoning is decided by the LLM node, not here. |
+| `reasoningReplayField` | The wire field a message's reasoning is sent back under, or `null` (the default) to never send it. The built-in OpenRouter record uses `reasoning`. Whether a given message keeps its reasoning is decided by the LLM node, not here; when the node keeps some and this is `null`, its log says how many messages lost it. |
 
 ```yaml
 replayFields: [reasoning_details]

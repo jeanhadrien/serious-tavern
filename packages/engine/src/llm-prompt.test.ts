@@ -73,6 +73,14 @@ describe('the prompt before the call', () => {
     ]);
   });
 
+  it('says so when kept reasoning has no wire field on the provider', async () => {
+    const line =
+      'Reasoning of 2 message(s) not sent: provider "abliteration.ai" has no reasoning replay field for this model';
+    expect((await sent({ replayReasoning: 'always', provider: 'abliteration' }, chat)).logs).toEqual([line]);
+    expect((await sent({ provider: 'abliteration' }, chat)).logs).toEqual([]);
+    expect((await sent({ replayReasoning: 'always' }, chat)).logs).toEqual([]);
+  });
+
   it('replays the reasoning of a chat reply, which has no provenance', async () => {
     const reply = { role: 'assistant', content: 'Hello', reasoning: 'old thought' } as PromptMessage;
     const keptBy = async (replayReasoning: string) =>

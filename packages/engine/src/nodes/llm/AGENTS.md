@@ -3,7 +3,7 @@
 The tool loop it runs is in `../../tools/AGENTS.md`; the adapter it calls in `../../providers/AGENTS.md`.
 
 - **It is a sink exactly when `tools.write` is non-empty** (`writesState`).
-- Prompt pipeline, on the rendered prompt only and never on stored data: render, `mergeSystemMessages` (consecutive unnamed system messages), `applyReplayPolicy`, `flattenUndeclaredToolBlocks` (a block calling a tool this node doesn't declare is sent as text, and the count is logged), `repairToolSequence` (count logged), then the loop.
+- Prompt pipeline, on the rendered prompt only and never on stored data: render, `mergeSystemMessages` (consecutive unnamed system messages), `applyReplayPolicy`, `flattenUndeclaredToolBlocks` (a block calling a tool this node doesn't declare is sent as text, and the count is logged), `repairToolSequence` (count logged), then the loop. When the final prompt still carries reasoning but the provider's resolved `reasoningReplayField` is null, the node logs how many messages lose it: the adapter drops it silently.
 - The node builds its tools ONCE, before flattening, and hands them to the loop: building twice doubles the log lines and makes two handle sets.
 - `replayPolicies` lives in shared, so the panel offers the same values.
 - **The replay policy is a plain filter on the rendered prompt** (position only: `never`, after the last user message, `always`). It never looks at `provenance` or at where a message came from: the user chose to drop that check, so preset reasoning and replies of other models replay alike. `reasoning` and `provider_data` are kept or stripped together, and both go on the wire when kept; neither takes priority.

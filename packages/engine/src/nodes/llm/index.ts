@@ -11,6 +11,7 @@ import type { NodeDefinition } from '../../types.js';
 import { renderPreset } from '../../preset.js';
 import { adapters, missingSecretMessage } from '../../providers/index.js';
 import '../../providers/openai-compatible.js';
+import { resolveWireSettings } from '../../providers/wire-settings.js';
 import { runToolLoop } from '../../tools/loop.js';
 import { buildStateTools } from '../../tools/state-tools.js';
 import { modelCaller } from './call.js';
@@ -154,6 +155,12 @@ export const llm: NodeDefinition = {
     if (flattened > 0) ctx.log(`${flattened} tool call(s) of undeclared tools sent as text`);
     const { messages, dropped } = repairToolSequence(flat);
     if (dropped > 0) ctx.log(`Left out ${dropped} tool message(s) or call(s) that had no counterpart in the prompt`);
+    // Reasoning the replay setting kept but the provider has no wire field for would vanish without a trace.
+    const unsent = messages.filter((message) => message.reasoning).length;
+    if (unsent > 0 && resolveWireSettings(provider, model).reasoningReplayField === null)
+      ctx.log(
+        `Reasoning of ${unsent} message(s) not sent: provider "${provider.name}" has no reasoning replay field for this model`,
+      );
     const request = {
       model,
       messages,

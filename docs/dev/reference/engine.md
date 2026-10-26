@@ -168,7 +168,9 @@ sequence, then run the loop. The preset preview shows the unmerged, unflattened 
   message, `always` keeps them all. Where a message comes from (a slot, a preset entry) and its `provenance` don't
   matter. The running loop's own messages always keep theirs. Both fields go on the wire as they are
   (`provider_data` spread, `reasoning` under `reasoningReplayField`); neither takes priority. Replaying another
-  model's `provider_data` (signed or encrypted reasoning) may be refused by the backend; the fix is `never`.
+  model's `provider_data` (signed or encrypted reasoning) may be refused by the backend; the fix is `never`. When kept
+  reasoning has no wire field (the record's resolved `reasoningReplayField` is null), the node logs how many messages
+  lose it.
 - **Undeclared tool blocks** (a block with any call to a tool this node doesn't declare; every block for a node
   without tools) are sent as text: the assistant message keeps its content plus `assistant -> name(arguments)` lines,
   and its tool messages become one user message of `tool name: result` lines. The node logs the count.
