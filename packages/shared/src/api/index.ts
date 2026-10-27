@@ -4,6 +4,7 @@ import { workflowEndpoints } from './workflows.js';
 import { presetEndpoints } from './presets.js';
 import { providerEndpoints } from './providers.js';
 import { collectionEndpoints } from './collections.js';
+import { snippetEndpoints } from './snippets.js';
 import { stateEndpoints } from './state.js';
 import { entityEndpoints } from './entities.js';
 import { catalogEndpoints } from './catalog.js';
@@ -18,6 +19,7 @@ export * from './workflows.js';
 export * from './presets.js';
 export * from './providers.js';
 export * from './collections.js';
+export * from './snippets.js';
 export * from './state.js';
 export * from './entities.js';
 export * from './catalog.js';
@@ -32,6 +34,7 @@ export const apiContract = {
   ...presetEndpoints,
   ...providerEndpoints,
   ...collectionEndpoints,
+  ...snippetEndpoints,
   ...stateEndpoints,
   ...entityEndpoints,
   ...catalogEndpoints,

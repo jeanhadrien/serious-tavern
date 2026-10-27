@@ -15,6 +15,7 @@ const run = (fields: string, value: unknown) => {
     config: { fields },
     trigger: { message: '', sessionId: 's' },
     settings: {},
+    snippets: {},
     history: [],
     secrets: { get: async () => undefined },
     resources: { presets: { get: async () => undefined } },

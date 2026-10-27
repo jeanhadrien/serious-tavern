@@ -24,6 +24,7 @@ Graph validation, the wave-based parallel executor, templating and node types. N
 
 ## What a run receives
 - **Chat settings:** the `settings` option holds values already resolved by the caller. Nodes see the frozen `ctx.settings`, templates `{{settings.<key>}}` (`{{settings}}` is compact JSON), the log `execution.settings` (`{}` when none). Nodes never read a session's stored values themselves.
+- **Snippets:** the `snippets` option (text by name, built by the caller with shared's `snippetTexts`) is the frozen `ctx.snippets` and the `{{snippets.<name>}}` namespace. A node that renders a template outside `renderTemplate(…, ctx)` (the LLM node's preset) passes `ctx.snippets` on.
 - **Story state:** the `state` option (a `StateSnapshot`) is the read-only `ctx.state`, and `{{state.*}}`/`{{trigger.turn}}` in templates. Templates read only `ctx.state.values`.
 - **Writes are buffered:** `ctx.writeState` only buffers (`StateWriteBuffer`, wired by `StateRun`). A node's requests count only when it completes, and resolve in a fixed order (wave, node id, call order) into `writes` on the result and on `ExecutionFailure.writes`. Item ids are `<executionId>:<nodeId>:<n>`.
 - `StateWriteBuffer.writer` stamps `turnId` and `runId` on an `add` to a thread key, from the `turnId` option (`ctx.trigger.turnId`; without it the run id stands in) and the run's execution id.

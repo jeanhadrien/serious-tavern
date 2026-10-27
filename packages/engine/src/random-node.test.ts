@@ -18,6 +18,7 @@ const run = (config: Record<string, unknown>, inputs: Record<string, unknown> = 
     config: random.configSchema.parse(config),
     trigger: { message: '', sessionId: 's' },
     settings: {},
+    snippets: {},
     history: [],
     secrets: { get: async () => undefined },
     resources: { presets: { get: async () => undefined } },

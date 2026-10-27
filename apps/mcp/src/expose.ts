@@ -29,6 +29,13 @@ export const exposeMap: Record<ApiEndpoint, ExposeEntry> = {
   previewPreset: 'readonly',
   deletePreset: noDeletes,
 
+  // Snippets: template text presets and node templates share, so agents writing presets can write them too
+  listSnippets: 'expose',
+  getSnippet: 'expose',
+  createSnippet: 'expose',
+  updateSnippet: 'expose',
+  deleteSnippet: noDeletes,
+
   // Workflows and node types
   listWorkflows: 'expose',
   getWorkflow: 'expose',

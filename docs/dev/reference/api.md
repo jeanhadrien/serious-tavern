@@ -87,7 +87,7 @@ Both fields describe that save only; the server drops them from a body, so echoi
 | `PUT /api/secrets/:name` | `{ value }`; names are letters, digits, `_` and `-` | `204`. Values can never be read back. |
 | `DELETE /api/secrets/:name` | | `204` |
 
-## Collections and state definitions
+## Collections, snippets and state definitions
 
 | Method and path | Request | Answer |
 | --- | --- | --- |
@@ -96,6 +96,10 @@ Both fields describe that save only; the server drops them from a body, so echoi
 | `POST /api/collections` | `name`, `description?`, `entries` (required: a write replaces them) | `201`. Client bookkeeping is ignored. |
 | `PUT /api/collections/:id` | same | `200`; an omitted description is removed; unknown stored fields survive. |
 | `DELETE /api/collections/:id` | | `204`; `409 COLLECTION_IN_USE` (details: workflow names) while a Recall or Draw node lists it. |
+| `GET /api/snippets`, `GET /api/snippets/:id` | | `200` whole records `{ id, name, description?, text, createdAt, updatedAt }`, in file-name order. |
+| `POST /api/snippets` | `name` (a template identifier), `description?`, `text` | `201`; `409 SNIPPET_NAME_TAKEN`. |
+| `PUT /api/snippets/:id` | same | `200`; an omitted description is removed; `409 SNIPPET_NAME_TAKEN`. Templates using the old name are not updated. |
+| `DELETE /api/snippets/:id` | | `204`. Never refused: templates using it render it empty. |
 | `GET /api/state-definitions`, `GET /api/state-definitions/:id` | | `200`, in file-name order. |
 | `POST /api/state-definitions` | `name`, `description?`, `keys` (required) | `201`; `409 STATE_DEFINITION_NAME_TAKEN`. |
 | `PUT /api/state-definitions/:id` | same | `200`; `409 STATE_DEFINITION_NAME_TAKEN`; `409 STATE_DEFINITION_IN_USE` for a rename while a chat holds live data under it. Prunes workflow edges to ports that no longer exist. |
@@ -119,4 +123,4 @@ Both fields describe that save only; the server drops them from a body, so echoi
 | --- | --- | --- |
 | `GET /api/app-settings` | | `200` the settings with defaults filled in. |
 | `PATCH /api/app-settings` | a partial body (`forkKeepsAlternatives`, `showMessageStats`) | `200` the whole settings; `500 APP_SETTINGS_UNREADABLE` when the file is not a JSON object. |
-| `GET /api/events` | | SSE, `changeEventSchema` (event name = `type`): `presets|providers|collections|stateDefinitions.changed` with `invalidFiles: { file, reason }[]`, `workflows|characters|personas|sessions.changed` with an optional record `id`, and `appSettings.changed` (no id; sent by every successful `PATCH /api/app-settings`). Every type is sent once on connect; a `: keepalive` comment every 15 s. Events only say something changed: clients re-fetch. |
+| `GET /api/events` | | SSE, `changeEventSchema` (event name = `type`): `presets|providers|collections|snippets|stateDefinitions.changed` with `invalidFiles: { file, reason }[]`, `workflows|characters|personas|sessions.changed` with an optional record `id`, and `appSettings.changed` (no id; sent by every successful `PATCH /api/app-settings`). Every type is sent once on connect; a `: keepalive` comment every 15 s. Events only say something changed: clients re-fetch. |

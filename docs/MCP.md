@@ -16,6 +16,7 @@ other.
 | Area | Allowed |
 | --- | --- |
 | Presets | List, read, create, update, and preview what a preset renders |
+| Snippets | List, read, create, update |
 | Workflows | List, read, create, update, and check that a workflow can run |
 | Node types | List them, read one type's ports and settings, work out the ports of a node |
 | Characters, personas | List, read, create, update (fields left out keep their value) |

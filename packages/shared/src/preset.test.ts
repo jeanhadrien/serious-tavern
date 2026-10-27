@@ -433,6 +433,13 @@ describe('chat settings macros', () => {
     expect(presetWarnings(parsed)).toEqual([]);
   });
 
+  it('hints one path per stored snippet', () => {
+    const hints = macroHints([], [], [], [{ name: 'tone', description: 'Voice' }, { name: 'style' }]);
+    expect(hints).toContainEqual({ expression: '{{snippets.tone}}', description: 'Voice', type: 'text' });
+    expect(hints).toContainEqual({ expression: '{{snippets.style}}', description: 'Snippet', type: 'text' });
+    expect(macroHints([]).some((hint) => hint.expression.startsWith('{{snippets.'))).toBe(false);
+  });
+
   it('hints one settings path per declared setting, typed by the setting', () => {
     const hints = macroHints(
       [{ key: 'message', dataType: 'text' }],

@@ -144,6 +144,7 @@ async function execute(
       character: started.character,
       persona: started.persona,
       settings: planned.settings,
+      snippets: started.snippets,
       state: story.snapshot,
       foldWith: story.foldWith,
       replies,

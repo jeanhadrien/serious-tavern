@@ -2,7 +2,7 @@
  * The primer a client shows the model when it connects. Only what the tools cannot say themselves: what the app is and
  * the habits that save a round trip. The details live in the guides (`read_guide`).
  */
-export const INSTRUCTIONS = `Tools for Serious Tavern, a single-user chatbot app. Each chat reply comes from a workflow: a graph of nodes (history, prompt, model call, memory...) that the user edits visually. You can read and write the building blocks: presets (prompt templates), workflows, characters and personas, and read providers and their models, story state definitions and collections. You cannot delete anything, touch secrets or run chats.
+export const INSTRUCTIONS = `Tools for Serious Tavern, a single-user chatbot app. Each chat reply comes from a workflow: a graph of nodes (history, prompt, model call, memory...) that the user edits visually. You can read and write the building blocks: presets (prompt templates), snippets (named template text any template reads as {{snippets.<name>}}), workflows, characters and personas, and read providers and their models, story state definitions and collections. You cannot delete anything, touch secrets or run chats.
 
 Start with read_guide when you need to know how something works (topics: workflows, presets, templating, ...). Every list_ tool returns summaries (id, name, description); call the matching get_ tool for a full record, and list_provider_models for model ids.
 

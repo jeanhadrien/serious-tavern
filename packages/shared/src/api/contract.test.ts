@@ -104,6 +104,7 @@ it('describes the change event stream, one event per resource type', () => {
     'presets.changed',
     'providers.changed',
     'collections.changed',
+    'snippets.changed',
     'stateDefinitions.changed',
     'workflows.changed',
     'characters.changed',

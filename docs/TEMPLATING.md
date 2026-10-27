@@ -28,6 +28,7 @@ The editor lists what is available under **Variables (click to insert)**.
 | `{{history}}` | The chat's earlier messages |
 | `{{settings.<key>}}` | A [chat setting](STATE-AND-LORE.md#chat-settings) the workflow declares; `{{settings}}` gives them all as JSON |
 | `{{state.<definition>.<key>}}` | [Story state](STATE-AND-LORE.md#story-state) as the turn started; `{{state}}` and `{{state.<definition>}}` give JSON |
+| `{{snippets.<name>}}` | A [snippet](#snippets): text you wrote once, filled in where it is used |
 
 - In presets, `{{history}}` and a messages input render as a `role: content` transcript, and an object as indented
   JSON. In node fields they render as compact JSON. `{{#each history}}` walks the messages themselves (`this.role`,
@@ -247,6 +248,30 @@ A State Write node runs every turn unless you gate it: connect a Condition branc
 its **Run when** input and it only writes when that branch is taken, whatever the operation is. A State Write can
 also store a fixed value (its **Value** setting) when nothing is connected to its **Value** input, so setting a
 mood to `"tense"` or adding 2 needs no helper node; a connected input overrides the setting.
+
+## Snippets
+
+A **snippet** is a named piece of template text you write once (in **Snippets**) and reuse in any preset, node field
+or character card as `{{snippets.<name>}}`. It renders where it is used, with that template's variables: state,
+settings, character, persona, inputs, and other snippets.
+
+A snippet named `tone`:
+
+```hbs
+{{#if (gt state.scene.tension 7)}}Short, tense sentences.{{else}}Relaxed, descriptive prose.{{/if}}
+Always write {{char}}'s replies in the present tense.
+```
+
+Then any preset entry can say `Style: {{snippets.tone}}`.
+
+- Names are case-sensitive identifiers (letters, digits and `_`, not starting with a digit), unique among snippets.
+  Renaming a snippet doesn't update the templates that use the old name.
+- An unknown snippet renders empty, and the editors warn about it. A snippet that ends up including itself renders
+  empty at that point.
+- `{{input.<key>}}` inside a snippet reads the inputs of the preset or node using it, so it only works where that
+  input exists.
+- Snippets are YAML files in `data/snippets/`, editable by hand while the app runs. If two files share a name, the
+  oldest snippet is used.
 
 ## Organizing with comments
 

@@ -56,6 +56,7 @@ export async function runNode(
     config: definition.configSchema.parse(config),
     trigger: { message: options.message ?? '', sessionId: 's', ...(options.turnId && { turnId: options.turnId }) },
     settings: {},
+    snippets: {},
     history: options.history ?? [],
     replies: [],
     secrets: { get: async () => undefined },

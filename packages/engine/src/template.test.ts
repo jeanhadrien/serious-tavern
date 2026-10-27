@@ -192,3 +192,28 @@ describe('block helpers', () => {
     expect(environment.helpers.log).toBeUndefined();
   });
 });
+
+describe('snippets', () => {
+  const withSnippets = (snippets: Record<string, string>): TemplateContext => ({
+    ...context(),
+    settings: { mood: 'calm' },
+    snippets,
+  });
+
+  it('renders a snippet with the context of the template using it, nested snippets included', () => {
+    const ctx = withSnippets({
+      tone: '{{#if (eq settings.mood "calm")}}Speak softly to {{user}}.{{else}}Shout.{{/if}}',
+      intro: '{{char}}: {{snippets.tone}}',
+    });
+    expect(renderTemplate('{{snippets.intro}}', ctx)).toBe('Mira: Speak softly to Alex.');
+    expect(renderTemplate('{{snippets.tone}} {{input.camelKey}}', ctx)).toBe('Speak softly to Alex. value');
+  });
+
+  it('renders unknown snippets and cycles as empty text, and works inside character fields', () => {
+    const ctx = withSnippets({ loop: 'a{{snippets.back}}', back: 'b{{snippets.loop}}', who: 'Mira' });
+    expect(renderTemplate('[{{snippets.missing}}]', ctx)).toBe('[]');
+    expect(renderTemplate('{{snippets.loop}}', ctx)).toBe('ab');
+    const card = { ...ctx, character: { ...ctx.character!, description: 'I am {{snippets.who}}' } };
+    expect(renderTemplate('{{description}}', card)).toBe('I am Mira');
+  });
+});

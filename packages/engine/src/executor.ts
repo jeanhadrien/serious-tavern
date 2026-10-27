@@ -64,6 +64,8 @@ export async function executeWorkflow(
     // Chat settings, already resolved against the workflow (`resolveChatSettings`). Recorded as
     // `execution.settings` and exposed as `ctx.settings`.
     settings?: Record<string, unknown>;
+    // Snippet text by name (`snippetTexts`): `ctx.snippets` and the template namespace `snippets`.
+    snippets?: Record<string, string>;
     // The story state the turn starts from (`foldStoryState` + `stateSnapshot`): what `ctx.state` reads and
     // `trigger.turn` reports. Writes nodes ask for are returned as `writes`, never visible during the run.
     state?: StateSnapshot;
@@ -90,6 +92,7 @@ export async function executeWorkflow(
   const { workflow, resources, definitions, ports, incoming, upstream, reachable } = preparation.prepared;
   const seed = options.seed ?? randomUUID();
   const settings = Object.freeze({ ...options.settings });
+  const snippets = Object.freeze({ ...options.snippets });
   const execution: ExecutionLog = {
     id: options.executionId ?? randomUUID(),
     workflowId: workflow.id,
@@ -213,6 +216,7 @@ export async function executeWorkflow(
                 character: options.character,
                 persona: options.persona,
                 settings,
+                snippets,
                 secrets: options.secrets,
                 resources,
                 replies: structuredClone(options.replies ?? []),

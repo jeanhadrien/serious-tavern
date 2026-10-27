@@ -60,6 +60,7 @@ dependencies, sink reachability, and execution-scoped resources.
 | `character`, `persona` | `ctx.character`, `ctx.persona` | `{{character.*}}`, `{{persona.*}}` |
 | `replies` (default `[]`) | Chat Input's `replies` output: what the workflows above saved this turn | |
 | `settings` (resolved by the caller) | frozen `ctx.settings` | `{{settings.*}}` |
+| `snippets` (text by name, `snippetTexts`) | frozen `ctx.snippets` | `{{snippets.<name>}}` |
 | `state` (a `StateSnapshot`) | read-only `ctx.state` | `{{state.*}}` (only `ctx.state.values`), `{{trigger.turn}}` |
 | `foldWith` | behind `ctx.pendingState()` (read-your-own-writes) | |
 | `turnId` | `ctx.trigger.turnId`, stamped on thread items | |
@@ -127,7 +128,8 @@ renders presets and template fields; `@st/shared` only depends on `@handlebars/p
 and the web bundle carries no compiler. The macro registry in shared defines every known path, and the helpers
 (`eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `and`, `or`, `not`, `linked`) are listed in `templateHelperNames` and defined
 in `template-helpers.ts`; Handlebars' `log` helper is removed. Character and persona fields are expanded recursively,
-cycles rendering empty. A template that doesn't parse renders verbatim and never throws. In presets `{{history}}` and
+cycles rendering empty. Snippets are expanded the same way, in the style (preset or node) of the template that uses
+them, so they see its inputs. A template that doesn't parse renders verbatim and never throws. In presets `{{history}}` and
 messages inputs render as transcripts and objects as pretty JSON; in node templates they render compact JSON
 (shared's `coerceValue` and `stringify` in `ports.ts` centralize both; the engine's `text.ts` adds the preset-only `toText`). User reference: [docs/TEMPLATING.md](../../TEMPLATING.md).
 

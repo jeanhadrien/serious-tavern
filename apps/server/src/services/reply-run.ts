@@ -94,6 +94,7 @@ export async function runReplyRun(
       character: started.character,
       persona: started.persona,
       settings: planned.settings,
+      snippets: started.snippets,
       state: start.state,
       foldWith: start.foldWith,
       replies: above,

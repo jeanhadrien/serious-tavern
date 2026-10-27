@@ -198,7 +198,8 @@ export function entryUsesInput(entry: MessageEntry, key: string): boolean {
   );
 }
 
-export function presetWarnings(preset: Preset): PresetWarning[] {
+/** With `snippetNames` (the stored snippets), a `{{snippets.<name>}}` for another name is a warning too. */
+export function presetWarnings(preset: Preset, options: { snippetNames?: readonly string[] } = {}): PresetWarning[] {
   const warnings: PresetWarning[] = [];
   preset.inputs.forEach((input, index) => {
     const usedBySlot = preset.entries.some(
@@ -213,7 +214,8 @@ export function presetWarnings(preset: Preset): PresetWarning[] {
   preset.entries.forEach((entry, index) => {
     if (entry.kind !== 'message' || !entry.enabled) return;
     for (const { field, template } of entryTemplates(entry)) {
-      for (const message of templateWarnings(template)) warnings.push({ path: ['entries', index, field], message });
+      for (const message of templateWarnings(template, options))
+        warnings.push({ path: ['entries', index, field], message });
     }
     if (entry.reasoning?.trim() && entry.role !== 'assistant')
       warnings.push({

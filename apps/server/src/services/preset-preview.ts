@@ -5,6 +5,7 @@ import {
   presetWarnings,
   resolveChatSettings,
   settingsCatalog,
+  snippetTexts,
   stateTemplateValues,
   listedSettings,
   replyWorkflows,
@@ -24,7 +25,7 @@ async function listedWorkflows(workflows: AppContext['workflows'], session: Sess
 }
 
 export async function previewPreset(
-  { sessions, workflows, characters, personas, stateDefinitions }: AppContext,
+  { sessions, workflows, characters, personas, stateDefinitions, snippets }: AppContext,
   { preset, inputs = {}, sessionId }: ApiParsedBody<'previewPreset'>,
 ): Promise<ApiResponse<'previewPreset'>> {
   const session = sessionId ? await sessions.get(sessionId) : undefined;
@@ -43,6 +44,7 @@ export async function previewPreset(
   const state = session
     ? foldSession(definitions, session, historyMessages(session.messages)).snapshot
     : emptyStateSnapshot(definitions);
+  const stored = await snippets.list();
   const values: Record<string, unknown> = { ...inputs };
   const sample = [
     { role: 'user', content: 'Hello!' },
@@ -64,9 +66,10 @@ export async function previewPreset(
           persona,
           settings,
           state: { values: stateTemplateValues(state) },
+          snippets: snippetTexts(stored),
         },
       }),
-      warnings: presetWarnings(preset),
+      warnings: presetWarnings(preset, { snippetNames: stored.map((snippet) => snippet.name) }),
     };
   } catch (error) {
     throw new HttpError(400, 'PRESET_PREVIEW_INVALID', errorMessage(error));

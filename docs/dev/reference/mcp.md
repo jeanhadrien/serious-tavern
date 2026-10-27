@@ -1,7 +1,7 @@
 # MCP server reference
 
 `apps/mcp` (`@st/mcp`) is a stdio [Model Context Protocol](https://modelcontextprotocol.io) server. It lets an agent
-(Claude Desktop, Claude Code, Cursor...) read and write presets, workflows, characters and personas, and read
+(Claude Desktop, Claude Code, Cursor...) read and write presets, snippets, workflows, characters and personas, and read
 providers, models, state definitions, collections and node types. It holds no data and no logic of the app: every call
 is an HTTP request to the running server. The rules to keep are in `apps/mcp/AGENTS.md`; setup for users is in
 [`docs/MCP.md`](../../MCP.md).
@@ -31,7 +31,7 @@ flowchart LR
 | Read-only hint | `tools.ts` | `GET`, or `readonly` in the expose map (preview, validate and resolve-ports are POSTs that only read). |
 | The HTTP call | `call.ts` | `method` and `path` of the entry; the same code for every tool. |
 
-**What v1 exposes:** presets (list, get, create, update, preview), workflows (list, get, create, update, validate), node
+**What v1 exposes:** presets (list, get, create, update, preview), snippets (list, get, create, update), workflows (list, get, create, update, validate), node
 types (list, get one, resolve ports), characters and personas (list, get, create, update), and read-only providers,
 provider models, state definitions and collections. Out: deletes, secrets, chats and turns, app settings, imports,
 avatars and card import/export (binary), and the event stream.

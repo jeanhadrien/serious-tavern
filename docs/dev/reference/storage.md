@@ -29,7 +29,7 @@ on read**, so readers go through tolerant helpers and new fields are `.optional(
 
 ## YAML repositories
 
-Presets, providers, collections and state definitions are YAML files, handled by the generic `YamlRepository<T>`
+Presets, providers, collections, snippets and state definitions are YAML files, handled by the generic `YamlRepository<T>`
 (`storage/yaml-repository.ts`, parameterized by a `YamlCodec`: parse, serialize, label). Users may edit or rename the
 files while the server runs, so:
 
@@ -59,13 +59,15 @@ files while the server runs, so:
   never changed or deleted. Rolling back: delete the YAML and rename `.json.migrated` back.
 - **Collections.** Keys are written as `name, description, entries, …`, entry keys as `title, text, keywords, tags,
   level, weight, enabled, …`; `weight: 1` and `enabled: true` are left out.
+- **Snippets.** Keys are written as `name, description, text, …`. The API keeps names unique; where hand-edited files
+  repeat one, `snippetTexts` (shared) uses the oldest snippet.
 
 ## Change events
 
 `GET /api/events` is one server-sent event stream for every client (event name = type).
 
-- **File-backed resources** (`presets`, `providers`, `collections`, `stateDefinitions`): the server watches
-  `data/presets/`, `data/providers/`, `data/collections/` and `data/state/definitions/` (`watchResourceFiles`;
+- **File-backed resources** (`presets`, `providers`, `collections`, `snippets`, `stateDefinitions`): the server watches
+  `data/presets/`, `data/providers/`, `data/collections/`, `data/snippets/` and `data/state/definitions/` (`watchResourceFiles`;
   `fs.watch`, non-recursive). Our own temp files, editor swap and lock files and non-YAML files are ignored; bursts
   (editors that save through a temp file and a rename) are debounced into one notification and a rescan. The watcher
   is started only by the server entry point, re-arms after errors, closes with the app, and watches the directory by

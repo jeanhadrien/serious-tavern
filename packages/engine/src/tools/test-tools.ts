@@ -134,6 +134,7 @@ export function toolContext(options: { withFold?: boolean } = {}) {
     trigger: { message: '', sessionId: 's' },
     history: [],
     settings: {},
+    snippets: {},
     secrets: { get: async () => undefined },
     resources,
     replies: [],

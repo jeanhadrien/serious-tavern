@@ -13,7 +13,7 @@ Fastify 5 on `PORT` (default 3001; `npm run dev` picks a free one). Data lives i
 - Repository writes are atomic (temp file, then rename). The rename retries transient Windows `EPERM`/`EACCES`/`EBUSY` errors.
 - Corrupt JSON files are never auto-deleted: `list()` skips them with a warning, `get()` throws with the file path.
 
-## YAML-backed resources (presets, providers, collections, state definitions)
+## YAML-backed resources (presets, providers, collections, snippets, state definitions)
 - They share `YamlRepository<T>`: a `YamlCodec` supplies parse/serialize/label, while the scan, stamping, locks and file naming are shared. Fix those there, once.
 - Identity is the `id` inside the file, never the filename. Users may edit or rename files while the server runs, so nothing is cached and every operation scans the directory.
 - Invalid files are skipped with a warning and never modified. `parseYamlRecord` stamps a valid file in place only when the blank keys are `id`/`createdAt`/`updatedAt`; any other blank value keeps it invalid and untouched.
@@ -22,6 +22,7 @@ Fastify 5 on `PORT` (default 3001; `npm run dev` picks a free one). Data lives i
 - **Providers:** built-ins are merged with stored records (`builtIn` flag) and are read-only (`409 PROVIDER_READ_ONLY` on PUT/DELETE). Route params are `{ id: string }`, not `idParamsSchema`, because of the built-in ids. Bodies are stripped of client bookkeeping (`id`, timestamps, `builtIn`).
 - **Model lists:** `ModelCatalog` caches in memory only. Its key is the whole record plus `SecretStore.revision`, never `updatedAt` (hand-edited files keep their old timestamp). Any new cache whose data depends on secrets keys on `revision` too.
 - **Collections:** `GET /api/collections` returns summaries (`entryCount`, no entries). `DELETE` answers `409 COLLECTION_IN_USE` (details: workflow names) while a Recall or Draw node lists the id. The serializer leaves out `weight: 1` and `enabled: true`.
+- **Snippets:** names are unique through the API (`409 SNIPPET_NAME_TAKEN`); hand-edited duplicates are resolved by `snippetTexts` (oldest wins), never by the repository. A turn loads the texts once (`StartedTurn.snippets`) and every run of the turn renders with them. Deleting or renaming is never refused: templates using the name render it empty.
 - **State definitions:** names unique ignoring case (`409 STATE_DEFINITION_NAME_TAKEN`); a rename or delete is refused with `409 STATE_DEFINITION_IN_USE` while a present turn wrote the definition (a delete also while a node uses it; `state-definition-usage.ts` lists the users). Updating a definition prunes the workflows' edges to vanished ports. `scene` is seeded into an empty directory.
 
 ## Workflows
@@ -29,7 +30,7 @@ Fastify 5 on `PORT` (default 3001; `npm run dev` picks a free one). Data lives i
 - **Positions:** the body schema (`workflowDraftSchema`) makes `position` optional, the stored `workflowSchema` keeps it required. `checkWorkflowForSave` fills the gaps with `layoutNodes` after pruning (so a dropped edge never shapes the layout); on update a node first keeps the stored position of its id.
 
 ## Change events (`GET /api/events`)
-- File-backed resources emit `presets|providers|collections|stateDefinitions.changed` with the currently invalid files. Records emit `workflows|characters|personas|sessions.changed` (`{ type, id? }`). On connect, every event type is sent once (id-less for records) so clients resync.
+- File-backed resources emit `presets|providers|collections|snippets|stateDefinitions.changed` with the currently invalid files. Records emit `workflows|characters|personas|sessions.changed` (`{ type, id? }`). On connect, every event type is sent once (id-less for records) so clients resync.
 - Record events come from `NotifyingRepository`, which wraps those repositories in `context.ts` and announces every successful save, update and delete. A new record resource gets wrapped there too.
 - `repo.silent` is the raw repository. Chat turns write through it and publish one `sessions.changed` when the turn settles, never per token. Tests that spy on a repository's `get` to pause inside `update` must spy on `.silent`.
 - File events come from the directory watchers **and** from every API write. Always publish with a fresh `listInvalid()`, never `[]`, or an API save clears the warning about a still-broken file.

@@ -8,6 +8,7 @@ import { registerPersonas } from './routes/personas.js';
 import { registerPresets } from './routes/presets.js';
 import { registerProviders } from './routes/providers.js';
 import { registerCollections } from './routes/collections.js';
+import { registerSnippets } from './routes/snippets.js';
 import { registerStateDefinitions } from './routes/state-definitions.js';
 import { registerWorkflows } from './routes/workflows.js';
 import { registerSessions } from './routes/sessions.js';
@@ -44,6 +45,7 @@ export async function createApp(
   registerPresets(app, context);
   registerProviders(app, context);
   registerCollections(app, context);
+  registerSnippets(app, context);
   registerStateDefinitions(app, context);
   registerWorkflows(app, context);
   registerSessions(app, context);
@@ -63,6 +65,7 @@ export async function createApp(
       await watchResourceFiles(context.changes, 'presets', context.presets),
       await watchResourceFiles(context.changes, 'providers', context.providers),
       await watchResourceFiles(context.changes, 'collections', context.collections),
+      await watchResourceFiles(context.changes, 'snippets', context.snippets),
       await watchResourceFiles(context.changes, 'stateDefinitions', context.stateDefinitions),
     ];
     app.addHook('onClose', async () => {

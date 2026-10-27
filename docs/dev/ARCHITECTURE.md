@@ -127,7 +127,7 @@ fields are kept, nothing is rewritten on read.
 | Workflows, characters, personas | `data/workflows/`, `data/characters/`, `data/personas/` | JSON |
 | Avatars | `data/avatars/` | images |
 | Execution logs | `data/executions/` | JSON, one per run |
-| Presets, providers, collections, state definitions | `data/presets/`, `data/providers/`, `data/collections/`, `data/state/definitions/` | YAML, editable by hand while the server runs |
+| Presets, providers, collections, snippets, state definitions | `data/presets/`, `data/providers/`, `data/collections/`, `data/snippets/`, `data/state/definitions/` | YAML, editable by hand while the server runs |
 | Secrets | `data/secrets.enc.json`, key in `data/.master.key` or `SECRETS_KEY` | AES-256-GCM |
 | App settings, seed ledger | `data/app-settings.json`, `data/.seeded.json` | JSON |
 

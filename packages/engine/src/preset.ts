@@ -81,6 +81,7 @@ export function renderPreset(
       persona?: Persona;
       settings?: Readonly<Record<string, unknown>>;
       state?: { readonly values: Readonly<Record<string, unknown>> };
+      snippets?: Readonly<Record<string, string>>;
     };
   },
 ): PromptMessage[] {
@@ -103,6 +104,7 @@ export function renderPreset(
     persona: options.templateContext.persona,
     settings: options.templateContext.settings,
     state: options.templateContext.state,
+    snippets: options.templateContext.snippets,
   };
   for (const entry of valid.entries) {
     if (entry.kind !== 'message' || !entry.enabled) continue;

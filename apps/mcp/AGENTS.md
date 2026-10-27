@@ -1,6 +1,6 @@
 # apps/mcp — agent notes
 
-A stdio MCP server that lets agents read and write presets, workflows, characters and personas through the running app's HTTP API. How the projection works: `docs/dev/reference/mcp.md`. User setup: `docs/MCP.md`.
+A stdio MCP server that lets agents read and write presets, snippets, workflows, characters and personas through the running app's HTTP API. How the projection works: `docs/dev/reference/mcp.md`. User setup: `docs/MCP.md`.
 
 ## The rule that shapes everything
 **Adding a feature to the app must not mean maintaining the MCP.** The MCP is a generic projection of `apiContract`: no per-endpoint code, no copied paths, no copied schemas, no hand-written tool descriptions.

@@ -418,6 +418,7 @@ describe('character nodes and history', () => {
       inputs: {},
       trigger: { message: '', sessionId: '' },
       settings: {},
+      snippets: {},
       resources: { presets: { get: async () => undefined } },
       signal: new AbortController().signal,
       log: () => {},

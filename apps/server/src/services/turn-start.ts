@@ -23,6 +23,7 @@ import { nodeResources } from './node-resources.js';
 import { regenerateTarget } from './regenerate.js';
 import { historyMessages } from './settle-turn.js';
 import { foldSession, foldWithOf, listDefinitions } from './story-state.js';
+import { loadSnippetTexts } from './snippets.js';
 
 /** What starts a turn: a message (possibly empty), or a regenerate of the last turn, which stores no user message. */
 export type TurnRequest = { content: string; regenerate?: false } | { content?: undefined; regenerate: true };
@@ -65,6 +66,8 @@ export type StartedTurn = {
   history: ChatMessage[];
   character?: Character;
   persona?: Persona;
+  // The `snippets` template namespace, loaded once: every run of the turn renders with the same texts.
+  snippets: Record<string, string>;
   // What the first run starts from.
   state: StateSnapshot;
   stateIssues: string[];
@@ -89,6 +92,7 @@ export async function startTurn(context: AppContext, sessionId: string, request:
       throw new HttpError(400, 'NO_ENABLED_WORKFLOW', 'The chat has no enabled workflow: switch one on to get a reply');
     // One listing serves the node ports and the fold, so a definition edited mid-turn cannot split them.
     const definitions = await listDefinitions(stateDefinitions);
+    const snippets = await loadSnippetTexts(context);
     const runs: PlannedRun[] = [];
     for (const entry of listed) {
       const workflow = await requireEntity(workflows, entry.workflowId, 'Workflow');
@@ -142,6 +146,7 @@ export async function startTurn(context: AppContext, sessionId: string, request:
       history,
       character,
       persona,
+      snippets,
       state: story.snapshot,
       stateIssues: story.issues,
       foldWith: foldWithOf(definitions, foldedSession, history, scope),

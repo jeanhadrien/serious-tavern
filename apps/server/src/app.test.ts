@@ -112,6 +112,21 @@ it('returns payloads conforming to every shared endpoint response contract', asy
       payload: { name: 'Contract lore', entries: [] },
     });
     await request('deleteCollection', { method: 'DELETE', url: `/api/collections/${collection.id}` });
+    const snippet = await request('createSnippet', {
+      method: 'POST',
+      url: '/api/snippets',
+      payload: { name: 'tone', text: 'Speak softly.' },
+    });
+    await request('getSnippet', { method: 'GET', url: `/api/snippets/${snippet.id}` });
+    expect((await request('listSnippets', { method: 'GET', url: '/api/snippets' })).map((item) => item.name)).toEqual([
+      'tone',
+    ]);
+    await request('updateSnippet', {
+      method: 'PUT',
+      url: `/api/snippets/${snippet.id}`,
+      payload: { name: 'tone', text: 'Speak loudly.' },
+    });
+    await request('deleteSnippet', { method: 'DELETE', url: `/api/snippets/${snippet.id}` });
     const definition = await request('createStateDefinition', {
       method: 'POST',
       url: '/api/state-definitions',

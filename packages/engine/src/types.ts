@@ -91,6 +91,9 @@ export type ExecutionContext = {
   // The chat settings resolved for this run (`resolveChatSettings`), by declared key. Read-only; also the
   // template namespace `settings`. Nodes never read a session's stored values themselves.
   settings: Readonly<Record<string, unknown>>;
+  // Snippet text by name, as the caller loaded it for the turn (`snippetTexts`). Read-only; also the template
+  // namespace `snippets`.
+  snippets: Readonly<Record<string, string>>;
   secrets: { get(name: string): Promise<string | undefined> };
   resources: NodeResources;
   // The replies the runs above this one saved in this turn, in chat order (Chat Input's `replies`). Empty for the first run.

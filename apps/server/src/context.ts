@@ -5,6 +5,7 @@ import { KeyedLock } from './storage/lock.js';
 import { PresetRepository } from './storage/preset-repository.js';
 import { ProviderRepository } from './storage/provider-repository.js';
 import { CollectionRepository } from './storage/collection-repository.js';
+import { SnippetRepository } from './storage/snippet-repository.js';
 import { StateDefinitionRepository } from './storage/state-definition-repository.js';
 import { AppSettingsStore } from './storage/app-settings-store.js';
 import { migrateJsonPresets } from './storage/preset-migration.js';
@@ -23,6 +24,8 @@ export interface AppContext {
   providers: ProviderRepository;
   /** Authored collections (lorebooks, decks): YAML files under `data/collections/`; read-only for workflows. */
   collections: CollectionRepository;
+  /** Snippets: YAML files under `data/snippets/`, named template text every template reads as `{{snippets.<name>}}`. */
+  snippets: SnippetRepository;
   /** State definitions: YAML files under `data/state/definitions/` naming what a chat's turns may store. */
   stateDefinitions: StateDefinitionRepository;
   sessions: NotifyingRepository<Session>;
@@ -70,6 +73,7 @@ export async function createContext(
     presets,
     providers: new ProviderRepository(join(dataDir, 'providers')),
     collections,
+    snippets: new SnippetRepository(join(dataDir, 'snippets')),
     stateDefinitions,
     sessions: notifying<Session>('sessions'),
     executions: new JsonRepository<ExecutionLog>(join(dataDir, 'executions')),

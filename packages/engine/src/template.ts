@@ -15,10 +15,12 @@ export type TemplateContext = {
   // Story state at the start of the turn: `values` is `{ <definition name>: { <key>: value } }`, the
   // `{{state.*}}` namespace. A `StateAccess` fits (it keeps its methods out of the template by design).
   state?: { readonly values: Readonly<Record<string, unknown>> };
+  // Snippet text by name (`snippetTexts`), the `{{snippets.<name>}}` namespace.
+  snippets?: Readonly<Record<string, string>>;
 };
 
 // `preset` renders inputs and bare `{{history}}` as message transcripts; `node` renders JSON.
-// Character and persona fields are always rendered in `node` style.
+// Character and persona fields are always rendered in `node` style; snippets in the style of the template using them.
 export type TemplateStyle = 'node' | 'preset';
 
 type CardSource = 'character' | 'persona';
@@ -58,6 +60,7 @@ function templateData(context: TemplateContext, style: TemplateStyle, active: Se
     state: presented(context.state?.values ?? {}, stringify),
     // A bare character has no alias, so it renders as empty text like any unknown name.
     character: context.character ? withToString(cardScope(context, 'character', active), () => '') : undefined,
+    snippets: snippetScope(context, style, active),
   };
   if (context.persona) {
     const persona = cardScope(context, 'persona', active);
@@ -93,6 +96,24 @@ function cardField(context: TemplateContext, source: CardSource, field: string, 
   } finally {
     active.delete(key);
   }
+}
+
+// Renders a snippet on first access, with the context of the template that uses it. Cycles render as empty text.
+function snippetScope(context: TemplateContext, style: TemplateStyle, active: Set<string>): Record<string, unknown> {
+  const scope: Record<string, unknown> = {};
+  for (const [name, text] of Object.entries(context.snippets ?? {})) {
+    const key = `snippets.${name}`;
+    lazy(scope, name, () => {
+      if (active.has(key)) return '';
+      active.add(key);
+      try {
+        return renderContextTemplate(text, context, style, active);
+      } finally {
+        active.delete(key);
+      }
+    });
+  }
+  return scope;
 }
 
 // Copies data so `{{path}}` renders through `format` while `{{#each}}` and `{{path.field}}` still see plain values.

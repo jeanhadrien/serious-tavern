@@ -6,8 +6,8 @@ import { analyzeTemplate } from './template-analysis.js';
 export type MacroDefinition = {
   name: string;
   description: string;
-  category: 'character' | 'persona' | 'input' | 'trigger' | 'history' | 'settings' | 'state' | 'alias';
-  source: 'character' | 'persona' | 'inputs' | 'trigger' | 'history' | 'settings' | 'state';
+  category: 'character' | 'persona' | 'input' | 'trigger' | 'history' | 'settings' | 'state' | 'snippets' | 'alias';
+  source: 'character' | 'persona' | 'inputs' | 'trigger' | 'history' | 'settings' | 'state' | 'snippets';
   field?: string;
   defaultValue?: string;
   pattern?: RegExp;
@@ -164,6 +164,15 @@ export const macroRegistry: readonly MacroDefinition[] = [
     pattern: /^state\.[\w]+(?:\.[\w]+)*$/,
     dataType: 'any',
   },
+  {
+    // Names come from the stored snippets (`macroHints`' `snippets`), never from a hand-written list.
+    name: 'snippets.<name>',
+    description: 'Snippet text, rendered where it is used',
+    category: 'snippets',
+    source: 'snippets',
+    pattern: /^snippets\.[\w]+$/,
+    dataType: 'text',
+  },
 ];
 
 // Names are case-sensitive, matching Handlebars path resolution.
@@ -182,6 +191,11 @@ export function templateMacros(
 
 export function macroInputKey(name: string): string | undefined {
   return findMacro(name)?.source === 'inputs' && name.includes('.') ? name.split('.')[1] : undefined;
+}
+
+/** The snippet a reference names (`snippets.tone` names `tone`), if it is a snippet reference. */
+export function snippetName(name: string): string | undefined {
+  return findMacro(name)?.source === 'snippets' ? name.split('.')[1] : undefined;
 }
 
 // Block and comment snippets for the editor; the helper names they use are listed in templateHelperNames.
@@ -207,11 +221,12 @@ const settingHintTypes: Record<WorkflowSetting['type'], PortDataType> = {
 };
 
 // `settings` lists declared chat settings (a workflow's own, or `settingsCatalog` for presets); `state` lists
-// the keys of the state definitions (`stateHints`).
+// the keys of the state definitions (`stateHints`); `snippets` the stored snippets.
 export function macroHints(
   inputs: readonly { key: string; dataType: PortDataType }[],
   settings: readonly Pick<WorkflowSetting, 'key' | 'type' | 'description'>[] = [],
   state: readonly StateHint[] = [],
+  snippets: readonly { name: string; description?: string }[] = [],
 ) {
   const hints = macroRegistry.flatMap((macro) => {
     if (macro.pattern) {
@@ -226,6 +241,12 @@ export function macroHints(
           expression: `{{${macro.name.replace('<path>', hint.path)}}}`,
           description: hint.description,
           type: hint.type,
+        }));
+      if (macro.source === 'snippets')
+        return snippets.map((snippet) => ({
+          expression: `{{${macro.name.replace('<name>', snippet.name)}}}`,
+          description: snippet.description || 'Snippet',
+          type: macro.dataType,
         }));
       if (macro.source !== 'inputs') return [];
       return inputs.map((input) => ({

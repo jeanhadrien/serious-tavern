@@ -57,7 +57,7 @@ function readEvents(response: Response) {
   return { events, comments, done, cancel: () => reader.cancel() };
 }
 // The snapshot every new connection starts with: one event per type.
-const SNAPSHOT_SIZE = 9;
+const SNAPSHOT_SIZE = 10;
 type PresetsChanged = Extract<ChangeEvent, { type: 'presets.changed' }>;
 const last = (events: ChangeEvent[]) =>
   events.filter((event): event is PresetsChanged => event.type === 'presets.changed').at(-1);
@@ -74,6 +74,7 @@ it('streams the current state on connect, then a change event per edit with the 
       'presets.changed',
       'providers.changed',
       'collections.changed',
+      'snippets.changed',
       'stateDefinitions.changed',
       'workflows.changed',
       'characters.changed',

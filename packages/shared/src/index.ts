@@ -15,6 +15,7 @@ export * from './preset.js';
 export * from './provider.js';
 export * from './provider-models.js';
 export * from './collection.js';
+export * from './snippet.js';
 export * from './state/index.js';
 export * from './links/index.js';
 export * from './hash.js';

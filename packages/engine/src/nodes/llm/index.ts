@@ -140,6 +140,7 @@ export const llm: NodeDefinition = {
         persona: ctx.persona,
         settings: ctx.settings,
         state: ctx.state,
+        snippets: ctx.snippets,
       },
     });
     const settings = toolSettingsSchema.parse(ctx.config);
