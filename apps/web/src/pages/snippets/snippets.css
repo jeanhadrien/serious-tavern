@@ -1,0 +1,67 @@
+/* Snippets live in L (a side column of about 180-450px), so everything stacks in one column. */
+.snippet-list {
+  height: 100%;
+  padding: 14px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.snippet-list > .toolbar h2 {
+  margin: 8px 0;
+}
+.snippet-list > .hint {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+}
+.snippet-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 7px 9px;
+}
+.snippet-row.selected {
+  background: #33394b;
+  border-color: #59617a;
+}
+.snippet-row > small,
+.snippet-row-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.snippet-editor {
+  height: 100%;
+  min-width: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.snippet-errors {
+  margin: 12px 14px 0;
+  padding-left: 20px;
+}
+.snippet-form {
+  padding: 14px;
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+.snippet-form input,
+.snippet-form textarea {
+  width: 100%;
+}
+/* The global label style capitalizes every word, which also hits the hints inside these labels. */
+.snippet-form label {
+  text-transform: none;
+}
+.snippet-text {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.85rem;
+}

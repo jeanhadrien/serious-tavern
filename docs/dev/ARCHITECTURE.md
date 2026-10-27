@@ -41,7 +41,7 @@ flowchart LR
 | `packages/node-ui` | Node configuration forms generated from each node's JSON Schema, and custom panels for the nodes that need more. Knows nothing of the web app's routing or API clients. |
 | `apps/server` | Fastify routes (thin) over services (logic): chat turns, story state, storage, secrets, imports, change events. Owns all data and secrets. |
 | `apps/mcp` | A stdio MCP server for external agents. A generic projection of the API contract: it turns the exposed endpoints into tools and calls the running server over HTTP, with no data and no per-endpoint code of its own. |
-| `apps/web` | The three-column UI: chat, workflow editor (React Flow), editors for presets, providers, state definitions, characters, personas and collections, and settings. |
+| `apps/web` | The three-column UI: chat, workflow editor (React Flow), editors for presets, snippets, providers, state definitions, characters, personas and collections, and settings. |
 
 The packages are consumed as TypeScript source (npm workspaces, ESM, strict). Nothing is compiled except the web
 bundle.

@@ -5,6 +5,7 @@
 export type ResourceId =
   | 'workflows'
   | 'presets'
+  | 'snippets'
   | 'providers'
   | 'stateDefinitions'
   | 'settings'
@@ -24,6 +25,7 @@ export type EditorKind = 'wide' | 'narrow';
 export const LIST_COLUMN: Record<ListId, 'L' | 'R'> = {
   workflows: 'L',
   presets: 'L',
+  snippets: 'L',
   providers: 'L',
   stateDefinitions: 'L',
   settings: 'L',
@@ -39,6 +41,7 @@ export const LISTLESS: readonly ResourceId[] = ['settings'];
 export const RESOURCE_IDS: readonly ResourceId[] = [
   'workflows',
   'presets',
+  'snippets',
   'providers',
   'stateDefinitions',
   'settings',
@@ -101,6 +104,7 @@ export type LayoutAction =
 const noResources = (): Record<ResourceId, boolean> => ({
   workflows: false,
   presets: false,
+  snippets: false,
   providers: false,
   stateDefinitions: false,
   settings: false,
@@ -113,6 +117,7 @@ const noResources = (): Record<ResourceId, boolean> => ({
 export const DESIGN_KINDS: Record<ResourceId, EditorKind> = {
   workflows: 'wide',
   presets: 'wide',
+  snippets: 'narrow',
   providers: 'narrow',
   stateDefinitions: 'narrow',
   settings: 'narrow',

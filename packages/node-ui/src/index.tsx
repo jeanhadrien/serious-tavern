@@ -47,7 +47,9 @@ function GenericPanel({
     descriptor.inputs.map((port) => ({ key: port.name, dataType: port.dataType })),
     context?.settings,
     context?.stateDefinitions && stateHints(context.stateDefinitions),
+    context?.snippets,
   );
+  const snippetNames = context?.snippets?.map((snippet) => snippet.name);
   const insert = (field: string, expression: string) => {
     const target = focused.current;
     if (target?.field === field && target.element.isConnected) {
@@ -69,7 +71,7 @@ function GenericPanel({
   const inputKeys = descriptor.inputs.map((port) => port.name);
   const hints = (key: string) => {
     if (!descriptor.templateFields?.includes(key)) return null;
-    const warnings = templateFieldWarnings(config[key] ?? fields[key]?.default, inputKeys);
+    const warnings = templateFieldWarnings(config[key] ?? fields[key]?.default, inputKeys, snippetNames);
     return (
       <>
         {warnings.length > 0 && (

@@ -5,6 +5,7 @@ import {
   presetSchema,
   type Preset,
   type PresetEntry,
+  type Snippet,
   type StateHint,
   type WorkflowSetting,
 } from '@st/shared';
@@ -20,6 +21,8 @@ export function PresetEntryEditor(props: {
   settings?: readonly WorkflowSetting[];
   /** Keys of the state definitions, hinted as `{{state.<definition>.<key>}}` (`stateHints`). */
   state?: readonly StateHint[];
+  /** The stored snippets, hinted as `{{snippets.<name>}}`. */
+  snippets?: readonly Pick<Snippet, 'name' | 'description'>[];
   onChange(entry: PresetEntry): void;
 }) {
   const contentRef = useRef<HTMLTextAreaElement | null>(null);
@@ -167,7 +170,7 @@ export function PresetEntryEditor(props: {
             )}
             <div className="template-hints">
               <small>Insert variable at cursor</small>
-              {macroHints(preset.inputs, props.settings, props.state).map((variable) => (
+              {macroHints(preset.inputs, props.settings, props.state, props.snippets).map((variable) => (
                 <button
                   type="button"
                   key={variable.expression}

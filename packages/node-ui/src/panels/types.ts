@@ -6,6 +6,7 @@ import type {
   Preset,
   ProviderModelList,
   ProviderView,
+  Snippet,
   StateDefinition,
   WorkflowSetting,
 } from '@st/shared';
@@ -26,6 +27,8 @@ export type NodePanelContext = {
   stateDefinitions?: readonly StateDefinition[];
   /** Chat settings the open workflow declares, hinted as `{{settings.<key>}}` in template fields. */
   settings?: readonly Pick<WorkflowSetting, 'key' | 'type' | 'description'>[];
+  /** Stored snippets, hinted as `{{snippets.<name>}}` in template fields; an unknown name is a warning. */
+  snippets?: readonly Pick<Snippet, 'name' | 'description'>[];
 };
 
 export type NodeConfigPanelProps = {

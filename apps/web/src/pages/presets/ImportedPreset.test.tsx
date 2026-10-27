@@ -44,6 +44,7 @@ const editorHtml = (readOnly: boolean, value: Preset = preset()) =>
       preset={value}
       dirty={false}
       readOnly={readOnly}
+      snippetNames={[]}
       onChange={() => {}}
       onSave={() => {}}
       onRevert={() => {}}

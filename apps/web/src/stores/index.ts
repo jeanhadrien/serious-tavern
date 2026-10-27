@@ -6,6 +6,7 @@ import {
   presetsApi,
   providersApi,
   sessionsApi,
+  snippetsApi,
   stateDefinitionsApi,
   workflowsApi,
 } from '../api.js';
@@ -17,6 +18,7 @@ import type {
   Persona,
   Preset,
   ProviderView,
+  Snippet,
   StateDefinition,
   Workflow,
 } from '@st/shared';
@@ -69,6 +71,13 @@ export const collectionsStore = createListStore({
   compare: byName,
 });
 
+// Snippets are small: the list holds whole records (the preset editor and node panels read their names).
+export const snippetsStore = createListStore({
+  event: 'snippets.changed',
+  load: () => snippetsApi.list(silent),
+  compare: byName,
+});
+
 // State definitions are small, so the list holds whole records (the editor and the node panels read them as is).
 export const stateDefinitionsStore = createListStore({
   event: 'stateDefinitions.changed',
@@ -92,6 +101,7 @@ export const presetEditorStore = createEditorStore<Preset>();
 export const characterEditorStore = createEditorStore<Character>();
 export const personaEditorStore = createEditorStore<Persona>();
 export const providerEditorStore = createEditorStore<ProviderView>();
+export const snippetEditorStore = createEditorStore<Snippet>();
 export const stateDefinitionEditorStore = createEditorStore<StateDefinition>();
 // The list opens summaries; the editor fetches the whole collection (a full one is used as is).
 export const collectionEditorStore = createEditorStore<CollectionSummary | Collection>();

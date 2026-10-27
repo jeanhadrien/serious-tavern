@@ -14,7 +14,7 @@ import { sessionsStore, useList } from '../../stores/index.js';
 import { PreviewMessage } from './PreviewMessage.js';
 import { previewToolNames } from './previewToolNames.js';
 
-export function PresetPreview(props: { preset: Preset }) {
+export function PresetPreview(props: { preset: Preset; snippetNames: readonly string[] }) {
   const sessions = useList(sessionsStore);
   const [sessionId, setSessionId] = useState('');
   const [samples, setSamples] = useState<Record<string, string>>({});
@@ -22,7 +22,7 @@ export function PresetPreview(props: { preset: Preset }) {
   const [serverWarnings, setServerWarnings] = useState<PresetWarning[]>([]);
   const [previewed, setPreviewed] = useState(false);
   const parsed = presetSchema.safeParse(props.preset);
-  const warnings = parsed.success ? presetWarnings(parsed.data) : [];
+  const warnings = parsed.success ? presetWarnings(parsed.data, { snippetNames: props.snippetNames }) : [];
   const toolNames = useMemo(() => previewToolNames(messages), [messages]);
 
   useEffect(() => {

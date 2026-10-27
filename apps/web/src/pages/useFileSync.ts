@@ -1,7 +1,7 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import { startFileLiveSync, type DiskChange, type FileLiveSyncEditor, type FileResource } from './fileLiveSync.js';
 
-/** What an editor of a file-backed resource (providers, collections, state definitions) tells the live sync. */
+/** What an editor of a file-backed resource (snippets, providers, collections, state definitions) tells the live sync. */
 export interface FileSyncEditor<Item extends { id: string; name: string }, Draft> {
   resource: FileResource;
   /** The open item and its draft. */

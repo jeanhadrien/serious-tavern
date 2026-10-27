@@ -3,9 +3,9 @@
 Node config forms generated from JSON Schema, custom panels (`src/panels/`) and template-variable hints.
 
 ## Boundaries
-- Panels get catalogs (presets, characters, providers, collections, state definitions as whole records, the open workflow's chat `settings`), `loadModels` and `renderLink` through a typed `context` prop. **node-ui never imports react-router or the web API clients**, and can't import from the web app.
-- **Template warnings** under a template field come only from shared's `templateWarnings` (through `templateFieldWarnings`, which also reads each row's value of a key/value list). They live in the panel only and are never validation issues; the node's input port names are the `inputKeys`. A custom panel that draws its own template field must call the same helper.
-- Template hints come from `macroHints`/`stateHints` in shared (`NodePanelContext.stateDefinitions`). Never hand-write a hint list.
+- Panels get catalogs (presets, characters, providers, collections, state definitions as whole records, snippets, the open workflow's chat `settings`), `loadModels` and `renderLink` through a typed `context` prop. **node-ui never imports react-router or the web API clients**, and can't import from the web app.
+- **Template warnings** under a template field come only from shared's `templateWarnings` (through `templateFieldWarnings`, which also reads each row's value of a key/value list). They live in the panel only and are never validation issues; the node's input port names are the `inputKeys`, and `context.snippets` (when given) the `snippetNames`. A custom panel that draws its own template field must call the same helper.
+- Template hints come from `macroHints`/`stateHints` in shared (`NodePanelContext.stateDefinitions`, `NodePanelContext.snippets`). Never hand-write a hint list.
 
 ## Generic form
 - A field's zod `.describe()` text is shown as a hint.

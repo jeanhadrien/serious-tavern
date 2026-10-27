@@ -8,6 +8,7 @@ import {
   collectionsStore,
   presetsStore,
   providersStore,
+  snippetsStore,
   stateDefinitionsStore,
   useEditorCommands,
   useEditorSaver,
@@ -41,6 +42,8 @@ export function useWorkflowEditor() {
   const collectionsList = useList(collectionsStore);
   // The State Read and State Write pickers and the `{{state.*}}` hints; the store follows `stateDefinitions.changed`.
   const stateDefinitionsList = useList(stateDefinitionsStore);
+  // The `{{snippets.*}}` hints and warnings of template fields; the store follows `snippets.changed`.
+  const snippetsList = useList(snippetsStore);
   const [workflow, setWorkflow] = useState<Workflow>();
   const [saved, setSaved] = useState('');
   const canvas = useWorkflowCanvas(types, presets, characters, stateDefinitionsList);
@@ -148,6 +151,7 @@ export function useWorkflowEditor() {
     providersList,
     collectionsList,
     stateDefinitionsList,
+    snippetsList,
     workflow,
     setWorkflow,
     canvas,

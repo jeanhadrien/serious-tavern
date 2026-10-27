@@ -9,6 +9,8 @@ import {
   presetsStore,
   providerEditorStore,
   providersStore,
+  snippetEditorStore,
+  snippetsStore,
   stateDefinitionEditorStore,
   stateDefinitionsStore,
   workflowEditorStore,
@@ -26,6 +28,7 @@ export const ITEM_SOURCES: Partial<Record<ResourceId, { list: ListStore<Item>; e
   {
     workflows: { list: workflowsStore, editor: workflowEditorStore },
     presets: { list: presetsStore, editor: presetEditorStore },
+    snippets: { list: snippetsStore, editor: snippetEditorStore },
     providers: { list: providersStore, editor: providerEditorStore },
     stateDefinitions: { list: stateDefinitionsStore, editor: stateDefinitionEditorStore },
     characters: { list: charactersStore, editor: characterEditorStore },

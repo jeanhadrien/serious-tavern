@@ -8,6 +8,7 @@ import {
   presetEditorStore,
   providerEditorStore,
   sessionsStore,
+  snippetEditorStore,
   stateDefinitionEditorStore,
   workflowEditorStore,
   type WorkflowFocus,
@@ -148,11 +149,13 @@ export function useLayoutUrl(layout: LayoutState, dispatch: Dispatch<LayoutActio
   const characterId = useOpenId(characterEditorStore);
   const personaId = useOpenId(personaEditorStore);
   const providerId = useOpenId(providerEditorStore);
+  const snippetId = useOpenId(snippetEditorStore);
   const stateDefinitionId = useOpenId(stateDefinitionEditorStore);
   const collectionId = useOpenId(collectionEditorStore);
   const openIds = {
     workflows: workflowId,
     presets: presetId,
+    snippets: snippetId,
     providers: providerId,
     stateDefinitions: stateDefinitionId,
     characters: characterId,

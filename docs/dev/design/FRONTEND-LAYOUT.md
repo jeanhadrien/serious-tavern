@@ -31,7 +31,7 @@ What was built, and where it refines the design below:
 
 | Column | Content | Notes |
 |---|---|---|
-| **L** | Technical lists: workflows, presets, providers, state definitions. Settings. | Providers, state definitions and settings are narrow editors shown in L (settings has no list). |
+| **L** | Technical lists: workflows, presets, snippets, providers, state definitions. Settings. | Snippets, providers, state definitions and settings are narrow editors shown in L (settings has no list). |
 | **M** | The chat, by default. | Wide editors take M over. |
 | **R** | Content lists: chats (session history), characters, personas, collections. | Browsing and editing only (see below). |
 
@@ -65,7 +65,7 @@ Below a width breakpoint the layout collapses to **L | M**:
 
 Below 700px the two-column layout is shown **one column at a time**:
 
-- A menu button in the header opens a drawer listing the chat, the open wide editor (if any) and every list, grouped as Content (chats, characters, personas, collections) and Setup (workflows, presets, providers, state definitions, settings). Dirty dots show on the items and on the menu button.
+- A menu button in the header opens a drawer listing the chat, the open wide editor (if any) and every list, grouped as Content (chats, characters, personas, collections) and Setup (workflows, presets, snippets, providers, state definitions, settings). Dirty dots show on the items and on the menu button.
 - Picking a list shows it full width. Opening an item follows it: a narrow editor replaces its list, a wide editor or a chat (from the chats list) takes the screen.
 - The header shows what is on screen. With a wide editor open it keeps the chat toggle and the close button.
 - Browser Back steps through the views the phone showed (the URL carries `view=` on phones).

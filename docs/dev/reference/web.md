@@ -30,7 +30,7 @@ interprets story state itself. Design references: `docs/dev/design/FRONTEND-LAYO
   only its `grid-area` or `hidden`, so streaming turns, drafts, scroll positions and the React Flow canvas survive.
   `useChat` lives in the shell and feeds the chat list (in R) and the conversation (`pages/Chat.tsx`). Prop-less views
   are module-level constants (`STATIC_VIEWS`, `DIRTY_SOURCES` in `layout/staticViews.tsx`).
-- **Editors by kind.** Wide (in M): workflows, presets. Narrow, in L with their list: providers, state definitions;
+- **Editors by kind.** Wide (in M): workflows, presets. Narrow, in L with their list: snippets, providers, state definitions;
   settings has no list. Narrow, in R with their list: characters, personas, collections. Opening a wide editor sends
   the chat to R and hides the narrow editor; closing it brings them back.
 - **Widths.** Columns are resized with `ResizeHandle` (drag, arrow keys; side minimum 180 px, M minimum 360 px),
@@ -75,7 +75,7 @@ and keeps the draft; a node that is gone toasts "This node is no longer in the w
   editor registers its save with `useEditorSaver`. `useUnsavedWarning` adds the browser's `beforeunload` warning.
 - **The header.** Every editor renders `EditorHeader`: back (narrow editors), title or name input, the unsaved marker,
   extra buttons, then Save, Revert, Duplicate, Delete. Characters, personas and presets keep their draft in `useDraft`
-  (draft plus saved snapshot); providers, collections, state definitions and workflows have drafts of their own shape.
+  (draft plus saved snapshot); snippets, providers, collections, state definitions and workflows have drafts of their own shape.
 - **Disk sync.** Editors of file-backed resources follow disk edits through `useFileSync` and the shared
   own-save-echo classifier (`classifyDraftChange`): a clean editor reloads; a dirty draft is never replaced (one
   warning; saving overwrites the file); a deleted item closes; each invalid file gets one persistent warning, cleared
@@ -92,6 +92,11 @@ and keeps the draft; a node that is gone toasts "This node is no longer in the w
   (`collectionDraft.ts`) and are checked on save (an unedited list is sent back as stored); unknown entry fields are
   sent back unchanged. Discard re-reads the collection first. A save answered `404` asks before recreating it (the file
   may exist but no longer parse). Rows are memoized so typing stays fast in lorebooks of hundreds of entries.
+- **Snippets** (`pages/snippets/`): a name, description and text form. "+ New" creates `snippet` (or the first free
+  `snippet2`...); a name already taken is refused by the server (`SNIPPET_NAME_TAKEN`, toasted). The text shows the
+  template warnings, unknown snippet names included. The preset editor and the node panels read the snippets store
+  for their `{{snippets.<name>}}` hints and unknown-snippet warnings (passed down as props: components rendered in SSR
+  tests never read a store).
 - **State definitions** (`pages/stateDefinitions/`): the draft holds every value as text and keeps the properties the
   form doesn't edit (`rest`); `definitionCompile.ts` is the only way to a request body and also produces the live
   problems. "+ New" creates `new_state` (or the first free `new_state2`...). A rename refused with

@@ -31,7 +31,12 @@ export function planInvalidFileAlerts(
 
 /** The resource being synced and how messages name it. */
 export interface FileResource {
-  event: 'presets.changed' | 'providers.changed' | 'collections.changed' | 'stateDefinitions.changed';
+  event:
+    | 'presets.changed'
+    | 'providers.changed'
+    | 'collections.changed'
+    | 'snippets.changed'
+    | 'stateDefinitions.changed';
   /** Lowercase singular noun, e.g. "preset". */
   noun: string;
   /**

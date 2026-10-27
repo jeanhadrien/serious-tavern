@@ -6,6 +6,7 @@ import type { ResourceId } from './state.js';
 const clean: Record<ResourceId, boolean> = {
   workflows: false,
   presets: false,
+  snippets: false,
   providers: false,
   stateDefinitions: false,
   settings: false,
@@ -29,6 +30,7 @@ it('lists the chat and every list, marking what is on screen', () => {
     'Collections',
     'Workflows',
     'Presets',
+    'Snippets',
     'Providers',
     'State definitions',
     'Settings',

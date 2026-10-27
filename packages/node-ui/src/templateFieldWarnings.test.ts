@@ -24,6 +24,11 @@ describe('templateFieldWarnings', () => {
     expect(templateFieldWarnings(rows, inputs)).toEqual(['Unknown macro: {{nope}}']);
   });
 
+  it('warns about unknown snippets only when the stored names are known', () => {
+    expect(templateFieldWarnings('{{snippets.tone}}', inputs)).toEqual([]);
+    expect(templateFieldWarnings('{{snippets.tone}}', inputs, ['style'])).toEqual(['Unknown snippet: tone']);
+  });
+
   it('leaves an array that is not key/value rows alone', () => {
     expect(templateFieldWarnings(['{{nope}}'], inputs)).toEqual([]);
   });

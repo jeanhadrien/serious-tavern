@@ -41,6 +41,7 @@ function WorkflowEditor() {
     providersList,
     collectionsList,
     stateDefinitionsList,
+    snippetsList,
     workflow,
     setWorkflow,
     canvas,
@@ -168,6 +169,7 @@ function WorkflowEditor() {
                 providersList={providersList}
                 collections={collectionsList}
                 stateDefinitions={stateDefinitionsList}
+                snippets={snippetsList}
                 settings={hinted}
                 updateConfig={canvas.updateConfig}
                 lastRun={lastRun}

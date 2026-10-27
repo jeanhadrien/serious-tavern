@@ -75,7 +75,14 @@ it('opens the providers editor in L in place of its list', () => {
   expect(slot(state, 'editor:providers')).toBe('L');
   expect(slot(state, 'list:providers')).toBeNull();
   expect(slot(state, 'list:chats')).toBe('R');
-  expect(columnIcons(state, 'L')).toEqual(['workflows', 'presets', 'providers', 'stateDefinitions', 'settings']);
+  expect(columnIcons(state, 'L')).toEqual([
+    'workflows',
+    'presets',
+    'snippets',
+    'providers',
+    'stateDefinitions',
+    'settings',
+  ]);
   // Another L tab hides the editor (keeping it open); coming back shows it again.
   const away = run(state, select('presets'));
   expect(slot(away, 'editor:providers')).toBeNull();
@@ -92,7 +99,14 @@ it('opens the state definitions editor in L in place of its list', () => {
   expect(slot(state, 'list:chats')).toBe('R');
   expect(slot(state, 'chat')).toBe('M');
   // The icon sits between Providers and Settings.
-  expect(columnIcons(state, 'L')).toEqual(['workflows', 'presets', 'providers', 'stateDefinitions', 'settings']);
+  expect(columnIcons(state, 'L')).toEqual([
+    'workflows',
+    'presets',
+    'snippets',
+    'providers',
+    'stateDefinitions',
+    'settings',
+  ]);
   // Another L tab hides the editor (keeping it open); coming back shows it again.
   const away = run(state, select('providers'));
   expect(slot(away, 'editor:stateDefinitions')).toBeNull();
@@ -106,7 +120,7 @@ it('opens the state definitions editor in L in place of its list', () => {
 it('shows the state definitions editor in compact mode in L and on a phone as its own view', () => {
   const compact = run(initialLayout(DESIGN_KINDS, true), select('stateDefinitions'), open('stateDefinitions'));
   expect(slot(compact, 'editor:stateDefinitions')).toBe('L');
-  expect(columnIcons(compact, 'L')).toHaveLength(9);
+  expect(columnIcons(compact, 'L')).toHaveLength(10);
   const onPhone = run(phone(), select('stateDefinitions'), open('stateDefinitions'));
   expect(mobileView(onPhone)).toBe('stateDefinitions');
   expect(shownViews(onPhone)).toEqual(['editor:stateDefinitions']);
@@ -168,7 +182,7 @@ it('ignores selecting the chat icon when the chat is in M', () => {
 
 it('collapses to L | M in compact mode', () => {
   const compact = initialLayout(DESIGN_KINDS, true);
-  expect(columnIcons(compact, 'L')).toHaveLength(9);
+  expect(columnIcons(compact, 'L')).toHaveLength(10);
   expect(columnIcons(compact, 'R')).toEqual([]);
   expect(slot(compact, 'chat')).toBe('M');
   expect(slot(compact, 'list:chats')).toBe('L');
@@ -268,6 +282,7 @@ it('supports any mix of editor kinds', () => {
   const interim = initialLayout({
     workflows: 'wide',
     presets: 'wide',
+    snippets: 'wide',
     providers: 'wide',
     stateDefinitions: 'wide',
     settings: 'wide',

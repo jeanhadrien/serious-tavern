@@ -21,6 +21,7 @@ export function WorkflowConfigPanel({
   collections,
   settings,
   stateDefinitions,
+  snippets,
   updateConfig,
   lastRun,
   onDelete,
@@ -36,6 +37,8 @@ export function WorkflowConfigPanel({
   settings?: readonly WorkflowSetting[];
   /** State definitions, for the State panels and `{{state.*}}` hints. */
   stateDefinitions?: NodePanelContext['stateDefinitions'];
+  /** Stored snippets, for `{{snippets.*}}` hints and warnings. */
+  snippets?: NodePanelContext['snippets'];
   updateConfig: (config: NodeInstance['config']) => void;
   /** The node in the open chat's last run of this workflow; absent while the chat has no run of it. */
   lastRun?: { io: LastRunIO | undefined; stale: boolean; nameOf: (nodeId: string) => string | undefined };
@@ -73,6 +76,7 @@ export function WorkflowConfigPanel({
             loadModels,
             settings,
             stateDefinitions,
+            snippets,
             renderLink: (to, label) => <PanelLink to={to} label={label} />,
           }}
         />

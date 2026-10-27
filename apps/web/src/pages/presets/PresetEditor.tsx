@@ -11,7 +11,12 @@ const newInput = (inputs: PresetInput[]): PresetInput => {
   return { id: newId(), key, dataType: 'text' };
 };
 
-function PresetInputs(props: { preset: Preset; readOnly: boolean; onChange(preset: Preset): void }) {
+function PresetInputs(props: {
+  preset: Preset;
+  readOnly: boolean;
+  snippetNames: readonly string[];
+  onChange(preset: Preset): void;
+}) {
   const lastValidKeys = useRef(new Map(props.preset.inputs.map((input) => [input.id, input.key])));
   const parsed = presetSchema.safeParse(props.preset);
   const issues = parsed.success ? [] : parsed.error.issues;
@@ -50,7 +55,7 @@ function PresetInputs(props: { preset: Preset; readOnly: boolean; onChange(prese
         (entry.kind === 'slot' && entry.inputKey === input.key) ||
         (entry.kind === 'message' && entryUsesInput(entry, input.key)),
     );
-  const warnings = parsed.success ? presetWarnings(parsed.data) : [];
+  const warnings = parsed.success ? presetWarnings(parsed.data, { snippetNames: props.snippetNames }) : [];
   return (
     <section className="preset-inputs">
       <div className="toolbar">
@@ -137,6 +142,8 @@ export function PresetEditor(props: {
   onDuplicate(): void;
   selectedEntryId: string;
   onSelectEntry(id: string): void;
+  /** The stored snippets' names: a `{{snippets.<name>}}` for another name is a warning. */
+  snippetNames: readonly string[];
 }) {
   return (
     <section className="preset-editor-column">
@@ -162,7 +169,12 @@ export function PresetEditor(props: {
           onChange={(event) => props.onChange({ ...props.preset, description: event.target.value || undefined })}
         />
       </label>
-      <PresetInputs preset={props.preset} readOnly={props.readOnly} onChange={props.onChange} />
+      <PresetInputs
+        preset={props.preset}
+        readOnly={props.readOnly}
+        snippetNames={props.snippetNames}
+        onChange={props.onChange}
+      />
       <EntryList
         preset={props.preset}
         readOnly={props.readOnly}

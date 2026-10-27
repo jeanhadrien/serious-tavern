@@ -3,8 +3,8 @@
 // plain chat layout is just `/`. Column widths, dirty flags and drafts never go through the URL.
 //
 //   session=<id>              the open chat
-//   left=workflows|presets|providers|stateDefinitions|settings
-//   left=provider:<id>|stateDefinition:<id>   a narrow editor open in L
+//   left=workflows|presets|snippets|providers|stateDefinitions|settings
+//   left=snippet:<id>|provider:<id>|stateDefinition:<id>   a narrow editor open in L
 //   wide=workflow|preset[:<id>]   the wide editor in M (the chat then moves to R)
 //   right=chats|characters|personas|collections|chat   what R shows ('chat' only counts with a wide editor)
 //   right=character:<id>|persona:<id>|collection:<id>  a narrow editor open in R
@@ -33,10 +33,11 @@ export interface LayoutUrl extends Omit<LayoutTarget, 'leftEditorOpen' | 'rightE
   node?: string;
 }
 
-const LEFT_TABS: readonly ListId[] = ['workflows', 'presets', 'providers', 'stateDefinitions', 'settings'];
+const LEFT_TABS: readonly ListId[] = ['workflows', 'presets', 'snippets', 'providers', 'stateDefinitions', 'settings'];
 const RIGHT_TABS: readonly (ListId | 'chat')[] = ['chats', 'characters', 'personas', 'collections', 'chat'];
 const WIDE_NAMES: Partial<Record<ResourceId, string>> = { workflows: 'workflow', presets: 'preset' };
 const NARROW_NAMES: Partial<Record<ResourceId, string>> = {
+  snippets: 'snippet',
   providers: 'provider',
   stateDefinitions: 'stateDefinition',
   characters: 'character',

@@ -8,6 +8,8 @@ import { Collections } from '../pages/collections/Collections.js';
 import { PresetListView } from '../pages/presets/PresetListView.js';
 import { ProviderListView } from '../pages/providers/ProviderListView.js';
 import { Providers } from '../pages/providers/Providers.js';
+import { SnippetListView } from '../pages/snippets/SnippetListView.js';
+import { Snippets } from '../pages/snippets/Snippets.js';
 import { StateDefinitionListView } from '../pages/stateDefinitions/StateDefinitionListView.js';
 import { StateDefinitions } from '../pages/stateDefinitions/StateDefinitions.js';
 import { WorkflowList } from '../pages/workflows/WorkflowList.js';
@@ -17,6 +19,7 @@ import {
   personaEditorStore,
   presetEditorStore,
   providerEditorStore,
+  snippetEditorStore,
   stateDefinitionEditorStore,
   workflowEditorStore,
 } from '../stores/index.js';
@@ -27,6 +30,7 @@ import type { ViewKey } from './derive.js';
 export const STATIC_VIEWS = {
   'list:workflows': <WorkflowList />,
   'list:presets': <PresetListView />,
+  'list:snippets': <SnippetListView />,
   'list:providers': <ProviderListView />,
   'list:stateDefinitions': <StateDefinitionListView />,
   'list:characters': <CharacterList />,
@@ -34,6 +38,7 @@ export const STATIC_VIEWS = {
   'list:collections': <CollectionListView />,
   'editor:workflows': <Workflows />,
   'editor:presets': <Presets />,
+  'editor:snippets': <Snippets />,
   'editor:providers': <Providers />,
   'editor:stateDefinitions': <StateDefinitions />,
   'editor:settings': <Settings />,
@@ -46,6 +51,7 @@ export const STATIC_VIEWS = {
 export const DIRTY_SOURCES = {
   workflows: workflowEditorStore,
   presets: presetEditorStore,
+  snippets: snippetEditorStore,
   providers: providerEditorStore,
   stateDefinitions: stateDefinitionEditorStore,
   characters: characterEditorStore,

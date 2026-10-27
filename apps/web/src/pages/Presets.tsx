@@ -4,6 +4,7 @@ import { presetsApi } from '../api.js';
 import {
   presetEditorStore,
   presetsStore,
+  snippetsStore,
   stateDefinitionsStore,
   useEditorCommands,
   useEditorSaver,
@@ -38,6 +39,9 @@ export function Presets() {
   // Story state keys come from the definitions, never from a hand-written list.
   const definitions = useList(stateDefinitionsStore);
   const state = useMemo(() => stateHints(definitions), [definitions]);
+  // Snippets are hinted as `{{snippets.<name>}}`, and an unknown name is a warning.
+  const snippets = useList(snippetsStore);
+  const snippetNames = useMemo(() => snippets.map((snippet) => snippet.name), [snippets]);
 
   const openPreset = (preset: Preset, entryId: string) => {
     load(preset);
@@ -115,6 +119,7 @@ export function Presets() {
             onDuplicate={() => void duplicatePreset(draft)}
             selectedEntryId={selectedEntryId}
             onSelectEntry={setSelectedEntryId}
+            snippetNames={snippetNames}
           />
           <Splitter
             className="preset-list-splitter"
@@ -132,13 +137,14 @@ export function Presets() {
               readOnly={readOnly}
               settings={settings}
               state={state}
+              snippets={snippets}
               onChange={(next) =>
                 change({ ...draft, entries: draft.entries.map((item) => (item.id === next.id ? next : item)) })
               }
             />
           </div>
           <div className="preset-preview-column">
-            <PresetPreview preset={draft} />
+            <PresetPreview preset={draft} snippetNames={snippetNames} />
           </div>
         </>
       ) : (
